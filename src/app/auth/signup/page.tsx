@@ -8,6 +8,7 @@ import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
 export default function SignUpPage() {
   const [name, setName] = useState("");
@@ -53,9 +54,18 @@ export default function SignUpPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md mx-auto"
       >
-        <div className="mb-10">
-          <h1 className="font-bodoni text-4xl mb-2 text-black">AUREUS</h1>
-          <p className="text-gray-500 font-hanken">Create your obsidian account</p>
+        <div className="mb-10 flex flex-col items-center text-center">
+          <div className="relative w-20 h-20 mb-4">
+            <Image
+              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+              alt="E-Tech Logo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+          <h1 className="font-hanken font-bold text-2xl tracking-tight text-black">E-TECH GLOBAL HUB</h1>
+          <p className="text-gray-500 font-hanken mt-1">Create your secure hub account</p>
         </div>
 
         <form onSubmit={handleSignUp} className="space-y-6">

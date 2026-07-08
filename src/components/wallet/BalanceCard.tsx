@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 
 interface BalanceCardProps {
   balance: number;
@@ -43,9 +44,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency }) =
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[14px]">verified_user</span>
+                <div className="relative w-6 h-6">
+                  <Image
+                    src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+                    alt="E-Tech Logo"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
                 <span className="font-label-sm text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/70 font-bold">
-                  Obsidian Priority
+                  E-TECH GLOBAL HUB
                 </span>
               </div>
               <p className="font-label-sm text-[12px] text-on-surface-variant/60">Available Balance</p>

@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function PinSetupPage() {
   const [pin, setPin] = useState("");
@@ -65,10 +66,18 @@ export default function PinSetupPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-8 items-center justify-between">
-      <div className="w-full text-center mt-10">
-        <h1 className="font-bodoni text-3xl mb-4 text-black">AUREUS</h1>
+      <div className="w-full flex flex-col items-center text-center mt-10">
+        <div className="relative w-16 h-16 mb-4">
+          <Image
+            src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+            alt="E-Tech Logo"
+            fill
+            className="object-contain"
+          />
+        </div>
+        <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
         <p className="text-gray-500 font-hanken tracking-widest uppercase text-xs">
-          {step === 1 ? "Set your 4-digit Access PIN" : "Confirm your Access PIN"}
+          {step === 1 ? "Set 4-digit Access PIN" : "Confirm Access PIN"}
         </p>
       </div>
 

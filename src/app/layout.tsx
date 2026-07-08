@@ -18,8 +18,11 @@ const hankenGrotesk = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "AUREUS | Obsidian Wealth",
-  description: "Elite financial services for the modern captain.",
+  title: "E-Tech Global Hub | Secure Digital Wallet",
+  description: "Next-generation financial technology and secure digital banking.",
+  icons: {
+    icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+  },
 };
 
 export default function RootLayout({
