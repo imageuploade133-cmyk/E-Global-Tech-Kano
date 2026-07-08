@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 export const Promotions: React.FC = () => {
   return (
@@ -16,11 +16,13 @@ export const Promotions: React.FC = () => {
       </div>
 
       <div className="glass-card rounded-xl overflow-hidden flex items-stretch">
-        <div className="w-1/3 bg-primary/10 flex items-center justify-center p-4">
-          <img
-            className="w-full h-full object-contain"
+        <div className="w-1/3 bg-primary/10 flex items-center justify-center p-4 relative min-h-[120px]">
+          <Image
+            className="object-contain p-2"
             alt="Promotion"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNmoQdHf_LOnaESXDKs_lPVyHSr4cGL5iwDTF0q3EOJYY9ItnlfnVB4xBRjqjAMq8OQOLtoRcsGnjPhGVGZSVgZZkKpkqYKai9oRq7L3osqKkYw8eYL3xom-MS9incdrS5PoJ3Fmdiyzfs4HCi9m3kVKMxD-VR9otIje3YP7rOjktpTQFKizNrlj0Q8Oy_uWdtULcK0xXFGju12ywxb8osmIe7PGkpZYf-lCcCJq_HoF-xMORcBpRRYs1l6DUVD47HevFJwdf39Lk"
+            fill
+            sizes="(max-width: 768px) 33vw, 200px"
           />
         </div>
         <div className="w-2/3 p-4 flex flex-col justify-between">

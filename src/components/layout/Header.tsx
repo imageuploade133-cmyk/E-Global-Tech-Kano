@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { cn } from "@/lib/utils";
+import Image from "next/image";
 import { NotificationTray, Notification } from "./NotificationTray";
 
 interface HeaderProps {
@@ -44,11 +44,13 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
     <>
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile py-4 bg-surface-dim/80 backdrop-blur-xl shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform">
-            <img
-              className="w-full h-full object-cover"
+          <div className="w-10 h-10 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative">
+            <Image
+              className="object-cover"
               alt="Profile"
               src={profileImage}
+              fill
+              sizes="40px"
             />
           </div>
           <div>
