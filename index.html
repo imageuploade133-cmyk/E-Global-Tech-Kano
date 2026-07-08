@@ -1,0 +1,335 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>AUREUS | Obsidian Wealth</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400..900;1,400..900&amp;family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#191f31",
+                        "surface-variant": "#2e3447",
+                        "on-tertiary-container": "#3d455a",
+                        "on-surface-variant": "#d0c5af",
+                        "surface-dim": "#0c1324",
+                        "error-container": "#93000a",
+                        "surface-bright": "#33394c",
+                        "on-primary": "#3c2f00",
+                        "on-background": "#dce1fb",
+                        "secondary-fixed-dim": "#95d3ba",
+                        "surface-container-high": "#23293c",
+                        "on-surface": "#dce1fb",
+                        "surface-container-lowest": "#070d1f",
+                        "primary": "#f2ca50",
+                        "secondary": "#95d3ba",
+                        "secondary-container": "#0b513d",
+                        "on-secondary-fixed": "#002117",
+                        "primary-fixed-dim": "#e9c349",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#0c1324",
+                        "on-primary-fixed-variant": "#574500",
+                        "inverse-on-surface": "#2a3043",
+                        "surface-container-low": "#151b2d",
+                        "tertiary": "#c6cee8",
+                        "on-error": "#690005",
+                        "surface-tint": "#e9c349",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "outline": "#99907c",
+                        "inverse-surface": "#dce1fb",
+                        "on-tertiary-fixed": "#131b2e",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        "background": "#0c1324",
+                        "surface-container-highest": "#2e3447",
+                        "inverse-primary": "#735c00",
+                        "on-primary-container": "#554300",
+                        "on-tertiary": "#283044",
+                        "on-primary-fixed": "#241a00",
+                        "primary-container": "#d4af37",
+                        "outline-variant": "#4d4635",
+                        "tertiary-container": "#abb2cc",
+                        "on-secondary-container": "#83c2a9",
+                        "error": "#ffb4ab",
+                        "secondary-fixed": "#b0f0d6",
+                        "on-secondary": "#003829",
+                        "primary-fixed": "#ffe088",
+                        "on-secondary-fixed-variant": "#0b513d",
+                        "tertiary-fixed": "#dae2fd"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "stack-xl": "64px",
+                        "container-max": "1280px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "gutter": "24px",
+                        "margin-mobile": "20px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Bodoni Moda"],
+                        "headline-lg-mobile": ["Bodoni Moda"],
+                        "label-sm": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "display-lg": ["Bodoni Moda"],
+                        "headline-lg": ["Bodoni Moda"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "data-display": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "500"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "data-display": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #070d1f;
+            color: #dce1fb;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .gold-shimmer {
+            background: linear-gradient(90deg, transparent, rgba(242, 202, 80, 0.1), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite linear;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .emerald-glow {
+            box-shadow: 0 0 15px rgba(6, 78, 59, 0.4);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="flex flex-col min-h-screen custom-scrollbar">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile py-4 bg-surface-dim/80 backdrop-blur-xl shadow-sm">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform">
+<img class="w-full h-full object-cover" data-alt="A professional and sophisticated portrait of a high-net-worth individual with a confident gaze, set against a dark, moody studio background with subtle golden rim lighting. The style is editorial and cinematic, reflecting ultra-luxury branding and premium financial services." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M">
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-tighter font-bold">Welcome back</p>
+<h1 class="font-headline-md text-headline-md tracking-widest text-primary font-bold">Hi, CAPTAIN</h1>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary hover:opacity-80 transition-opacity">notifications_active</button>
+</div>
+</header>
+<main class="mt-24 px-margin-mobile flex-grow pb-32">
+<!-- Featured Balance Card -->
+<section class="relative mb-stack-lg overflow-hidden rounded-xl bg-surface-container-high p-6 border border-white/5">
+<div class="absolute inset-0 gold-shimmer pointer-events-none"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">verified_user</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">Available Balance</span>
+<span class="material-symbols-outlined text-on-surface-variant/60 text-base">visibility</span>
+</div>
+<a class="flex items-center gap-1 font-label-sm text-label-sm text-primary hover:underline" href="#">
+                        Transaction History
+                        <span class="material-symbols-outlined text-sm">chevron_right</span>
+</a>
+</div>
+<h2 class="font-display-lg text-display-lg text-primary mb-6 font-bold">#85,872.45</h2>
+<div class="flex gap-3">
+  <button class="flex-grow py-4 bg-secondary-container emerald-glow rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 group">
+    <span class="material-symbols-outlined text-secondary group-hover:rotate-90 transition-transform">add</span>
+    <span class="font-label-sm text-label-sm text-secondary tracking-widest uppercase font-bold">Add Money</span>
+  </button>
+  <button class="flex-grow py-4 bg-surface-variant border border-primary/30 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 group">
+    <span class="material-symbols-outlined text-primary">send</span>
+    <span class="font-label-sm text-label-sm text-primary tracking-widest uppercase font-bold">Transfer</span>
+  </button>
+</div>
+</div>
+</section>
+<!-- Service Grid -->
+<section class="grid grid-cols-4 gap-4 mb-stack-lg">
+<!-- Row 1: Primary Actions -->
+<div class="col-span-4 grid grid-cols-3 gap-3 mb-2">
+<div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-dim transition-colors">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">To Opay</span>
+</div>
+<div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-dim transition-colors">
+<span class="material-symbols-outlined">account_balance</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">To Bank</span>
+</div>
+<div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-dim transition-colors">
+<span class="material-symbols-outlined">outbox</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">Withdraw</span>
+</div>
+</div>
+<!-- Row 2 & 3: Services -->
+<div class="col-span-4 grid grid-cols-4 gap-2">
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-secondary text-xl">cell_tower</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">Airtime</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-secondary text-xl">swap_vert</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">Data</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-secondary text-xl">sports_basketball</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">Betting</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-secondary text-xl">tv</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">TV</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: &quot;FILL&quot; 1;">diamond</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">Wealth</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-primary text-xl">real_estate_agent</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">Loan</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-primary text-xl">volunteer_activism</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">Impact</span>
+</button>
+<button class="flex flex-col items-center gap-2 py-3 active:opacity-60 transition-opacity">
+<div class="p-3 bg-surface-container rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-primary text-xl">apps</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/80">More</span>
+</button>
+</div>
+</section>
+<!-- Promotions -->
+<section class="space-y-4 mb-stack-xl">
+<div class="flex justify-between items-end">
+<h3 class="font-headline-md text-headline-md text-on-surface font-bold">Privileges</h3>
+<a class="font-label-sm text-label-sm text-primary" href="#">View All</a>
+</div>
+<div class="glass-card rounded-xl overflow-hidden flex items-stretch">
+<div class="w-1/3 bg-primary/10 flex items-center justify-center p-4">
+<img class="w-full h-full object-contain" data-alt="An elegant golden gift box with a silk ribbon, floating in a dark space filled with sparkling dust particles and soft atmospheric lighting. The image captures a sense of exclusive reward and premium gifting, styled with deep navy and gold tones consistent with luxury fintech." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNmoQdHf_LOnaESXDKs_lPVyHSr4cGL5iwDTF0q3EOJYY9ItnlfnVB4xBRjqjAMq8OQOLtoRcsGnjPhGVGZSVgZZkKpkqYKai9oRq7L3osqKkYw8eYL3xom-MS9incdrS5PoJ3Fmdiyzfs4HCi9m3kVKMxD-VR9otIje3YP7rOjktpTQFKizNrlj0Q8Oy_uWdtULcK0xXFGju12ywxb8osmIe7PGkpZYf-lCcCJq_HoF-xMORcBpRRYs1l6DUVD47HevFJwdf39Lk">
+</div>
+<div class="w-2/3 p-4 flex flex-col justify-between">
+<div>
+<h4 class="font-headline-md text-[18px] text-primary mb-1">Get Your Vouchers</h4>
+<p class="font-body-md text-label-sm text-on-surface-variant/70">Exclusive access to premium partner rewards and dining credits.</p>
+</div>
+<div class="flex justify-between items-center mt-4">
+<span class="font-label-sm text-[10px] text-on-surface-variant/50 font-bold">Exp: Mar 24, 2024</span>
+<button class="bg-primary text-surface-dim font-label-sm text-label-sm px-4 py-1.5 rounded-full hover:bg-primary-fixed-dim transition-colors">Redeem</button>
+</div>
+</div>
+</div>
+<div class="glass-card rounded-xl p-5 border-l-4 border-secondary">
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary">campaign</span>
+</div>
+<div>
+<h4 class="font-headline-md text-[18px] text-secondary mb-1">Cash up for grabs!</h4>
+<p class="font-body-md text-label-sm text-on-surface-variant/70 mb-3">Invite fellow captains to the fleet and earn #3,000 for each successful boarding.</p>
+<button class="text-secondary font-label-sm text-label-sm flex items-center gap-1 hover:gap-2 transition-all">
+                            Refer Friends Now
+                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-surface-container-highest/90 dark:bg-surface-container-highest/90 backdrop-blur-2xl border-t border-white/10 shadow-[0_-4px_20px_rgba(212,175,55,0.1)] rounded-t-full">
+<!-- Wealth - ACTIVE -->
+<a class="flex flex-col items-center justify-center text-primary font-bold active:scale-95 transition-all duration-300" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">account_balance_wallet</span>
+<span class="font-label-sm text-label-sm">Wealth</span>
+</a>
+<!-- Markets -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80 transition-colors active:scale-95 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-label-sm text-label-sm">Markets</span>
+</a>
+<!-- Concierge -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80 transition-colors active:scale-95 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">support_agent</span>
+<span class="font-label-sm text-label-sm">Concierge</span>
+</a>
+<!-- Vault -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant/60 hover:text-primary/80 transition-colors active:scale-95 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">lock</span>
+<span class="font-label-sm text-label-sm">Vault</span>
+</a>
+</nav>
+<script>
+        // Micro-interactions and subtle glow effects
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.glass-card');
+
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    card.style.setProperty('--mouse-x', `${x}px`);
+                    card.style.setProperty('--mouse-y', `${y}px`);
+                });
+            });
+        });
+    </script>
+
+
+</body></html>
