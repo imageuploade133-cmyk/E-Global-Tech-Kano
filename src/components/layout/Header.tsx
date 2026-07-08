@@ -65,12 +65,20 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
               sizes="40px"
             />
           </div>
+          <div className="relative w-8 h-8 mr-1">
+            <Image
+              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+              alt="E-Tech Logo"
+              fill
+              className="object-contain"
+            />
+          </div>
           <div>
-            <p className="font-label-sm text-[12px] text-on-surface-variant uppercase tracking-tighter font-bold">
+            <p className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-tighter font-bold leading-none">
               Welcome back
             </p>
-            <h1 className="font-headline-md text-[24px] tracking-widest text-primary font-bold">
-              Hi, {userName}
+            <h1 className="font-hanken text-[18px] tracking-tight text-primary font-bold">
+              {userName}
             </h1>
           </div>
         </div>
