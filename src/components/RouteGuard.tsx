@@ -20,11 +20,13 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       }
     } else {
       // User is logged in
-      if (!userData?.pin && pathname !== "/auth/pin-setup") {
+      const hasPin = Boolean(userData?.pin);
+
+      if (!hasPin && pathname !== "/auth/pin-setup") {
         router.push("/auth/pin-setup");
-      } else if (userData?.pin && !isPinVerified && pathname !== "/auth/pin") {
+      } else if (hasPin && !isPinVerified && pathname !== "/auth/pin") {
         router.push("/auth/pin");
-      } else if (isPinVerified && isAuthRoute) {
+      } else if (hasPin && isPinVerified && isAuthRoute) {
         router.push("/");
       }
     }
