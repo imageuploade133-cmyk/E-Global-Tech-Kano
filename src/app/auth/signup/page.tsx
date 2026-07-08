@@ -40,6 +40,7 @@ export default function SignUpPage() {
       toast.success("Account created successfully!");
       router.push("/auth/pin-setup");
     } catch (error: unknown) {
+      console.error("Signup Error:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to create account";
       toast.error(errorMessage);
     } finally {
