@@ -15,78 +15,122 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency }) =
   const formattedBalance = new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency: currency,
+    minimumFractionDigits: 2,
   }).format(balance);
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="relative mb-stack-lg overflow-hidden rounded-xl bg-surface-container-high p-6 border border-white/5"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="mb-stack-lg"
     >
-      <div className="absolute inset-0 gold-shimmer pointer-events-none"></div>
-      <div className="relative z-10">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-sm">
-              verified_user
-            </span>
-            <span className="font-label-sm text-label-sm text-on-surface-variant/80">
-              Available Balance
-            </span>
-            <button
-              onClick={() => setIsVisible(!isVisible)}
-              className="text-on-surface-variant/60 hover:text-on-surface-variant transition-colors flex items-center"
-            >
-              <span className="material-symbols-outlined text-base">
-                {isVisible ? "visibility" : "visibility_off"}
-              </span>
-            </button>
+      {/* Physical Card Design */}
+      <div className="relative aspect-[1.586/1] w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 group">
+        {/* Card Background - Premium Obsidian Mesh */}
+        <div className="absolute inset-0 bg-[#0c1324]">
+            <div className="absolute inset-0 opacity-40"
+                 style={{
+                    backgroundImage: `radial-gradient(circle at 20% 30%, #f2ca50 0%, transparent 40%),
+                                     radial-gradient(circle at 80% 70%, #95d3ba 0%, transparent 40%)`
+                 }}
+            />
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+            <div className="absolute inset-0 gold-shimmer opacity-20"></div>
+        </div>
+
+        <div className="relative h-full p-6 flex flex-col justify-between z-10">
+          {/* Top Row: Label and Chip */}
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[14px]">verified_user</span>
+                <span className="font-label-sm text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/70 font-bold">
+                  Obsidian Priority
+                </span>
+              </div>
+              <p className="font-label-sm text-[12px] text-on-surface-variant/60">Available Balance</p>
+            </div>
+            {/* SIM Chip Icon */}
+            <div className="w-10 h-8 rounded-md bg-gradient-to-br from-primary/80 to-primary-container border border-primary/20 flex flex-col justify-around p-1.5 overflow-hidden">
+                <div className="w-full h-[1px] bg-black/20"></div>
+                <div className="w-full h-[1px] bg-black/20"></div>
+                <div className="w-full h-[1px] bg-black/20"></div>
+            </div>
           </div>
-          <a
-            className="flex items-center gap-1 font-label-sm text-label-sm text-primary hover:underline"
-            href="#"
-          >
-            Transaction History
-            <span className="material-symbols-outlined text-sm">
-              chevron_right
-            </span>
-          </a>
+
+          {/* Middle: Balance */}
+          <div className="space-y-2">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={isVisible ? "visible" : "hidden"}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex items-baseline gap-3"
+              >
+                <h2 className="font-display-lg text-[32px] md:text-[40px] text-primary font-bold tracking-tight">
+                  {isVisible ? formattedBalance : "₦ •••,•••.••"}
+                </h2>
+                <button
+                  onClick={() => setIsVisible(!isVisible)}
+                  className="text-primary/40 hover:text-primary transition-colors p-1"
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {isVisible ? "visibility" : "visibility_off"}
+                  </span>
+                </button>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Card Number Mockup */}
+            <div className="flex gap-4 font-mono text-[14px] text-on-surface-variant/40 tracking-[0.2em]">
+                <span>4582</span>
+                <span>••••</span>
+                <span>••••</span>
+                <span>8921</span>
+            </div>
+          </div>
+
+          {/* Bottom: User Name and Type */}
+          <div className="flex justify-between items-end">
+            <div>
+                <p className="font-label-sm text-[10px] uppercase tracking-wider text-on-surface-variant/40 mb-1">Card Holder</p>
+                <p className="font-label-sm text-[14px] text-on-surface uppercase tracking-widest font-bold">THE CAPTAIN</p>
+            </div>
+            <div className="flex flex-col items-end">
+                 <span className="material-symbols-outlined text-primary text-[28px] opacity-80" style={{ fontVariationSettings: '"FILL" 1' }}>diamond</span>
+                 <p className="font-label-sm text-[10px] text-primary/60 font-bold uppercase tracking-tighter">Infinite</p>
+            </div>
+          </div>
         </div>
-        <AnimatePresence mode="wait">
-          <motion.h2
-            key={isVisible ? "visible" : "hidden"}
-            initial={{ opacity: 0, filter: "blur(4px)" }}
-            animate={{ opacity: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, filter: "blur(4px)" }}
-            transition={{ duration: 0.2 }}
-            className="font-display-lg text-[40px] leading-tight text-primary mb-6 font-bold"
-          >
-            {isVisible ? formattedBalance : "₦ •••,•••.••"}
-          </motion.h2>
-        </AnimatePresence>
-        <div className="flex gap-3">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            className="flex-grow py-4 bg-secondary-container emerald-glow rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all group"
-          >
-            <span className="material-symbols-outlined text-secondary group-hover:rotate-90 transition-transform">
-              add
-            </span>
-            <span className="font-label-sm text-label-sm text-secondary tracking-widest uppercase font-bold">
-              Add Money
-            </span>
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            className="flex-grow py-4 bg-surface-variant border border-primary/30 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all group"
-          >
-            <span className="material-symbols-outlined text-primary">send</span>
-            <span className="font-label-sm text-label-sm text-primary tracking-widest uppercase font-bold">
-              Transfer
-            </span>
-          </motion.button>
-        </div>
+      </div>
+
+      {/* Action Buttons Below Card */}
+      <div className="mt-6 flex gap-3">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          className="flex-grow py-4 bg-secondary-container/30 border border-secondary/20 backdrop-blur-md rounded-2xl flex items-center justify-center gap-2 hover:bg-secondary-container/40 transition-all group"
+        >
+          <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-secondary text-[18px]">add</span>
+          </div>
+          <span className="font-label-sm text-[12px] text-secondary tracking-widest uppercase font-bold">
+            Add Money
+          </span>
+        </motion.button>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          className="flex-grow py-4 bg-surface-variant/30 border border-primary/20 backdrop-blur-md rounded-2xl flex items-center justify-center gap-2 hover:bg-surface-variant/40 transition-all group"
+        >
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-primary text-[18px]">send</span>
+          </div>
+          <span className="font-label-sm text-[12px] text-primary tracking-widest uppercase font-bold">
+            Transfer
+          </span>
+        </motion.button>
       </div>
     </motion.section>
   );

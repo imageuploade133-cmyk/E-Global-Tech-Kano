@@ -13,3 +13,12 @@ export interface WalletState {
   userName: string;
   profileImage: string;
 }
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  type: "transaction" | "security" | "promo";
+  read: boolean;
+}
