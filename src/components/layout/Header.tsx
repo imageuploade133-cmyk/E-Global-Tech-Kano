@@ -3,6 +3,9 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { NotificationTray, Notification } from "./NotificationTray";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
+import { toast } from "sonner";
 
 interface HeaderProps {
   userName: string;
@@ -40,6 +43,15 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const unreadCount = MOCK_NOTIFICATIONS.filter(n => !n.read).length;
 
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Logged out successfully");
+    } catch {
+      toast.error("Failed to logout");
+    }
+  };
+
   return (
     <>
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile py-4 bg-surface-dim/80 backdrop-blur-xl shadow-sm">
@@ -63,6 +75,12 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <button
+            onClick={handleSignOut}
+            className="text-primary hover:opacity-80 transition-opacity p-2"
+          >
+            <span className="material-symbols-outlined text-[24px]">logout</span>
+          </button>
           <button
             onClick={() => setIsNotificationsOpen(true)}
             className="relative text-primary hover:opacity-80 transition-opacity p-2"

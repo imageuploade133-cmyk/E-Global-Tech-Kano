@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Bodoni_Moda, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/AuthContext";
+import { Toaster } from "sonner";
+import { RouteGuard } from "@/components/RouteGuard";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -36,7 +39,12 @@ export default function RootLayout({
       <body
         className={`${bodoniModa.variable} ${hankenGrotesk.variable} antialiased custom-scrollbar flex flex-col min-h-screen`}
       >
-        {children}
+        <AuthProvider>
+          <RouteGuard>
+            {children}
+          </RouteGuard>
+          <Toaster position="top-center" richColors />
+        </AuthProvider>
       </body>
     </html>
   );
