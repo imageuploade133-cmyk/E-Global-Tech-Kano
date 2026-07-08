@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -52,12 +52,13 @@ export default function PinSetupPage() {
   const savePin = async (finalPin: string) => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(db, "users", user.uid), {
         pin: finalPin,
-      });
+      }, { merge: true });
       toast.success("PIN set successfully");
       router.push("/auth/pin");
-    } catch {
+    } catch (error) {
+      console.error("Save PIN Error:", error);
       toast.error("Failed to save PIN");
     }
   };
