@@ -1,0 +1,26 @@
+
+> e-global-wallet@0.1.0 dev
+> next dev -p 3006
+
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3006
+   - Network:      http://192.168.0.2:3006
+
+ ✓ Starting...
+ ✓ Ready in 3.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 14s (1654 modules)
+ HEAD / 200 in 15764ms
+ GET / 200 in 62ms
+ ○ Compiling /auth/login ...
+ ✓ Compiled /auth/login in 1693ms (1660 modules)
+ GET /auth/login 200 in 1872ms
+ GET /auth/login 200 in 35ms
+ GET /auth/login 200 in 426ms
+ GET / 200 in 56ms
+ GET /auth/login 200 in 18ms
+ ✓ Compiled in 609ms (1660 modules)
+ GET /auth/login 200 in 379ms
+ GET / 200 in 42ms
+ GET / 200 in 367ms
+ ✓ Compiled in 861ms (1660 modules)
