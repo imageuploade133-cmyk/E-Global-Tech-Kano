@@ -3,14 +3,24 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import { useAuth } from "@/lib/AuthContext";
 
 interface BalanceCardProps {
   balance: number;
   currency: string;
+  userName?: string;
 }
 
-export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency }) => {
+export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
   const [isVisible, setIsVisible] = useState(true);
+  const { userData, user } = useAuth();
+
+  const resolvedName = (
+    userName ||
+    userData?.name ||
+    user?.displayName ||
+    "THE CAPTAIN"
+  ).toUpperCase();
 
   const formattedBalance = new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -103,7 +113,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency }) =
           <div className="flex justify-between items-end">
             <div>
                 <p className="font-label-sm text-[10px] uppercase tracking-wider text-[#FFFFFF]/70 mb-1">Card Holder</p>
-                <p className="font-label-sm text-[14px] text-[#FFFFFF] uppercase tracking-widest font-bold">THE CAPTAIN</p>
+                <p className="font-label-sm text-[14px] text-[#FFFFFF] uppercase tracking-widest font-bold">{resolvedName}</p>
             </div>
             <div className="flex flex-col items-end">
                  <span className="material-symbols-outlined text-[#FFFFFF] text-[28px] opacity-90" style={{ fontVariationSettings: '"FILL" 1' }}>diamond</span>
