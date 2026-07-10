@@ -1,0 +1,43 @@
+
+> e-global-wallet@0.1.0 dev
+> next dev -p 3006
+
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3006
+   - Network:      http://192.168.0.2:3006
+
+ ✓ Starting...
+ ✓ Ready in 3.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 14s (1654 modules)
+ HEAD / 200 in 15764ms
+ GET / 200 in 62ms
+ ○ Compiling /auth/login ...
+ ✓ Compiled /auth/login in 1693ms (1660 modules)
+ GET /auth/login 200 in 1872ms
+ GET /auth/login 200 in 35ms
+ GET /auth/login 200 in 426ms
+ GET / 200 in 56ms
+ GET /auth/login 200 in 18ms
+ ✓ Compiled in 609ms (1660 modules)
+ GET /auth/login 200 in 379ms
+ GET / 200 in 42ms
+ GET / 200 in 367ms
+ ✓ Compiled in 861ms (1660 modules)
+ ✓ Compiled in 4.9s (753 modules)
+ ✓ Compiled in 611ms (753 modules)
+ ○ Compiling /auth/signup ...
+ ✓ Compiled /auth/signup in 1432ms (1653 modules)
+ GET /auth/signup 200 in 2566ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1281ms (1657 modules)
+ GET /_next/static/css/app/layout.css?v=1783714639558 404 in 2030ms
+ GET /_next/static/chunks/app/layout.js 404 in 2025ms
+ GET /_next/static/chunks/main-app.js?v=1783714639558 404 in 2038ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 2031ms
+ GET /auth/signup 200 in 135ms
+ GET /_next/static/css/app/layout.css?v=1783714674405 404 in 97ms
+ GET /_next/static/chunks/main-app.js?v=1783714674405 404 in 144ms
+ GET /_next/static/chunks/app/layout.js 404 in 144ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 159ms
+ GET /auth/signup 200 in 33ms
