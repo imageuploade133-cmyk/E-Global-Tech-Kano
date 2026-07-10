@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { NotificationTray, Notification } from "./NotificationTray";
+import { LogoutDrawer } from "./LogoutDrawer";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { toast } from "sonner";
@@ -41,9 +42,11 @@ const MOCK_NOTIFICATIONS: Notification[] = [
 
 export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const unreadCount = MOCK_NOTIFICATIONS.filter(n => !n.read).length;
 
   const handleSignOut = async () => {
+    setIsLogoutOpen(false);
     try {
       await signOut(auth);
       toast.success("Logged out successfully");
@@ -84,8 +87,8 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
         </div>
         <div className="flex items-center gap-4">
           <button
-            onClick={handleSignOut}
-            className="text-primary hover:opacity-80 transition-opacity p-2"
+            onClick={() => setIsLogoutOpen(true)}
+            className="text-primary hover:opacity-80 transition-opacity p-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[24px]">logout</span>
           </button>
@@ -107,6 +110,12 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         notifications={MOCK_NOTIFICATIONS}
+      />
+
+      <LogoutDrawer
+        isOpen={isLogoutOpen}
+        onClose={() => setIsLogoutOpen(false)}
+        onConfirm={handleSignOut}
       />
     </>
   );
