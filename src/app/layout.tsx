@@ -46,7 +46,46 @@ export default function RootLayout({
           <RouteGuard>
             {children}
           </RouteGuard>
-          <Toaster position="top-center" richColors />
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              style: {
+                background: "linear-gradient(135deg, #0c1324 0%, #141d30 100%)",
+                border: "1px solid rgba(212, 175, 55, 0.25)",
+                color: "#FFFFFF",
+                fontFamily: "var(--font-hanken-grotesk), sans-serif",
+                borderRadius: "16px",
+                boxShadow: "none",
+              },
+              classNames: {
+                toast: "shadow-none border border-[#d4af37]/20",
+                title: "text-[#FFFFFF] font-bold text-[14px] font-hanken",
+                description: "text-[#FFFFFF]/80 text-[12px] font-hanken",
+              },
+            }}
+            icons={{
+              success: (
+                <span className="material-symbols-outlined text-[#95d3ba] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  check_circle
+                </span>
+              ),
+              error: (
+                <span className="material-symbols-outlined text-[#dc3545] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  error
+                </span>
+              ),
+              info: (
+                <span className="material-symbols-outlined text-[#f2ca50] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  info
+                </span>
+              ),
+              warning: (
+                <span className="material-symbols-outlined text-[#f2ca50] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  warning
+                </span>
+              ),
+            }}
+          />
         </AuthProvider>
       </body>
     </html>
