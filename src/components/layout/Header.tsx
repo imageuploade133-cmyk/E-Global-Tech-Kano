@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
             <p className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-tighter font-bold leading-none">
               Welcome back
             </p>
-            <h1 className="font-hanken text-[18px] tracking-tight text-primary font-bold">
+            <h1 className="font-hanken text-[18px] tracking-tight text-black font-bold">
               {userName}
             </h1>
           </div>
