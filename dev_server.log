@@ -24,3 +24,20 @@
  GET / 200 in 42ms
  GET / 200 in 367ms
  ✓ Compiled in 861ms (1660 modules)
+ ✓ Compiled in 4.9s (753 modules)
+ ✓ Compiled in 611ms (753 modules)
+ ○ Compiling /auth/signup ...
+ ✓ Compiled /auth/signup in 1432ms (1653 modules)
+ GET /auth/signup 200 in 2566ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1281ms (1657 modules)
+ GET /_next/static/css/app/layout.css?v=1783714639558 404 in 2030ms
+ GET /_next/static/chunks/app/layout.js 404 in 2025ms
+ GET /_next/static/chunks/main-app.js?v=1783714639558 404 in 2038ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 2031ms
+ GET /auth/signup 200 in 135ms
+ GET /_next/static/css/app/layout.css?v=1783714674405 404 in 97ms
+ GET /_next/static/chunks/main-app.js?v=1783714674405 404 in 144ms
+ GET /_next/static/chunks/app/layout.js 404 in 144ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 159ms
+ GET /auth/signup 200 in 33ms
