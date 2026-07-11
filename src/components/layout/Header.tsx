@@ -76,18 +76,18 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
 
   return (
     <>
-      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile py-4 bg-surface-dim/80 backdrop-blur-xl shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative">
+      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile py-2.5 min-[375px]:py-3 bg-surface-dim/80 backdrop-blur-xl shadow-sm text-black">
+        <div className="flex items-center gap-1.5 min-[375px]:gap-2.5 flex-1 min-w-0 mr-2">
+          <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative flex-shrink-0">
             <Image
               className="object-cover"
               alt="Profile"
               src={profileImage}
               fill
-              sizes="40px"
+              sizes="36px"
             />
           </div>
-          <div className="relative w-8 h-8 mr-1">
+          <div className="relative w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 flex-shrink-0">
             <Image
               src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
               alt="E-Tech Logo"
@@ -95,31 +95,31 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
               className="object-contain"
             />
           </div>
-          <div>
-            <p className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-tighter font-bold leading-none">
+          <div className="flex-1 min-w-0">
+            <p className="font-label-sm text-[8px] min-[375px]:text-[9px] text-on-surface-variant uppercase tracking-tighter font-bold leading-none truncate">
               Welcome back
             </p>
-            <h1 className="font-hanken text-[18px] tracking-tight text-black font-bold">
+            <h1 className="font-hanken text-[14px] min-[375px]:text-[16px] tracking-tight text-black font-bold truncate" title={userName}>
               {userName}
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => setIsLogoutOpen(true)}
-            className="w-10 h-10 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+            className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: '"wght" 500' }}>
+            <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]" style={{ fontVariationSettings: '"wght" 500' }}>
               power_settings_new
             </span>
           </button>
           <button
             onClick={() => setIsNotificationsOpen(true)}
-            className="relative w-10 h-10 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+            className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[24px]">notifications</span>
+            <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]">notifications</span>
             {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-error text-error-container rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-surface-dim">
+                <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-error text-error-container rounded-full text-[8px] font-bold flex items-center justify-center border border-surface-dim">
                     {unreadCount}
                 </span>
             )}

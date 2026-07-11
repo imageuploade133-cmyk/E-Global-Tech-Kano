@@ -21,7 +21,7 @@ export default function Home() {
     <>
       <Header userName={currentUser.userName} profileImage={currentUser.profileImage} />
 
-      <main className="mt-24 px-margin-mobile flex-grow pb-32">
+      <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-24 min-[375px]:pb-32">
         <BalanceCard balance={currentUser.balance} currency={currentUser.currency} />
         <ServiceGrid />
         <Promotions />
