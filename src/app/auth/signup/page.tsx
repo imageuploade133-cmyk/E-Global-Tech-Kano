@@ -14,6 +14,7 @@ export default function SignUpPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -257,14 +258,25 @@ export default function SignUpPage() {
 
           <div className="space-y-1">
             <label className="text-xs font-bold uppercase tracking-widest text-black">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-black"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-gray-50 border-b border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-black transition-colors text-black"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer transition-colors p-1"
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  {showPassword ? "visibility" : "visibility_off"}
+                </span>
+              </button>
+            </div>
           </div>
 
           <button
