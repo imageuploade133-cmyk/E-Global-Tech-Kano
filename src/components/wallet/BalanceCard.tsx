@@ -41,7 +41,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         <div className="absolute inset-0 bg-[#0c1324]">
             <div className="absolute inset-0 opacity-40"
                  style={{
-                    backgroundImage: `radial-gradient(circle at 20% 30%, #f2ca50 0%, transparent 40%),
+                    backgroundImage: `radial-gradient(circle at 20% 30%, #FC7A00 0%, transparent 40%),
                                      radial-gradient(circle at 80% 70%, #95d3ba 0%, transparent 40%)`
                  }}
             />
@@ -69,7 +69,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               <p className="font-label-sm text-[12px] text-[#FFFFFF]/80">Available Balance</p>
             </div>
             {/* SIM Chip Icon */}
-            <div className="w-10 h-8 rounded-md bg-gradient-to-br from-[#f2ca50]/80 to-[#ffe088] border border-[#f2ca50]/20 flex flex-col justify-around p-1.5 overflow-hidden">
+            <div className="w-10 h-8 rounded-md bg-gradient-to-br from-[#FC7A00]/80 to-[#FFB870] border border-[#FC7A00]/20 flex flex-col justify-around p-1.5 overflow-hidden">
                 <div className="w-full h-[1px] bg-black/20"></div>
                 <div className="w-full h-[1px] bg-black/20"></div>
                 <div className="w-full h-[1px] bg-black/20"></div>
@@ -141,7 +141,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         <motion.button
           whileTap={{ scale: 0.95 }}
           whileHover={{ scale: 1.02 }}
-          className="flex-grow py-4 bg-gradient-to-r from-[#d4af37] via-[#f2ca50] to-[#b38f1d] border border-[#f2ca50]/30 shadow-[0_4px_20px_rgba(212,175,55,0.25)] rounded-2xl flex items-center justify-center gap-2 hover:shadow-[0_6px_24px_rgba(212,175,55,0.4)] hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer"
+          className="flex-grow py-4 bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#D46600] border border-[#FC7A00]/30 shadow-[0_4px_20px_rgba(252,122,0,0.25)] rounded-2xl flex items-center justify-center gap-2 hover:shadow-[0_6px_24px_rgba(252,122,0,0.4)] hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer"
         >
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300">
             <span className="material-symbols-outlined text-white text-[18px] font-bold">send</span>

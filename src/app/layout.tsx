@@ -51,14 +51,14 @@ export default function RootLayout({
             toastOptions={{
               style: {
                 background: "linear-gradient(135deg, #0c1324 0%, #141d30 100%)",
-                border: "1px solid rgba(212, 175, 55, 0.25)",
+                border: "1px solid rgba(252, 122, 0, 0.25)",
                 color: "#FFFFFF",
                 fontFamily: "var(--font-hanken-grotesk), sans-serif",
                 borderRadius: "16px",
                 boxShadow: "none",
               },
               classNames: {
-                toast: "shadow-none border border-[#d4af37]/20",
+                toast: "shadow-none border border-[#FC7A00]/20",
                 title: "text-[#FFFFFF] font-bold text-[14px] font-hanken",
                 description: "text-[#FFFFFF]/80 text-[12px] font-hanken",
               },
@@ -75,12 +75,12 @@ export default function RootLayout({
                 </span>
               ),
               info: (
-                <span className="material-symbols-outlined text-[#f2ca50] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                <span className="material-symbols-outlined text-[#FC7A00] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
                   info
                 </span>
               ),
               warning: (
-                <span className="material-symbols-outlined text-[#f2ca50] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                <span className="material-symbols-outlined text-[#FC7A00] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
                   warning
                 </span>
               ),

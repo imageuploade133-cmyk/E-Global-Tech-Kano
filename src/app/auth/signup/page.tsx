@@ -247,7 +247,7 @@ export default function SignUpPage() {
             Profile Picture <span className="text-red-500">*</span>
           </label>
 
-          <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-dashed border-[#d4af37] flex items-center justify-center bg-gray-50 group shadow-md">
+          <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-dashed border-[#FC7A00] flex items-center justify-center bg-gray-50 group shadow-md">
             {photo ? (
               <Image
                 src={photo}
@@ -292,7 +292,7 @@ export default function SignUpPage() {
             <button
               type="button"
               onClick={() => setShowPermissionDrawer(true)}
-              className="px-3 py-1.5 bg-gradient-to-r from-[#d4af37] to-[#f2ca50] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">photo_camera</span>
               Take Selfie
@@ -394,7 +394,7 @@ export default function SignUpPage() {
                   </button>
                 </div>
 
-                <div className="w-14 h-14 rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37] mb-4">
+                <div className="w-14 h-14 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4">
                   <span className="material-symbols-outlined text-[28px] font-bold">photo_camera</span>
                 </div>
 
@@ -480,7 +480,7 @@ export default function SignUpPage() {
 
                 {/* Centered Video Stream container with guide overlay */}
                 <div className="flex-grow flex flex-col justify-center items-center w-full px-6">
-                  <div className="relative w-full aspect-square max-w-[320px] rounded-[32px] overflow-hidden bg-black flex items-center justify-center border-2 border-[#d4af37]">
+                  <div className="relative w-full aspect-square max-w-[320px] rounded-[32px] overflow-hidden bg-black flex items-center justify-center border-2 border-[#FC7A00]">
                     <video
                       ref={videoRef}
                       autoPlay
@@ -531,7 +531,7 @@ export default function SignUpPage() {
                     type="button"
                     onClick={triggerCapture}
                     disabled={countdown !== null}
-                    className="w-full py-4 bg-gradient-to-r from-[#d4af37] to-[#f2ca50] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[18px]">photo_camera</span>
                     {countdown !== null ? "Get Ready..." : "Capture Selfie"}

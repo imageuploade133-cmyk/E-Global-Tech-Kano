@@ -24,11 +24,11 @@
   --color-surface-container-high: #ffffff;
   --color-on-surface: #212529;
   --color-surface-container-lowest: #ffffff;
-  --color-primary: #d4af37; /* Metallic Gold */
+  --color-primary: #FC7A00; /* Vibrant Orange */
   --color-secondary: #0b513d;
   --color-secondary-container: #e6f3f0;
   --color-on-secondary-fixed: #002117;
-  --color-primary-fixed-dim: #f2ca50;
+  --color-primary-fixed-dim: #FC7A00;
   --color-on-error-container: #842029;
   --color-surface: #ffffff;
   --color-on-primary-fixed-variant: #574500;
@@ -36,7 +36,7 @@
   --color-surface-container-low: #f8f9fa;
   --color-tertiary: #6c757d;
   --color-on-error: #ffffff;
-  --color-surface-tint: #d4af37;
+  --color-surface-tint: #FC7A00;
   --color-tertiary-fixed-dim: #bec6e0;
   --color-outline: #dee2e6;
   --color-inverse-surface: #212529;
@@ -48,14 +48,14 @@
   --color-on-primary-container: #554300;
   --color-on-tertiary: #ffffff;
   --color-on-primary-fixed: #241a00;
-  --color-primary-container: #fff9db;
+  --color-primary-container: #FFF2E6;
   --color-outline-variant: #e9ecef;
   --color-tertiary-container: #f8f9fa;
   --color-on-secondary-container: #0b513d;
   --color-error: #dc3545;
   --color-secondary-fixed: #b0f0d6;
   --color-on-secondary: #ffffff;
-  --color-primary-fixed: #ffe088;
+  --color-primary-fixed: #FF9E40;
   --color-on-secondary-fixed-variant: #0b513d;
   --color-tertiary-fixed: #dae2fd;
 
@@ -89,7 +89,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(212, 175, 55, 0.05),
+    rgba(252, 122, 0, 0.05),
     transparent
   );
   background-size: 200% 100%;

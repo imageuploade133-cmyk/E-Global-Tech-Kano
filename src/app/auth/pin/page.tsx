@@ -174,7 +174,7 @@ export default function PinPage() {
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#f2ca50] border-r-[#0b513d]"
+                  className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#FC7A00] border-r-[#0b513d]"
                 />
 
                 {/* Logo container inside the ring with micro-scale pulse */}
@@ -337,7 +337,7 @@ export default function PinPage() {
 
               {/* Content body with selection options */}
               <div className="flex-grow flex flex-col justify-start items-center px-4 text-center w-full overflow-y-auto">
-                <div className="w-12 h-12 rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37] mb-4">
+                <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4">
                   <span className="material-symbols-outlined text-[24px] font-bold">lock_reset</span>
                 </div>
                 <h4 className="font-hanken font-bold text-base text-black mb-1">Verify Identity to Reset PIN</h4>
@@ -353,12 +353,12 @@ export default function PinPage() {
                     onClick={() => setResetOption("email")}
                     className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                       resetOption === "email"
-                        ? "border-[#f2ca50] bg-[#f2ca50]/5 ring-1 ring-[#f2ca50]"
+                        ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
                         : "border-gray-200 bg-white hover:bg-gray-50"
                     }`}
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      resetOption === "email" ? "bg-[#f2ca50]/20 text-[#d4af37]" : "bg-gray-100 text-gray-500"
+                      resetOption === "email" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
                     }`}>
                       <span className="material-symbols-outlined text-[20px]">mail</span>
                     </div>
@@ -367,9 +367,9 @@ export default function PinPage() {
                       <p className="font-hanken text-[11px] text-gray-400">Send recovery link to registered email</p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      resetOption === "email" ? "border-[#d4af37]" : "border-gray-300"
+                      resetOption === "email" ? "border-[#FC7A00]" : "border-gray-300"
                     }`}>
-                      {resetOption === "email" && <div className="w-2.5 h-2.5 rounded-full bg-[#d4af37]" />}
+                      {resetOption === "email" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
                     </div>
                   </button>
 
@@ -379,12 +379,12 @@ export default function PinPage() {
                     onClick={() => setResetOption("otp")}
                     className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                       resetOption === "otp"
-                        ? "border-[#f2ca50] bg-[#f2ca50]/5 ring-1 ring-[#f2ca50]"
+                        ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
                         : "border-gray-200 bg-white hover:bg-gray-50"
                     }`}
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      resetOption === "otp" ? "bg-[#f2ca50]/20 text-[#d4af37]" : "bg-gray-100 text-gray-500"
+                      resetOption === "otp" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
                     }`}>
                       <span className="material-symbols-outlined text-[20px]">sms</span>
                     </div>
@@ -393,9 +393,9 @@ export default function PinPage() {
                       <p className="font-hanken text-[11px] text-gray-400">Send 6-digit secure code to phone</p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      resetOption === "otp" ? "border-[#d4af37]" : "border-gray-300"
+                      resetOption === "otp" ? "border-[#FC7A00]" : "border-gray-300"
                     }`}>
-                      {resetOption === "otp" && <div className="w-2.5 h-2.5 rounded-full bg-[#d4af37]" />}
+                      {resetOption === "otp" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
                     </div>
                   </button>
                 </div>
