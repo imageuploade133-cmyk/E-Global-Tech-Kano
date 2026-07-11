@@ -66,7 +66,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   E-TECH GLOBAL HUB
                 </span>
               </div>
-              <p className="font-label-sm text-[12px] text-[#FFFFFF]/80">Available Balance</p>
+              <p className="font-label-sm text-[12px] text-[#FFFFFF] font-medium">Available Balance</p>
             </div>
             {/* SIM Chip Icon */}
             <div className="w-10 h-8 rounded-md bg-gradient-to-br from-[#FC7A00]/80 to-[#FFB870] border border-[#FC7A00]/20 flex flex-col justify-around p-1.5 overflow-hidden">
@@ -91,9 +91,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </h2>
                 <button
                   onClick={() => setIsVisible(!isVisible)}
-                  className="text-[#FFFFFF]/60 hover:text-[#FFFFFF] transition-colors p-1"
+                  className="text-[#FFFFFF] hover:text-[#FFFFFF] transition-colors p-1"
                 >
-                  <span className="material-symbols-outlined text-[20px]">
+                  <span className="material-symbols-outlined text-[20px] text-[#FFFFFF]">
                     {isVisible ? "visibility" : "visibility_off"}
                   </span>
                 </button>
@@ -101,7 +101,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </AnimatePresence>
 
             {/* Card Number Mockup */}
-            <div className="flex gap-4 font-mono text-[14px] text-[#FFFFFF]/70 tracking-[0.2em]">
+            <div className="flex gap-4 font-mono text-[14px] text-[#FFFFFF] tracking-[0.2em]">
                 <span>4582</span>
                 <span>••••</span>
                 <span>••••</span>
@@ -112,25 +112,29 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           {/* Bottom: User Name and Type */}
           <div className="flex justify-between items-end">
             <div>
-                <p className="font-label-sm text-[10px] uppercase tracking-wider text-[#FFFFFF]/70 mb-1">Account Holder</p>
+                <p className="font-label-sm text-[10px] uppercase tracking-wider text-[#FFFFFF] mb-1 font-medium">Account Holder</p>
                 <p className="font-label-sm text-[14px] text-[#FFFFFF] uppercase tracking-widest font-bold">{resolvedName}</p>
             </div>
             <div className="flex flex-col items-end">
-                 <span className="material-symbols-outlined text-[#FFFFFF] text-[28px] opacity-90" style={{ fontVariationSettings: '"FILL" 1' }}>diamond</span>
-                 <p className="font-label-sm text-[10px] text-[#FFFFFF]/80 font-bold uppercase tracking-tighter">Infinite</p>
+                 <span className="material-symbols-outlined text-[#FFFFFF] text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>diamond</span>
+                 <p className="font-label-sm text-[10px] text-[#FFFFFF] font-bold uppercase tracking-tighter">Infinite</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Action Buttons Below Card */}
-      <div className="mt-6 flex gap-3">
+      <div className="mt-6 flex gap-4">
+        {/* Add Money - Sleek Teal to Lime Green Gradient */}
         <motion.button
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.02 }}
-          className="flex-grow py-4 bg-gradient-to-r from-[#0b513d] to-[#128a67] border border-[#16a37a]/30 shadow-[0_4px_20px_rgba(11,81,61,0.25)] rounded-2xl flex items-center justify-center gap-2 hover:shadow-[0_6px_24px_rgba(11,81,61,0.4)] hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer"
+          whileTap={{ scale: 0.96 }}
+          whileHover={{ scale: 1.03, y: -2 }}
+          className="flex-grow py-4 bg-gradient-to-r from-[#11998e] via-[#1fb89a] to-[#38ef7d] border border-[#38ef7d]/20 shadow-[0_8px_25px_rgba(17,153,142,0.3)] rounded-2xl flex items-center justify-center gap-2 hover:shadow-[0_12px_30px_rgba(56,239,125,0.55)] active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden"
         >
-          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300">
+          {/* Shine effect overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+
+          <div className="w-8 h-8 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300">
             <span className="material-symbols-outlined text-white text-[18px] font-bold">add</span>
           </div>
           <span className="font-label-sm text-[13px] text-white tracking-widest uppercase font-bold">
@@ -138,12 +142,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </span>
         </motion.button>
 
+        {/* Transfer - Sleek Brand Orange to Sunset Red Gradient */}
         <motion.button
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.02 }}
-          className="flex-grow py-4 bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#D46600] border border-[#FC7A00]/30 shadow-[0_4px_20px_rgba(252,122,0,0.25)] rounded-2xl flex items-center justify-center gap-2 hover:shadow-[0_6px_24px_rgba(252,122,0,0.4)] hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer"
+          whileTap={{ scale: 0.96 }}
+          whileHover={{ scale: 1.03, y: -2 }}
+          className="flex-grow py-4 bg-gradient-to-r from-[#FC7A00] via-[#FF5E36] to-[#FF3B30] border border-[#FC7A00]/20 shadow-[0_8px_25px_rgba(252,122,0,0.3)] rounded-2xl flex items-center justify-center gap-2 hover:shadow-[0_12px_30px_rgba(255,94,54,0.55)] active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden"
         >
-          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300">
+          {/* Shine effect overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+
+          <div className="w-8 h-8 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300">
             <span className="material-symbols-outlined text-white text-[18px] font-bold">send</span>
           </div>
           <span className="font-label-sm text-[13px] text-white tracking-widest uppercase font-bold">
