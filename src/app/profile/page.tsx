@@ -7,12 +7,55 @@ import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
-import { updatePassword } from "firebase/auth";
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
+import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
+import { useRouter } from "next/navigation";
+
+// The 4 distinct categories for daily transfer limit
+const LIMIT_CATEGORIES = [
+  {
+    id: "standard",
+    label: "Standard",
+    limit: 500000,
+    description: "Standard daily limit",
+    icon: "account_balance_wallet",
+    color: "border-gray-200 text-gray-800",
+    activeColor: "border-[#FC7A00] bg-[#FC7A00]/5 text-black ring-1 ring-[#FC7A00]"
+  },
+  {
+    id: "silver",
+    label: "Silver Elite",
+    limit: 2000000,
+    description: "Higher transfer capacity",
+    icon: "shield",
+    color: "border-gray-200 text-gray-800",
+    activeColor: "border-[#0b513d] bg-[#0b513d]/5 text-black ring-1 ring-[#0b513d]"
+  },
+  {
+    id: "gold",
+    label: "Gold VIP",
+    limit: 5000000,
+    description: "Premium elite limit",
+    icon: "workspace_premium",
+    color: "border-gray-200 text-gray-800",
+    activeColor: "border-amber-500 bg-amber-500/5 text-black ring-1 ring-amber-500"
+  },
+  {
+    id: "diamond",
+    label: "Infinite Diamond",
+    limit: 10000000,
+    description: "Ultimate max capacity",
+    icon: "diamond",
+    color: "border-gray-200 text-gray-800",
+    activeColor: "border-emerald-500 bg-emerald-500/5 text-black ring-1 ring-emerald-500"
+  }
+];
 
 export default function ProfilePage() {
   const { userData, user, updateUserData } = useAuth();
+  const router = useRouter();
 
   // Basic User Information
   const userName = (userData?.name || user?.displayName || "Captain") as string;
@@ -22,6 +65,7 @@ export default function ProfilePage() {
   // Modal / Drawer States
   const [showCameraDrawer, setShowCameraDrawer] = useState(false);
   const [showPermissionDrawer, setShowPermissionDrawer] = useState(false);
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   // Camera & Image Variables
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -37,11 +81,13 @@ export default function ProfilePage() {
   const dailyLimit = userData?.dailyLimit ?? 500000;
 
   // Change Password Form State
+  const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Change PIN Form State
+  const [oldPin, setOldPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [isUpdatingPin, setIsUpdatingPin] = useState(false);
@@ -175,11 +221,15 @@ export default function ProfilePage() {
     }
   };
 
-  // Change Password Action
+  // Change Password Action with Old Password Verification
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!oldPassword) {
+      toast.error("Please enter your current password.");
+      return;
+    }
     if (!newPassword || newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters long.");
+      toast.error("New password must be at least 6 characters long.");
       return;
     }
 
@@ -187,34 +237,49 @@ export default function ProfilePage() {
     try {
       const isMock = sessionStorage.getItem("mock") === "true";
       if (isMock) {
-        toast.success("Mock Password updated successfully!");
+        toast.success("Password updated successfully (Mock Validation passed)!");
       } else {
         const currentUser = auth.currentUser;
-        if (currentUser) {
+        if (currentUser && currentUser.email) {
+          // Reauthenticate live user before changing password
+          const credential = EmailAuthProvider.credential(currentUser.email, oldPassword);
+          await reauthenticateWithCredential(currentUser, credential);
           await updatePassword(currentUser, newPassword);
           toast.success("Password updated successfully!");
         } else {
           toast.error("No active session found");
         }
       }
+      setOldPassword("");
       setNewPassword("");
     } catch (err: unknown) {
       console.error(err);
-      toast.error("Please re-authenticate to change your password.");
+      toast.error("Incorrect old password or authentication error.");
     } finally {
       setIsUpdatingPassword(false);
     }
   };
 
-  // Change PIN Action
+  // Change PIN Action with Old PIN Verification
   const handleUpdatePin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (oldPin.length !== 4 || isNaN(Number(oldPin))) {
+      toast.error("Please enter a valid 4-digit old PIN.");
+      return;
+    }
     if (newPin.length !== 4 || isNaN(Number(newPin))) {
-      toast.error("PIN must be exactly 4 digits.");
+      toast.error("New PIN must be exactly 4 digits.");
       return;
     }
     if (newPin !== confirmPin) {
-      toast.error("PINs do not match.");
+      toast.error("New PINs do not match.");
+      return;
+    }
+
+    // Verify Old PIN matches current user PIN
+    const currentStoredPin = userData?.pin || "1234"; // Default mock PIN is '1234'
+    if (oldPin !== currentStoredPin) {
+      toast.error("Incorrect current PIN. Access denied.");
       return;
     }
 
@@ -222,6 +287,7 @@ export default function ProfilePage() {
     try {
       await updateUserData({ pin: newPin });
       toast.success("Access PIN updated successfully!");
+      setOldPin("");
       setNewPin("");
       setConfirmPin("");
     } catch {
@@ -253,25 +319,26 @@ export default function ProfilePage() {
     }
   };
 
-  // Increase Limit Action
-  const handleLimitChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const limit = Number(e.target.value);
+  // Category selection handler for Daily Transfer Limit
+  const handleSelectLimitCategory = async (limit: number) => {
     try {
       await updateUserData({ dailyLimit: limit });
+      toast.success(`Daily limit set to ₦${new Intl.NumberFormat("en-NG").format(limit)}`);
     } catch {
-      toast.error("Failed to update Daily Limit");
+      toast.error("Failed to update transfer limit");
     }
   };
 
-  // Determine Daily Limit tier
-  const getLimitTier = (limit: number) => {
-    if (limit <= 500000) return { label: "Standard Tier", color: "bg-gray-100 text-gray-800" };
-    if (limit <= 2000000) return { label: "Silver Elite Tier", color: "bg-blue-100 text-blue-800" };
-    if (limit <= 5000000) return { label: "Gold VIP Tier", color: "bg-amber-100 text-[#FC7A00]" };
-    return { label: "Infinite Diamond Tier", color: "bg-emerald-100 text-emerald-800" };
+  const handleLogoutConfirm = async () => {
+    setIsLogoutOpen(false);
+    try {
+      await auth.signOut();
+      toast.success("Logged out successfully");
+      router.push("/auth/login");
+    } catch {
+      toast.error("Failed to logout");
+    }
   };
-
-  const currentTier = getLimitTier(dailyLimit);
 
   return (
     <>
@@ -341,7 +408,7 @@ export default function ProfilePage() {
               <button
                 onClick={handleTogglePinRequired}
                 className={cn(
-                  "w-12 h-6 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative",
+                  "w-12 h-6 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative cursor-pointer",
                   isPinRequired ? "bg-[#07B038]" : "bg-gray-200"
                 )}
               >
@@ -363,7 +430,7 @@ export default function ProfilePage() {
               <button
                 onClick={handleToggleFaceId}
                 className={cn(
-                  "w-12 h-6 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative",
+                  "w-12 h-6 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative cursor-pointer",
                   isFaceIdEnabled ? "bg-[#07B038]" : "bg-gray-200"
                 )}
               >
@@ -377,40 +444,48 @@ export default function ProfilePage() {
             </div>
           </section>
 
-          {/* Section: Daily Limit Adjuster */}
+          {/* Section: Daily Transfer Limit - 4 Grid Categories */}
           <section className="glass-card rounded-2xl p-5 space-y-4">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+            <div className="border-b border-gray-100 pb-2">
               <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500">
-                Daily Transfer Limit
+                Daily Transfer Limit Categories
               </h3>
-              <span className={cn("px-2 py-0.5 rounded-full text-[9px] font-bold", currentTier.color)}>
-                {currentTier.label}
-              </span>
+              <p className="font-hanken text-[10px] text-gray-400 mt-0.5">Select a category to change your daily limit</p>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-baseline">
-                <span className="font-hanken text-[11px] text-gray-400">Limit:</span>
-                <span className="font-hanken font-bold text-base text-[#FC7A00]">
-                  ₦{new Intl.NumberFormat("en-NG", { minimumFractionDigits: 0 }).format(dailyLimit)}
-                </span>
-              </div>
-
-              <input
-                type="range"
-                min="100000"
-                max="10000000"
-                step="100000"
-                value={dailyLimit}
-                onChange={handleLimitChange}
-                className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-[#FC7A00]"
-              />
-
-              <div className="flex justify-between text-[9px] text-gray-400 font-medium">
-                <span>₦100K</span>
-                <span>₦5M</span>
-                <span>₦10M (VIP MAX)</span>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              {LIMIT_CATEGORIES.map((cat) => {
+                const isSelected = dailyLimit === cat.limit;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => handleSelectLimitCategory(cat.limit)}
+                    className={cn(
+                      "p-3 rounded-xl border text-left flex flex-col justify-between h-24 transition-all duration-300 cursor-pointer",
+                      isSelected ? cat.activeColor : cat.color + " hover:bg-gray-50 bg-white"
+                    )}
+                  >
+                    <div className="flex justify-between items-start w-full">
+                      <span className={cn(
+                        "material-symbols-outlined text-[20px]",
+                        isSelected ? "text-inherit" : "text-gray-400"
+                      )} style={isSelected && cat.id === "diamond" ? { fontVariationSettings: '"FILL" 1' } : {}}>
+                        {cat.icon}
+                      </span>
+                      {isSelected && (
+                        <span className="material-symbols-outlined text-[16px] text-emerald-500 font-bold">check_circle</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-hanken font-bold text-xs text-black">{cat.label}</p>
+                      <p className="font-hanken font-black text-sm text-black mt-0.5">
+                        ₦{new Intl.NumberFormat("en-NG", { maximumFractionDigits: 0 }).format(cat.limit / 1000)}K
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -421,30 +496,45 @@ export default function ProfilePage() {
             </h3>
 
             <form onSubmit={handleUpdatePin} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-black">New 4-Digit PIN</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-black">Current 4-Digit PIN</label>
                   <input
                     type="password"
                     maxLength={4}
                     required
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+                    value={oldPin}
+                    onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ""))}
                     className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
                     placeholder="••••"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-black">Confirm PIN</label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    required
-                    value={confirmPin}
-                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
-                    className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
-                    placeholder="••••"
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-black">New 4-Digit PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      required
+                      value={newPin}
+                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+                      className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
+                      placeholder="••••"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-black">Confirm PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      required
+                      value={confirmPin}
+                      onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
+                      className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
+                      placeholder="••••"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -465,26 +555,40 @@ export default function ProfilePage() {
             </h3>
 
             <form onSubmit={handleUpdatePassword} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-black">New Password</label>
-                <div className="relative">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-black">Current Password</label>
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type="password"
                     required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-gray-50 border-b border-gray-200 py-2 pl-1 pr-10 outline-none focus:border-black transition-colors text-black text-sm"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-sm"
                     placeholder="••••••••"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer transition-colors p-1"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      {showPassword ? "visibility" : "visibility_off"}
-                    </span>
-                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-black">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-gray-50 border-b border-gray-200 py-2 pl-1 pr-10 outline-none focus:border-black transition-colors text-black text-sm"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer transition-colors p-1"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {showPassword ? "visibility" : "visibility_off"}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -496,6 +600,17 @@ export default function ProfilePage() {
                 {isUpdatingPassword ? "Updating..." : "Update Password"}
               </button>
             </form>
+          </section>
+
+          {/* Section: Destructive Actions (Logout) */}
+          <section className="pt-2">
+            <button
+              onClick={() => setIsLogoutOpen(true)}
+              className="w-full py-4 bg-[#dc3545]/10 hover:bg-[#dc3545]/15 border border-[#dc3545]/20 text-[#dc3545] rounded-2xl flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-xs active:scale-95 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[20px]">logout</span>
+              Sign Out from Device
+            </button>
           </section>
         </motion.div>
       </main>
@@ -671,6 +786,12 @@ export default function ProfilePage() {
           </>
         )}
       </AnimatePresence>
+
+      <LogoutDrawer
+        isOpen={isLogoutOpen}
+        onClose={() => setIsLogoutOpen(false)}
+        onConfirm={handleLogoutConfirm}
+      />
 
       <BottomNav />
     </>
