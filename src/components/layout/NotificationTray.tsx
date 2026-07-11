@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -17,131 +17,154 @@ interface NotificationTrayProps {
   isOpen: boolean;
   onClose: () => void;
   notifications: Notification[];
+  onMarkAllRead: () => void;
+  onDeleteNotification: (id: string) => void;
+  onToggleRead: (id: string) => void;
 }
 
 export const NotificationTray: React.FC<NotificationTrayProps> = ({
   isOpen,
   onClose,
   notifications,
+  onMarkAllRead,
+  onDeleteNotification,
+  onToggleRead,
 }) => {
+  // Prevent background scrolling while open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
-          />
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+          className="fixed inset-0 w-full h-full bg-white z-[10000] flex flex-col"
+        >
+          {/* Top Sticky App Header */}
+          <div className="safe-top px-margin-mobile py-4 border-b border-gray-100 flex justify-between items-center bg-white">
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+            </button>
+            <div className="text-center">
+              <h2 className="font-hanken font-bold text-lg text-black">
+                Notifications
+              </h2>
+            </div>
+            {notifications.length > 0 ? (
+              <button
+                onClick={onMarkAllRead}
+                className="text-[12px] font-bold text-[#d4af37] uppercase tracking-wider hover:brightness-110 cursor-pointer"
+              >
+                Clear All
+              </button>
+            ) : (
+              <div className="w-10" />
+            )}
+          </div>
 
-          {/* Drawer */}
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-[85%] max-w-md bg-surface-dim border-l border-white/5 z-[101] shadow-2xl flex flex-col"
-          >
-            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-surface-container-low">
-              <div>
-                <h2 className="font-headline-md text-[20px] text-primary font-bold">
-                  Notifications
-                </h2>
-                <p className="text-on-surface-variant/60 text-[12px]">
-                  Stay updated with your fleet
+          {/* Scrollable Notifications Area */}
+          <div className="flex-grow overflow-y-auto p-margin-mobile space-y-4 custom-scrollbar bg-gray-50/50">
+            {notifications.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4 text-gray-400">
+                  <span className="material-symbols-outlined text-[36px]">
+                    notifications_off
+                  </span>
+                </div>
+                <h3 className="font-hanken font-bold text-lg text-black mb-1">All Caught Up!</h3>
+                <p className="text-gray-400 text-sm max-w-[240px]">
+                  You have cleared all alerts and messages in your secure inbox.
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                className="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <div className="flex-grow overflow-y-auto custom-scrollbar p-4 space-y-4">
-              {notifications.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                  <div className="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center mb-4 text-primary/40">
-                    <span className="material-symbols-outlined text-[32px]">
-                      notifications_off
-                    </span>
-                  </div>
-                  <p className="text-on-surface font-bold">All clear!</p>
-                  <p className="text-on-surface-variant/60 text-sm">
-                    No new alerts at the moment.
-                  </p>
-                </div>
-              ) : (
-                notifications.map((n, i) => (
+            ) : (
+              <div className="space-y-3">
+                {notifications.map((n) => (
                   <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
+                    layout
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
                     key={n.id}
+                    onClick={() => onToggleRead(n.id)}
                     className={cn(
-                      "p-4 rounded-2xl border transition-all",
+                      "p-4 rounded-2xl border transition-all cursor-pointer select-none shadow-none relative overflow-hidden",
                       n.read
-                        ? "bg-surface-container-low border-white/5"
-                        : "bg-surface-container border-primary/20 shadow-lg"
+                        ? "bg-white border-gray-100 text-gray-500"
+                        : "bg-white border-[#d4af37]/35 text-black"
                     )}
                   >
+                    {/* Left Colored Stripe for Unread alerts */}
+                    {!n.read && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-[#d4af37] to-[#f2ca50]" />
+                    )}
+
                     <div className="flex gap-4">
+                      {/* Interactive type icons */}
                       <div
                         className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
+                          "w-11 h-11 rounded-full flex items-center justify-center shrink-0",
                           n.type === "transaction"
-                            ? "bg-secondary/10 text-secondary"
+                            ? "bg-[#0b513d]/10 text-[#0b513d]"
                             : n.type === "security"
-                            ? "bg-error-container/20 text-error"
-                            : "bg-primary/10 text-primary"
+                            ? "bg-[#dc3545]/10 text-[#dc3545]"
+                            : "bg-[#d4af37]/10 text-[#d4af37]"
                         )}
                       >
-                        <span className="material-symbols-outlined text-[20px]">
+                        <span className="material-symbols-outlined text-[20px] font-bold">
                           {n.type === "transaction"
                             ? "payments"
                             : n.type === "security"
-                            ? "shield"
+                            ? "gpp_maybe"
                             : "campaign"}
                         </span>
                       </div>
-                      <div className="flex-grow">
+
+                      <div className="flex-grow pr-6">
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className="font-bold text-on-surface text-[14px]">
+                          <h4 className={cn("text-[14px] leading-tight font-hanken", n.read ? "font-medium text-gray-700" : "font-bold text-black")}>
                             {n.title}
                           </h4>
-                          <span className="text-[10px] text-on-surface-variant/40 font-mono">
+                          <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap ml-2">
                             {n.time}
                           </span>
                         </div>
-                        <p className="text-on-surface-variant/70 text-[12px] leading-relaxed">
+                        <p className={cn("text-[12px] leading-relaxed font-hanken", n.read ? "text-gray-400" : "text-gray-600")}>
                           {n.message}
                         </p>
-                        {!n.read && (
-                          <div className="mt-2 flex items-center gap-1">
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                            <span className="text-[10px] text-primary font-bold uppercase tracking-widest">
-                              New
-                            </span>
-                          </div>
-                        )}
                       </div>
+
+                      {/* Delete notification button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteNotification(n.id);
+                        }}
+                        className="absolute right-3 top-3 text-gray-300 hover:text-red-500 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
                     </div>
                   </motion.div>
-                ))
-              )}
-            </div>
-
-            <div className="p-4 border-t border-white/5 bg-surface-container-low">
-                <button className="w-full py-3 bg-surface-variant hover:bg-surface-bright rounded-xl text-primary text-[12px] font-bold uppercase tracking-widest transition-colors">
-                    Mark All as Read
-                </button>
-            </div>
-          </motion.div>
-        </>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
