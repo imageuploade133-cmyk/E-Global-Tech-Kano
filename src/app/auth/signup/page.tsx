@@ -288,90 +288,110 @@ export default function SignUpPage() {
           </button>
         </form>
 
-        {/* Elegant Modal Backdrop and Dialog for Selfie Capture */}
+        {/* Elegant 90% Height Bottom Drawer for Active Selfie Capture */}
         <AnimatePresence>
           {showCamera && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
-            >
+            <>
+              {/* Overlay Backdrop */}
               <motion.div
-                initial={{ scale: 0.9, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.9, y: 20 }}
-                className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full p-6 relative border border-gray-100 flex flex-col items-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={stopCamera}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+              />
+
+              {/* 90% Height Slide Up Drawer */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none"
               >
-                <div className="w-full flex justify-between items-center mb-4">
-                  <h3 className="font-hanken font-bold text-lg text-black">Take a Selfie</h3>
+                {/* Drag handle */}
+                <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-4 mb-4" />
+
+                {/* Header block */}
+                <div className="w-full px-6 flex justify-between items-center border-b border-gray-100 pb-4 mb-6">
+                  <div className="w-6" /> {/* Spacer */}
+                  <h3 className="font-hanken font-bold text-base text-black text-center">
+                    Selfie Verification
+                  </h3>
                   <button
                     type="button"
                     onClick={stopCamera}
-                    className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-black transition-colors"
+                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-black transition-colors cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[20px]">close</span>
+                    <span className="material-symbols-outlined text-[20px] font-bold">close</span>
                   </button>
                 </div>
 
-                {/* Video container with face guideline overlay */}
-                <div className="relative w-72 h-72 rounded-2xl overflow-hidden bg-black shadow-inner flex items-center justify-center border-2 border-[#d4af37]">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full h-full object-cover scale-x-[-1]"
-                  />
+                {/* Centered Video Stream container with guide overlay */}
+                <div className="flex-grow flex flex-col justify-center items-center w-full px-6">
+                  <div className="relative w-full aspect-square max-w-[320px] rounded-[32px] overflow-hidden bg-black flex items-center justify-center border-2 border-[#d4af37]">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-cover scale-x-[-1]"
+                    />
 
-                  {/* Face Guide Overlay */}
-                  <div className="absolute inset-0 border-[24px] border-black/40 pointer-events-none flex items-center justify-center">
-                    <div className="w-48 h-56 rounded-[100px] border-2 border-dashed border-white/60 flex items-center justify-center">
-                      <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Align Face Here</span>
+                    {/* Oval Portrait Face Guide Overlay */}
+                    <div className="absolute inset-0 border-[32px] border-black/40 pointer-events-none flex items-center justify-center">
+                      <div className="w-48 h-56 rounded-[100px] border-2 border-dashed border-white/60 flex items-center justify-center">
+                        <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold font-hanken">Align Face</span>
+                      </div>
                     </div>
+
+                    {/* Countdown indicator */}
+                    {countdown !== null && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <motion.span
+                          key={countdown}
+                          initial={{ scale: 0.5, opacity: 0 }}
+                          animate={{ scale: 1.5, opacity: 1 }}
+                          exit={{ scale: 2, opacity: 0 }}
+                          transition={{ duration: 0.4 }}
+                          className="text-white text-6xl font-bold font-hanken"
+                        >
+                          {countdown}
+                        </motion.span>
+                      </div>
+                    )}
+
+                    {/* Camera Flash effect overlay */}
+                    {flash && (
+                      <div className="absolute inset-0 bg-white z-10 animate-pulse" />
+                    )}
                   </div>
 
-                  {/* Countdown display */}
-                  {countdown !== null && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <motion.span
-                        key={countdown}
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1.5, opacity: 1 }}
-                        exit={{ scale: 2, opacity: 0 }}
-                        transition={{ duration: 0.4 }}
-                        className="text-white text-6xl font-bold font-hanken"
-                      >
-                        {countdown}
-                      </motion.span>
-                    </div>
-                  )}
-
-                  {/* Flash Overlay Effect */}
-                  {flash && (
-                    <div className="absolute inset-0 bg-white z-10 animate-pulse" />
-                  )}
+                  <p className="font-hanken text-xs text-gray-400 text-center mt-6 max-w-[260px] leading-relaxed">
+                    Make sure your face is clearly visible inside the alignment frame with good lighting for standard secure sign up verification.
+                  </p>
                 </div>
 
-                <div className="mt-6 flex gap-4 w-full justify-center">
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold rounded-xl transition-all"
-                  >
-                    Cancel
-                  </button>
+                {/* Bottom Action buttons bar */}
+                <div className="w-full p-6 border-t border-gray-100 flex flex-col gap-3">
                   <button
                     type="button"
                     onClick={triggerCapture}
                     disabled={countdown !== null}
-                    className="px-6 py-2 bg-gradient-to-r from-[#d4af37] to-[#f2ca50] hover:brightness-105 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:opacity-50"
+                    className="w-full py-4 bg-gradient-to-r from-[#d4af37] to-[#f2ca50] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px]">photo_camera</span>
-                    {countdown !== null ? "Get Ready..." : "Capture"}
+                    <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+                    {countdown !== null ? "Get Ready..." : "Capture Selfie"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                  >
+                    Cancel
                   </button>
                 </div>
               </motion.div>
-            </motion.div>
+            </>
           )}
         </AnimatePresence>
 
