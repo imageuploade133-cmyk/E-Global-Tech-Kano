@@ -170,24 +170,24 @@ export default function PinPage() {
           >
             <div className="relative flex flex-col items-center">
               {/* Spinning luxury gradient ring */}
-              <div className="relative w-24 h-24 flex items-center justify-center">
+              <div className="relative w-14 h-14 flex items-center justify-center">
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#FC7A00] border-r-[#0b513d]"
+                  transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+                  className="absolute inset-0 rounded-full border-3 border-gray-100 border-t-[#FC7A00] border-r-[#0b513d]"
                 />
 
                 {/* Logo container inside the ring with micro-scale pulse */}
                 <motion.div
-                  animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                  className="relative w-14 h-14 bg-white rounded-full p-2 shadow-sm flex items-center justify-center"
+                  animate={{ scale: [1, 1.03, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+                  className="relative w-9 h-9 bg-white rounded-full p-1.5 shadow-sm flex items-center justify-center"
                 >
                   <Image
                     src="https://e-global-tech-kano.vercel.app/_next/image?url=https%3A%2F%2Fi.ibb.co%2FWWjZrtC7%2FE-Tech.png&w=640&q=75"
                     alt="E-Tech Logo"
-                    width={40}
-                    height={40}
+                    width={24}
+                    height={24}
                     className="object-contain"
                     priority
                   />
@@ -201,20 +201,20 @@ export default function PinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
-                className="mt-8 font-hanken font-bold text-sm tracking-wider uppercase text-gray-800 text-center"
+                className="mt-6 font-hanken font-bold text-xs tracking-wider uppercase text-gray-800 text-center"
               >
                 {verifyingText}
               </motion.p>
 
-              <p className="mt-2 font-hanken text-xs text-gray-400">
+              <p className="mt-2 font-hanken text-[11px] text-gray-400">
                 Please do not close or exit the app
               </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="w-full flex flex-col items-center text-center mt-10">
-        <div className="relative w-16 h-16 mb-4">
+      <div className="w-full flex flex-col items-center text-center mt-6 min-[375px]:mt-10">
+        <div className="relative w-14 h-14 min-[375px]:w-16 min-[375px]:h-16 mb-3">
           <Image
             src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
             alt="E-Tech Logo"
@@ -222,40 +222,40 @@ export default function PinPage() {
             className="object-contain"
           />
         </div>
-        <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
-        <p className="text-gray-500 font-hanken tracking-widest uppercase text-xs">Enter Access PIN</p>
+        <h1 className="font-hanken font-bold text-lg min-[375px]:text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
+        <p className="text-gray-500 font-hanken tracking-widest uppercase text-[10px] min-[375px]:text-xs">Enter Access PIN</p>
       </div>
 
-      <div className="flex gap-4 justify-center my-10">
+      <div className="flex gap-3 min-[375px]:gap-4 justify-center my-6 min-[375px]:my-10">
         {[...Array(4)].map((_, i) => (
           <div
             key={i}
-            className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
-              pin.length > i ? "bg-black border-black scale-125" : "bg-transparent border-gray-200"
+            className={`w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4 rounded-full border-2 transition-all duration-300 ${
+              pin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
             }`}
           />
         ))}
       </div>
 
-      <div className="w-full max-w-xs grid grid-cols-3 gap-6 mb-10">
+      <div className="w-full max-w-[260px] min-[360px]:max-w-[290px] min-[410px]:max-w-xs grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-6 mb-6 min-[360px]:mb-10">
         {keypadNumbers.slice(0, 9).map((num) => (
           <motion.button
             whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
             whileHover={{ scale: 1.05 }}
             key={num}
             onClick={() => handleKeyPress(num)}
-            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+            className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
           >
             {num}
           </motion.button>
         ))}
-        <div className="w-20 h-20" />
+        <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20" />
         {keypadNumbers[9] !== undefined && (
           <motion.button
             whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
             whileHover={{ scale: 1.05 }}
             onClick={() => handleKeyPress(keypadNumbers[9])}
-            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+            className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
           >
             {keypadNumbers[9]}
           </motion.button>
@@ -264,9 +264,9 @@ export default function PinPage() {
           whileTap={{ scale: 0.9 }}
           whileHover={{ scale: 1.05 }}
           onClick={handleDelete}
-          className="w-20 h-20 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer"
+          className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer"
         >
-          <span className="material-symbols-outlined text-3xl">backspace</span>
+          <span className="material-symbols-outlined text-[24px] min-[360px]:text-[28px] min-[410px]:text-3xl">backspace</span>
         </motion.button>
       </div>
 

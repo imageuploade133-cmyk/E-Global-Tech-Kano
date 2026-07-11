@@ -33,7 +33,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="mb-stack-lg"
+      className="mb-stack-lg text-black"
     >
       {/* Physical Card Design */}
       <div className="relative aspect-[1.586/1] w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 group">
@@ -49,12 +49,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             <div className="absolute inset-0 gold-shimmer opacity-20"></div>
         </div>
 
-        <div className="relative h-full p-6 flex flex-col justify-between z-10">
+        <div className="relative h-full p-4 min-[375px]:p-5 md:p-6 flex flex-col justify-between z-10">
           {/* Top Row: Label and Chip */}
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="relative w-6 h-6">
+          <div className="flex justify-between items-start gap-3 w-full overflow-hidden">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                <div className="relative w-5 h-5 min-[375px]:w-6 min-[375px]:h-6 flex-shrink-0">
                   <Image
                     src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
                     alt="E-Tech Logo"
@@ -62,14 +62,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     className="object-contain"
                   />
                 </div>
-                <span className="font-label-sm text-[10px] uppercase tracking-[0.2em] text-[#FFFFFF] font-bold">
+                <span className="font-label-sm text-[8px] min-[375px]:text-[10px] uppercase tracking-[0.15em] text-[#FFFFFF] font-bold truncate">
                   E-TECH GLOBAL HUB
                 </span>
               </div>
-              <p className="font-label-sm text-[12px] text-[#FFFFFF] font-medium">Available Balance</p>
+              <p className="font-label-sm text-[10px] min-[375px]:text-[12px] text-[#FFFFFF]/80 font-medium mt-0.5">Available Balance</p>
             </div>
             {/* SIM Chip Icon */}
-            <div className="w-10 h-8 rounded-md bg-gradient-to-br from-[#FC7A00]/80 to-[#FFB870] border border-[#FC7A00]/20 flex flex-col justify-around p-1.5 overflow-hidden">
+            <div className="w-8 h-6 min-[375px]:w-10 min-[375px]:h-8 rounded-md bg-gradient-to-br from-[#FC7A00]/80 to-[#FFB870] border border-[#FC7A00]/20 flex flex-col justify-around p-1 min-[375px]:p-1.5 overflow-hidden flex-shrink-0">
                 <div className="w-full h-[1px] bg-black/20"></div>
                 <div className="w-full h-[1px] bg-black/20"></div>
                 <div className="w-full h-[1px] bg-black/20"></div>
@@ -77,23 +77,25 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </div>
 
           {/* Middle: Balance */}
-          <div className="space-y-2">
+          <div className="space-y-1.5 min-[375px]:space-y-2 w-full overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.div
                 key={isVisible ? "visible" : "hidden"}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="flex items-baseline gap-3"
+                className="flex items-center justify-between gap-2 w-full overflow-hidden"
               >
-                <h2 className="font-display-lg text-[32px] md:text-[40px] text-[#FFFFFF] font-bold tracking-tight">
-                  {isVisible ? formattedBalance : "₦ •••,•••.••"}
-                </h2>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-display-lg text-[20px] min-[360px]:text-[24px] min-[400px]:text-[30px] md:text-[36px] lg:text-[40px] text-[#FFFFFF] font-bold tracking-tight truncate" title={formattedBalance}>
+                    {isVisible ? formattedBalance : "₦ •••,•••.••"}
+                  </h2>
+                </div>
                 <button
                   onClick={() => setIsVisible(!isVisible)}
-                  className="text-[#FFFFFF] hover:text-[#FFFFFF] transition-colors p-1"
+                  className="text-[#FFFFFF] hover:text-[#FFFFFF] transition-colors p-1 flex-shrink-0 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[20px] text-[#FFFFFF]">
+                  <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-[#FFFFFF] block">
                     {isVisible ? "visibility" : "visibility_off"}
                   </span>
                 </button>
@@ -101,7 +103,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </AnimatePresence>
 
             {/* Card Number Mockup */}
-            <div className="flex gap-4 font-mono text-[14px] text-[#FFFFFF] tracking-[0.2em]">
+            <div className="flex gap-2 min-[375px]:gap-4 font-mono text-[11px] min-[375px]:text-[13px] md:text-[14px] text-[#FFFFFF]/80 tracking-[0.15em] min-[375px]:tracking-[0.2em]">
                 <span>4582</span>
                 <span>••••</span>
                 <span>••••</span>
@@ -110,14 +112,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </div>
 
           {/* Bottom: User Name and Type */}
-          <div className="flex justify-between items-end">
-            <div>
-                <p className="font-label-sm text-[10px] uppercase tracking-wider text-[#FFFFFF] mb-1 font-medium">Account Holder</p>
-                <p className="font-label-sm text-[14px] text-[#FFFFFF] uppercase tracking-widest font-bold">{resolvedName}</p>
+          <div className="flex justify-between items-end gap-3 w-full overflow-hidden">
+            <div className="flex-1 min-w-0">
+                <p className="font-label-sm text-[8px] min-[375px]:text-[9px] uppercase tracking-wider text-[#FFFFFF]/70 mb-0.5 font-medium truncate">Account Holder</p>
+                <p className="font-label-sm text-[11px] min-[375px]:text-[13px] md:text-[14px] text-[#FFFFFF] uppercase tracking-widest font-bold truncate" title={resolvedName}>{resolvedName}</p>
             </div>
-            <div className="flex flex-col items-end">
-                 <span className="material-symbols-outlined text-[#FFFFFF] text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>diamond</span>
-                 <p className="font-label-sm text-[10px] text-[#FFFFFF] font-bold uppercase tracking-tighter">Infinite</p>
+            <div className="flex flex-col items-end flex-shrink-0">
+                 <span className="material-symbols-outlined text-[#FFFFFF] text-[22px] min-[375px]:text-[26px]" style={{ fontVariationSettings: '"FILL" 1' }}>diamond</span>
+                 <p className="font-label-sm text-[8px] min-[375px]:text-[9px] text-[#FFFFFF] font-bold uppercase tracking-tighter">Infinite</p>
             </div>
           </div>
         </div>

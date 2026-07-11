@@ -59,13 +59,13 @@
   --color-on-secondary-fixed-variant: #0b513d;
   --color-tertiary-fixed: #dae2fd;
 
-  --spacing-stack-lg: 32px;
-  --spacing-stack-xl: 64px;
+  --spacing-stack-lg: 24px;
+  --spacing-stack-xl: 48px;
   --spacing-container-max: 1280px;
   --spacing-stack-md: 16px;
   --spacing-stack-sm: 8px;
-  --spacing-gutter: 24px;
-  --spacing-margin-mobile: 20px;
+  --spacing-gutter: 16px;
+  --spacing-margin-mobile: 16px;
 }
 
 @layer base {
@@ -73,7 +73,7 @@
     background-color: #ffffff;
     color: #212529;
     -webkit-font-smoothing: antialiased;
-    min-height: max(884px, 100dvh);
+    min-height: 100dvh;
     font-family: var(--font-hanken-grotesk), sans-serif;
   }
 }
