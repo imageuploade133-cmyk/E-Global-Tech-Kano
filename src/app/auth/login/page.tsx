@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { formatFirebaseError } from "@/lib/utils";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -25,8 +26,9 @@ export default function LoginPage() {
       toast.success("Welcome back!");
       router.push("/auth/pin");
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to login";
-      toast.error(errorMessage);
+      console.error("Login Error:", error);
+      const friendlyMessage = formatFirebaseError(error);
+      toast.error(friendlyMessage);
     } finally {
       setLoading(false);
     }
