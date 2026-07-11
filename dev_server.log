@@ -1,0 +1,16 @@
+
+> e-global-wallet@0.1.0 dev
+> next dev -p 3006
+
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3006
+   - Network:      http://192.168.0.2:3006
+
+ ✓ Starting...
+ ✓ Ready in 3.2s
+ ○ Compiling / ...
+ ✓ Compiled / in 8.3s (1624 modules)
+ HEAD / 200 in 9972ms
+ ○ Compiling /auth/pin ...
+ ✓ Compiled /auth/pin in 1589ms (1631 modules)
+ GET /auth/pin?mock=true 200 in 2476ms
