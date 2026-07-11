@@ -57,7 +57,7 @@ export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onC
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 pointer-events-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] pointer-events-auto"
           />
 
           {/* Bottom Drawer Sheet */}
@@ -65,40 +65,53 @@ export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onC
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 220 }}
+            transition={{ type: "spring", damping: 26, stiffness: 240 }}
             drag="y"
             dragDirectionLock
-            dragConstraints={{ top: 0, bottom: 400 }}
+            dragConstraints={{ top: 0, bottom: 450 }}
             dragElastic={{ top: 0, bottom: 0.8 }}
             onDragEnd={handleDragEnd}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] border-t border-gray-100 p-6 pb-10 z-50 flex flex-col items-center select-none cursor-default shadow-none touch-none"
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[24px] border-t border-gray-200 p-6 pb-12 z-[9999] flex flex-col items-center select-none cursor-default shadow-none touch-none"
           >
-            {/* Draggable indicator bar */}
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-6 cursor-grab active:cursor-grabbing" />
+            {/* Instagram/TikTok Draggable indicator bar */}
+            <div className="w-10 h-1 bg-gray-300 rounded-full mb-4 cursor-grab active:cursor-grabbing" />
 
-            <div className="w-16 h-16 rounded-full bg-[#dc3545]/10 flex items-center justify-center text-[#dc3545] mb-4">
-              <span className="material-symbols-outlined text-[32px]">logout</span>
+            {/* Header style like Instagram/TikTok comment drawer */}
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+              <div className="w-6" /> {/* Spacer */}
+              <h2 className="font-hanken font-bold text-base text-black text-center">
+                Sign Out
+              </h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-black transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px] font-bold">close</span>
+              </button>
             </div>
 
-            <h2 className="font-hanken font-bold text-xl text-black text-center mb-2">
-              Confirm Sign Out
-            </h2>
-            <p className="font-hanken text-sm text-gray-500 text-center max-w-[280px] mb-8 leading-relaxed">
+            <div className="w-14 h-14 rounded-full bg-[#dc3545]/10 flex items-center justify-center text-[#dc3545] mb-4">
+              <span className="material-symbols-outlined text-[28px]">logout</span>
+            </div>
+
+            <p className="font-hanken text-sm text-gray-500 text-center max-w-[290px] mb-8 leading-relaxed">
               Are you sure you want to log out of your secure E-Tech account? You will need your login details and PIN to gain access again.
             </p>
 
+            {/* Clear stack button actions that are completely visible and overlay BottomNav */}
             <div className="flex flex-col gap-3 w-full">
               <button
                 type="button"
                 onClick={onConfirm}
-                className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none"
+                className="w-full py-4 bg-[#dc3545] hover:bg-[#c82333] active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
               >
                 Log Out
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none"
+                className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
               >
                 Cancel
               </button>
