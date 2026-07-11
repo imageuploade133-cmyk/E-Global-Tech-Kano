@@ -7,10 +7,7 @@
    - Network:      http://192.168.0.2:3006
 
  ✓ Starting...
- ✓ Ready in 3.2s
+ ✓ Ready in 2.4s
  ○ Compiling / ...
- ✓ Compiled / in 7.1s (1624 modules)
- HEAD / 200 in 8464ms
- ○ Compiling /auth/pin ...
- ✓ Compiled /auth/pin in 1518ms (1631 modules)
- GET /auth/pin?mock=true 200 in 2154ms
+ ✓ Compiled / in 7s (1627 modules)
+ GET /?mock=true 200 in 8422ms

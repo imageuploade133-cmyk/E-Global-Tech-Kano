@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/AuthContext";
 import { Toaster } from "sonner";
 import { RouteGuard } from "@/components/RouteGuard";
+import { OfflineDrawer } from "@/components/layout/OfflineDrawer";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -46,6 +47,7 @@ export default function RootLayout({
           <RouteGuard>
             {children}
           </RouteGuard>
+          <OfflineDrawer />
           <Toaster
             position="top-center"
             toastOptions={{
