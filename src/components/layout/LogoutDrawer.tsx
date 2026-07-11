@@ -77,11 +77,11 @@ export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onC
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
             drag="y"
             dragDirectionLock
             dragConstraints={{ top: 0, bottom: 450 }}
-            dragElastic={{ top: 0, bottom: 0.8 }}
+            dragElastic={{ top: 0, bottom: 0.2 }} // Minimize elastic overshoot to avoid hooking
             onDragEnd={handleDragEnd}
             className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[24px] border-t border-gray-200 p-6 pb-8 z-[9999] flex flex-col items-center select-none cursor-default shadow-none touch-none"
           >

@@ -13,11 +13,11 @@ interface HeaderProps {
   profileImage: string;
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
+const INITIAL_NOTIFICATIONS: Notification[] = [
   {
     id: "1",
     title: "Transfer Successful",
-    message: "You have successfully sent #25,000 to Opay - STEVE.",
+    message: "You have successfully sent ₦25,000.00 to Opay - STEVE.",
     time: "2m ago",
     type: "transaction",
     read: false,
@@ -25,7 +25,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
   {
     id: "2",
     title: "New Login Detected",
-    message: "A new login was detected on an iPhone 15 Pro near Lagos.",
+    message: "A secure new session was authenticated on an iPhone 15 Pro near Lagos.",
     time: "1h ago",
     type: "security",
     read: false,
@@ -33,7 +33,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
   {
     id: "3",
     title: "Exclusive Reward",
-    message: "Your Infinite card status grants you access to 15% off at ZUMA.",
+    message: "Your E-Tech Infinite status grants you exclusive access to luxury concierge rewards.",
     time: "5h ago",
     type: "promo",
     read: true,
@@ -43,7 +43,9 @@ const MOCK_NOTIFICATIONS: Notification[] = [
 export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
-  const unreadCount = MOCK_NOTIFICATIONS.filter(n => !n.read).length;
+  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleSignOut = async () => {
     setIsLogoutOpen(false);
@@ -53,6 +55,23 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
     } catch {
       toast.error("Failed to logout");
     }
+  };
+
+  // Production-grade action handlers
+  const handleMarkAllRead = () => {
+    setNotifications([]);
+    toast.success("Notifications cleared");
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    toast.success("Alert cleared");
+  };
+
+  const handleToggleRead = (id: string) => {
+    setNotifications(prev =>
+      prev.map(n => (n.id === id ? { ...n, read: true } : n))
+    );
   };
 
   return (
@@ -111,7 +130,10 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
       <NotificationTray
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
-        notifications={MOCK_NOTIFICATIONS}
+        notifications={notifications}
+        onMarkAllRead={handleMarkAllRead}
+        onDeleteNotification={handleDeleteNotification}
+        onToggleRead={handleToggleRead}
       />
 
       <LogoutDrawer
