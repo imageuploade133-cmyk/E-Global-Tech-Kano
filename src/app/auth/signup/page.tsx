@@ -19,6 +19,9 @@ export default function SignUpPage() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Custom Permission Drawer state
+  const [showPermissionDrawer, setShowPermissionDrawer] = useState(false);
+
   // Camera state
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -41,7 +44,7 @@ export default function SignUpPage() {
     setCountdown(null);
   }, [cameraStream]);
 
-  // Sync state with browser back history (device physical/swipe back button support for camera drawer)
+  // Sync state with browser back history for camera drawer
   useEffect(() => {
     if (showCamera) {
       window.history.pushState({ cameraOpen: true }, "");
@@ -64,9 +67,9 @@ export default function SignUpPage() {
     }
   }, [showCamera, stopCamera]);
 
-  // Prevent background body scroll when camera drawer is open
+  // Prevent background body scroll when camera drawer or permission drawer is open
   useEffect(() => {
-    if (showCamera) {
+    if (showCamera || showPermissionDrawer) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -74,7 +77,7 @@ export default function SignUpPage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showCamera]);
+  }, [showCamera, showPermissionDrawer]);
 
   // Handle Photo Upload from local files
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +98,6 @@ export default function SignUpPage() {
 
   // Start Camera Stream with robust constraints and device configuration
   const startCamera = async (mode: "user" | "environment" = facingMode) => {
-    // Stop any existing streams first to release the camera hardware
     if (cameraStream) {
       cameraStream.getTracks().forEach((track) => track.stop());
     }
@@ -134,7 +136,6 @@ export default function SignUpPage() {
     toast.success(nextMode === "user" ? "Switched to Front Camera" : "Switched to Back Camera");
   };
 
-
   // Drag down to dismiss gesture for selfie drawer
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.y > 100 || info.velocity.y > 500) {
@@ -169,7 +170,6 @@ export default function SignUpPage() {
 
       if (ctx) {
         if (facingMode === "user") {
-          // Mirror selfie only if front camera is active
           ctx.translate(canvas.width, 0);
           ctx.scale(-1, 1);
         }
@@ -291,7 +291,7 @@ export default function SignUpPage() {
             </button>
             <button
               type="button"
-              onClick={() => startCamera(facingMode)}
+              onClick={() => setShowPermissionDrawer(true)}
               className="px-3 py-1.5 bg-gradient-to-r from-[#d4af37] to-[#f2ca50] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">photo_camera</span>
@@ -356,6 +356,75 @@ export default function SignUpPage() {
             {loading ? "Creating..." : "Create Account"}
           </button>
         </form>
+
+        {/* Elegant Custom Camera Permission Bottom Drawer Modal */}
+        <AnimatePresence>
+          {showPermissionDrawer && (
+            <>
+              {/* Overlay Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowPermissionDrawer(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+              />
+
+              {/* Bottom Sheet Drawer */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 260 }}
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 z-[99999] flex flex-col items-center shadow-none"
+              >
+                {/* Grab Handle */}
+                <div className="w-10 h-1 bg-gray-300 rounded-full mb-5" />
+
+                {/* Header */}
+                <div className="w-full flex justify-between items-center border-b border-gray-100 pb-3 mb-5">
+                  <div className="w-8" />
+                  <h3 className="font-hanken font-bold text-base text-black text-center">Camera Access Needed</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowPermissionDrawer(false)}
+                    className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                  </button>
+                </div>
+
+                <div className="w-14 h-14 rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37] mb-4">
+                  <span className="material-symbols-outlined text-[28px] font-bold">photo_camera</span>
+                </div>
+
+                <p className="font-hanken text-sm text-gray-500 text-center max-w-[280px] mb-8 leading-relaxed">
+                  E-Tech secure identity setup requires camera access to capture your selfie. This verifies your KYC status and safeguards your wallet transactions.
+                </p>
+
+                <div className="flex flex-col gap-3 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPermissionDrawer(false);
+                      startCamera(facingMode);
+                    }}
+                    className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                  >
+                    Allow Camera Access
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPermissionDrawer(false)}
+                    className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Elegant 90% Height Bottom Drawer for Active Selfie Capture */}
         <AnimatePresence>
