@@ -136,7 +136,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
             {notifications.length > 0 && !trayLoading ? (
               <button
                 onClick={onMarkAllRead}
-                className="text-[12px] font-bold text-[#d4af37] uppercase tracking-wider hover:brightness-110 cursor-pointer"
+                className="text-[12px] font-bold text-[#FC7A00] uppercase tracking-wider hover:brightness-110 cursor-pointer"
               >
                 Clear All
               </button>
@@ -190,11 +190,11 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                       "p-4 rounded-2xl border transition-all cursor-pointer select-none shadow-none relative overflow-hidden",
                       n.read
                         ? "bg-white border-gray-100 text-gray-500"
-                        : "bg-white border-[#d4af37]/35 text-black"
+                        : "bg-white border-[#FC7A00]/35 text-black"
                     )}
                   >
                     {!n.read && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-[#d4af37] to-[#f2ca50]" />
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-[#FC7A00] to-[#FF9022]" />
                     )}
 
                     <div className="flex gap-4">
@@ -206,7 +206,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                             ? "bg-[#0b513d]/10 text-[#0b513d]"
                             : n.type === "security"
                             ? "bg-[#dc3545]/10 text-[#dc3545]"
-                            : "bg-[#d4af37]/10 text-[#d4af37]"
+                            : "bg-[#FC7A00]/10 text-[#FC7A00]"
                         )}
                       >
                         <span className="material-symbols-outlined text-[20px] font-bold">
@@ -303,7 +303,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                             ? "bg-[#0b513d]/10 text-[#0b513d]"
                             : selectedNotification.type === "security"
                             ? "bg-[#dc3545]/10 text-[#dc3545]"
-                            : "bg-[#d4af37]/10 text-[#d4af37]"
+                            : "bg-[#FC7A00]/10 text-[#FC7A00]"
                         )}
                       >
                         <span className="material-symbols-outlined text-[32px] font-bold">
@@ -389,11 +389,11 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                       /* Promotional Detail Layout */
                       <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4 text-center">
                         <p className="text-[11px] text-gray-400 uppercase tracking-widest font-bold">Infinite Exclusive Pass</p>
-                        <h2 className="text-2xl font-display-lg text-[#d4af37] font-bold">ZUMA LOUNGE 15% OFF</h2>
+                        <h2 className="text-2xl font-display-lg text-[#FC7A00] font-bold">ZUMA LOUNGE 15% OFF</h2>
                         <p className="font-hanken text-sm text-gray-500 max-w-[280px] mx-auto leading-relaxed pt-2 border-t border-dashed border-gray-200">
                           To redeem, present your E-Tech Infinite diamond digital status card at check-in or checkout. Use promo reference code below.
                         </p>
-                        <div className="bg-white border border-[#d4af37]/30 py-3 px-4 rounded-xl inline-block mt-4">
+                        <div className="bg-white border border-[#FC7A00]/30 py-3 px-4 rounded-xl inline-block mt-4">
                           <span className="font-mono font-bold text-black tracking-widest text-lg">ETGINFINITE15</span>
                         </div>
                       </div>
