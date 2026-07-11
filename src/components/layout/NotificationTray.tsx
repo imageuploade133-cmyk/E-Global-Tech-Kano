@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,43 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
   onDeleteNotification,
   onToggleRead,
 }) => {
+  const [trayLoading, setTrayLoading] = useState(true);
+  const hasPushedState = useRef(false);
+
+  // Sync state with browser back history (device physical/swipe back button support)
+  useEffect(() => {
+    if (isOpen) {
+      window.history.pushState({ notificationsOpen: true }, "");
+      hasPushedState.current = true;
+
+      const handlePopState = (e: PopStateEvent) => {
+        e.preventDefault();
+        hasPushedState.current = false;
+        onClose();
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      return () => {
+        window.removeEventListener("popstate", handlePopState);
+        if (hasPushedState.current) {
+          window.history.back();
+          hasPushedState.current = false;
+        }
+      };
+    }
+  }, [isOpen, onClose]);
+
+  // Simulate skeleton loader when opening the tray
+  useEffect(() => {
+    if (isOpen) {
+      setTrayLoading(true);
+      const timer = setTimeout(() => {
+        setTrayLoading(false);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   // Prevent background scrolling while open
   useEffect(() => {
     if (isOpen) {
@@ -56,7 +93,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
           <div className="safe-top px-margin-mobile py-4 border-b border-gray-100 flex justify-between items-center bg-white">
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+              className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
             </button>
@@ -65,7 +102,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                 Notifications
               </h2>
             </div>
-            {notifications.length > 0 ? (
+            {notifications.length > 0 && !trayLoading ? (
               <button
                 onClick={onMarkAllRead}
                 className="text-[12px] font-bold text-[#d4af37] uppercase tracking-wider hover:brightness-110 cursor-pointer"
@@ -79,7 +116,24 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
 
           {/* Scrollable Notifications Area */}
           <div className="flex-grow overflow-y-auto p-margin-mobile space-y-4 custom-scrollbar bg-gray-50/50">
-            {notifications.length === 0 ? (
+            {trayLoading ? (
+              /* High-fidelity Skeleton Loading mimicking native production apps */
+              <div className="space-y-3">
+                {[...Array(3)].map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-2xl border border-gray-100 bg-white flex gap-4 animate-pulse"
+                  >
+                    <div className="w-11 h-11 rounded-full bg-gray-100 shrink-0" />
+                    <div className="flex-grow space-y-2">
+                      <div className="h-4 bg-gray-100 rounded w-1/3" />
+                      <div className="h-3 bg-gray-100 rounded w-5/6" />
+                      <div className="h-3 bg-gray-100 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-8">
                 <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4 text-gray-400">
                   <span className="material-symbols-outlined text-[36px]">
@@ -148,15 +202,15 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                         </p>
                       </div>
 
-                      {/* Delete notification button */}
+                      {/* Delete notification button upgraded with a gorgeous gray border circle */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteNotification(n.id);
                         }}
-                        className="absolute right-3 top-3 text-gray-300 hover:text-red-500 transition-colors cursor-pointer"
+                        className="absolute right-3 top-3 w-7 h-7 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-200 transition-all cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[18px]">close</span>
+                        <span className="material-symbols-outlined text-[13px] font-bold">close</span>
                       </button>
                     </div>
                   </motion.div>

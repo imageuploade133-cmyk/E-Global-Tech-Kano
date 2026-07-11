@@ -392,10 +392,10 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={toggleCamera}
-                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-black transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
                     title="Switch Camera (Front/Back)"
                   >
-                    <span className="material-symbols-outlined text-[20px] font-bold">flip_camera_ios</span>
+                    <span className="material-symbols-outlined text-[16px] font-bold">flip_camera_ios</span>
                   </button>
                   <h3 className="font-hanken font-bold text-base text-black text-center">
                     Selfie Verification
@@ -403,9 +403,9 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={stopCamera}
-                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-black transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[20px] font-bold">close</span>
+                    <span className="material-symbols-outlined text-[16px] font-bold">close</span>
                   </button>
                 </div>
 

@@ -90,16 +90,16 @@ export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onC
 
             {/* Header style like Instagram/TikTok comment drawer */}
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
-              <div className="w-6" /> {/* Spacer */}
+              <div className="w-8" /> {/* Spacer matched to button width */}
               <h2 className="font-hanken font-bold text-base text-black text-center">
                 Sign Out
               </h2>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-black transition-all cursor-pointer"
+                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[20px] font-bold">close</span>
+                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
               </button>
             </div>
 
