@@ -38,6 +38,18 @@ export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onC
     }
   }, [isOpen, onClose]);
 
+  // Prevent background body scroll when drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
   // Handle drag to dismiss gesture
   const handleDragEnd = async (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.y > 100 || info.velocity.y > 500) {
@@ -65,13 +77,13 @@ export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onC
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 26, stiffness: 240 }}
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
             drag="y"
             dragDirectionLock
             dragConstraints={{ top: 0, bottom: 450 }}
             dragElastic={{ top: 0, bottom: 0.8 }}
             onDragEnd={handleDragEnd}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[24px] border-t border-gray-200 p-6 pb-12 z-[9999] flex flex-col items-center select-none cursor-default shadow-none touch-none"
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[24px] border-t border-gray-200 p-6 pb-8 z-[9999] flex flex-col items-center select-none cursor-default shadow-none touch-none"
           >
             {/* Instagram/TikTok Draggable indicator bar */}
             <div className="w-10 h-1 bg-gray-300 rounded-full mb-4 cursor-grab active:cursor-grabbing" />
