@@ -19,3 +19,5 @@
  ○ Compiling /auth/login ...
  ✓ Compiled /auth/login in 764ms (1658 modules)
  GET /auth/login 200 in 931ms
+ ✓ Compiled in 9.7s (1651 modules)
+ GET /?mock=true 200 in 312ms
