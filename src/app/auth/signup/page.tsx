@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import Image from "next/image";
-import { cn } from "@/lib/utils";
+import { cn, formatFirebaseError } from "@/lib/utils";
 
 export default function SignUpPage() {
   const [name, setName] = useState("");
@@ -213,8 +213,8 @@ export default function SignUpPage() {
       router.push("/auth/pin-setup");
     } catch (error: unknown) {
       console.error("Signup Error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to create account";
-      toast.error(errorMessage);
+      const friendlyMessage = formatFirebaseError(error);
+      toast.error(friendlyMessage);
     } finally {
       setLoading(false);
     }
