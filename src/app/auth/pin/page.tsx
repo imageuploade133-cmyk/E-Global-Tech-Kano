@@ -16,6 +16,10 @@ export default function PinPage() {
   const { user, userData, setPinVerified, loading } = useAuth();
   const router = useRouter();
 
+  // Loading Delay State
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyingText, setVerifyingText] = useState("Securing connection...");
+
   // Forgot PIN bottom drawer state
   const [showForgotPin, setShowForgotPin] = useState(false);
   const [isRequestingReset, setIsRequestingReset] = useState(false);
@@ -119,20 +123,86 @@ export default function PinPage() {
   };
 
   const verifyPin = (submittedPin: string) => {
-    if (userData?.pin === submittedPin) {
-      setPinVerified(true);
-      toast.success("Identity verified");
-      router.push("/");
-    } else {
-      toast.error("Incorrect PIN");
-      setPin("");
-    }
+    setIsVerifying(true);
+    setVerifyingText("Decrypting security key...");
+
+    // Stage 1 of loading animation
+    setTimeout(() => {
+      setVerifyingText("Authenticating signature...");
+    }, 800);
+
+    // Stage 2: final resolution after 1.8 seconds delay
+    setTimeout(() => {
+      if (userData?.pin === submittedPin) {
+        setPinVerified(true);
+        toast.success("Identity verified");
+        router.push("/");
+      } else {
+        toast.error("Incorrect PIN");
+        setPin("");
+        setIsVerifying(false);
+      }
+    }, 1800);
   };
 
   if (loading) return null;
 
   return (
-    <div className="flex flex-col min-h-screen bg-white p-8 items-center justify-between">
+    <div className="flex flex-col min-h-screen bg-white p-8 items-center justify-between relative overflow-hidden">
+      {/* Full Screen High-Fidelity Loading Overlay */}
+      <AnimatePresence>
+        {isVerifying && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-white/95 backdrop-blur-md z-[99999] flex flex-col items-center justify-center p-6"
+          >
+            <div className="relative flex flex-col items-center">
+              {/* Spinning luxury gradient ring */}
+              <div className="relative w-32 h-32 flex items-center justify-center">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                  className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#f2ca50] border-r-[#0b513d]"
+                />
+
+                {/* Logo container inside the ring with micro-scale pulse */}
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  className="relative w-20 h-20 bg-white rounded-full p-2 shadow-sm flex items-center justify-center"
+                >
+                  <Image
+                    src="https://e-global-tech-kano.vercel.app/_next/image?url=https%3A%2F%2Fi.ibb.co%2FWWjZrtC7%2FE-Tech.png&w=640&q=75"
+                    alt="E-Tech Logo"
+                    width={64}
+                    height={64}
+                    className="object-contain"
+                    priority
+                  />
+                </motion.div>
+              </div>
+
+              {/* Status Message Text */}
+              <motion.p
+                key={verifyingText}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mt-8 font-hanken font-bold text-sm tracking-wider uppercase text-gray-800 text-center"
+              >
+                {verifyingText}
+              </motion.p>
+
+              <p className="mt-2 font-hanken text-xs text-gray-400">
+                Please do not close or exit the app
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="w-full flex flex-col items-center text-center mt-10">
         <div className="relative w-16 h-16 mb-4">
           <Image

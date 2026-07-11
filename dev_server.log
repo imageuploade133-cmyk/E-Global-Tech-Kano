@@ -1,0 +1,51 @@
+
+> e-global-wallet@0.1.0 dev
+> next dev -p 3006
+
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3006
+   - Network:      http://192.168.0.2:3006
+
+ ✓ Starting...
+ ✓ Ready in 1964ms
+ ○ Compiling / ...
+ ✓ Compiled / in 5.1s (1638 modules)
+RouteGuard render state: {
+  loading: true,
+  hasUser: false,
+  pathname: '/',
+  hasPin: false,
+  isPinVerified: false
+}
+ HEAD / 200 in 6126ms
+ ○ Compiling /auth/pin ...
+ ✓ Compiled /auth/pin in 1179ms (1645 modules)
+RouteGuard render state: {
+  loading: true,
+  hasUser: false,
+  pathname: '/auth/pin',
+  hasPin: false,
+  isPinVerified: false
+}
+ GET /auth/pin?mock=true 200 in 1801ms
+ GET / 200 in 35ms
+ GET / 200 in 31ms
+RouteGuard render state: {
+  loading: true,
+  hasUser: false,
+  pathname: '/auth/pin',
+  hasPin: false,
+  isPinVerified: false
+}
+ GET /auth/pin?mock=true 200 in 75ms
+ GET / 200 in 31ms
+ GET / 200 in 26ms
+RouteGuard render state: {
+  loading: true,
+  hasUser: false,
+  pathname: '/auth/pin',
+  hasPin: false,
+  isPinVerified: false
+}
+ GET /auth/pin?mock=true 200 in 37ms
+ ✓ Compiled in 875ms (1630 modules)
