@@ -12,10 +12,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const isAuthRoute = pathname.startsWith("/auth");
+    // Only allow /auth/login and /auth/signup without session authentication
+    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup";
 
     if (!user) {
-      if (!isAuthRoute) {
+      if (!isPublicRoute) {
         router.push("/auth/login");
       }
     } else {
@@ -26,7 +27,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         router.push("/auth/pin-setup");
       } else if (hasPin && !isPinVerified && pathname !== "/auth/pin") {
         router.push("/auth/pin");
-      } else if (hasPin && isPinVerified && isAuthRoute) {
+      } else if (hasPin && isPinVerified && (pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/pin" || pathname === "/auth/pin-setup")) {
         router.push("/");
       }
     }
@@ -40,10 +41,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isAuthRoute = pathname.startsWith("/auth");
+  const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup";
 
   // Show nothing while redirecting
-  if (!user && !isAuthRoute) return null;
+  if (!user && !isPublicRoute) return null;
   if (user && !userData?.pin && pathname !== "/auth/pin-setup") return null;
   if (user && userData?.pin && !isPinVerified && pathname !== "/auth/pin") return null;
 
