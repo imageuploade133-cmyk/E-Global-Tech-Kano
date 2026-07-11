@@ -126,37 +126,37 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       </div>
 
       {/* Action Buttons Below Card - Shadow removed as requested */}
-      <div className="mt-6 flex gap-4">
-        {/* Add Money - Cool Teal-Cyan-Blue Premium Tri-Gradient */}
+      <div className="mt-5 min-[375px]:mt-6 flex gap-3 min-[375px]:gap-4">
+        {/* Add Money - Deep Emerald Gradient based on #07B038 */}
         <motion.button
           whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.03, y: -2 }}
-          className="flex-grow py-4 bg-gradient-to-r from-[#00f2fe] via-[#4facfe] to-[#00c6ff] border border-white/10 rounded-2xl flex items-center justify-center gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none"
+          whileHover={{ scale: 1.03, y: -1 }}
+          className="flex-grow py-3 min-[375px]:py-3.5 px-2 min-[375px]:px-4 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl min-[375px]:rounded-2xl flex items-center justify-center gap-1.5 min-[375px]:gap-2.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none"
         >
           {/* Shine effect overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
 
-          <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300">
-            <span className="material-symbols-outlined text-white text-[18px] font-bold">add_card</span>
+          <div className="w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[14px] min-[375px]:text-[16px] font-bold block">add_card</span>
           </div>
-          <span className="font-label-sm text-[13px] text-white tracking-widest uppercase font-bold">
+          <span className="font-label-sm text-[11px] min-[375px]:text-[12px] md:text-[13px] text-white tracking-wider min-[375px]:tracking-widest uppercase font-bold truncate">
             Add Money
           </span>
         </motion.button>
 
-        {/* Transfer - Cool Brand Orange-Pink-Sunset Coral Premium Tri-Gradient */}
+        {/* Transfer - Deep Sunset Orange Gradient based on #FC7A00 */}
         <motion.button
           whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.03, y: -2 }}
-          className="flex-grow py-4 bg-gradient-to-r from-[#ff0844] via-[#FC7A00] to-[#ffb199] border border-white/10 rounded-2xl flex items-center justify-center gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none"
+          whileHover={{ scale: 1.03, y: -1 }}
+          className="flex-grow py-3 min-[375px]:py-3.5 px-2 min-[375px]:px-4 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl min-[375px]:rounded-2xl flex items-center justify-center gap-1.5 min-[375px]:gap-2.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none"
         >
           {/* Shine effect overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
 
-          <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300">
-            <span className="material-symbols-outlined text-white text-[18px] font-bold">send</span>
+          <div className="w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[14px] min-[375px]:text-[16px] font-bold block">send</span>
           </div>
-          <span className="font-label-sm text-[13px] text-white tracking-widest uppercase font-bold">
+          <span className="font-label-sm text-[11px] min-[375px]:text-[12px] md:text-[13px] text-white tracking-wider min-[375px]:tracking-widest uppercase font-bold truncate">
             Transfer
           </span>
         </motion.button>
