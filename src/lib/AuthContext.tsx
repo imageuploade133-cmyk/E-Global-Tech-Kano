@@ -25,33 +25,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isPinVerified, setIsPinVerified] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [isPinVerified, setIsPinVerified] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Set session storage if query param is present so it persists redirects
-      if (window.location.search.includes("mock=true")) {
-        sessionStorage.setItem("mock", "true");
-      }
+    // Check if mock query parameter or session is active (run only on client to avoid SSR hydration mismatch)
+    const hasMockQuery = window.location.search.includes("mock=true");
+    const hasMockSession = sessionStorage.getItem("mock") === "true";
 
-      if (sessionStorage.getItem("mock") === "true") {
-        setUser({
-          uid: "mock-uid",
-          displayName: "JULES VERNE",
-          email: "jules@example.com",
-        } as User);
-        setUserData({
-          name: "JULES VERNE",
-          email: "jules@example.com",
-          pin: "1234",
-          balance: 750000,
-        });
-        setIsPinVerified(true);
-        setLoading(false);
-        return;
-      }
+    if (hasMockQuery) {
+      sessionStorage.setItem("mock", "true");
+    }
+
+    if (hasMockQuery || hasMockSession) {
+      setUser({
+        uid: "mock-uid",
+        displayName: "JULES VERNE",
+        email: "jules@example.com",
+      } as User);
+      setUserData({
+        name: "JULES VERNE",
+        email: "jules@example.com",
+        pin: "1234",
+        balance: 750000,
+      });
+      setIsPinVerified(true);
+      setLoading(false);
+      return;
     }
 
     let unsubscribeSnapshot: (() => void) | null = null;
