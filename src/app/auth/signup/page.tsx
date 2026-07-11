@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 export default function SignUpPage() {
   const [name, setName] = useState("");
@@ -17,14 +18,63 @@ export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Camera state
   const [showCamera, setShowCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const hasPushedState = useRef(false);
+
+  // Stop Camera Stream
+  const stopCamera = React.useCallback(() => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+    setCountdown(null);
+  }, [cameraStream]);
+
+  // Sync state with browser back history (device physical/swipe back button support for camera drawer)
+  useEffect(() => {
+    if (showCamera) {
+      window.history.pushState({ cameraOpen: true }, "");
+      hasPushedState.current = true;
+
+      const handlePopState = (e: PopStateEvent) => {
+        e.preventDefault();
+        hasPushedState.current = false;
+        stopCamera();
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      return () => {
+        window.removeEventListener("popstate", handlePopState);
+        if (hasPushedState.current) {
+          window.history.back();
+          hasPushedState.current = false;
+        }
+      };
+    }
+  }, [showCamera, stopCamera]);
+
+  // Prevent background body scroll when camera drawer is open
+  useEffect(() => {
+    if (showCamera) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showCamera]);
 
   // Handle Photo Upload from local files
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,32 +93,53 @@ export default function SignUpPage() {
     }
   };
 
-  // Start Camera Stream
-  const startCamera = async () => {
+  // Start Camera Stream with robust constraints and device configuration
+  const startCamera = async (mode: "user" | "environment" = facingMode) => {
+    // Stop any existing streams first to release the camera hardware
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 400 }, height: { ideal: 400 } },
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: mode,
+          width: { min: 240, ideal: 640, max: 1080 },
+          height: { min: 240, ideal: 640, max: 1080 },
+        },
         audio: false,
-      });
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setCameraStream(stream);
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play().catch((playErr) => {
+          console.error("Video element play failed:", playErr);
+        });
       }
       setShowCamera(true);
     } catch (err) {
       console.error("Camera access denied or unavailable:", err);
-      toast.error("Could not access your camera. Please allow permission or upload an image instead.");
+      toast.error("Could not access your camera lens. Please allow permission or upload an image instead.");
     }
   };
 
-  // Stop Camera Stream
-  const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
+  // Switch camera facing direction dynamically (Front / Back)
+  const toggleCamera = () => {
+    const nextMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextMode);
+    startCamera(nextMode);
+    toast.success(nextMode === "user" ? "Switched to Front Camera" : "Switched to Back Camera");
+  };
+
+
+  // Drag down to dismiss gesture for selfie drawer
+  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (info.offset.y > 100 || info.velocity.y > 500) {
+      stopCamera();
     }
-    setShowCamera(false);
-    setCountdown(null);
   };
 
   // Capture Selfie with elegant countdown and flash
@@ -88,19 +159,20 @@ export default function SignUpPage() {
 
   const captureSelfie = () => {
     if (videoRef.current) {
-      // Trigger camera flash visual
       setFlash(true);
       setTimeout(() => setFlash(false), 300);
 
       const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth || 400;
-      canvas.height = videoRef.current.videoHeight || 400;
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 640;
       const ctx = canvas.getContext("2d");
 
       if (ctx) {
-        // Mirror selfie to look natural to the user
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        if (facingMode === "user") {
+          // Mirror selfie only if front camera is active
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
         const dataUrl = canvas.toDataURL("image/jpeg");
@@ -125,18 +197,16 @@ export default function SignUpPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Update Profile picture and display name
       await updateProfile(user, { displayName: name, photoURL: photo });
 
-      // Create user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
         name,
         email,
         uid: user.uid,
         photoURL: photo,
         createdAt: new Date().toISOString(),
-        balance: 10000.00, // Pre-fund mock users with starting balance
-        pin: null, // User will set PIN next
+        balance: 10000.00,
+        pin: null,
       });
 
       toast.success("Account created successfully!");
@@ -191,7 +261,6 @@ export default function SignUpPage() {
               </span>
             )}
 
-            {/* Quick remove overlay */}
             {photo && (
               <button
                 type="button"
@@ -215,15 +284,15 @@ export default function SignUpPage() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold rounded-lg flex items-center gap-1 transition-all"
+              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold rounded-lg flex items-center gap-1 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">upload_file</span>
               Upload Image
             </button>
             <button
               type="button"
-              onClick={startCamera}
-              className="px-3 py-1.5 bg-gradient-to-r from-[#d4af37] to-[#f2ca50] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all"
+              onClick={() => startCamera(facingMode)}
+              className="px-3 py-1.5 bg-gradient-to-r from-[#d4af37] to-[#f2ca50] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">photo_camera</span>
               Take Selfie
@@ -282,7 +351,7 @@ export default function SignUpPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 shadow-md"
+            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 shadow-md cursor-pointer"
           >
             {loading ? "Creating..." : "Create Account"}
           </button>
@@ -307,14 +376,27 @@ export default function SignUpPage() {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none"
+                drag="y"
+                dragDirectionLock
+                dragConstraints={{ top: 0, bottom: 450 }}
+                dragElastic={{ top: 0, bottom: 0.2 }}
+                onDragEnd={handleDragEnd}
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none touch-none"
               >
                 {/* Drag handle */}
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-4 mb-4" />
+                <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-4 mb-4 cursor-grab active:cursor-grabbing" />
 
                 {/* Header block */}
                 <div className="w-full px-6 flex justify-between items-center border-b border-gray-100 pb-4 mb-6">
-                  <div className="w-6" /> {/* Spacer */}
+                  {/* Switch camera button */}
+                  <button
+                    type="button"
+                    onClick={toggleCamera}
+                    className="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-black transition-colors cursor-pointer"
+                    title="Switch Camera (Front/Back)"
+                  >
+                    <span className="material-symbols-outlined text-[20px] font-bold">flip_camera_ios</span>
+                  </button>
                   <h3 className="font-hanken font-bold text-base text-black text-center">
                     Selfie Verification
                   </h3>
@@ -334,7 +416,10 @@ export default function SignUpPage() {
                       ref={videoRef}
                       autoPlay
                       playsInline
-                      className="w-full h-full object-cover scale-x-[-1]"
+                      className={cn(
+                        "w-full h-full object-cover",
+                        facingMode === "user" ? "scale-x-[-1]" : "scale-x-[1]"
+                      )}
                     />
 
                     {/* Oval Portrait Face Guide Overlay */}
@@ -367,7 +452,7 @@ export default function SignUpPage() {
                   </div>
 
                   <p className="font-hanken text-xs text-gray-400 text-center mt-6 max-w-[260px] leading-relaxed">
-                    Make sure your face is clearly visible inside the alignment frame with good lighting for standard secure sign up verification.
+                    Make sure your face is clearly visible inside the alignment frame. Use the top-left button to toggle between front and back camera lenses.
                   </p>
                 </div>
 
