@@ -170,7 +170,7 @@ export default function PinPage() {
           >
             <div className="relative flex flex-col items-center">
               {/* Spinning luxury gradient ring */}
-              <div className="relative w-32 h-32 flex items-center justify-center">
+              <div className="relative w-24 h-24 flex items-center justify-center">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
@@ -181,13 +181,13 @@ export default function PinPage() {
                 <motion.div
                   animate={{ scale: [1, 1.05, 1] }}
                   transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                  className="relative w-20 h-20 bg-white rounded-full p-2 shadow-sm flex items-center justify-center"
+                  className="relative w-14 h-14 bg-white rounded-full p-2 shadow-sm flex items-center justify-center"
                 >
                   <Image
                     src="https://e-global-tech-kano.vercel.app/_next/image?url=https%3A%2F%2Fi.ibb.co%2FWWjZrtC7%2FE-Tech.png&w=640&q=75"
                     alt="E-Tech Logo"
-                    width={64}
-                    height={64}
+                    width={40}
+                    height={40}
                     className="object-contain"
                     priority
                   />
