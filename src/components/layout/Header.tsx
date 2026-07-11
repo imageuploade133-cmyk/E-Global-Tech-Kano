@@ -85,18 +85,20 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setIsLogoutOpen(true)}
-            className="text-primary hover:opacity-80 transition-opacity p-2 cursor-pointer"
+            className="w-10 h-10 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[24px]">logout</span>
+            <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: '"wght" 500' }}>
+              power_settings_new
+            </span>
           </button>
           <button
             onClick={() => setIsNotificationsOpen(true)}
-            className="relative text-primary hover:opacity-80 transition-opacity p-2"
+            className="relative w-10 h-10 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[28px]">notifications</span>
+            <span className="material-symbols-outlined text-[24px]">notifications</span>
             {unreadCount > 0 && (
                 <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-error text-error-container rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-surface-dim">
                     {unreadCount}
