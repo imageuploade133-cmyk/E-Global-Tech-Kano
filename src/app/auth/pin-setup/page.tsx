@@ -7,13 +7,28 @@ import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import Image from "next/image";
+import { motion } from "framer-motion";
 
 export default function PinSetupPage() {
   const [pin, setPin] = useState("");
   const [step, setStep] = useState(1); // 1: Initial, 2: Confirm
   const [firstPin, setFirstPin] = useState("");
+  const [keypadNumbers, setKeypadNumbers] = useState<string[]>([]);
   const { user, loading } = useAuth();
   const router = useRouter();
+
+  const shuffleKeypad = () => {
+    const numbers = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+    for (let i = numbers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+    }
+    setKeypadNumbers(numbers);
+  };
+
+  useEffect(() => {
+    shuffleKeypad();
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -25,6 +40,7 @@ export default function PinSetupPage() {
     if (pin.length < 4) {
       const newPin = pin + num;
       setPin(newPin);
+      shuffleKeypad();
 
       if (newPin.length === 4) {
         if (step === 1) {
@@ -47,6 +63,7 @@ export default function PinSetupPage() {
 
   const handleDelete = () => {
     setPin(pin.slice(0, -1));
+    shuffleKeypad();
   };
 
   const savePin = async (finalPin: string) => {
@@ -94,28 +111,36 @@ export default function PinSetupPage() {
       </div>
 
       <div className="w-full max-w-xs grid grid-cols-3 gap-6 mb-10">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-          <button
+        {keypadNumbers.slice(0, 9).map((num) => (
+          <motion.button
+            whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+            whileHover={{ scale: 1.05 }}
             key={num}
-            onClick={() => handleKeyPress(num.toString())}
-            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-hanken border border-gray-100 active:bg-black active:text-white transition-colors text-black"
+            onClick={() => handleKeyPress(num)}
+            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
           >
             {num}
-          </button>
+          </motion.button>
         ))}
-        <div />
-        <button
-          onClick={() => handleKeyPress("0")}
-          className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-hanken border border-gray-100 active:bg-black active:text-white transition-colors text-black"
-        >
-          0
-        </button>
-        <button
+        <div className="w-20 h-20" />
+        {keypadNumbers[9] !== undefined && (
+          <motion.button
+            whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+            whileHover={{ scale: 1.05 }}
+            onClick={() => handleKeyPress(keypadNumbers[9])}
+            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+          >
+            {keypadNumbers[9]}
+          </motion.button>
+        )}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          whileHover={{ scale: 1.05 }}
           onClick={handleDelete}
-          className="w-20 h-20 rounded-full flex items-center justify-center text-black active:text-red-500"
+          className="w-20 h-20 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer"
         >
           <span className="material-symbols-outlined text-3xl">backspace</span>
-        </button>
+        </motion.button>
       </div>
     </div>
   );
