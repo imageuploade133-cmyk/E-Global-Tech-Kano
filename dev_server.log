@@ -7,45 +7,10 @@
    - Network:      http://192.168.0.2:3006
 
  ✓ Starting...
- ✓ Ready in 1964ms
+ ✓ Ready in 3.2s
  ○ Compiling / ...
- ✓ Compiled / in 5.1s (1638 modules)
-RouteGuard render state: {
-  loading: true,
-  hasUser: false,
-  pathname: '/',
-  hasPin: false,
-  isPinVerified: false
-}
- HEAD / 200 in 6126ms
+ ✓ Compiled / in 8.3s (1624 modules)
+ HEAD / 200 in 9972ms
  ○ Compiling /auth/pin ...
- ✓ Compiled /auth/pin in 1179ms (1645 modules)
-RouteGuard render state: {
-  loading: true,
-  hasUser: false,
-  pathname: '/auth/pin',
-  hasPin: false,
-  isPinVerified: false
-}
- GET /auth/pin?mock=true 200 in 1801ms
- GET / 200 in 35ms
- GET / 200 in 31ms
-RouteGuard render state: {
-  loading: true,
-  hasUser: false,
-  pathname: '/auth/pin',
-  hasPin: false,
-  isPinVerified: false
-}
- GET /auth/pin?mock=true 200 in 75ms
- GET / 200 in 31ms
- GET / 200 in 26ms
-RouteGuard render state: {
-  loading: true,
-  hasUser: false,
-  pathname: '/auth/pin',
-  hasPin: false,
-  isPinVerified: false
-}
- GET /auth/pin?mock=true 200 in 37ms
- ✓ Compiled in 875ms (1630 modules)
+ ✓ Compiled /auth/pin in 1589ms (1631 modules)
+ GET /auth/pin?mock=true 200 in 2476ms

@@ -9,12 +9,16 @@ import { motion, AnimatePresence, PanInfo } from "framer-motion";
 
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
+import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 
 export default function PinPage() {
   const [pin, setPin] = useState("");
   const [keypadNumbers, setKeypadNumbers] = useState<string[]>([]);
   const { user, userData, setPinVerified, loading } = useAuth();
   const router = useRouter();
+
+  // Logout confirmation state
+  const [isLogoutDrawerOpen, setIsLogoutDrawerOpen] = useState(false);
 
   // Loading Delay State
   const [isVerifying, setIsVerifying] = useState(false);
@@ -23,6 +27,7 @@ export default function PinPage() {
   // Forgot PIN bottom drawer state
   const [showForgotPin, setShowForgotPin] = useState(false);
   const [isRequestingReset, setIsRequestingReset] = useState(false);
+  const [resetOption, setResetOption] = useState<"email" | "otp">("email");
   const hasPushedState = useRef(false);
 
   const shuffleKeypad = () => {
@@ -80,6 +85,7 @@ export default function PinPage() {
   }, [showForgotPin]);
 
   const handleLogOutFromPin = async () => {
+    setIsLogoutDrawerOpen(false);
     try {
       await signOut(auth);
       toast.success("Logged out successfully");
@@ -94,7 +100,11 @@ export default function PinPage() {
     setTimeout(() => {
       setIsRequestingReset(false);
       setShowForgotPin(false);
-      toast.success("A secure verification link has been dispatched to your email address.");
+      if (resetOption === "email") {
+        toast.success("A secure verification link has been dispatched to your email address.");
+      } else {
+        toast.success("A 6-digit One-Time Passcode has been sent to your registered mobile number.");
+      }
     }, 1200);
   };
 
@@ -269,12 +279,19 @@ export default function PinPage() {
           Forgot PIN?
         </button>
         <button
-          onClick={handleLogOutFromPin}
+          onClick={() => setIsLogoutDrawerOpen(true)}
           className="text-gray-400 hover:text-red-500 font-semibold transition-colors cursor-pointer"
         >
           Sign Out
         </button>
       </div>
+
+      {/* Logout Confirmation Drawer */}
+      <LogoutDrawer
+        isOpen={isLogoutDrawerOpen}
+        onClose={() => setIsLogoutDrawerOpen(false)}
+        onConfirm={handleLogOutFromPin}
+      />
 
       {/* 90% Height Bottom Drawer for Forgot PIN recovery */}
       <AnimatePresence>
@@ -318,15 +335,70 @@ export default function PinPage() {
                 </button>
               </div>
 
-              {/* Content body */}
-              <div className="flex-grow flex flex-col justify-center items-center px-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37] mb-6">
-                  <span className="material-symbols-outlined text-[32px] font-bold">lock_reset</span>
+              {/* Content body with selection options */}
+              <div className="flex-grow flex flex-col justify-start items-center px-4 text-center w-full overflow-y-auto">
+                <div className="w-12 h-12 rounded-full bg-[#d4af37]/10 flex items-center justify-center text-[#d4af37] mb-4">
+                  <span className="material-symbols-outlined text-[24px] font-bold">lock_reset</span>
                 </div>
-                <h4 className="font-hanken font-bold text-lg text-black mb-2">Secure Verification Needed</h4>
-                <p className="font-hanken text-sm text-gray-500 max-w-[280px] leading-relaxed">
-                  For top-tier asset security, PIN retrieval is linked directly to your authenticated email. Click below to receive a secure OTP reset connection link.
+                <h4 className="font-hanken font-bold text-base text-black mb-1">Verify Identity to Reset PIN</h4>
+                <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed mb-6">
+                  Select your preferred high-security verification method to recover your secure 4-digit Access PIN.
                 </p>
+
+                {/* Reset options interactive selector list */}
+                <div className="w-full flex flex-col gap-3 mb-6">
+                  {/* Email option card */}
+                  <button
+                    type="button"
+                    onClick={() => setResetOption("email")}
+                    className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      resetOption === "email"
+                        ? "border-[#f2ca50] bg-[#f2ca50]/5 ring-1 ring-[#f2ca50]"
+                        : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                      resetOption === "email" ? "bg-[#f2ca50]/20 text-[#d4af37]" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      <span className="material-symbols-outlined text-[20px]">mail</span>
+                    </div>
+                    <div className="flex-grow">
+                      <p className="font-hanken font-bold text-xs text-black">Email Verification</p>
+                      <p className="font-hanken text-[11px] text-gray-400">Send recovery link to registered email</p>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      resetOption === "email" ? "border-[#d4af37]" : "border-gray-300"
+                    }`}>
+                      {resetOption === "email" && <div className="w-2.5 h-2.5 rounded-full bg-[#d4af37]" />}
+                    </div>
+                  </button>
+
+                  {/* SMS OTP option card */}
+                  <button
+                    type="button"
+                    onClick={() => setResetOption("otp")}
+                    className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      resetOption === "otp"
+                        ? "border-[#f2ca50] bg-[#f2ca50]/5 ring-1 ring-[#f2ca50]"
+                        : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                      resetOption === "otp" ? "bg-[#f2ca50]/20 text-[#d4af37]" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      <span className="material-symbols-outlined text-[20px]">sms</span>
+                    </div>
+                    <div className="flex-grow">
+                      <p className="font-hanken font-bold text-xs text-black">SMS One-Time Passcode (OTP)</p>
+                      <p className="font-hanken text-[11px] text-gray-400">Send 6-digit secure code to phone</p>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      resetOption === "otp" ? "border-[#d4af37]" : "border-gray-300"
+                    }`}>
+                      {resetOption === "otp" && <div className="w-2.5 h-2.5 rounded-full bg-[#d4af37]" />}
+                    </div>
+                  </button>
+                </div>
               </div>
 
               {/* Bottom Buttons with high-fidelity loading visual feedback */}
@@ -340,10 +412,10 @@ export default function PinPage() {
                   {isRequestingReset ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Dispatching Reset...
+                      {resetOption === "email" ? "Dispatching Reset..." : "Generating OTP..."}
                     </>
                   ) : (
-                    "Request Secure Reset Link"
+                    resetOption === "email" ? "Request Secure Reset Link" : "Generate Secure OTP Code"
                   )}
                 </button>
                 <button

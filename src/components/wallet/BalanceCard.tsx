@@ -112,7 +112,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           {/* Bottom: User Name and Type */}
           <div className="flex justify-between items-end">
             <div>
-                <p className="font-label-sm text-[10px] uppercase tracking-wider text-[#FFFFFF]/70 mb-1">Card Holder</p>
+                <p className="font-label-sm text-[10px] uppercase tracking-wider text-[#FFFFFF]/70 mb-1">Account Holder</p>
                 <p className="font-label-sm text-[14px] text-[#FFFFFF] uppercase tracking-widest font-bold">{resolvedName}</p>
             </div>
             <div className="flex flex-col items-end">
