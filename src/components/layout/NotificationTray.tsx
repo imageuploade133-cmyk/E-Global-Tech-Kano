@@ -33,54 +33,37 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
   const [trayLoading, setTrayLoading] = useState(true);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
 
-  const hasPushedState = useRef(false);
-  const hasPushedDetailState = useRef(false);
+  // Use refs to avoid effect-cleanup loops when states transition
+  const selectedRef = useRef<Notification | null>(null);
+  selectedRef.current = selectedNotification;
 
-  // Sync state with browser back history for the Main Notifications Tray
+  // Single-channel, unified popstate listener for back button integration
   useEffect(() => {
-    if (isOpen && !selectedNotification) {
+    if (isOpen) {
+      // Push state representing main tray open
       window.history.pushState({ notificationsOpen: true }, "");
-      hasPushedState.current = true;
 
-      const handlePopState = (e: PopStateEvent) => {
-        e.preventDefault();
-        hasPushedState.current = false;
-        onClose();
+      const handlePopState = () => {
+        // Intercept back actions
+        if (selectedRef.current) {
+          // If sub-drawer is open, dismiss it first
+          setSelectedNotification(null);
+        } else {
+          // Otherwise, close the main notification panel
+          onClose();
+        }
       };
 
       window.addEventListener("popstate", handlePopState);
       return () => {
         window.removeEventListener("popstate", handlePopState);
-        if (hasPushedState.current) {
+        // Clean up main tray history state if closed manually
+        if (window.history.state?.notificationsOpen) {
           window.history.back();
-          hasPushedState.current = false;
         }
       };
     }
-  }, [isOpen, onClose, selectedNotification]);
-
-  // Sync state with browser back history for the 90% Height Detail Drawer
-  useEffect(() => {
-    if (selectedNotification) {
-      window.history.pushState({ detailOpen: true }, "");
-      hasPushedDetailState.current = true;
-
-      const handlePopState = (e: PopStateEvent) => {
-        e.preventDefault();
-        hasPushedDetailState.current = false;
-        setSelectedNotification(null);
-      };
-
-      window.addEventListener("popstate", handlePopState);
-      return () => {
-        window.removeEventListener("popstate", handlePopState);
-        if (hasPushedDetailState.current) {
-          window.history.back();
-          hasPushedDetailState.current = false;
-        }
-      };
-    }
-  }, [selectedNotification]);
+  }, [isOpen, onClose]);
 
   // Simulate skeleton loader when opening the tray
   useEffect(() => {
@@ -105,16 +88,26 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
     };
   }, [isOpen, selectedNotification]);
 
+  // Trigger sub-drawer and push custom history state for popstate back button support
+  const handleNotificationClick = (n: Notification) => {
+    onToggleRead(n.id);
+    window.history.pushState({ detailOpen: true }, "");
+    setSelectedNotification(n);
+  };
+
+  // Close sub-drawer manually and align browser history
+  const handleCloseDetail = () => {
+    if (window.history.state?.detailOpen) {
+      window.history.back();
+    }
+    setSelectedNotification(null);
+  };
+
   // Handle drag to dismiss for the 90% detail drawer
   const handleDetailDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.y > 100 || info.velocity.y > 500) {
-      setSelectedNotification(null);
+      handleCloseDetail();
     }
-  };
-
-  const handleNotificationClick = (n: Notification) => {
-    onToggleRead(n.id);
-    setSelectedNotification(n);
   };
 
   return (
@@ -265,7 +258,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => setSelectedNotification(null)}
+                  onClick={handleCloseDetail}
                   className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[20000]"
                 />
 
@@ -293,7 +286,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                     </h3>
                     <button
                       type="button"
-                      onClick={() => setSelectedNotification(null)}
+                      onClick={handleCloseDetail}
                       className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[16px] font-bold">close</span>
@@ -409,7 +402,7 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                     <div className="mt-8 flex flex-col gap-3">
                       <button
                         type="button"
-                        onClick={() => setSelectedNotification(null)}
+                        onClick={handleCloseDetail}
                         className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
                       >
                         Acknowledge Alert
