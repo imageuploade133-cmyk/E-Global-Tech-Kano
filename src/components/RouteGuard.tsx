@@ -24,12 +24,16 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     } else {
       // User is logged in
       const hasPin = Boolean(userData?.pin);
+      const isPinRequired = userData?.isPinRequired !== false;
 
       if (!hasPin && pathname !== "/auth/pin-setup") {
         router.push("/auth/pin-setup");
-      } else if (hasPin && !isPinVerified && pathname !== "/auth/pin") {
+      } else if (hasPin && isPinRequired && !isPinVerified && pathname !== "/auth/pin") {
         router.push("/auth/pin");
-      } else if (hasPin && isPinVerified && (pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/pin" || pathname === "/auth/pin-setup")) {
+      } else if (
+        (hasPin && isPinVerified && (pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/pin" || pathname === "/auth/pin-setup")) ||
+        (hasPin && !isPinRequired && (pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/pin" || pathname === "/auth/pin-setup"))
+      ) {
         router.push("/");
       }
     }
@@ -81,7 +85,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Show nothing while redirecting
   if (!user && !isPublicRoute) return null;
   if (user && !userData?.pin && pathname !== "/auth/pin-setup") return null;
-  if (user && userData?.pin && !isPinVerified && pathname !== "/auth/pin") return null;
+  const isPinRequired = userData?.isPinRequired !== false;
+  if (user && userData?.pin && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
 
   return <>{children}</>;
 }
