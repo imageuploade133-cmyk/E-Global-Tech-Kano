@@ -77,7 +77,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   />
                 </div>
                 <span className="font-label-sm text-[8px] min-[360px]:text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF] font-bold truncate">
-                  E-TECH HUB
+                  E-TECH GLOBAL HUB
                 </span>
               </div>
             </div>
@@ -117,13 +117,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </div>
 
           {/* Bottom section: Card Number, User Name, Expiry/infinite badge */}
-          <div className="space-y-1 w-full overflow-hidden flex-shrink-0">
-            {/* Card Number Mockup */}
-            <div className="flex gap-2 min-[360px]:gap-3 font-mono text-[9px] min-[360px]:text-[11px] text-[#FFFFFF]/70 tracking-[0.12em]">
-                <span>4582</span>
-                <span>••••</span>
-                <span>••••</span>
-                <span>8921</span>
+          <div className="space-y-1.5 w-full overflow-hidden flex-shrink-0">
+            {/* Card Number Mockup - using ACCOUNT HOLDER name as the number */}
+            <div className="font-mono text-[9px] min-[360px]:text-[11px] text-[#FFFFFF]/80 tracking-[0.15em] uppercase truncate max-w-full" title={resolvedName}>
+              {resolvedName}
             </div>
 
             {/* Bottom: User Name and Type */}
@@ -134,9 +131,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     {resolvedName}
                   </p>
               </div>
-              <div className="flex flex-col items-end flex-shrink-0">
-                   <span className="material-symbols-outlined text-[#FFFFFF] text-[18px] min-[360px]:text-[22px]" style={{ fontVariationSettings: '"FILL" 1' }}>diamond</span>
-                   <p className="font-label-sm text-[7px] min-[360px]:text-[8px] text-[#FFFFFF] font-bold uppercase tracking-tighter">Infinite</p>
+              <div className="flex flex-col items-end flex-shrink-0 bg-white/10 px-2 py-0.5 rounded border border-white/15 backdrop-blur-xs select-none">
+                   <span className="font-mono text-[9px] min-[360px]:text-[11px] text-[#FFFFFF] font-black tracking-wider leading-none">NGN</span>
               </div>
             </div>
           </div>
