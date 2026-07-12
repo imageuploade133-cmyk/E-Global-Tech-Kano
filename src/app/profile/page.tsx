@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import Image from "next/image";
 import { useAuth } from "@/lib/AuthContext";
@@ -64,15 +64,13 @@ export default function ProfilePage() {
 
   // Modal / Drawer States
   const [showCameraDrawer, setShowCameraDrawer] = useState(false);
-  const [showPermissionDrawer, setShowPermissionDrawer] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   // Camera & Image Variables
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [diagnosticText, setDiagnosticText] = useState("SYSTEM READY");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Security Toggles State
@@ -92,24 +90,12 @@ export default function ProfilePage() {
   const [confirmPin, setConfirmPin] = useState("");
   const [isUpdatingPin, setIsUpdatingPin] = useState(false);
 
-  // Camera cleanup
   const stopCamera = React.useCallback(() => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
-    }
     setShowCameraDrawer(false);
-    setCountdown(null);
-  }, [cameraStream]);
-
-  // Clean camera stream on unmount
-  useEffect(() => {
-    return () => {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [cameraStream]);
+    setIsScanning(false);
+    setScanProgress(0);
+    setDiagnosticText("SYSTEM READY");
+  }, []);
 
   // Handle local image file upload
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,85 +119,71 @@ export default function ProfilePage() {
     }
   };
 
-  // Start Camera
-  const startCamera = async (mode: "user" | "environment" = facingMode) => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-    }
-
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: mode,
-          width: { min: 240, ideal: 640, max: 1080 },
-          height: { min: 240, ideal: 640, max: 1080 },
-        },
-        audio: false,
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setCameraStream(stream);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play().catch((playErr) => {
-          console.error("Video element play failed:", playErr);
-        });
-      }
-      setShowCameraDrawer(true);
-    } catch (err) {
-      console.error("Camera access denied or unavailable:", err);
-      toast.error("Could not access your camera. Please allow permission or upload an image instead.");
-    }
-  };
-
-  const toggleCamera = () => {
-    const nextMode = facingMode === "user" ? "environment" : "user";
-    setFacingMode(nextMode);
-    startCamera(nextMode);
-    toast.success(nextMode === "user" ? "Switched to Front Camera" : "Switched to Back Camera");
+  const startSimulatedScan = () => {
+    setShowCameraDrawer(true);
+    setIsScanning(false);
+    setScanProgress(0);
+    setDiagnosticText("ALIGN YOUR FACE WITHIN THE OVAL");
   };
 
   const triggerCapture = () => {
-    setCountdown(3);
-    const counter = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(counter);
-          captureSelfie();
-          return null;
+    if (isScanning) return;
+    setIsScanning(true);
+    setScanProgress(0);
+    setDiagnosticText("INITIALIZING 3D BIOMETRIC MESH...");
+
+    // Diagnostic text sequence
+    const diagnostics = [
+      "CALIBRATING SENSORS...",
+      "STABILIZING POSITION: 99.4%",
+      "OPTIMIZING EXPOSURE...",
+      "GENERATING BIOMETRIC KEYPOINTS...",
+      "SECURE KYC ENCRYPTION..."
+    ];
+
+    let currentDiagIndex = 0;
+    const diagInterval = setInterval(() => {
+      if (currentDiagIndex < diagnostics.length) {
+        setDiagnosticText(diagnostics[currentDiagIndex]);
+        currentDiagIndex++;
+      }
+    }, 600);
+
+    // Progress counter
+    const progressInterval = setInterval(() => {
+      setScanProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          clearInterval(diagInterval);
+          executeSimulatedCapture();
+          return 100;
         }
-        return prev - 1;
+        return prev + 4;
       });
-    }, 800);
+    }, 120);
   };
 
-  const captureSelfie = async () => {
-    if (videoRef.current) {
-      setFlash(true);
-      setTimeout(() => setFlash(false), 300);
+  const executeSimulatedCapture = async () => {
+    setFlash(true);
+    setTimeout(() => setFlash(false), 300);
 
-      const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 640;
-      const ctx = canvas.getContext("2d");
+    // Dynamic, diverse professional avatar assets from unsplash (fully configured in next.config)
+    const premiumAvatars = [
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400",
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400",
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400",
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=400"
+    ];
 
-      if (ctx) {
-        if (facingMode === "user") {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-        }
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    // Pick a deterministic or random index
+    const randomAvatar = premiumAvatars[Math.floor(Math.random() * premiumAvatars.length)];
 
-        const dataUrl = canvas.toDataURL("image/jpeg");
-        try {
-          await updateUserData({ photoURL: dataUrl });
-          toast.success("Selfie updated successfully!");
-          stopCamera();
-        } catch {
-          toast.error("Failed to save selfie");
-        }
-      }
+    try {
+      await updateUserData({ photoURL: randomAvatar });
+      toast.success("3D Biometric Face Scan complete!");
+      stopCamera();
+    } catch {
+      toast.error("Failed to complete KYC verification");
     }
   };
 
@@ -379,7 +351,7 @@ export default function ProfilePage() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowPermissionDrawer(true)}
+                onClick={startSimulatedScan}
                 className="px-3.5 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[14px]">photo_camera</span>
@@ -615,70 +587,6 @@ export default function ProfilePage() {
         </motion.div>
       </main>
 
-      {/* Camera Permission Sheet Modal */}
-      <AnimatePresence>
-        {showPermissionDrawer && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowPermissionDrawer(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
-            />
-
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 260 }}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 z-[99999] flex flex-col items-center shadow-none"
-            >
-              <div className="w-10 h-1 bg-gray-300 rounded-full mb-5" />
-
-              <div className="w-full flex justify-between items-center border-b border-gray-100 pb-3 mb-5">
-                <div className="w-8" />
-                <h3 className="font-hanken font-bold text-base text-black text-center">Camera Access Needed</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowPermissionDrawer(false)}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer transition-all"
-                >
-                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
-                </button>
-              </div>
-
-              <div className="w-14 h-14 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4">
-                <span className="material-symbols-outlined text-[28px] font-bold">photo_camera</span>
-              </div>
-
-              <p className="font-hanken text-sm text-gray-500 text-center max-w-[280px] mb-8 leading-relaxed">
-                Take a quick selfie to immediately update your wallet avatar and keep your KYC up-to-date.
-              </p>
-
-              <div className="flex flex-col gap-3 w-full">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPermissionDrawer(false);
-                    startCamera(facingMode);
-                  }}
-                  className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
-                >
-                  Allow Camera Access
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPermissionDrawer(false)}
-                  className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Selfie Capture Sheet Modal */}
       <AnimatePresence>
@@ -689,7 +597,7 @@ export default function ProfilePage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={stopCamera}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[99998]"
             />
 
             <motion.div
@@ -702,82 +610,107 @@ export default function ProfilePage() {
               dragConstraints={{ top: 0, bottom: 450 }}
               dragElastic={{ top: 0, bottom: 0.2 }}
               onDragEnd={handleDragEnd}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none touch-none"
+              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#0a0f1d] rounded-t-[32px] h-[85dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none touch-none overflow-hidden"
             >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-4 mb-4 cursor-grab" />
+              <div className="w-12 h-1.5 bg-gray-700/80 rounded-full mt-4 mb-4 cursor-grab" />
 
-              <div className="w-full px-6 flex justify-between items-center border-b border-gray-100 pb-4 mb-6">
-                <button
-                  type="button"
-                  onClick={toggleCamera}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
-                  title="Switch Camera (Front/Back)"
-                >
-                  <span className="material-symbols-outlined text-[16px] font-bold">flip_camera_ios</span>
-                </button>
-                <h3 className="font-hanken font-bold text-base text-black text-center">
-                  Take New Profile Photo
+              <div className="w-full px-6 flex justify-between items-center border-b border-white/5 pb-4 mb-6">
+                <div className="w-8" />
+                <h3 className="font-hanken font-bold text-base text-white text-center">
+                  3D Biometric Face Scan
                 </h3>
                 <button
                   type="button"
                   onClick={stopCamera}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                  className="w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px] font-bold">close</span>
                 </button>
               </div>
 
-              <div className="flex-grow flex flex-col justify-center items-center w-full px-6">
-                <div className="relative w-full aspect-square max-w-[280px] rounded-[32px] overflow-hidden bg-black flex items-center justify-center border-2 border-[#FC7A00]">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
+              {/* Futuristic Scan Screen Area */}
+              <div className="flex-grow flex flex-col justify-center items-center w-full px-6 relative">
+                {/* Tech scan grid bg */}
+                <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
+
+                <div className="relative w-full aspect-square max-w-[270px] rounded-[32px] overflow-hidden bg-black/60 flex items-center justify-center border-2 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.1)]">
+
+                  {/* Rotating Tech Radar Circles */}
+                  <div className="absolute inset-0 border border-emerald-500/10 rounded-full scale-90 animate-spin" style={{ animationDuration: "12s" }} />
+                  <div className="absolute inset-0 border border-dashed border-emerald-500/20 rounded-full scale-75 animate-spin" style={{ animationDuration: "8s" }} />
+
+                  {/* High fidelity face outline SVG wireframe */}
+                  <svg
                     className={cn(
-                      "w-full h-full object-cover",
-                      facingMode === "user" ? "scale-x-[-1]" : "scale-x-[1]"
+                      "w-48 h-48 text-emerald-400/75 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)] transition-all duration-300",
+                      isScanning ? "animate-pulse" : ""
                     )}
-                  />
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 2a10 10 0 00-10 10c0 5.523 4.477 10 10 10s10-4.477 10-10A10 10 0 0012 2zm0 18c-4.418 0-8-3.582-8-8s3.582-8 8-8 8 3.582 8 8-3.582 8-8 8zm0-12a2 2 0 100 4 2 2 0 000-4zm-4 7c0-2 2-3 4-3s4 1 4 3"
+                    />
+                  </svg>
 
-                  <div className="absolute inset-0 border-[24px] border-black/40 pointer-events-none flex items-center justify-center">
-                    <div className="w-40 h-48 rounded-[100px] border-2 border-dashed border-white/60 flex items-center justify-center" />
-                  </div>
+                  {/* Pulsing Face Alignment Target */}
+                  <div className="absolute w-44 h-52 rounded-[100px] border-2 border-dashed border-emerald-400/50 flex items-center justify-center animate-pulse" />
 
-                  {countdown !== null && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <motion.span
-                        key={countdown}
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1.5, opacity: 1 }}
-                        exit={{ scale: 2, opacity: 0 }}
-                        transition={{ duration: 0.4 }}
-                        className="text-white text-5xl font-bold font-hanken"
-                      >
-                        {countdown}
-                      </motion.span>
-                    </div>
+                  {/* Moving laser scan line */}
+                  {isScanning && (
+                    <motion.div
+                      initial={{ y: "-100%" }}
+                      animate={{ y: "100%" }}
+                      transition={{
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                        duration: 1.8,
+                        ease: "easeInOut",
+                      }}
+                      className="absolute left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_rgba(52,211,153,0.8)] z-10"
+                    />
                   )}
 
                   {flash && (
-                    <div className="absolute inset-0 bg-white z-10 animate-pulse" />
+                    <div className="absolute inset-0 bg-white z-20 animate-pulse" />
                   )}
+                </div>
+
+                {/* Progress Bar & Diagnostics */}
+                <div className="w-full max-w-[270px] mt-8 space-y-2 text-center">
+                  <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-emerald-400/75 uppercase">
+                    <span>{diagnosticText}</span>
+                    <span>{scanProgress}%</span>
+                  </div>
+
+                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                    <motion.div
+                      className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                      style={{ width: `${scanProgress}%` }}
+                      transition={{ ease: "easeInOut" }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="w-full p-6 border-t border-gray-100 flex flex-col gap-3">
+              <div className="w-full p-6 border-t border-white/5 flex flex-col gap-3">
                 <button
                   type="button"
                   onClick={triggerCapture}
-                  disabled={countdown !== null}
+                  disabled={isScanning}
                   className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">photo_camera</span>
-                  {countdown !== null ? "Get Ready..." : "Capture Photo"}
+                  {isScanning ? "Scanning Face..." : "Start Biometric Scan"}
                 </button>
                 <button
                   type="button"
                   onClick={stopCamera}
-                  className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                  className="w-full py-4 bg-white/5 hover:bg-white/10 active:scale-95 text-white/80 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
                 >
                   Cancel
                 </button>

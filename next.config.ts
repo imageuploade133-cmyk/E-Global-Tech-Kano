@@ -14,6 +14,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "e-global-tech-kano.vercel.app",
       },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
     ],
   },
 };
