@@ -69,12 +69,27 @@
 }
 
 @layer base {
+  /* Hide scrollbars globally across all browsers, Android WebViews, and Safari iOS */
+  * {
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE/Edge */
+    -webkit-overflow-scrolling: touch !important; /* iOS smooth scrolling momentum */
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera, Android WebView, iOS Safari */
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+  }
+
   body {
     background-color: #ffffff;
     color: #212529;
     -webkit-font-smoothing: antialiased;
     min-height: 100dvh;
     font-family: var(--font-hanken-grotesk), sans-serif;
+    overflow-x: hidden;
   }
 }
 
