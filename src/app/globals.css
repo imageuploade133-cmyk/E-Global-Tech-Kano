@@ -59,13 +59,13 @@
   --color-on-secondary-fixed-variant: #0b513d;
   --color-tertiary-fixed: #dae2fd;
 
-  --spacing-stack-lg: 24px;
-  --spacing-stack-xl: 48px;
+  --spacing-stack-lg: clamp(16px, 5vw, 24px);
+  --spacing-stack-xl: clamp(28px, 8vw, 48px);
   --spacing-container-max: 1280px;
-  --spacing-stack-md: 16px;
-  --spacing-stack-sm: 8px;
-  --spacing-gutter: 16px;
-  --spacing-margin-mobile: 16px;
+  --spacing-stack-md: clamp(12px, 4vw, 16px);
+  --spacing-stack-sm: clamp(6px, 2vw, 8px);
+  --spacing-gutter: clamp(10px, 4vw, 16px);
+  --spacing-margin-mobile: clamp(10px, 4vw, 16px);
 }
 
 @layer base {
@@ -81,6 +81,17 @@
     width: 0 !important;
     height: 0 !important;
     background: transparent !important;
+  }
+
+  /* Prevent auto-zoom on iOS by guaranteeing 16px minimum font on inputs */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Smooth scroll reset support */
+  html, body {
+    scroll-behavior: smooth;
+    overscroll-behavior-y: none; /* mimics native elastic bounce limit */
   }
 
   body {

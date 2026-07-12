@@ -94,9 +94,20 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50"
+            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer"
           >
-            {loading ? "Authenticating..." : "Login"}
+            {loading ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                  className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
+                />
+                <span>Authenticating...</span>
+              </>
+            ) : (
+              "Login"
+            )}
           </button>
         </form>
 

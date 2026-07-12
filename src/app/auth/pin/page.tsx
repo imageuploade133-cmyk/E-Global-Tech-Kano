@@ -421,7 +421,7 @@ export default function PinPage() {
                 <button
                   type="button"
                   onClick={() => setShowForgotPin(false)}
-                  className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                  className="w-full py-4 bg-white hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer premium-gradient-border"
                 >
                   Cancel
                 </button>
