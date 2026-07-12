@@ -351,8 +351,8 @@ export default function ProfilePage() {
           className="max-w-md mx-auto space-y-6"
         >
           {/* Section: Profile Header & Photo Editor */}
-          <section className="glass-card rounded-2xl p-5 flex flex-col items-center text-center">
-            <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-[#FC7A00] flex items-center justify-center bg-gray-50 shadow-md">
+          <section className="premium-gradient-card premium-gradient-border p-6 flex flex-col items-center text-center">
+            <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-[#FC7A00] flex items-center justify-center bg-gray-50 shadow-lg">
               <Image
                 src={currentPhoto}
                 alt="Profile Avatar"
@@ -361,7 +361,7 @@ export default function ProfilePage() {
               />
             </div>
 
-            <div className="mt-3 flex gap-2">
+            <div className="mt-4 flex gap-2.5">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -372,7 +372,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer"
+                className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[14px]">upload_file</span>
                 Upload File
@@ -380,22 +380,22 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowPermissionDrawer(true)}
-                className="px-2.5 py-1 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer"
+                className="px-3.5 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[14px]">photo_camera</span>
                 Take Selfie
               </button>
             </div>
 
-            <div className="mt-4">
-              <h2 className="font-hanken font-bold text-lg text-black">{userName}</h2>
-              <p className="font-hanken text-xs text-gray-400">{userEmail}</p>
+            <div className="mt-5">
+              <h2 className="font-hanken font-bold text-xl text-black tracking-tight">{userName}</h2>
+              <p className="font-hanken text-xs text-gray-400 font-semibold">{userEmail}</p>
             </div>
           </section>
 
           {/* Section: Security Preferences & Toggles */}
-          <section className="glass-card rounded-2xl p-5 space-y-4">
-            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100 pb-2">
+          <section className="premium-gradient-card premium-gradient-border p-6 space-y-4">
+            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100/60 pb-2.5">
               Security Settings
             </h3>
 
@@ -445,8 +445,8 @@ export default function ProfilePage() {
           </section>
 
           {/* Section: Daily Transfer Limit - 4 Grid Categories */}
-          <section className="glass-card rounded-2xl p-5 space-y-4">
-            <div className="border-b border-gray-100 pb-2">
+          <section className="premium-gradient-card premium-gradient-border p-6 space-y-4">
+            <div className="border-b border-gray-100/60 pb-2.5">
               <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500">
                 Daily Transfer Limit Categories
               </h3>
@@ -490,8 +490,8 @@ export default function ProfilePage() {
           </section>
 
           {/* Section: Change Access PIN Form */}
-          <section className="glass-card rounded-2xl p-5 space-y-4">
-            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100 pb-2">
+          <section className="premium-gradient-card premium-gradient-border p-6 space-y-4">
+            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100/60 pb-2.5">
               Change Access PIN
             </h3>
 
@@ -549,8 +549,8 @@ export default function ProfilePage() {
           </section>
 
           {/* Section: Change Password Form */}
-          <section className="glass-card rounded-2xl p-5 space-y-4">
-            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100 pb-2">
+          <section className="premium-gradient-card premium-gradient-border p-6 space-y-4">
+            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100/60 pb-2.5">
               Change Account Password
             </h3>
 
