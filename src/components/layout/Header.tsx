@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { NotificationTray, Notification } from "./NotificationTray";
 import { LogoutDrawer } from "./LogoutDrawer";
 import { auth } from "@/lib/firebase";
@@ -105,9 +106,19 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <Link
+            href="/support"
+            className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+            title="Customer Support"
+          >
+            <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]" style={{ fontVariationSettings: '"wght" 500' }}>
+              support_agent
+            </span>
+          </Link>
           <button
             onClick={() => setIsLogoutOpen(true)}
             className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+            title="Sign Out"
           >
             <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]" style={{ fontVariationSettings: '"wght" 500' }}>
               power_settings_new
@@ -116,6 +127,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
           <button
             onClick={() => setIsNotificationsOpen(true)}
             className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+            title="Notifications"
           >
             <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]">notifications</span>
             {unreadCount > 0 && (
