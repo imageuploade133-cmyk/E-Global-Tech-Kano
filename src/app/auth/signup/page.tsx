@@ -351,9 +351,20 @@ export default function SignUpPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 shadow-md cursor-pointer"
+            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 shadow-md cursor-pointer flex items-center justify-center gap-2.5"
           >
-            {loading ? "Creating..." : "Create Account"}
+            {loading ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                  className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
+                />
+                <span>Creating...</span>
+              </>
+            ) : (
+              "Create Account"
+            )}
           </button>
         </form>
 
@@ -416,7 +427,7 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={() => setShowPermissionDrawer(false)}
-                    className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                    className="w-full py-4 bg-white hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer premium-gradient-border"
                   >
                     Cancel
                   </button>
@@ -539,7 +550,7 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={stopCamera}
-                    className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                    className="w-full py-4 bg-white hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer premium-gradient-border"
                   >
                     Cancel
                   </button>

@@ -710,7 +710,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={stopCamera}
-                  className="w-full py-4 bg-white/5 hover:bg-white/10 active:scale-95 text-white/80 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                  className="w-full py-4 bg-[#0a0f1d]/40 hover:bg-white/5 active:scale-95 text-white/90 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer premium-gradient-border"
                 >
                   Cancel
                 </button>
