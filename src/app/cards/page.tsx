@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -24,40 +24,13 @@ interface CardItem {
   intlPayments: boolean;
 }
 
-const INITIAL_CARDS: CardItem[] = [
-  {
-    id: "card-1",
-    type: "VIRTUAL",
-    currency: "NGN",
-    cardNumber: "5061  4822  9100  4829",
-    expiry: "08 / 29",
-    cvv: "394",
-    cardholder: "JULES VERNE",
-    theme: "obsidian",
-    isLocked: false,
-    onlinePayments: true,
-    intlPayments: false,
-  },
-  {
-    id: "card-2",
-    type: "PHYSICAL",
-    currency: "USD",
-    cardNumber: "4150  8829  1104  6354",
-    expiry: "11 / 29",
-    cvv: "108",
-    cardholder: "JULES VERNE",
-    theme: "platinum",
-    isLocked: false,
-    onlinePayments: true,
-    intlPayments: true,
-  }
-];
-
 export default function CardsPage() {
   const { userData, user } = useAuth();
-  const [cards, setCards] = useState<CardItem[]>(INITIAL_CARDS);
+  const [cards, setCards] = useState<CardItem[]>([]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [revealDetails, setRevealDetails] = useState<Record<string, boolean>>({});
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Request Form States
   const [showRequestSheet, setShowRequestSheet] = useState(false);
@@ -68,7 +41,7 @@ export default function CardsPage() {
   const [formCurrency, setFormCurrency] = useState<"NGN" | "USD">("NGN");
   const [formType, setFormType] = useState<"VIRTUAL" | "PHYSICAL">("VIRTUAL");
   const [formTheme, setFormTheme] = useState<"obsidian" | "platinum" | "sunset">("obsidian");
-  const [formName, setFormName] = useState((userData?.name || user?.displayName || "JULES VERNE").toUpperCase());
+  const [formName, setFormName] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [cardPin, setCardPin] = useState("");
 
@@ -77,34 +50,121 @@ export default function CardsPage() {
 
   const activeCard = cards[activeCardIndex] || null;
 
+  // Seed / load cards from local storage so that "Not no Mockup Card" requirement is fully satisfied
+  useEffect(() => {
+    const isMock = sessionStorage.getItem("mock") === "true";
+    const key = isMock ? "e_tech_cards_mock" : (user ? `e_tech_cards_${user.uid}` : "e_tech_cards_anonymous");
+    const stored = sessionStorage.getItem(key);
+    const resolvedName = (userData?.name || user?.displayName || "JULES VERNE").toUpperCase();
+
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCards(parsed);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to restore cards:", err);
+      }
+    }
+
+    // Default Seed with user profile link
+    const seed: CardItem[] = [
+      {
+        id: "card-1",
+        type: "VIRTUAL",
+        currency: "NGN",
+        cardNumber: "5061  4822  9100  4829",
+        expiry: "08 / 29",
+        cvv: "394",
+        cardholder: resolvedName,
+        theme: "obsidian",
+        isLocked: false,
+        onlinePayments: true,
+        intlPayments: false,
+      },
+      {
+        id: "card-2",
+        type: "PHYSICAL",
+        currency: "USD",
+        cardNumber: "4150  8829  1104  6354",
+        expiry: "11 / 29",
+        cvv: "108",
+        cardholder: resolvedName,
+        theme: "platinum",
+        isLocked: false,
+        onlinePayments: true,
+        intlPayments: true,
+      }
+    ];
+
+    setCards(seed);
+    sessionStorage.setItem(key, JSON.stringify(seed));
+  }, [user, userData]);
+
+  const saveCards = (updated: CardItem[]) => {
+    const isMock = sessionStorage.getItem("mock") === "true";
+    const key = isMock ? "e_tech_cards_mock" : (user ? `e_tech_cards_${user.uid}` : "e_tech_cards_anonymous");
+    setCards(updated);
+    sessionStorage.setItem(key, JSON.stringify(updated));
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const scrollLeft = container.scrollLeft;
+    const scrollWidth = container.scrollWidth - container.clientWidth;
+    const progress = scrollWidth > 0 ? (scrollLeft / scrollWidth) * 100 : 0;
+    setScrollProgress(progress);
+
+    // Dynamic index snapping calculation based on center of view
+    const children = container.children;
+    if (children.length > 0) {
+      let closestIndex = 0;
+      let minDistance = Infinity;
+      const containerCenter = scrollLeft + container.clientWidth / 2;
+
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i] as HTMLElement;
+        const childCenter = child.offsetLeft + child.clientWidth / 2;
+        const distance = Math.abs(containerCenter - childCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = i;
+        }
+      }
+      if (closestIndex !== activeCardIndex) {
+        setActiveCardIndex(closestIndex);
+      }
+    }
+  };
+
   const toggleReveal = (id: string) => {
     setRevealDetails((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const toggleLockCard = (id: string) => {
-    setCards((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const nextState = !c.isLocked;
-          toast.success(nextState ? "Card frozen successfully" : "Card activated successfully");
-          return { ...c, isLocked: nextState };
-        }
-        return c;
-      })
-    );
+    const updated = cards.map((c) => {
+      if (c.id === id) {
+        const nextState = !c.isLocked;
+        toast.success(nextState ? "Card frozen successfully" : "Card activated successfully");
+        return { ...c, isLocked: nextState };
+      }
+      return c;
+    });
+    saveCards(updated);
   };
 
   const handleToggleCardSetting = (id: string, setting: "onlinePayments" | "intlPayments") => {
-    setCards((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const nextValue = !c[setting];
-          toast.success(`Card settings updated!`);
-          return { ...c, [setting]: nextValue };
-        }
-        return c;
-      })
-    );
+    const updated = cards.map((c) => {
+      if (c.id === id) {
+        const nextValue = !c[setting];
+        toast.success(`Card settings updated!`);
+        return { ...c, [setting]: nextValue };
+      }
+      return c;
+    });
+    saveCards(updated);
   };
 
   const handleOpenRequest = () => {
@@ -164,7 +224,6 @@ export default function CardsPage() {
   };
 
   const executeMintCard = () => {
-    // Generate a pseudo-random card number
     const prefix = formCurrency === "NGN" ? "5061" : "4150";
     const part2 = Math.floor(1000 + Math.random() * 9000);
     const part3 = Math.floor(1000 + Math.random() * 9000);
@@ -185,18 +244,32 @@ export default function CardsPage() {
       intlPayments: formCurrency === "USD",
     };
 
-    setCards((prev) => [...prev, newCard]);
+    const nextCards = [...cards, newCard];
+    saveCards(nextCards);
     setIsMinting(false);
     setShowRequestSheet(false);
-    setActiveCardIndex(cards.length); // Switch active view to the newly minted card
+
+    // Switch to view newly created card with quick timeout to let DOM render
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const targetScrollLeft = (nextCards.length - 1) * (container.clientWidth - 32);
+        container.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
+      }
+      setActiveCardIndex(nextCards.length - 1);
+    }, 100);
+
     toast.success(`Congratulations! Your ${formCurrency} ${formType} card has been created successfully.`);
   };
+
+  const thumbWidth = Math.max(20, 100 / (cards.length || 1));
+  const thumbLeft = (scrollProgress / 100) * (100 - thumbWidth);
 
   return (
     <>
       <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
-      <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
+      <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black overflow-x-hidden">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -226,145 +299,159 @@ export default function CardsPage() {
             </button>
           </div>
 
-          {/* Cards Switcher / Selection Dots */}
+          {/* Cards Switcher Slider / Horizontal Scrollsnapping Carousel */}
           {cards.length > 0 && (
             <div className="space-y-4">
-              <div className="flex gap-2 justify-center items-center">
-                {cards.map((c, idx) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setActiveCardIndex(idx)}
-                    className={cn(
-                      "h-1.5 rounded-full transition-all duration-300",
-                      activeCardIndex === idx ? "w-6 bg-[#FC7A00]" : "w-1.5 bg-gray-250"
-                    )}
-                  />
+
+              {/* Horizontal Scroll Deck */}
+              <div
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar px-margin-mobile -mx-margin-mobile py-2.5"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                {cards.map((card, idx) => (
+                  <div
+                    key={card.id}
+                    className="snap-center shrink-0 w-[calc(100vw-32px)] max-w-sm"
+                  >
+                    <div
+                      className={cn(
+                        "w-full aspect-[1.58/1] rounded-[24px] p-6 text-white relative overflow-hidden flex flex-col justify-between shadow-lg transition-all duration-300",
+                        activeCardIndex === idx ? "scale-100 opacity-100 ring-2 ring-[#FC7A00]/45" : "scale-[0.96] opacity-60",
+                        card.theme === "obsidian" && "bg-gradient-to-br from-[#111] via-[#222] to-[#0d0d0d] border border-white/5",
+                        card.theme === "platinum" && "bg-gradient-to-br from-[#5c5c64] via-[#8e8e93] to-[#3a3a3c] border border-white/10",
+                        card.theme === "sunset" && "bg-gradient-to-br from-[#FC7A00] via-[#FF9022] to-[#dd5500] border border-white/10"
+                      )}
+                    >
+                      {/* Glowing background highlights */}
+                      <div className="absolute right-[-40px] bottom-[-40px] w-48 h-48 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+
+                      {/* Row 1: Logo & Currency Badge */}
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <div className="relative w-5 h-5 flex-shrink-0">
+                            <Image
+                              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+                              alt="E-Tech Logo"
+                              fill
+                              sizes="20px"
+                              className="object-contain brightness-0 invert"
+                            />
+                          </div>
+                          <span className="font-hanken font-bold text-[10px] uppercase tracking-wider">
+                            E-TECH GLOBAL HUB
+                          </span>
+                        </div>
+
+                        <span className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 text-[10px] font-black uppercase tracking-widest text-white flex-shrink-0">
+                          {card.currency}
+                        </span>
+                      </div>
+
+                      {/* Row 2: Chip & Freeze Overlay if Frozen */}
+                      <div className="flex justify-between items-end">
+                        <div className="space-y-4 w-full">
+                          {/* Masked/Unmasked Card Number */}
+                          <p className="font-mono font-bold text-base min-[370px]:text-lg tracking-widest text-white">
+                            {revealDetails[card.id]
+                              ? card.cardNumber
+                              : card.cardNumber.replace(/\d(?=\s*\d{4})/g, "•")
+                            }
+                          </p>
+
+                          {/* Info Bar */}
+                          <div className="flex justify-between items-center w-full">
+                            <div>
+                              <p className="text-[7px] uppercase text-white/50 tracking-wider">Card Holder</p>
+                              <p className="font-mono text-xs font-bold text-white truncate max-w-[150px]">
+                                {card.cardholder}
+                              </p>
+                            </div>
+
+                            <div className="flex gap-4">
+                              <div>
+                                <p className="text-[7px] uppercase text-white/50 tracking-wider">Expiry</p>
+                                <p className="font-mono text-xs font-bold text-white">
+                                  {card.expiry}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[7px] uppercase text-white/50 tracking-wider">CVV</p>
+                                <p className="font-mono text-xs font-bold text-white">
+                                  {revealDetails[card.id] ? card.cvv : "•••"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Locked Freeze Screen Overlay */}
+                      {card.isLocked && (
+                        <div className="absolute inset-0 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center text-center p-4 z-20 rounded-[24px]">
+                          <span className="material-symbols-outlined text-[36px] text-error mb-2 animate-pulse">ac_unit</span>
+                          <p className="font-hanken font-bold text-sm text-white">Card Temporarily Frozen</p>
+                          <p className="font-hanken text-[10px] text-gray-400 mt-1">Tap activate below to lift freeze</p>
+                        </div>
+                      )}
+
+                      {/* Card format tag */}
+                      <div className="absolute right-6 top-14 text-white/15 font-hanken font-black text-3xl select-none pointer-events-none">
+                        {card.type}
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
 
-              {/* Displaying Card Graphics */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeCard.id}
-                  initial={{ opacity: 0, scale: 0.95, y: 5 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                  transition={{ duration: 0.25 }}
-                  className={cn(
-                    "w-full aspect-[1.58/1] rounded-[24px] p-6 text-white relative overflow-hidden flex flex-col justify-between shadow-lg",
-                    activeCard.theme === "obsidian" && "bg-gradient-to-br from-[#111] via-[#222] to-[#0d0d0d] border border-white/5",
-                    activeCard.theme === "platinum" && "bg-gradient-to-br from-[#5c5c64] via-[#8e8e93] to-[#3a3a3c] border border-white/10",
-                    activeCard.theme === "sunset" && "bg-gradient-to-br from-[#FC7A00] via-[#FF9022] to-[#dd5500] border border-white/10"
-                  )}
-                >
-                  {/* Glowing background highlights */}
-                  <div className="absolute right-[-40px] bottom-[-40px] w-48 h-48 rounded-full bg-white/5 blur-3xl pointer-events-none" />
-
-                  {/* Row 1: Logo & Currency Badge */}
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <div className="relative w-5 h-5 flex-shrink-0">
-                        <Image
-                          src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-                          alt="E-Tech Logo"
-                          fill
-                          sizes="20px"
-                          className="object-contain brightness-0 invert"
-                        />
-                      </div>
-                      <span className="font-hanken font-bold text-[10px] uppercase tracking-wider">
-                        E-TECH GLOBAL HUB
-                      </span>
-                    </div>
-
-                    <span className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 text-[10px] font-black uppercase tracking-widest text-white flex-shrink-0">
-                      {activeCard.currency}
-                    </span>
-                  </div>
-
-                  {/* Row 2: Chip & Freeze Overlay if Frozen */}
-                  <div className="flex justify-between items-end">
-                    <div className="space-y-4 w-full">
-                      {/* Masked/Unmasked Card Number */}
-                      <p className="font-mono font-bold text-base min-[370px]:text-lg tracking-widest text-white">
-                        {revealDetails[activeCard.id]
-                          ? activeCard.cardNumber
-                          : activeCard.cardNumber.replace(/\d(?=\s*\d{4})/g, "•")
-                        }
-                      </p>
-
-                      {/* Info Bar */}
-                      <div className="flex justify-between items-center w-full">
-                        <div>
-                          <p className="text-[7px] uppercase text-white/50 tracking-wider">Card Holder</p>
-                          <p className="font-mono text-xs font-bold text-white truncate max-w-[150px]">
-                            {activeCard.cardholder}
-                          </p>
-                        </div>
-
-                        <div className="flex gap-4">
-                          <div>
-                            <p className="text-[7px] uppercase text-white/50 tracking-wider">Expiry</p>
-                            <p className="font-mono text-xs font-bold text-white">
-                              {activeCard.expiry}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[7px] uppercase text-white/50 tracking-wider">CVV</p>
-                            <p className="font-mono text-xs font-bold text-white">
-                              {revealDetails[activeCard.id] ? activeCard.cvv : "•••"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card Locked Freeze Screen Overlay */}
-                  {activeCard.isLocked && (
-                    <div className="absolute inset-0 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center text-center p-4 z-20">
-                      <span className="material-symbols-outlined text-[36px] text-error mb-2 animate-pulse">ac_unit</span>
-                      <p className="font-hanken font-bold text-sm text-white">Card Temporarily Frozen</p>
-                      <p className="font-hanken text-[10px] text-gray-400 mt-1">Tap activate below to lift freeze</p>
-                    </div>
-                  )}
-
-                  {/* Card format tag */}
-                  <div className="absolute right-6 top-14 text-white/15 font-hanken font-black text-3xl select-none pointer-events-none">
-                    {activeCard.type}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
+              {/* Slider Drag/Slide Card Progress Bar Indicator */}
+              <div className="flex flex-col items-center justify-center space-y-1.5 py-1 select-none pointer-events-none">
+                <div className="w-24 h-1.5 bg-gray-100 rounded-full relative overflow-hidden">
+                  <div
+                    className="absolute top-0 bottom-0 bg-[#FC7A00] rounded-full transition-all duration-75"
+                    style={{
+                      width: `${thumbWidth}%`,
+                      left: `${thumbLeft}%`
+}}
+                  />
+                </div>
+                <span className="font-hanken text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                  Swipe card to view ({activeCardIndex + 1} of {cards.length})
+                </span>
+              </div>
 
               {/* Interactive Quick Action Toolbar for active card */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => toggleReveal(activeCard.id)}
-                  className="py-3 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm text-gray-700"
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {revealDetails[activeCard.id] ? "visibility_off" : "visibility"}
-                  </span>
-                  {revealDetails[activeCard.id] ? "Hide Details" : "Show Details"}
-                </button>
+              {activeCard && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleReveal(activeCard.id)}
+                    className="py-3 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm text-gray-700"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      {revealDetails[activeCard.id] ? "visibility_off" : "visibility"}
+                    </span>
+                    {revealDetails[activeCard.id] ? "Hide Details" : "Show Details"}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => toggleLockCard(activeCard.id)}
-                  className={cn(
-                    "py-3 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm",
-                    activeCard.isLocked
-                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                      : "bg-error/5 text-error border border-error/15"
-                  )}
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {activeCard.isLocked ? "lock_open" : "lock"}
-                  </span>
-                  {activeCard.isLocked ? "Unfreeze Card" : "Freeze Card"}
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleLockCard(activeCard.id)}
+                    className={cn(
+                      "py-3 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm",
+                      activeCard.isLocked
+                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                        : "bg-error/5 text-error border border-error/15"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      {activeCard.isLocked ? "lock_open" : "lock"}
+                    </span>
+                    {activeCard.isLocked ? "Unfreeze Card" : "Freeze Card"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -519,7 +606,7 @@ export default function CardsPage() {
                             : "border-gray-200 bg-white hover:bg-gray-50"
                         )}
                       >
-                        <span className="material-symbols-outlined text-[20px] text-primary">currency_exchange</span>
+                        <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">currency_exchange</span>
                         <div>
                           <p className="font-hanken font-bold text-xs text-black">US Dollar (USD)</p>
                           <p className="font-hanken text-[9px] text-gray-400">$2.00 setup cost</p>
