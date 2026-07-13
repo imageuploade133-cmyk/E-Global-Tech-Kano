@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { doc, setDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 
 export interface AppConfig {
   logoUrl: string;
@@ -42,26 +42,56 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
 
-    try {
-      unsubscribe = onSnapshot(doc(db, "config", "app"), (docSnap) => {
-        if (docSnap.exists()) {
-          const remoteData = docSnap.data() as Partial<AppConfig>;
-          setConfig((prev) => ({
-            ...prev,
-            ...remoteData,
-          }));
-        } else {
-          // If Firestore config doc doesn't exist, seed it with default configurations
-          setDoc(doc(db, "config", "app"), DEFAULT_CONFIG);
+    const setupListener = () => {
+      try {
+        unsubscribe = onSnapshot(doc(db, "config", "app"), (docSnap) => {
+          if (docSnap.exists()) {
+            const remoteData = docSnap.data() as Partial<AppConfig>;
+            setConfig((prev) => ({
+              ...prev,
+              ...remoteData,
+            }));
+          } else {
+            // Seed default config quietly without throwing permission exceptions
+            setDoc(doc(db, "config", "app"), DEFAULT_CONFIG).catch(() => {
+              // Ignore if we lack write permissions initially
+            });
+          }
+        }, (error) => {
+          // Quietly handle permission failures for guest users
+          if (error.code === "permission-denied") {
+            console.log("Config subscription postponed: Admin authorization required.");
+          } else {
+            console.warn("Config listener error:", error);
+          }
+        });
+      } catch (e) {
+        console.error("Firestore initialization error:", e);
+      }
+    };
+
+    // Attempt to listen when Firebase Auth is loaded
+    const unsubscribeAuth = auth.onAuthStateChanged((user: unknown) => {
+      if (user) {
+        if (unsubscribe) unsubscribe();
+        setupListener();
+      } else {
+        // Load fallback config immediately if unauthenticated
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
         }
-      }, (error) => {
-        console.warn("Firestore config listener blocked (User may not be authenticated yet):", error);
-      });
-    } catch (e) {
-      console.error("Firestore initialization error:", e);
-    }
+        if (typeof window !== "undefined") {
+          const cached = localStorage.getItem("app_global_config");
+          if (cached) {
+            try { setConfig(JSON.parse(cached)); } catch { /* ignore */ }
+          }
+        }
+      }
+    });
 
     return () => {
+      unsubscribeAuth();
       if (unsubscribe) unsubscribe();
     };
   }, []);
