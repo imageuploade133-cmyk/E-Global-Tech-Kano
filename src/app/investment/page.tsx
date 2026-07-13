@@ -210,7 +210,7 @@ export default function InvestmentPage() {
       <div className="min-h-dvh bg-background text-on-background pb-32">
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
-        <main className="max-w-md mx-auto px-margin-mobile pt-5">
+        <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
           {/* Header Title Section */}
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
