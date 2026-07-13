@@ -8,6 +8,7 @@ import { LogoutDrawer } from "./LogoutDrawer";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { toast } from "sonner";
+import { useAppConfig } from "@/lib/ConfigContext";
 
 interface HeaderProps {
   userName: string;
@@ -44,6 +45,7 @@ const INITIAL_NOTIFICATIONS: Notification[] = [
 export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const { config } = useAppConfig();
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -88,12 +90,11 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
               sizes="36px"
             />
           </div>
-          <div className="relative w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 flex-shrink-0">
-            <Image
-              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+          <div className="relative w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 flex-shrink-0 bg-black/5 rounded p-0.5">
+            <img
+              src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
               alt="E-Tech Logo"
-              fill
-              className="object-contain"
+              className="w-full h-full object-contain"
             />
           </div>
           <div className="flex-1 min-w-0">

@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+"use client";
+
+import { AuthProvider } from "@/lib/AuthContext";
+import { ConfigProvider } from "@/lib/ConfigContext";
+import { Toaster } from "sonner";
 import { Bodoni_Moda, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/lib/AuthContext";
-import { Toaster } from "sonner";
-import { RouteGuard } from "@/components/RouteGuard";
-import { OfflineDrawer } from "@/components/layout/OfflineDrawer";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -18,84 +18,26 @@ const hankenGrotesk = Hanken_Grotesk({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "E-Tech Global Hub | Secure Digital Wallet",
-  description: "Next-generation financial technology and secure digital banking.",
-  icons: {
-    icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
-  },
-};
-
-export const viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${bodoniModa.variable} ${hankenGrotesk.variable}`}>
       <head>
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add_card,apps,arrow_back,arrow_forward,atm,campaign,cell_tower,chat,chevron_right,close,credit_card,diamond,expand_less,expand_more,face,gpp_maybe,headset_mic,history,lock_clock,notifications,power_settings_new,payments,real_estate_agent,receipt_long,search,send,sports_basketball,support_agent,tv"
         />
       </head>
-      <body
-        className={`${bodoniModa.variable} ${hankenGrotesk.variable} antialiased custom-scrollbar flex flex-col min-h-screen`}
-      >
-        <AuthProvider>
-          <RouteGuard>
+      <body className="antialiased flex flex-col min-h-dvh">
+        <ConfigProvider>
+          <AuthProvider>
+            <Toaster position="top-center" expand={false} richColors closeButton />
             {children}
-          </RouteGuard>
-          <OfflineDrawer />
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              style: {
-                background: "linear-gradient(135deg, #0c1324 0%, #141d30 100%)",
-                border: "1px solid rgba(252, 122, 0, 0.25)",
-                color: "#FFFFFF",
-                fontFamily: "var(--font-hanken-grotesk), sans-serif",
-                borderRadius: "16px",
-                boxShadow: "none",
-              },
-              classNames: {
-                toast: "shadow-none border border-[#FC7A00]/20",
-                title: "text-[#FFFFFF] font-bold text-[14px] font-hanken",
-                description: "text-[#FFFFFF]/80 text-[12px] font-hanken",
-              },
-            }}
-            icons={{
-              success: (
-                <span className="material-symbols-outlined text-[#95d3ba] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  check_circle
-                </span>
-              ),
-              error: (
-                <span className="material-symbols-outlined text-[#dc3545] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  error
-                </span>
-              ),
-              info: (
-                <span className="material-symbols-outlined text-[#FC7A00] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  info
-                </span>
-              ),
-              warning: (
-                <span className="material-symbols-outlined text-[#FC7A00] text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  warning
-                </span>
-              ),
-            }}
-          />
-        </AuthProvider>
+          </AuthProvider>
+        </ConfigProvider>
       </body>
     </html>
   );
