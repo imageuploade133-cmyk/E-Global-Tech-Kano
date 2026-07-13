@@ -2,9 +2,22 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write only their own data
+    // Helper function to check if the authenticated user is an administrator
+    function isAdmin() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Allow users to read and write only their own data, or allow administrators full access
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+    }
+
+    // Config parameters: allow read to all logged-in users, write restricted only to administrators
+    match /config/app {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // Default deny for all other collections
