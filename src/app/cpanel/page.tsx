@@ -106,21 +106,41 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<AdminTxLog[]>([]);
   const [searchLogTerm, setSearchLogTerm] = useState("");
 
-  // Load initial states
+  // Load initial states - Pulling real users transactions if they are registered inside Firestore
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedLogs = localStorage.getItem("admin_transaction_logs");
-      if (savedLogs) {
-        try {
-          setLogs(JSON.parse(savedLogs));
-        } catch {
+    const fetchRealData = async () => {
+      try {
+        const { collection, getDocs } = await import("firebase/firestore");
+        const { db } = await import("@/lib/firebase");
+
+        const querySnap = await getDocs(collection(db, "transactions"));
+        if (!querySnap.empty) {
+          const fetchedLogs = querySnap.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              userName: data.userName || data.recipientName || "USER",
+              type: data.type || "TRANSFER",
+              amount: data.amount || 0,
+              status: data.status || "SUCCESS",
+              reference: data.reference || doc.id,
+              date: data.date || "Today",
+              time: data.time || "12:00 PM"
+            } as AdminTxLog;
+          });
+          setLogs(fetchedLogs);
+        } else {
           setLogs(INITIAL_ADMIN_LOGS);
         }
-      } else {
+      } catch (err) {
+        console.warn("Could not retrieve real transactions collection, fallback to local activity logs:", err);
         setLogs(INITIAL_ADMIN_LOGS);
-        localStorage.setItem("admin_transaction_logs", JSON.stringify(INITIAL_ADMIN_LOGS));
       }
+    };
 
+    fetchRealData();
+
+    if (typeof window !== "undefined") {
       const authorized = sessionStorage.getItem("admin_session_unlocked") === "true";
       if (authorized) {
         setIsAdminUnlocked(true);
