@@ -8,8 +8,11 @@ import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { useAuth } from "@/lib/AuthContext";
 
+import { useAppConfig } from "@/lib/ConfigContext";
+
 export default function SupportPage() {
   const { userData, user } = useAuth();
+  const { config } = useAppConfig();
   const [activeFAQ, setActiveFAQ] = useState<number | null>(null);
 
   const userName = (userData?.name || user?.displayName || "Captain") as string;
@@ -21,8 +24,8 @@ export default function SupportPage() {
       id: "priority",
       title: "Priority Helpline",
       subtitle: "24/7 Dedicated Call Center",
-      phone: "+234 800 345 6225",
-      formattedPhone: "+234 (0) 800 E-GLOBAL",
+      phone: config.supportPhone1,
+      formattedPhone: config.supportPhone1,
       icon: "phone_in_talk",
       badge: "Toll Free",
       color: "from-[#FC7A00] to-[#FF9022]",
@@ -31,8 +34,8 @@ export default function SupportPage() {
       id: "whatsapp",
       title: "WhatsApp VIP Chat",
       subtitle: "Instant Chat Support",
-      phone: "+234 901 234 5678",
-      formattedPhone: "+234 901 234 5678",
+      phone: config.supportPhone2,
+      formattedPhone: config.supportPhone2,
       icon: "chat",
       badge: "Fastest Response",
       color: "from-emerald-500 to-teal-600",

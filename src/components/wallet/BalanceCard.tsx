@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { useAuth } from "@/lib/AuthContext";
+import { useAppConfig } from "@/lib/ConfigContext";
 
 interface BalanceCardProps {
   balance: number;
@@ -14,6 +14,7 @@ interface BalanceCardProps {
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
   const [isVisible, setIsVisible] = useState(true);
   const { userData, user } = useAuth();
+  const { config } = useAppConfig();
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
 
   // Safely calculate active locked savings from sessionStorage
@@ -107,12 +108,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           <div className="flex justify-between items-start gap-2 w-full overflow-hidden flex-shrink-0">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 overflow-hidden">
-                <div className="relative w-4.5 h-4.5 min-[360px]:w-5 min-[360px]:h-5 flex-shrink-0">
-                  <Image
-                    src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+                <div className="relative w-4.5 h-4.5 min-[360px]:w-5 min-[360px]:h-5 flex-shrink-0 bg-white/10 rounded-sm p-0.5">
+                  <img
+                    src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
                     alt="E-Tech Logo"
-                    fill
-                    className="object-contain"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <span className="font-label-sm text-[8px] min-[360px]:text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF] font-bold truncate">
