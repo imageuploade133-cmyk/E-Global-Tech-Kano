@@ -32,8 +32,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    // Only allow /auth/login and /auth/signup without session authentication
-    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup";
+    // Allow public/exempt routes (/auth/login, /auth/signup, /cpanel)
+    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
 
     if (!user) {
       if (!isPublicRoute) {
@@ -43,6 +43,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       // User is logged in
       const hasPin = Boolean(userData?.pin);
       const isPinRequired = userData?.isPinRequired !== false;
+
+      // Allow /cpanel access even if pin or auth state verification is pending
+      if (pathname === "/cpanel") {
+        return;
+      }
 
       if (!hasPin && pathname !== "/auth/pin-setup") {
         router.push("/auth/pin-setup");
@@ -101,10 +106,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup";
+  const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
 
   // Show nothing while redirecting
   if (!user && !isPublicRoute) return null;
+  if (pathname === "/cpanel") return <>{children}</>;
   if (user && !userData?.pin && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
   if (user && userData?.pin && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
