@@ -8,7 +8,7 @@ import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// Interface for simulated user transactions (the transaction log viewer)
+// Interface for simulated user transactions
 interface AdminTxLog {
   id: string;
   userName: string;
@@ -99,7 +99,6 @@ export default function AdminPage() {
 
   // Load initial states
   useEffect(() => {
-    // Check if there are local saved transaction logs or initialize
     if (typeof window !== "undefined") {
       const savedLogs = localStorage.getItem("admin_transaction_logs");
       if (savedLogs) {
@@ -113,7 +112,6 @@ export default function AdminPage() {
         localStorage.setItem("admin_transaction_logs", JSON.stringify(INITIAL_ADMIN_LOGS));
       }
 
-      // Check if admin is currently authorized in this session
       const authorized = sessionStorage.getItem("admin_session_unlocked") === "true";
       if (authorized) {
         setIsAdminUnlocked(true);
@@ -134,7 +132,6 @@ export default function AdminPage() {
 
   const handleAdminVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    // Default admin entry is '9900' or being the default mock/admin user 'jules@example.com' or 'CAPTAIN'
     const isMockUser = user?.email === "jules@example.com" || userData?.name === "JULES VERNE";
     if (adminPin === "9900" || (isMockUser && adminPin === "1234") || adminPin === "8888") {
       setIsAdminUnlocked(true);
@@ -143,7 +140,7 @@ export default function AdminPage() {
       }
       toast.success("Admin Authorization Granted!");
     } else {
-      toast.error("Invalid Admin Credential PIN Code!");
+      toast.error("Invalid Admin Passcode PIN!");
     }
   };
 
@@ -155,7 +152,7 @@ export default function AdminPage() {
       supportPhone2: phone2Input,
       supportEmail: emailInput,
     });
-    toast.success("Branding and Support settings saved successfully!");
+    toast.success("Branding and Support settings applied!");
   };
 
   const handleSaveMetrics = (e: React.FormEvent) => {
@@ -165,7 +162,7 @@ export default function AdminPage() {
       globalNgnBalance: Number(ngnBalanceInput),
       globalUsdBalance: Number(usdBalanceInput),
     });
-    toast.success("Core dashboard metrics updated successfully!");
+    toast.success("Core metrics modified successfully!");
   };
 
   // Log moderation utilities
@@ -194,59 +191,57 @@ export default function AdminPage() {
     if (typeof window !== "undefined") {
       localStorage.setItem("admin_transaction_logs", JSON.stringify(updated));
     }
-    toast.success("Simulated inbound transaction log generated!");
+    toast.success("Simulated transaction log generated!");
   };
 
-  // Filter transaction logs
   const filteredLogs = logs.filter(l =>
     l.userName.toLowerCase().includes(searchLogTerm.toLowerCase()) ||
     l.reference.toLowerCase().includes(searchLogTerm.toLowerCase()) ||
     l.type.toLowerCase().includes(searchLogTerm.toLowerCase())
   );
 
-  // Lockscreen form
+  // Clean pure Light Mode lockscreen (Not dark mode)
   if (!isAdminUnlocked) {
     return (
-      <main className="min-h-screen bg-[#080d1a] flex items-center justify-center p-4 text-white">
+      <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm glass-card rounded-[28px] p-6 border border-white/10 flex flex-col items-center text-center space-y-6"
-          style={{ background: "rgba(12, 19, 36, 0.85)" }}
+          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 shadow-xl flex flex-col items-center text-center space-y-6"
         >
-          <div className="w-14 h-14 rounded-2xl bg-[#FC7A00]/20 flex items-center justify-center text-[#FC7A00]">
+          <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00] shadow-inner">
             <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_maybe</span>
           </div>
 
           <div>
-            <h2 className="font-hanken font-extrabold text-xl tracking-tight text-white leading-tight">Admin Portal Gate</h2>
-            <p className="font-hanken text-xs text-gray-400 mt-1 font-semibold leading-relaxed">
-              Secure Control Panel access. Enter Admin Code or use default simulated credential.
+            <h2 className="font-hanken font-extrabold text-2xl tracking-tight text-gray-900 leading-tight">Admin Gatekeeper</h2>
+            <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
+              Welcome to the E-Tech Enterprise Control Panel. Enter your administrative credential PIN below to access global configurations.
             </p>
           </div>
 
           <form onSubmit={handleAdminVerify} className="w-full space-y-4">
-            <div className="space-y-1.5 text-left">
-              <label className="font-hanken text-[10px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Entry Code PIN</label>
+            <div className="space-y-2 text-left">
+              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin PIN Code</label>
               <input
                 type="password"
                 maxLength={6}
                 value={adminPin}
                 onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter admin passcode (e.g. 9900)"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-center font-mono font-bold text-lg text-white placeholder-gray-600 outline-none focus:border-[#FC7A00] transition-all"
+                placeholder="Enter passcode (e.g. 9900)"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] rounded-xl text-xs font-black uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all cursor-pointer text-white"
+              className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer shadow-md"
             >
-              Verify Credentials
+              Verify Authority
             </button>
           </form>
 
-          <Link href="/" className="font-hanken text-xs text-gray-500 hover:text-white transition-colors underline">
+          <Link href="/" className="font-hanken text-xs text-gray-400 hover:text-gray-700 transition-colors underline font-medium">
             Return to Fleet Homepage
           </Link>
         </motion.div>
@@ -255,346 +250,442 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#080d1a] text-white flex flex-col">
-      {/* Top Banner Navigation Header */}
-      <header className="sticky top-0 z-50 bg-[#0c1324]/90 backdrop-blur-md px-4 py-4 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="w-8 h-8 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-white active:scale-90 transition-all cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          </Link>
-          <div>
-            <h1 className="font-hanken font-extrabold text-sm text-white tracking-tight flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#FC7A00] animate-pulse" />
-              E-TECH ADMIN CPANEL
-            </h1>
-            <p className="font-hanken text-[9px] text-[#FC7A00] font-black uppercase tracking-widest mt-0.5">Control Center</p>
+    <main className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-hanken">
+      {/* Side Navigation on Desktop, Header Navigation on Mobile */}
+      <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between flex-shrink-0">
+        <div className="flex flex-col">
+          {/* Brand Row */}
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded bg-gray-100 p-1 flex items-center justify-center">
+                <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
+              </div>
+              <div>
+                <h1 className="font-hanken font-black text-sm tracking-tight text-gray-900 leading-none">E-TECH CONSOLE</h1>
+                <p className="text-[9px] font-black tracking-widest text-[#FC7A00] uppercase mt-1">Control Panel</p>
+              </div>
+            </div>
+            {/* Quick home link */}
+            <Link
+              href="/"
+              className="md:hidden w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 border border-gray-100 active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </Link>
           </div>
+
+          {/* Nav Links */}
+          <nav className="p-4 space-y-1.5 flex flex-row md:flex-col gap-1.5 overflow-x-auto no-scrollbar md:overflow-visible">
+            <button
+              onClick={() => setActiveTab("dashboard")}
+              className={cn(
+                "flex-grow md:flex-grow-0 flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                activeTab === "dashboard"
+                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">cell_tower</span>
+              <span>Metrics & Balances</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={cn(
+                "flex-grow md:flex-grow-0 flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                activeTab === "settings"
+                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">diamond</span>
+              <span>Branding & Support</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("transactions")}
+              className={cn(
+                "flex-grow md:flex-grow-0 flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                activeTab === "transactions"
+                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">history</span>
+              <span>Global Ledger</span>
+            </button>
+          </nav>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
+        {/* Console Foot Action */}
+        <div className="p-4 border-t border-gray-100 hidden md:block">
           <button
-            onClick={() => setActiveTab("dashboard")}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
-              activeTab === "dashboard" ? "bg-[#FC7A00] text-white" : "text-gray-400 hover:text-white"
-            )}
+            onClick={() => {
+              setIsAdminUnlocked(false);
+              if (typeof window !== "undefined") {
+                sessionStorage.removeItem("admin_session_unlocked");
+              }
+              toast.info("Console session locked.");
+            }}
+            className="w-full py-3 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-gray-500 text-center"
           >
-            Metrics
-          </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
-              activeTab === "settings" ? "bg-[#FC7A00] text-white" : "text-gray-400 hover:text-white"
-            )}
-          >
-            Branding
-          </button>
-          <button
-            onClick={() => setActiveTab("transactions")}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
-              activeTab === "transactions" ? "bg-[#FC7A00] text-white" : "text-gray-400 hover:text-white"
-            )}
-          >
-            Ledger
+            Lock Admin Console
           </button>
         </div>
-      </header>
+      </aside>
 
-      {/* Main Content Body */}
-      <div className="flex-1 p-4 max-w-md mx-auto w-full space-y-6 pb-24">
-        <AnimatePresence mode="wait">
-          {/* TAB 1: Metrics & Global Balances */}
-          {activeTab === "dashboard" && (
-            <motion.div
-              key="metrics-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-5"
+      {/* Main Content Workspace */}
+      <section className="flex-1 flex flex-col min-w-0">
+        {/* Top Header on Desktop */}
+        <header className="hidden md:flex justify-between items-center px-8 py-5 bg-white border-b border-gray-200">
+          <div>
+            <h2 className="font-hanken font-extrabold text-lg text-gray-800">
+              {activeTab === "dashboard" && "Platform Operations & Metrics"}
+              {activeTab === "settings" && "Dynamic Visual Settings Manager"}
+              {activeTab === "transactions" && "Global Financial Audit Logs"}
+            </h2>
+            <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider">Enterprise System Suite</p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="px-4 py-2 border border-gray-200 hover:border-[#FC7A00] rounded-xl text-xs font-bold uppercase tracking-wider text-gray-600 hover:text-[#FC7A00] transition-colors flex items-center gap-1.5"
             >
-              <h2 className="font-hanken font-black text-xs uppercase tracking-widest text-[#FC7A00]">
-                Live Metrics Control
-              </h2>
+              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              Fleet Homepage
+            </Link>
+          </div>
+        </header>
 
-              {/* Status overview cards */}
-              <div className="grid grid-cols-1 gap-3">
-                <div className="glass-card rounded-2xl p-4 border border-white/10 bg-gradient-to-br from-[#0c1324] to-[#070b14] flex justify-between items-center">
-                  <div>
-                    <p className="font-hanken text-[10px] text-gray-400 uppercase font-black tracking-wider">Total registered users</p>
-                    <p className="font-mono text-2xl font-black text-white mt-1">{config.totalUsers.toLocaleString()}</p>
-                  </div>
-                  <span className="material-symbols-outlined text-[32px] text-[#FC7A00]">face</span>
-                </div>
-
-                <div className="glass-card rounded-2xl p-4 border border-white/10 bg-gradient-to-br from-[#0c1324] to-[#070b14] flex justify-between items-center">
-                  <div>
-                    <p className="font-hanken text-[10px] text-gray-400 uppercase font-black tracking-wider">Cumulative ngn pool balance</p>
-                    <p className="font-mono text-2xl font-black text-emerald-400 mt-1">₦{config.globalNgnBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <span className="material-symbols-outlined text-[32px] text-emerald-500">payments</span>
-                </div>
-
-                <div className="glass-card rounded-2xl p-4 border border-white/10 bg-gradient-to-br from-[#0c1324] to-[#070b14] flex justify-between items-center">
-                  <div>
-                    <p className="font-hanken text-[10px] text-gray-400 uppercase font-black tracking-wider">Cumulative usd pool balance</p>
-                    <p className="font-mono text-2xl font-black text-cyan-400 mt-1">${config.globalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <span className="material-symbols-outlined text-[32px] text-cyan-500">credit_card</span>
-                </div>
-              </div>
-
-              {/* Form to update metrics */}
-              <form onSubmit={handleSaveMetrics} className="glass-card rounded-2xl p-5 border border-white/10 bg-white/5 space-y-4">
-                <h3 className="font-hanken font-bold text-xs text-white border-b border-white/5 pb-2 uppercase tracking-wide">
-                  Simulate Global Metrics
-                </h3>
-
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="font-hanken text-[9px] text-gray-400 uppercase font-bold">Simulate Total User Count</label>
-                    <input
-                      type="number"
-                      value={usersCountInput}
-                      onChange={(e) => setUsersCountInput(Number(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 font-mono text-xs text-white outline-none focus:border-[#FC7A00]"
-                    />
+        {/* Dashboard workspace page view scrollable container */}
+        <div className="p-4 md:p-8 overflow-y-auto flex-1 max-w-5xl w-full mx-auto space-y-6 pb-24 md:pb-8">
+          <AnimatePresence mode="wait">
+            {/* Tab 1: Dashboard metrics */}
+            {activeTab === "dashboard" && (
+              <motion.div
+                key="dashboard-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                {/* Clean Light-Mode Metric Cards Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Platform Registered Users</p>
+                      <p className="font-mono text-3xl font-black text-gray-900 mt-2">{config.totalUsers.toLocaleString()}</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1.5">Live counter</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
+                      <span className="material-symbols-outlined text-[24px]">face</span>
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="font-hanken text-[9px] text-gray-400 uppercase font-bold">Simulate Global NGN Holdings (₦)</label>
-                    <input
-                      type="number"
-                      value={ngnBalanceInput}
-                      onChange={(e) => setNgnBalanceInput(Number(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 font-mono text-xs text-white outline-none focus:border-[#FC7A00]"
-                    />
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool NGN holdings</p>
+                      <p className="font-mono text-3xl font-black text-emerald-600 mt-2">₦{config.globalNgnBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[10px] text-[#07B038] font-bold uppercase tracking-wider mt-1.5">Live liquidity</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+                      <span className="material-symbols-outlined text-[24px]">payments</span>
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="font-hanken text-[9px] text-gray-400 uppercase font-bold">Simulate Global USD Holdings ($)</label>
-                    <input
-                      type="number"
-                      value={usdBalanceInput}
-                      onChange={(e) => setUsdBalanceInput(Number(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 font-mono text-xs text-white outline-none focus:border-[#FC7A00]"
-                    />
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool USD holdings</p>
+                      <p className="font-mono text-3xl font-black text-cyan-600 mt-2">${config.globalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                      <p className="text-[10px] text-cyan-500 font-bold uppercase tracking-wider mt-1.5">Live reserves</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600">
+                      <span className="material-symbols-outlined text-[24px]">credit_card</span>
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[#FC7A00] rounded-xl text-[10px] font-black uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                >
-                  Save Metrics Override
-                </button>
-              </form>
-            </motion.div>
-          )}
+                {/* Simulated metric values form */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                  <h3 className="font-hanken font-extrabold text-sm text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
+                    Simulate System Balances
+                  </h3>
 
-          {/* TAB 2: Branding & Support Details Settings */}
-          {activeTab === "settings" && (
-            <motion.div
-              key="settings-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-5"
-            >
-              <h2 className="font-hanken font-black text-xs uppercase tracking-widest text-[#FC7A00]">
-                App Branding Settings
-              </h2>
+                  <form onSubmit={handleSaveMetrics} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Total User Metrics</label>
+                      <input
+                        type="number"
+                        value={usersCountInput}
+                        onChange={(e) => setUsersCountInput(Number(e.target.value))}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                      />
+                    </div>
 
-              <form onSubmit={handleSaveSettings} className="glass-card rounded-2xl p-5 border border-white/10 bg-white/5 space-y-4">
-                <div className="space-y-3">
-                  {/* Logo URL Input */}
-                  <div className="space-y-1.5">
-                    <label className="font-hanken text-[9px] text-gray-400 uppercase font-bold">App Brand Logo URL</label>
-                    <input
-                      type="url"
-                      value={logoInput}
-                      onChange={(e) => setLogoInput(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#FC7A00]"
-                    />
-                    <p className="font-hanken text-[8px] text-gray-500">Provide any remote png/jpg url. Must load correctly.</p>
-                  </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">NGN holdings (₦)</label>
+                      <input
+                        type="number"
+                        value={ngnBalanceInput}
+                        onChange={(e) => setNgnBalanceInput(Number(e.target.value))}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                      />
+                    </div>
 
-                  {/* Priority Phone */}
-                  <div className="space-y-1.5">
-                    <label className="font-hanken text-[9px] text-gray-400 uppercase font-bold">Priority Toll-Free Phone</label>
-                    <input
-                      type="text"
-                      value={phone1Input}
-                      onChange={(e) => setPhone1Input(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 font-mono text-xs text-white outline-none focus:border-[#FC7A00]"
-                    />
-                  </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">USD holdings ($)</label>
+                      <input
+                        type="number"
+                        value={usdBalanceInput}
+                        onChange={(e) => setUsdBalanceInput(Number(e.target.value))}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                      />
+                    </div>
 
-                  {/* VIP Phone */}
-                  <div className="space-y-1.5">
-                    <label className="font-hanken text-[9px] text-gray-400 uppercase font-bold">WhatsApp VIP Hotline</label>
-                    <input
-                      type="text"
-                      value={phone2Input}
-                      onChange={(e) => setPhone2Input(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 font-mono text-xs text-white outline-none focus:border-[#FC7A00]"
-                    />
-                  </div>
-
-                  {/* Email Support */}
-                  <div className="space-y-1.5">
-                    <label className="font-hanken text-[9px] text-gray-400 uppercase font-bold">Official Support Email</label>
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-[#FC7A00]"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-[#FC7A00] rounded-xl text-[10px] font-black uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-                >
-                  Apply Branding Updates
-                </button>
-              </form>
-
-              {/* Preview of Live Branding */}
-              <div className="glass-card rounded-2xl p-4 border border-white/10 bg-gradient-to-br from-[#0c1324] to-[#070b14] space-y-3">
-                <p className="font-hanken text-[9px] text-gray-400 font-bold uppercase tracking-wider">Live Support Card Mockup</p>
-                <div className="flex items-center gap-2.5 bg-white/5 p-3 rounded-xl border border-white/5">
-                  <div className="relative w-8 h-8 rounded bg-white flex items-center justify-center p-1.5">
-                    <img src={logoInput || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="Brand Logo preview" className="object-contain" />
-                  </div>
-                  <div>
-                    <p className="font-hanken text-xs font-bold text-white">{emailInput}</p>
-                    <p className="font-mono text-[10px] text-gray-400 mt-0.5">{phone1Input}</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* TAB 3: Global Transaction Log Explorer */}
-          {activeTab === "transactions" && (
-            <motion.div
-              key="transactions-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-4"
-            >
-              <div className="flex justify-between items-center">
-                <h2 className="font-hanken font-black text-xs uppercase tracking-widest text-[#FC7A00]">
-                  Global Ledger Log
-                </h2>
-                <button
-                  type="button"
-                  onClick={handleAddSimulatedTx}
-                  className="px-2.5 py-1 bg-white/10 border border-white/15 rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-white/15 flex items-center gap-1 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[12px]">add_card</span>
-                  Simulate Tx
-                </button>
-              </div>
-
-              {/* Filter search bar */}
-              <div className="relative w-full">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[18px]">
-                  search
-                </span>
-                <input
-                  type="text"
-                  value={searchLogTerm}
-                  onChange={(e) => setSearchLogTerm(e.target.value)}
-                  placeholder="Search user, status, reference..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-[#FC7A00]"
-                />
-              </div>
-
-              {/* Logs Rows list */}
-              <div className="space-y-2.5 max-h-[360px] overflow-y-auto custom-scrollbar">
-                {filteredLogs.length === 0 ? (
-                  <p className="text-center py-8 font-hanken text-xs text-gray-500 uppercase tracking-widest">No transaction logs match</p>
-                ) : (
-                  filteredLogs.map((log) => {
-                    const isCredit = log.type === "DEPOSIT";
-                    return (
-                      <div
-                        key={log.id}
-                        className="p-3.5 bg-white/5 border border-white/10 rounded-xl flex flex-col gap-2 relative overflow-hidden"
+                    <div className="md:col-span-3 pt-3">
+                      <button
+                        type="submit"
+                        className="px-6 py-3.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] transition-all cursor-pointer shadow-sm active:scale-98"
                       >
-                        <div className="flex justify-between items-start gap-2">
-                          <div>
-                            <p className="font-hanken text-[11px] font-extrabold text-white leading-none">{log.userName}</p>
-                            <p className="font-hanken text-[8px] text-gray-500 uppercase tracking-wide mt-1 font-bold">
-                              {log.date} @ {log.time}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className={cn("font-mono text-xs font-black", isCredit ? "text-emerald-400" : "text-white")}>
-                              {isCredit ? "+" : "-"}₦{log.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </p>
-                            <span className={cn(
-                              "inline-block px-1.5 py-0.5 rounded text-[7.5px] font-black tracking-wider uppercase mt-1",
-                              log.status === "SUCCESS" && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-                              log.status === "PENDING" && "bg-amber-500/10 text-amber-400 border border-amber-500/20",
-                              log.status === "FAILED" && "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                            )}>
-                              {log.status}
-                            </span>
-                          </div>
-                        </div>
+                        Override System Metrics
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </motion.div>
+            )}
 
-                        {/* Actions for log */}
-                        <div className="flex justify-between items-center pt-2 border-t border-white/5">
-                          <span className="font-mono text-[8.5px] text-gray-500">{log.reference}</span>
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => handleUpdateLogStatus(log.id, "SUCCESS")}
-                              className="px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/15 text-emerald-400 hover:bg-emerald-500/20 text-[8px] font-black uppercase rounded"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleUpdateLogStatus(log.id, "FAILED")}
-                              className="px-1.5 py-0.5 bg-rose-500/10 border border-rose-500/15 text-rose-400 hover:bg-rose-500/20 text-[8px] font-black uppercase rounded"
-                            >
-                              Fail
-                            </button>
-                          </div>
-                        </div>
+            {/* Tab 2: Settings Branding / support */}
+            {activeTab === "settings" && (
+              <motion.div
+                key="settings-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="grid grid-cols-1 md:grid-cols-3 gap-6"
+              >
+                {/* Left Forms */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm md:col-span-2">
+                  <h3 className="font-hanken font-extrabold text-sm text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
+                    Live Brand Settings
+                  </h3>
+
+                  <form onSubmit={handleSaveSettings} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Core Brand Logo URL</label>
+                      <input
+                        type="url"
+                        value={logoInput}
+                        onChange={(e) => setLogoInput(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                      />
+                      <p className="text-[9px] text-gray-400">Must be a valid remote PNG, JPG, or SVG image file URL.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400">Toll-Free Support Line</label>
+                        <input
+                          type="text"
+                          value={phone1Input}
+                          onChange={(e) => setPhone1Input(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        />
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
 
-      {/* Persistent admin action logout floating button */}
-      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 z-40 bg-[#080d1a]/80 backdrop-blur-md">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400">VIP Chat Hotline</label>
+                        <input
+                          type="text"
+                          value={phone2Input}
+                          onChange={(e) => setPhone2Input(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">System Support Email</label>
+                      <input
+                        type="email"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="px-6 py-3.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] transition-all cursor-pointer shadow-sm active:scale-98"
+                    >
+                      Save Branding Configurations
+                    </button>
+                  </form>
+                </div>
+
+                {/* Right Preview Panel */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-3">Live Platform Widget Preview</h4>
+
+                    {/* Simulated card widget */}
+                    <div className="border border-gray-100 p-4 rounded-xl space-y-3 bg-gray-50">
+                      <div className="flex justify-between items-center">
+                        <div className="w-10 h-10 rounded bg-white flex items-center justify-center p-1.5 shadow-xs border border-gray-100">
+                          <img src={logoInput || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="Brand Logo Preview" className="object-contain" />
+                        </div>
+                        <span className="text-[10px] font-mono text-[#FC7A00] bg-orange-50 px-2 py-0.5 rounded border border-orange-100">LIVE</span>
+                      </div>
+
+                      <div>
+                        <p className="text-[11px] text-gray-400 uppercase font-black tracking-wide leading-none">Support contact details</p>
+                        <p className="text-xs font-black text-gray-900 mt-1">{emailInput}</p>
+                        <p className="text-[11px] font-mono text-gray-500 mt-1">{phone1Input}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100 mt-4">
+                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed">
+                      All alterations committed inside this settings matrix propagates instantly to the global wallet UI client, including the top Header and Support Hotline components.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Tab 3: Ledger audits */}
+            {activeTab === "transactions" && (
+              <motion.div
+                key="ledger-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200">
+                  <div className="relative flex-1 max-w-md">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      value={searchLogTerm}
+                      onChange={(e) => setSearchLogTerm(e.target.value)}
+                      placeholder="Search user, status, reference..."
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddSimulatedTx}
+                    className="px-4 py-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-100 text-[#FC7A00] rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">add_card</span>
+                    Inject Simulated Log
+                  </button>
+                </div>
+
+                {/* Clean responsive table audit design */}
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                          <th className="px-6 py-4">User</th>
+                          <th className="px-6 py-4">Type</th>
+                          <th className="px-6 py-4">Amount</th>
+                          <th className="px-6 py-4">Status</th>
+                          <th className="px-6 py-4">Reference ID</th>
+                          <th className="px-6 py-4 text-right">Moderation Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 text-xs">
+                        {filteredLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-8 text-center text-gray-400 uppercase tracking-widest font-bold">
+                              No ledger entries found
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredLogs.map((log) => {
+                            const isCredit = log.type === "DEPOSIT";
+                            return (
+                              <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <p className="font-extrabold text-gray-900 leading-tight">{log.userName}</p>
+                                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">{log.date} @ {log.time}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                    isCredit ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                                  )}>
+                                    {log.type}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 font-mono font-bold text-gray-950">
+                                  {isCredit ? "+" : "-"}₦{log.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+                                    log.status === "SUCCESS" && "bg-emerald-50 text-emerald-600",
+                                    log.status === "PENDING" && "bg-amber-50 text-amber-600",
+                                    log.status === "FAILED" && "bg-rose-50 text-rose-600"
+                                  )}>
+                                    {log.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 font-mono text-gray-400 text-[10px] select-all">
+                                  {log.reference}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex gap-1 justify-end">
+                                    <button
+                                      onClick={() => handleUpdateLogStatus(log.id, "SUCCESS")}
+                                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase rounded border border-emerald-100 transition-colors"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleUpdateLogStatus(log.id, "FAILED")}
+                                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[9px] font-black uppercase rounded border border-rose-100 transition-colors"
+                                    >
+                                      Fail
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </section>
+
+      {/* Persisting lock administrative actions button for Mobile view only */}
+      <footer className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-40">
         <button
           onClick={() => {
             setIsAdminUnlocked(false);
             if (typeof window !== "undefined") {
               sessionStorage.removeItem("admin_session_unlocked");
             }
-            toast.info("Admin Session Closed.");
+            toast.info("Console session locked.");
           }}
-          className="w-full py-3 border border-white/10 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-center text-gray-400 hover:text-white transition-all cursor-pointer"
+          className="w-full py-3 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-gray-500 text-center"
         >
-          Close CPanel Control Session
+          Lock Admin Console Session
         </button>
       </footer>
     </main>
