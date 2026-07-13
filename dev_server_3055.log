@@ -1,0 +1,20 @@
+
+> e-global-wallet@0.1.0 dev
+> next dev -p 3055
+
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3055
+   - Network:      http://192.168.0.2:3055
+
+ ✓ Starting...
+ ✓ Ready in 1980ms
+ ○ Compiling / ...
+ ✓ Compiled / in 14.5s (1676 modules)
+ GET /?mock=true 200 in 16000ms
+ ○ Compiling /store ...
+ ✓ Compiled /store in 1939ms (1665 modules)
+ GET /?mock=true 200 in 733ms
+ GET /store 200 in 2752ms
+ ○ Compiling /investment ...
+ ✓ Compiled /investment in 512ms (1658 modules)
+ GET /investment 200 in 814ms

@@ -1,13 +1,15 @@
-   ▲ Next.js 15.1.12
-   - Local:        http://localhost:3033
-   - Network:      http://192.168.0.2:3033
 
- ✓ Starting...
- ✓ Ready in 1915ms
- ○ Compiling / ...
- ✓ Compiled / in 13.3s (1676 modules)
- GET /?mock=true 200 in 14977ms
- ○ Compiling /history ...
- ✓ Compiled /history in 1779ms (1665 modules)
- GET /history 200 in 1930ms
- GET /history 200 in 39ms
+> e-global-wallet@0.1.0 dev
+> next dev -p 3012
+
+ ⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use :::3012
+    at <unknown> (Error: listen EADDRINUSE: address already in use :::3012)
+    at new Promise (<anonymous>) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3012
+}
+[?25h
