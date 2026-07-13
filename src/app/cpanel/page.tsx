@@ -8,7 +8,6 @@ import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// Interface for simulated user transactions
 interface AdminTxLog {
   id: string;
   userName: string;
@@ -81,6 +80,9 @@ export default function AdminPage() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "transactions">("dashboard");
+
+  // Sidebar minimize state
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
   // Editable settings states
   const [logoInput, setLogoInput] = useState(config.logoUrl);
@@ -251,21 +253,42 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-hanken">
-      {/* Side Navigation on Desktop, Header Navigation on Mobile */}
-      <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between flex-shrink-0">
-        <div className="flex flex-col">
+      {/* Side Navigation with collapsing state for desktop, collapsing dynamically with motion */}
+      <motion.aside
+        animate={{ width: isSidebarMinimized ? 80 : 256 }}
+        className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between flex-shrink-0 relative overflow-hidden transition-all duration-300"
+      >
+        <div className="flex flex-col h-full">
           {/* Brand Row */}
-          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded bg-gray-100 p-1 flex items-center justify-center">
+          <div className="p-5 border-b border-gray-100 flex items-center justify-between min-h-[73px]">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <div className="w-8 h-8 rounded bg-gray-100 p-1 flex-shrink-0 flex items-center justify-center">
                 <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
               </div>
-              <div>
-                <h1 className="font-hanken font-black text-sm tracking-tight text-gray-900 leading-none">E-TECH CONSOLE</h1>
-                <p className="text-[9px] font-black tracking-widest text-[#FC7A00] uppercase mt-1">Control Panel</p>
-              </div>
+              {!isSidebarMinimized && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex flex-col"
+                >
+                  <h1 className="font-hanken font-black text-sm tracking-tight text-gray-900 leading-none">E-TECH</h1>
+                  <p className="text-[8px] font-black tracking-widest text-[#FC7A00] uppercase mt-0.5">Control Panel</p>
+                </motion.div>
+              )}
             </div>
-            {/* Quick home link */}
+
+            {/* Minimize Sidebar toggle button for Desktop */}
+            <button
+              onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
+              className="hidden md:flex w-7 h-7 rounded-lg border border-gray-150 hover:bg-gray-50 items-center justify-center text-gray-500 cursor-pointer active:scale-90 transition-all ml-1.5"
+              title={isSidebarMinimized ? "Expand Menu" : "Collapse Menu"}
+            >
+              <span className="material-symbols-outlined text-[16px] font-bold">
+                {isSidebarMinimized ? "chevron_right" : "chevron_left"}
+              </span>
+            </button>
+
+            {/* Quick home link for Mobile */}
             <Link
               href="/"
               className="md:hidden w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 border border-gray-100 active:scale-95"
@@ -274,50 +297,56 @@ export default function AdminPage() {
             </Link>
           </div>
 
-          {/* Nav Links */}
+          {/* Collapsible Nav Links */}
           <nav className="p-4 space-y-1.5 flex flex-row md:flex-col gap-1.5 overflow-x-auto no-scrollbar md:overflow-visible">
             <button
               onClick={() => setActiveTab("dashboard")}
               className={cn(
-                "flex-grow md:flex-grow-0 flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                "flex-grow md:flex-grow-0 flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
                 activeTab === "dashboard"
                   ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+                isSidebarMinimized ? "justify-center" : "justify-center md:justify-start"
               )}
+              title="Metrics & Balances"
             >
               <span className="material-symbols-outlined text-[18px]">cell_tower</span>
-              <span>Metrics & Balances</span>
+              {!isSidebarMinimized && <span>Metrics</span>}
             </button>
 
             <button
               onClick={() => setActiveTab("settings")}
               className={cn(
-                "flex-grow md:flex-grow-0 flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                "flex-grow md:flex-grow-0 flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
                 activeTab === "settings"
                   ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+                isSidebarMinimized ? "justify-center" : "justify-center md:justify-start"
               )}
+              title="Branding & Support"
             >
               <span className="material-symbols-outlined text-[18px]">diamond</span>
-              <span>Branding & Support</span>
+              {!isSidebarMinimized && <span>Branding</span>}
             </button>
 
             <button
               onClick={() => setActiveTab("transactions")}
               className={cn(
-                "flex-grow md:flex-grow-0 flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                "flex-grow md:flex-grow-0 flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
                 activeTab === "transactions"
                   ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+                isSidebarMinimized ? "justify-center" : "justify-center md:justify-start"
               )}
+              title="Global Ledger"
             >
               <span className="material-symbols-outlined text-[18px]">history</span>
-              <span>Global Ledger</span>
+              {!isSidebarMinimized && <span>Ledger</span>}
             </button>
           </nav>
         </div>
 
-        {/* Console Foot Action */}
+        {/* Console Lock Button */}
         <div className="p-4 border-t border-gray-100 hidden md:block">
           <button
             onClick={() => {
@@ -327,12 +356,17 @@ export default function AdminPage() {
               }
               toast.info("Console session locked.");
             }}
-            className="w-full py-3 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-gray-500 text-center"
+            className={cn(
+              "w-full py-3 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-gray-500 text-center flex items-center justify-center gap-1.5",
+              isSidebarMinimized && "p-1"
+            )}
+            title="Lock Console"
           >
-            Lock Admin Console
+            <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
+            {!isSidebarMinimized && <span>Lock Console</span>}
           </button>
         </div>
-      </aside>
+      </motion.aside>
 
       {/* Main Content Workspace */}
       <section className="flex-1 flex flex-col min-w-0">
@@ -370,44 +404,60 @@ export default function AdminPage() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-6"
               >
-                {/* Clean Light-Mode Metric Cards Row */}
+                {/* Premium Gradient Cards with Beautiful Highlight Borders */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Platform Registered Users</p>
-                      <p className="font-mono text-3xl font-black text-gray-900 mt-2">{config.totalUsers.toLocaleString()}</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1.5">Live counter</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
-                      <span className="material-symbols-outlined text-[24px]">face</span>
+                  {/* Total Users Card */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-white via-orange-50/10 to-orange-50/40 rounded-2xl p-6 border-2 border-orange-100 shadow-sm hover:shadow-md transition-all">
+                    {/* Corner shine highlight */}
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#FC7A00]/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
+
+                    <div className="flex justify-between items-center relative z-10">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Platform Registered Users</p>
+                        <p className="font-mono text-3xl font-black text-gray-900 mt-2">{config.totalUsers.toLocaleString()}</p>
+                        <p className="text-[10px] text-[#FC7A00] font-bold uppercase tracking-wider mt-1.5">Live Counter</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 border border-orange-300 flex items-center justify-center text-[#FC7A00] shadow-sm">
+                        <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: '"FILL" 1' }}>face</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool NGN holdings</p>
-                      <p className="font-mono text-3xl font-black text-emerald-600 mt-2">₦{config.globalNgnBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                      <p className="text-[10px] text-[#07B038] font-bold uppercase tracking-wider mt-1.5">Live liquidity</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-                      <span className="material-symbols-outlined text-[24px]">payments</span>
+                  {/* NGN holdings Card */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-white via-emerald-50/10 to-emerald-50/40 rounded-2xl p-6 border-2 border-emerald-150 shadow-sm hover:shadow-md transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
+
+                    <div className="flex justify-between items-center relative z-10">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool NGN holdings</p>
+                        <p className="font-mono text-3xl font-black text-emerald-600 mt-2">₦{config.globalNgnBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mt-1.5">Live Liquidity</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 border border-emerald-300 flex items-center justify-center text-emerald-600 shadow-sm">
+                        <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: '"FILL" 1' }}>payments</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool USD holdings</p>
-                      <p className="font-mono text-3xl font-black text-cyan-600 mt-2">${config.globalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                      <p className="text-[10px] text-cyan-500 font-bold uppercase tracking-wider mt-1.5">Live reserves</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600">
-                      <span className="material-symbols-outlined text-[24px]">credit_card</span>
+                  {/* USD holdings Card */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-white via-cyan-50/10 to-cyan-50/40 rounded-2xl p-6 border-2 border-cyan-150 shadow-sm hover:shadow-md transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
+
+                    <div className="flex justify-between items-center relative z-10">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool USD holdings</p>
+                        <p className="font-mono text-3xl font-black text-cyan-600 mt-2">${config.globalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[10px] text-cyan-600 font-bold uppercase tracking-wider mt-1.5">Live Reserves</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-100 to-cyan-200 border border-cyan-300 flex items-center justify-center text-cyan-600 shadow-sm">
+                        <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: '"FILL" 1' }}>credit_card</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Simulated metric values form */}
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                {/* Simulated metric values form card */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden bg-gradient-to-br from-white via-gray-50/30 to-gray-50/50">
                   <h3 className="font-hanken font-extrabold text-sm text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
                     Simulate System Balances
                   </h3>
@@ -419,7 +469,7 @@ export default function AdminPage() {
                         type="number"
                         value={usersCountInput}
                         onChange={(e) => setUsersCountInput(Number(e.target.value))}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                       />
                     </div>
 
@@ -429,7 +479,7 @@ export default function AdminPage() {
                         type="number"
                         value={ngnBalanceInput}
                         onChange={(e) => setNgnBalanceInput(Number(e.target.value))}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                       />
                     </div>
 
@@ -439,14 +489,14 @@ export default function AdminPage() {
                         type="number"
                         value={usdBalanceInput}
                         onChange={(e) => setUsdBalanceInput(Number(e.target.value))}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                       />
                     </div>
 
                     <div className="md:col-span-3 pt-3">
                       <button
                         type="submit"
-                        className="px-6 py-3.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] transition-all cursor-pointer shadow-sm active:scale-98"
+                        className="px-6 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:brightness-110 transition-all cursor-pointer shadow-md active:scale-98"
                       >
                         Override System Metrics
                       </button>
@@ -466,7 +516,7 @@ export default function AdminPage() {
                 className="grid grid-cols-1 md:grid-cols-3 gap-6"
               >
                 {/* Left Forms */}
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm md:col-span-2">
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm md:col-span-2 bg-gradient-to-br from-white via-gray-50/10 to-gray-50/30">
                   <h3 className="font-hanken font-extrabold text-sm text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
                     Live Brand Settings
                   </h3>
@@ -479,9 +529,9 @@ export default function AdminPage() {
                         value={logoInput}
                         onChange={(e) => setLogoInput(e.target.value)}
                         placeholder="https://..."
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                       />
-                      <p className="text-[9px] text-gray-400">Must be a valid remote PNG, JPG, or SVG image file URL.</p>
+                      <p className="text-[9px] text-gray-400 font-semibold">Must be a valid remote PNG, JPG, or SVG image file URL.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -491,7 +541,7 @@ export default function AdminPage() {
                           type="text"
                           value={phone1Input}
                           onChange={(e) => setPhone1Input(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                         />
                       </div>
 
@@ -501,7 +551,7 @@ export default function AdminPage() {
                           type="text"
                           value={phone2Input}
                           onChange={(e) => setPhone2Input(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                         />
                       </div>
                     </div>
@@ -512,31 +562,32 @@ export default function AdminPage() {
                         type="email"
                         value={emailInput}
                         onChange={(e) => setEmailInput(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="px-6 py-3.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] transition-all cursor-pointer shadow-sm active:scale-98"
+                      className="px-6 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:brightness-110 transition-all cursor-pointer shadow-md active:scale-98"
                     >
                       Save Branding Configurations
                     </button>
                   </form>
                 </div>
 
-                {/* Right Preview Panel */}
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-                  <div>
+                {/* Right Preview Panel with nice border and light gradient background */}
+                <div className="bg-gradient-to-br from-white via-orange-50/10 to-orange-50/30 border-2 border-orange-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                  <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-orange-100/10 rounded-full blur-xl" />
+
+                  <div className="relative z-10">
                     <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-3">Live Platform Widget Preview</h4>
 
-                    {/* Simulated card widget */}
-                    <div className="border border-gray-100 p-4 rounded-xl space-y-3 bg-gray-50">
+                    <div className="border border-orange-100 p-4 rounded-xl space-y-3 bg-white/80 backdrop-blur-xs">
                       <div className="flex justify-between items-center">
                         <div className="w-10 h-10 rounded bg-white flex items-center justify-center p-1.5 shadow-xs border border-gray-100">
                           <img src={logoInput || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="Brand Logo Preview" className="object-contain" />
                         </div>
-                        <span className="text-[10px] font-mono text-[#FC7A00] bg-orange-50 px-2 py-0.5 rounded border border-orange-100">LIVE</span>
+                        <span className="text-[10px] font-mono font-black text-[#FC7A00] bg-orange-50 px-2 py-0.5 rounded border border-orange-100">LIVE</span>
                       </div>
 
                       <div>
@@ -547,7 +598,7 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-100 mt-4">
+                  <div className="pt-4 border-t border-gray-100 mt-4 relative z-10">
                     <p className="text-[10px] text-gray-400 font-bold leading-relaxed">
                       All alterations committed inside this settings matrix propagates instantly to the global wallet UI client, including the top Header and Support Hotline components.
                     </p>
@@ -565,7 +616,7 @@ export default function AdminPage() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4"
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 bg-gradient-to-r from-white to-gray-50/50">
                   <div className="relative flex-1 max-w-md">
                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
                       search
@@ -575,14 +626,14 @@ export default function AdminPage() {
                       value={searchLogTerm}
                       onChange={(e) => setSearchLogTerm(e.target.value)}
                       placeholder="Search user, status, reference..."
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-800 outline-none focus:border-[#FC7A00] focus:bg-white"
+                      className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
                     />
                   </div>
 
                   <button
                     type="button"
                     onClick={handleAddSimulatedTx}
-                    className="px-4 py-2.5 bg-orange-50 hover:bg-orange-100 border border-orange-100 text-[#FC7A00] rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+                    className="px-4 py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md whitespace-nowrap"
                   >
                     <span className="material-symbols-outlined text-[14px]">add_card</span>
                     Inject Simulated Log
@@ -590,8 +641,8 @@ export default function AdminPage() {
                 </div>
 
                 {/* Clean responsive table audit design */}
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                  <div className="overflow-x-auto">
+                <div className="bg-white border-2 border-gray-150 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto animate-fadeIn">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black uppercase text-gray-400 tracking-wider">
@@ -647,13 +698,13 @@ export default function AdminPage() {
                                   <div className="flex gap-1 justify-end">
                                     <button
                                       onClick={() => handleUpdateLogStatus(log.id, "SUCCESS")}
-                                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase rounded border border-emerald-100 transition-colors"
+                                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase rounded border border-emerald-100 transition-colors cursor-pointer"
                                     >
                                       Approve
                                     </button>
                                     <button
                                       onClick={() => handleUpdateLogStatus(log.id, "FAILED")}
-                                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[9px] font-black uppercase rounded border border-rose-100 transition-colors"
+                                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[9px] font-black uppercase rounded border border-rose-100 transition-colors cursor-pointer"
                                     >
                                       Fail
                                     </button>
@@ -673,7 +724,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* Persisting lock administrative actions button for Mobile view only */}
+      {/* Mobile Lock Action Drawer */}
       <footer className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-40">
         <button
           onClick={() => {
