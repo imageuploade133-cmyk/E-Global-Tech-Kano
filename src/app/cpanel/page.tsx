@@ -89,6 +89,8 @@ export default function AdminPage() {
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
   const [emailInput, setEmailInput] = useState(config.supportEmail);
+  const [apiKeyInput, setApiKeyInput] = useState(config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005");
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   // Editable metrics states
   const [usersCountInput, setUsersCountInput] = useState(config.totalUsers);
@@ -127,6 +129,7 @@ export default function AdminPage() {
     setPhone1Input(config.supportPhone1);
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
+    setApiKeyInput(config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005");
     setUsersCountInput(config.totalUsers);
     setNgnBalanceInput(config.globalNgnBalance);
     setUsdBalanceInput(config.globalUsdBalance);
@@ -153,8 +156,44 @@ export default function AdminPage() {
       supportPhone1: phone1Input,
       supportPhone2: phone2Input,
       supportEmail: emailInput,
+      imgbbApiKey: apiKeyInput,
     });
-    toast.success("Branding and Support settings applied!");
+    toast.success("Branding, Support and API configurations applied!");
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const key = apiKeyInput || "0d1a390cb385b632d952db08a3479005";
+    toast.loading("Uploading app logo to Imgbb servers...");
+
+    try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${key}`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      toast.dismiss();
+
+      if (json.success) {
+        const uploadedUrl = json.data.display_url;
+        setLogoInput(uploadedUrl);
+        updateConfig({ logoUrl: uploadedUrl });
+        toast.success("App logo successfully uploaded and updated!");
+      } else {
+        toast.error(json.error?.message || "Failed to upload logo image to Imgbb!");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Imgbb API communication failure. Confirm internet connection and API token.");
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
   const handleSaveMetrics = (e: React.FormEvent) => {
@@ -522,16 +561,47 @@ export default function AdminPage() {
                   </h3>
 
                   <form onSubmit={handleSaveSettings} className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-gray-400">Core Brand Logo URL</label>
+                    {/* Imgbb Live API key config */}
+                    <div className="space-y-1 bg-orange-50/50 p-4 rounded-xl border border-orange-100">
+                      <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Imgbb API Key (Image Upload Rail)</label>
                       <input
-                        type="url"
-                        value={logoInput}
-                        onChange={(e) => setLogoInput(e.target.value)}
-                        placeholder="https://..."
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                        type="text"
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder="Enter Imgbb v1 api key"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] mt-1 shadow-xs"
                       />
-                      <p className="text-[9px] text-gray-400 font-semibold">Must be a valid remote PNG, JPG, or SVG image file URL.</p>
+                      <p className="text-[9px] text-gray-500 mt-1 font-semibold leading-relaxed">
+                        API key used across the platform to upload all client verification selfie/KYC assets and logo materials live to Imgbb storage.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Logo URL Input */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400">Core Brand Logo URL</label>
+                        <input
+                          type="url"
+                          value={logoInput}
+                          onChange={(e) => setLogoInput(e.target.value)}
+                          placeholder="https://..."
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                        />
+                      </div>
+
+                      {/* Logo File Selector (Uploads directly to Imgbb) */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400">Upload Logo Image File</label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={isUploadingLogo}
+                            onChange={handleLogoUpload}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-gray-800 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-orange-50 file:text-[#FC7A00] hover:file:bg-orange-100 file:cursor-pointer cursor-pointer disabled:opacity-50"
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
