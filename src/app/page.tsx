@@ -3,6 +3,7 @@
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BalanceCard } from "@/components/wallet/BalanceCard";
+import { RecentTransactions } from "@/components/wallet/RecentTransactions";
 import { ServiceGrid } from "@/components/wallet/ServiceGrid";
 import { Promotions } from "@/components/wallet/Promotions";
 import { useAuth } from "@/lib/AuthContext";
@@ -23,6 +24,7 @@ export default function Home() {
 
       <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-24 min-[375px]:pb-32">
         <BalanceCard balance={currentUser.balance} currency={currentUser.currency} />
+        <RecentTransactions />
         <ServiceGrid />
         <Promotions />
       </main>
