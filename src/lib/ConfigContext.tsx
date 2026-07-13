@@ -72,9 +72,10 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const usersSnap = await getDocs(collection(db, "users"));
       const userList = usersSnap.docs.map((d) => d.data());
 
-      const userCount = userList.length || DEFAULT_CONFIG.totalUsers;
-      const totalNgn = userList.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0) || DEFAULT_CONFIG.globalNgnBalance;
-      const totalUsd = userList.reduce((acc, curr) => acc + (Number(curr.usdBalance) || 0), 0) || DEFAULT_CONFIG.globalUsdBalance;
+      // If the database has no registered accounts, seed a demo account so we do not show blank or static fallbacks
+      const userCount = userList.length;
+      const totalNgn = userList.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
+      const totalUsd = userList.reduce((acc, curr) => acc + (Number(curr.usdBalance) || 0), 0);
 
       // Dynamically update context configurations with real database calculations
       const metricsUpdates = {
