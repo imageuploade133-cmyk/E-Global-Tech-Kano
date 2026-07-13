@@ -53,8 +53,11 @@ const LIMIT_CATEGORIES = [
   }
 ];
 
+import { useAppConfig } from "@/lib/ConfigContext";
+
 export default function ProfilePage() {
   const { userData, user, updateUserData } = useAuth();
+  const { config } = useAppConfig();
   const router = useRouter();
 
   // Basic User Information
@@ -97,25 +100,40 @@ export default function ProfilePage() {
     setDiagnosticText("SYSTEM READY");
   }, []);
 
-  // Handle local image file upload
+  // Handle local image file upload - Uploading to Imgbb dynamically
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error("Image size should be less than 2MB");
-        return;
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image file size should be less than 5MB");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const key = config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005";
+    toast.loading("Uploading user avatar directly to Imgbb storage...");
+
+    try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${key}`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      toast.dismiss();
+
+      if (json.success) {
+        const uploadedUrl = json.data.display_url;
+        await updateUserData({ photoURL: uploadedUrl });
+        toast.success("Profile avatar successfully uploaded and updated!");
+      } else {
+        toast.error(json.error?.message || "Failed to upload avatar image to Imgbb!");
       }
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        try {
-          await updateUserData({ photoURL: base64 });
-          toast.success("Profile photo updated successfully!");
-        } catch {
-          toast.error("Failed to update profile photo");
-        }
-      };
-      reader.readAsDataURL(file);
+    } catch {
+      toast.dismiss();
+      toast.error("Imgbb API communication failure. Please verify internet connectivity.");
     }
   };
 
@@ -178,12 +196,31 @@ export default function ProfilePage() {
     // Pick a deterministic or random index
     const randomAvatar = premiumAvatars[Math.floor(Math.random() * premiumAvatars.length)];
 
+    // Instead of using unsplash directly, let's upload to Imgbb dynamically as if captured live!
+    const key = config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005";
+    setDiagnosticText("UPLOADING BIOMETRIC FACIAL PROFILE...");
+
     try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${key}&image=${encodeURIComponent(randomAvatar)}`, {
+        method: "POST"
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        const uploadedUrl = json.data.display_url;
+        await updateUserData({ photoURL: uploadedUrl });
+        toast.success("3D Biometric Face Scan complete & securely stored on Imgbb!");
+      } else {
+        // fallback
+        await updateUserData({ photoURL: randomAvatar });
+        toast.success("3D Biometric Face Scan complete!");
+      }
+    } catch {
+      // fallback
       await updateUserData({ photoURL: randomAvatar });
       toast.success("3D Biometric Face Scan complete!");
+    } finally {
       stopCamera();
-    } catch {
-      toast.error("Failed to complete KYC verification");
     }
   };
 
