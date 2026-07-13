@@ -32,29 +32,29 @@ interface ActiveInvestment {
 const INVESTMENT_OPTIONS: InvestmentOption[] = [
   {
     id: "premium_yield",
-    name: "E-Tech Premium Yield",
+    name: "E-Tech Premium Savings Plan",
     apr: 18.5,
     icon: "trending_up",
     minAmount: 5000,
-    description: "High-yield compounding returns backed by diversified green-infrastructure assets.",
+    description: "Save and earn extra money safely. Your money is secured and earns interest every day.",
     bgGradient: "from-[#FC7A00] to-[#FF9E43]"
   },
   {
     id: "secure_crypto",
-    name: "Secure Crypto Yield",
+    name: "Safe High-Yield Savings",
     apr: 24.0,
     icon: "currency_bitcoin",
     minAmount: 15000,
-    description: "Premium locked liquidity rewards utilizing low-risk stablecoin market markers.",
+    description: "Safe and solid returns. Put your savings to work and get highly stable, extra profits.",
     bgGradient: "from-[#111] to-[#333]"
   },
   {
     id: "green_bond",
-    name: "Green Energy Bond",
+    name: "Eco-Friendly Savings Plan",
     apr: 14.2,
     icon: "eco",
     minAmount: 2000,
-    description: "Eco-friendly fixed income funding solar and local sustainable development grids.",
+    description: "Green savings. Help support solar and community power projects while earning good interest.",
     bgGradient: "from-[#11998e] to-[#38ef7d]"
   }
 ];
@@ -74,6 +74,30 @@ export default function InvestmentPage() {
 
   // Agreement Modal State
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const hasPushedState = React.useRef(false);
+
+  // Sync state with browser back history (device physical/swipe back button support)
+  useEffect(() => {
+    if (showConfirmModal) {
+      window.history.pushState({ confirmOpen: true }, "");
+      hasPushedState.current = true;
+
+      const handlePopState = (e: PopStateEvent) => {
+        e.preventDefault();
+        hasPushedState.current = false;
+        setShowConfirmModal(false);
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      return () => {
+        window.removeEventListener("popstate", handlePopState);
+        if (hasPushedState.current) {
+          window.history.back();
+          hasPushedState.current = false;
+        }
+      };
+    }
+  }, [showConfirmModal]);
 
   // Submitting Loader
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -220,10 +244,10 @@ export default function InvestmentPage() {
             </div>
             <div>
               <h1 className="font-bodoni text-[20px] font-bold tracking-tight text-black">
-                Vault Yield
+                Save & Earn
               </h1>
               <p className="font-hanken text-[11px] text-gray-500 font-medium">
-                Locked-in high yield wealth compounds
+                Save money for a fixed time to earn extra cash rewards
               </p>
             </div>
           </div>
@@ -231,7 +255,7 @@ export default function InvestmentPage() {
           {/* Balance card indicator */}
           <div className="bg-gradient-to-br from-[#111] to-[#222] rounded-[24px] p-5 text-white mb-6 border border-white/5 shadow-md">
             <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-              Available Investment Wallet Capital
+              Your Available Main Wallet Balance
             </p>
             <p className="font-bodoni text-[26px] font-bold mt-1 text-[#FC7A00]">
               ₦{userBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -241,7 +265,7 @@ export default function InvestmentPage() {
                 lock
               </span>
               <p className="font-hanken text-[9px] text-gray-300 font-semibold">
-                Protected and fully secured by Ledger Node contracts.
+                Your money is completely safe and secure.
               </p>
             </div>
           </div>
@@ -252,12 +276,12 @@ export default function InvestmentPage() {
               <span className="material-symbols-outlined text-primary text-[18px]">
                 add_task
               </span>
-              Start New Fixed Vault
+              Start Saving & Earning
             </h2>
 
             {/* Select Options Scroll */}
             <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2.5">
-              Choose Premium Growth Portfolio
+              Choose Your Savings Plan
             </label>
             <div className="flex flex-col gap-2.5 mb-5">
               {INVESTMENT_OPTIONS.map((opt) => {
@@ -296,7 +320,7 @@ export default function InvestmentPage() {
                         {opt.apr}% APR
                       </span>
                       <span className="font-hanken text-[9px] text-gray-400 font-bold uppercase tracking-wider">
-                        Growth Rate
+                        Interest Rate
                       </span>
                     </div>
                   </button>
@@ -314,7 +338,7 @@ export default function InvestmentPage() {
             {/* Form Fields: Amount */}
             <div className="mb-4">
               <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                Capital Amount to Invest (₦)
+                How much do you want to save? (₦)
               </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-hanken text-[14px] font-bold text-gray-400">
@@ -340,7 +364,7 @@ export default function InvestmentPage() {
             {/* Maturity end date selectpicker */}
             <div className="mb-5">
               <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                Target maturity end date (Locked term)
+                When do you want to unlock your savings? (Pick a Date)
               </label>
               <input
                 type="date"
@@ -355,17 +379,17 @@ export default function InvestmentPage() {
             {amountStr && maturityDate && (
               <div className="mb-5 p-4 rounded-xl bg-gradient-to-r from-[#FFFBF7] to-[#FFF7EF] border border-[#FFECD8] animate-fade-in">
                 <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">
-                  Growth Reward Forecast
+                  Your Estimated Earnings
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <span className="block font-hanken text-[9px] text-gray-500 font-medium">Estimated Reward</span>
+                    <span className="block font-hanken text-[9px] text-gray-500 font-medium">Extra Interest You Earn</span>
                     <span className="font-hanken text-[15px] font-extrabold text-green-600">
                       +₦{getEstimatedReward().toLocaleString()}
                     </span>
                   </div>
                   <div>
-                    <span className="block font-hanken text-[9px] text-gray-500 font-medium">Duration Locked</span>
+                    <span className="block font-hanken text-[9px] text-gray-500 font-medium">Time Locked</span>
                     <span className="font-hanken text-[13px] font-extrabold text-black">
                       {getInvestmentDays()} Days
                     </span>
@@ -382,7 +406,7 @@ export default function InvestmentPage() {
               <span className="material-symbols-outlined text-[18px]">
                 verified
               </span>
-              Initiate Yield Growth Lock
+              Confirm & Start Savings
             </button>
           </form>
 
@@ -392,7 +416,7 @@ export default function InvestmentPage() {
               <span className="material-symbols-outlined text-green-500 text-[18px]">
                 lock_clock
               </span>
-              Active Vaults ({activeInvestments.length})
+              My Active Savings ({activeInvestments.length})
             </h2>
 
             {activeInvestments.length === 0 ? (
@@ -401,10 +425,10 @@ export default function InvestmentPage() {
                   hourglass_empty
                 </span>
                 <p className="font-hanken text-[12px] font-bold text-black mb-1">
-                  No Active Growth Locks
+                  No Active Savings
                 </p>
                 <p className="font-hanken text-[10px] text-gray-400 leading-relaxed max-w-[220px]">
-                  Select a growth vault structure above to protect your capital and generate robust yield.
+                  Pick a savings plan above to securely lock and grow your savings.
                 </p>
               </div>
             ) : (
@@ -412,7 +436,7 @@ export default function InvestmentPage() {
                 {activeInvestments.map((inv) => (
                   <div
                     key={inv.id}
-                    className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm"
+                    className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm animate-fade-in"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -440,7 +464,7 @@ export default function InvestmentPage() {
                     <div className="border-t border-gray-50 pt-3 flex items-center justify-between">
                       <div>
                         <span className="block font-hanken text-[8.5px] text-gray-400 font-bold uppercase tracking-wide">
-                          Lock Start
+                          Start Date
                         </span>
                         <span className="font-hanken text-[10px] font-semibold text-gray-600">
                           {inv.startDate}
@@ -462,7 +486,7 @@ export default function InvestmentPage() {
                         progress_activity
                       </span>
                       <p className="font-hanken text-[9px] text-gray-500 font-bold">
-                        Yield capital locked-in secure escrow node.
+                        Your money is securely locked and growing.
                       </p>
                     </div>
                   </div>
@@ -486,10 +510,19 @@ export default function InvestmentPage() {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="relative bg-white w-full max-w-md rounded-t-[32px] p-6 shadow-2xl border-t border-gray-100 z-10 max-h-[92dvh] overflow-y-auto no-scrollbar"
+                drag="y"
+                dragDirectionLock
+                dragConstraints={{ top: 0, bottom: 450 }}
+                dragElastic={{ top: 0, bottom: 0.2 }}
+                onDragEnd={(event, info) => {
+                  if (!isSubmitting && (info.offset.y > 100 || info.velocity.y > 500)) {
+                    setShowConfirmModal(false);
+                  }
+                }}
+                className="relative bg-white w-full max-w-md rounded-t-[32px] p-6 shadow-2xl border-t border-gray-100 z-10 max-h-[92dvh] overflow-y-auto no-scrollbar touch-none select-none"
               >
                 {/* Drag handle line */}
-                <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+                <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-5 cursor-grab active:cursor-grabbing" />
 
                 {/* Secure warning emblem */}
                 <div className="flex flex-col items-center text-center mb-5">
@@ -499,29 +532,29 @@ export default function InvestmentPage() {
                     </span>
                   </div>
                   <h3 className="font-bodoni text-[18px] font-bold text-black">
-                    Strict Vault Lock Agreement
+                    Locked Savings Plan Rules
                   </h3>
                   <p className="font-hanken text-[11px] text-gray-500 max-w-[280px] mt-1 font-semibold leading-relaxed">
-                    Please read and verify the lock-in terms carefully before securing your yield vault.
+                    Please read these simple rules before you lock your savings.
                   </p>
                 </div>
 
                 {/* Investment specific lock bounds details */}
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-5">
                   <div className="flex justify-between py-2 border-b border-gray-100/60 font-hanken text-[12px]">
-                    <span className="text-gray-500 font-semibold">Growth Portfolio</span>
+                    <span className="text-gray-500 font-semibold">Savings Plan</span>
                     <span className="text-black font-bold">{selectedOption.name}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100/60 font-hanken text-[12px]">
-                    <span className="text-gray-500 font-semibold">Locked Capital</span>
+                    <span className="text-gray-500 font-semibold">Amount Saved</span>
                     <span className="text-black font-bold">₦{parseFloat(amountStr).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100/60 font-hanken text-[12px]">
-                    <span className="text-gray-500 font-semibold">Lock End Date</span>
+                    <span className="text-gray-500 font-semibold">Withdrawal Date</span>
                     <span className="text-[#FC7A00] font-extrabold">{new Date(maturityDate).toLocaleDateString()}</span>
                   </div>
                   <div className="flex justify-between py-2 font-hanken text-[12px]">
-                    <span className="text-gray-500 font-semibold">Growth Reward (Yield)</span>
+                    <span className="text-gray-500 font-semibold">Extra Interest You Earn</span>
                     <span className="text-green-600 font-extrabold">+{getEstimatedReward().toLocaleString()} ({selectedOption.apr}%)</span>
                   </div>
                 </div>
@@ -530,12 +563,12 @@ export default function InvestmentPage() {
                 <div className="bg-red-50/50 border border-red-100 rounded-xl p-4 mb-6">
                   <h4 className="font-hanken text-[11px] font-extrabold text-red-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[14px]">warning</span>
-                    LEGAL BINDING ESCROW TERMS
+                    SECURE SAVINGS RULES
                   </h4>
                   <ul className="list-disc list-inside space-y-1 font-hanken text-[10px] text-gray-600 font-semibold leading-relaxed">
-                    <li>This growth vault operates under cryptographic strict automated locks.</li>
-                    <li><strong className="text-black">No early withdrawals or cancellations</strong> are allowed under any circumstances.</li>
-                    <li>This growth structure ends precisely on <strong className="text-black">{new Date(maturityDate).toLocaleDateString()}</strong>. Your locked balance and generated rewards will return to your balance then.</li>
+                    <li>This savings plan is fully locked and automatic.</li>
+                    <li><strong className="text-black">You cannot withdraw or cancel this early</strong> under any circumstances.</li>
+                    <li>Your money and extra interest rewards will return directly to your main wallet balance on <strong className="text-black">{new Date(maturityDate).toLocaleDateString()}</strong>.</li>
                   </ul>
                 </div>
 

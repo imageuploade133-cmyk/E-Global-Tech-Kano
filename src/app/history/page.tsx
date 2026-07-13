@@ -137,6 +137,30 @@ export default function HistoryPage() {
   const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState<"all" | "deposit" | "transfer" | "bills" | "card">("all");
+  const hasPushedState = React.useRef(false);
+
+  // Sync state with browser back history (device physical/swipe back button support)
+  React.useEffect(() => {
+    if (selectedTx) {
+      window.history.pushState({ receiptOpen: true }, "");
+      hasPushedState.current = true;
+
+      const handlePopState = (e: PopStateEvent) => {
+        e.preventDefault();
+        hasPushedState.current = false;
+        setSelectedTx(null);
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      return () => {
+        window.removeEventListener("popstate", handlePopState);
+        if (hasPushedState.current) {
+          window.history.back();
+          hasPushedState.current = false;
+        }
+      };
+    }
+  }, [selectedTx]);
 
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
@@ -218,8 +242,8 @@ export default function HistoryPage() {
                 className={cn(
                   "px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all flex-shrink-0 cursor-pointer shadow-sm border",
                   activeCategory === cat.id
-                    ? "bg-[#FC7A00] text-white border-[#FC7A00]"
-                    : "bg-white text-gray-600 border-gray-100 hover:bg-gray-50"
+                    ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-[0_2px_8px_rgba(252,122,0,0.15)]"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                 )}
               >
                 {cat.label}
@@ -242,7 +266,7 @@ export default function HistoryPage() {
                   <button
                     key={tx.id}
                     onClick={() => setSelectedTx(tx)}
-                    className="w-full text-left bg-white border border-gray-100 p-4 rounded-2xl flex items-center justify-between gap-3 active:scale-[0.99] hover:border-gray-200 transition-all cursor-pointer shadow-sm"
+                    className="w-full text-left bg-white border border-gray-200 p-4 rounded-2xl flex items-center justify-between gap-3 active:scale-[0.99] hover:border-gray-300 transition-all cursor-pointer shadow-sm"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       {/* Interactive type indicator badge icons */}
@@ -319,9 +343,18 @@ export default function HistoryPage() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 shadow-none text-black overflow-hidden"
+              drag="y"
+              dragDirectionLock
+              dragConstraints={{ top: 0, bottom: 450 }}
+              dragElastic={{ top: 0, bottom: 0.2 }}
+              onDragEnd={(event, info) => {
+                if (info.offset.y > 100 || info.velocity.y > 500) {
+                  setSelectedTx(null);
+                }
+              }}
+              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 shadow-none text-black overflow-hidden touch-none select-none"
             >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab active:cursor-grabbing" />
 
               {/* Receipt Header details */}
               <div className="text-center space-y-2 pb-6 border-b border-gray-100">

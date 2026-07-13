@@ -15,3 +15,65 @@
  ✓ Compiled /investment in 1446ms (1659 modules)
  GET /investment?mock=true 200 in 2066ms
  GET /store?mock=true 200 in 601ms
+ ✓ Compiled in 4.6s (752 modules)
+ ✓ Compiled in 1468ms (1659 modules)
+ ✓ Compiled in 424ms (752 modules)
+ ✓ Compiled in 499ms (752 modules)
+ ✓ Compiled in 761ms (752 modules)
+ GET /store?mock=true 200 in 407ms
+ ○ Compiling /history ...
+ ✓ Compiled /history in 2.7s (1679 modules)
+ ⨯ Error: Cannot find module './638.js'
+Require stack:
+- /app/.next/server/webpack-runtime.js
+- /app/.next/server/app/investment/page.js
+- /app/node_modules/next/dist/server/require.js
+- /app/node_modules/next/dist/server/load-components.js
+- /app/node_modules/next/dist/build/utils.js
+- /app/node_modules/next/dist/build/swc/options.js
+- /app/node_modules/next/dist/build/swc/index.js
+- /app/node_modules/next/dist/build/next-config-ts/transpile-config.js
+- /app/node_modules/next/dist/server/config.js
+- /app/node_modules/next/dist/server/next.js
+- /app/node_modules/next/dist/server/lib/start-server.js
+    at __webpack_require__.f.require (.next/server/webpack-runtime.js:198:28)
+    at <unknown> (.next/server/webpack-runtime.js:111:40)
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (.next/server/webpack-runtime.js:110:67)
+    at Array.map (<anonymous>)
+    at __webpack_require__.X (.next/server/webpack-runtime.js:162:22)
+    at <unknown> (.next/server/app/investment/page.js:1:20687)
+    at Object.<anonymous> (.next/server/app/investment/page.js:1:20748) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/investment'
+}
+ GET /support 200 in 3038ms
+ GET / 200 in 3040ms
+ GET /cards 200 in 3040ms
+ GET /history 200 in 3041ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 5.1s (1928 modules)
+ GET /profile 200 in 5072ms
+ GET /investment 500 in 8347ms
+ GET /investment?mock=true 200 in 829ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1744ms (1932 modules)
+ GET /_next/static/css/app/layout.css?v=1783922556677 404 in 2350ms
+ GET /_next/static/chunks/app/layout.js 404 in 2339ms
+ GET /_next/static/chunks/main-app.js?v=1783922556677 404 in 2347ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 2347ms
+ GET /_next/static/chunks/app/investment/page.js 404 in 2336ms
+ GET /store?mock=true 200 in 91ms
+ GET /_next/static/css/app/layout.css?v=1783922690158 404 in 39ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 96ms
+ GET /_next/static/chunks/app/store/page.js 404 in 93ms
+ GET /_next/static/chunks/main-app.js?v=1783922690158 404 in 97ms
+ GET /_next/static/chunks/app/layout.js 404 in 100ms
+ GET /store?mock=true 200 in 35ms
+ GET /_next/static/css/app/layout.css?v=1783922795103 404 in 39ms
+ GET /_next/static/chunks/main-app.js?v=1783922795103 404 in 83ms
+ GET /_next/static/chunks/app/layout.js 404 in 79ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 76ms
+ GET /_next/static/chunks/app/store/page.js 404 in 78ms
+[?25h

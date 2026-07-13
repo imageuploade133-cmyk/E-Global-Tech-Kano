@@ -14,6 +14,45 @@ interface BalanceCardProps {
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
   const [isVisible, setIsVisible] = useState(true);
   const { userData, user } = useAuth();
+  const [totalInvestment, setTotalInvestment] = useState<number>(0);
+
+  // Safely calculate active locked savings from sessionStorage
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("active_investments");
+      if (saved) {
+        try {
+          const list = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            const sum = list.reduce((acc: number, curr: { amount: number }) => acc + (parseFloat(curr.amount.toString()) || 0), 0);
+            setTotalInvestment(sum);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // Set up custom listener/interval to sync investment updates in real-time
+    const interval = setInterval(() => {
+      const saved = sessionStorage.getItem("active_investments");
+      if (saved) {
+        try {
+          const list = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            const sum = list.reduce((acc: number, curr: { amount: number }) => acc + (parseFloat(curr.amount.toString()) || 0), 0);
+            setTotalInvestment(sum);
+          }
+        } catch {
+          // ignore
+        }
+      } else {
+        setTotalInvestment(0);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const resolvedName = (
     userName ||
@@ -90,7 +129,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
           {/* Middle: Balance & Available Label */}
           <div className="flex flex-col justify-center gap-0.5 w-full overflow-hidden my-auto py-1 flex-grow">
-            <p className="font-label-sm text-[8px] min-[360px]:text-[10px] text-[#FFFFFF]/70 font-medium">Available Balance</p>
+            <div className="flex justify-between items-center w-full">
+              <p className="font-label-sm text-[8px] min-[360px]:text-[10px] text-[#FFFFFF]/70 font-medium">Available Balance</p>
+              <div className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-xs">
+                <span className="material-symbols-outlined text-[9px] text-[#FC7A00] font-bold">lock_clock</span>
+                <span className="font-label-sm text-[7.5px] min-[360px]:text-[8.5px] text-[#FFFFFF]/95 font-bold uppercase tracking-wider">
+                  Savings: ₦{isVisible ? totalInvestment.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "•••,•••"}
+                </span>
+              </div>
+            </div>
             <AnimatePresence mode="wait">
               <motion.div
                 key={isVisible ? "visible" : "hidden"}
