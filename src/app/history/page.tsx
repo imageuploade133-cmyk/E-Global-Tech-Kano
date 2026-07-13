@@ -3,34 +3,17 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
+import { TransactionReceipt, Transaction } from "@/components/wallet/TransactionReceipt";
 
-interface TransactionItem {
-  id: string;
-  reference: string;
-  type: "DEPOSIT" | "TRANSFER" | "BILL_PAYMENT" | "CARD_FUND" | "CASHOUT";
-  category: "deposit" | "transfer" | "bills" | "card";
-  amount: number;
-  currency: "NGN" | "USD";
-  description: string;
-  recipientName?: string;
-  bankName?: string;
-  status: "SUCCESS" | "PENDING" | "FAILED";
-  date: string;
-  time: string;
-  fee: number;
-}
-
-const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
+const HISTORICAL_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-1001",
     reference: "ETF-8924021-992",
     type: "DEPOSIT",
-    category: "deposit",
     amount: 500000.00,
     currency: "NGN",
     description: "Inbound Bank Settlement",
@@ -45,7 +28,6 @@ const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
     id: "tx-1002",
     reference: "ETF-1039845-812",
     type: "TRANSFER",
-    category: "transfer",
     amount: 120000.00,
     currency: "NGN",
     description: "Account Transfer to Steve",
@@ -60,7 +42,6 @@ const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
     id: "tx-1003",
     reference: "ETF-3904812-709",
     type: "BILL_PAYMENT",
-    category: "bills",
     amount: 25000.00,
     currency: "NGN",
     description: "DSTV Premium Renewal",
@@ -75,7 +56,6 @@ const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
     id: "tx-1004",
     reference: "ETF-7719283-441",
     type: "CARD_FUND",
-    category: "card",
     amount: 50.00,
     currency: "USD",
     description: "USD Card Provisioning",
@@ -90,7 +70,6 @@ const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
     id: "tx-1005",
     reference: "ETF-1123984-500",
     type: "TRANSFER",
-    category: "transfer",
     amount: 45000.00,
     currency: "NGN",
     description: "Rent Allocation Payment",
@@ -105,7 +84,6 @@ const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
     id: "tx-1006",
     reference: "ETF-9908123-667",
     type: "BILL_PAYMENT",
-    category: "bills",
     amount: 15000.00,
     currency: "NGN",
     description: "IKEDC Prepaid Meter recharge",
@@ -119,7 +97,6 @@ const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
     id: "tx-1007",
     reference: "ETF-4819203-311",
     type: "CASHOUT",
-    category: "deposit",
     amount: 30000.00,
     currency: "NGN",
     description: "Card Withdrawal Cashout",
@@ -134,7 +111,7 @@ const HISTORICAL_TRANSACTIONS: TransactionItem[] = [
 
 export default function HistoryPage() {
   const { userData, user } = useAuth();
-  const [selectedTx, setSelectedTx] = useState<TransactionItem | null>(null);
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState<"all" | "deposit" | "transfer" | "bills" | "card">("all");
   const hasPushedState = React.useRef(false);
@@ -165,9 +142,19 @@ export default function HistoryPage() {
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
+  // Map category strings back to filters
+  const getCategoryFromTx = (tx: Transaction) => {
+    if (tx.type === "DEPOSIT" || tx.type === "CASHOUT") return "deposit";
+    if (tx.type === "TRANSFER") return "transfer";
+    if (tx.type === "BILL_PAYMENT") return "bills";
+    if (tx.type === "CARD_FUND") return "card";
+    return "all";
+  };
+
   // Filter logic based on category buttons and search key characters
   const filteredTransactions = HISTORICAL_TRANSACTIONS.filter((tx) => {
-    const matchesCategory = activeCategory === "all" || tx.category === activeCategory;
+    const txCategory = getCategoryFromTx(tx);
+    const matchesCategory = activeCategory === "all" || txCategory === activeCategory;
     const matchesSearch =
       tx.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -175,11 +162,6 @@ export default function HistoryPage() {
       tx.type.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
-
-  const handleCopyReference = (ref: string) => {
-    navigator.clipboard.writeText(ref);
-    toast.success("Transaction reference copied!");
-  };
 
   return (
     <>
@@ -326,138 +308,10 @@ export default function HistoryPage() {
         </motion.div>
       </main>
 
-      {/* High-Fidelity Transaction Receipt Details Drawer */}
+      {/* Shared High-Fidelity Transaction Receipt Details Drawer wrapped in AnimatePresence for smooth exit transition */}
       <AnimatePresence>
         {selectedTx && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedTx(null)}
-              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[99998]"
-            />
-
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-              drag="y"
-              dragDirectionLock
-              dragConstraints={{ top: 0, bottom: 450 }}
-              dragElastic={{ top: 0, bottom: 0.2 }}
-              onDragEnd={(event, info) => {
-                if (info.offset.y > 100 || info.velocity.y > 500) {
-                  setSelectedTx(null);
-                }
-              }}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 shadow-none text-black overflow-hidden touch-none select-none"
-            >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab active:cursor-grabbing" />
-
-              {/* Receipt Header details */}
-              <div className="text-center space-y-2 pb-6 border-b border-gray-100">
-                <div
-                  className={cn(
-                    "w-12 h-12 rounded-full mx-auto flex items-center justify-center",
-                    selectedTx.type === "DEPOSIT" || selectedTx.type === "CASHOUT"
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "bg-error/5 text-error"
-                  )}
-                >
-                  <span className="material-symbols-outlined text-[24px]">
-                    {selectedTx.type === "DEPOSIT" && "south_west"}
-                    {selectedTx.type === "TRANSFER" && "north_east"}
-                    {selectedTx.type === "BILL_PAYMENT" && "receipt_long"}
-                    {selectedTx.type === "CARD_FUND" && "credit_card"}
-                    {selectedTx.type === "CASHOUT" && "atm"}
-                  </span>
-                </div>
-
-                <h3 className="font-hanken font-black text-sm uppercase tracking-widest text-gray-400">
-                  Transaction Receipt
-                </h3>
-                <p className="font-mono text-xl min-[360px]:text-2xl font-black text-black">
-                  {selectedTx.type === "DEPOSIT" || selectedTx.type === "CASHOUT" ? "+" : "-"}
-                  {selectedTx.currency === "NGN" ? "₦" : "$"}
-                  {selectedTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-
-                <p className="font-hanken text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-relaxed">
-                  {selectedTx.description}
-                </p>
-              </div>
-
-              {/* Data Specifications Table */}
-              <div className="py-5 space-y-3 text-xs">
-                <div className="flex justify-between items-center text-gray-500 font-semibold">
-                  <span>Reference ID</span>
-                  <div className="flex items-center gap-1">
-                    <span className="font-mono text-black font-bold uppercase text-[11px]">{selectedTx.reference}</span>
-                    <button
-                      onClick={() => handleCopyReference(selectedTx.reference)}
-                      className="text-primary hover:brightness-95 active:scale-95 flex items-center justify-center cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center text-gray-500 font-semibold">
-                  <span>Transfer Type</span>
-                  <span className="font-bold text-black uppercase text-[11px]">{selectedTx.type}</span>
-                </div>
-
-                {selectedTx.recipientName && (
-                  <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Beneficiary</span>
-                    <span className="font-bold text-black uppercase text-[11px]">{selectedTx.recipientName}</span>
-                  </div>
-                )}
-
-                {selectedTx.bankName && (
-                  <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Provider Bank</span>
-                    <span className="font-bold text-black uppercase text-[11px]">{selectedTx.bankName}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center text-gray-500 font-semibold">
-                  <span>Processing Fee</span>
-                  <span className="font-bold text-black uppercase text-[11px]">
-                    {selectedTx.currency === "NGN" ? "₦" : "$"}
-                    {selectedTx.fee.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center text-gray-500 font-semibold">
-                  <span>Status code</span>
-                  <span
-                    className={cn(
-                      "font-black tracking-widest text-[10px] uppercase",
-                      selectedTx.status === "SUCCESS" ? "text-emerald-600" : "text-error"
-                    )}
-                  >
-                    {selectedTx.status}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center text-gray-500 font-semibold">
-                  <span>Settlement Time</span>
-                  <span className="font-bold text-black text-[11px]">{selectedTx.date} @ {selectedTx.time}</span>
-                </div>
-              </div>
-
-              {/* Primary Dismiss */}
-              <button
-                onClick={() => setSelectedTx(null)}
-                className="w-full mt-2 py-4 bg-gray-50 hover:bg-gray-100 text-black text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all text-center"
-              >
-                Dismiss Receipt
-              </button>
-            </motion.div>
-          </>
+          <TransactionReceipt transaction={selectedTx} onClose={() => setSelectedTx(null)} />
         )}
       </AnimatePresence>
 
