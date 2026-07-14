@@ -106,9 +106,15 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<AdminTxLog[]>([]);
   const [searchLogTerm, setSearchLogTerm] = useState("");
 
-  // Load initial states - Pulling real users transactions if they are registered inside Firestore
+  // Load initial states - Pulling real users transactions if they are registered inside Firestore and authorized
   useEffect(() => {
     const fetchRealData = async () => {
+      // Banish permission errors for unauthenticated guests by checking if console is unlocked first
+      if (!isAdminUnlocked) {
+        setLogs(INITIAL_ADMIN_LOGS);
+        return;
+      }
+
       try {
         const { collection, getDocs } = await import("firebase/firestore");
         const { db } = await import("@/lib/firebase");
@@ -179,6 +185,34 @@ export default function AdminPage() {
         sessionStorage.setItem("admin_session_unlocked", "true");
       }
       toast.success("Admin Authorization Granted!");
+
+      // Lazily sync real database transactions upon successful validation clearance
+      const fetchRealData = async () => {
+        try {
+          const { collection, getDocs } = await import("firebase/firestore");
+          const { db } = await import("@/lib/firebase");
+          const querySnap = await getDocs(collection(db, "transactions"));
+          if (!querySnap.empty) {
+            const fetchedLogs = querySnap.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                userName: data.userName || data.recipientName || "USER",
+                type: data.type || "TRANSFER",
+                amount: data.amount || 0,
+                status: data.status || "SUCCESS",
+                reference: data.reference || doc.id,
+                date: data.date || "Today",
+                time: data.time || "12:00 PM"
+              } as AdminTxLog;
+            });
+            setLogs(fetchedLogs);
+          }
+        } catch {
+          // Fall back gracefully
+        }
+      };
+      fetchRealData();
     } else {
       toast.error("Invalid Admin Passcode PIN!");
     }
