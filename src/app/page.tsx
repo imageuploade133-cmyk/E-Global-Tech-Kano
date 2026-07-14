@@ -30,39 +30,58 @@ export default function Home() {
 
   // Capture and process Flutterwave callback parameters dynamically
   useEffect(() => {
-    const transactionId = searchParams.get("transaction_id");
+    const transactionId = searchParams.get("transaction_id") || searchParams.get("transactionId");
     const status = searchParams.get("status");
+    const txRef = searchParams.get("tx_ref") || searchParams.get("txRef");
     const verifyParam = searchParams.get("verify");
 
-    if ((verifyParam === "flw" && transactionId) || verifyParam === "flw_success") {
+    // Automatically trigger verification if transaction_id, success status, or verify params are detected
+    if (transactionId || status === "successful" || status === "completed" || verifyParam === "flw" || verifyParam === "flw_success") {
+      console.log("[Success page loaded] URL parameters detected:", {
+        transactionId,
+        status,
+        txRef,
+        verifyParam
+      });
+
+      if (transactionId) {
+        console.log(`[transaction_id received] ID: ${transactionId}, tx_ref: ${txRef || "N/A"}`);
+      }
+
       const verifyPayment = async () => {
         setVerificationStatus("verifying");
         toast.loading("Verifying Flutterwave transaction details...");
 
         try {
-          // If we redirected inside same tab
           if (transactionId) {
+            console.log(`[Verify API called] Requesting /api/flutterwave/verify?id=${transactionId}`);
             const res = await fetch(`/api/flutterwave/verify?id=${transactionId}`);
             const data = await res.json();
             toast.dismiss();
 
             if (data.success) {
+              console.log("[Verification successful] Response data:", data);
               setVerifiedAmount(data.fundedAmount || 0);
               setVerificationStatus("success");
               toast.success("Wallet successfully funded!");
+
+              console.log(`[Wallet credited] Amount: ₦${data.fundedAmount || 0}, New Balance: ₦${data.newBalance || 0}`);
+              console.log("[Transaction saved] Ledger entry secured in Firestore database.");
             } else {
+              console.error("[Verification failed] Endpoint returned error:", data.error);
               setVerifyMessage(data.error || "Verification was rejected by the gateway.");
               setVerificationStatus("error");
               toast.error("Wallet funding was unsuccessful.");
             }
           } else {
-            // Direct successful iframe completion
+            console.warn("[Success page loaded] Direct callback loaded without a specific transaction_id.");
             setVerifiedAmount(0);
             setVerificationStatus("success");
             toast.dismiss();
             toast.success("Wallet successfully funded!");
           }
-        } catch {
+        } catch (err) {
+          console.error("[Verify API Exception] Connection failure:", err);
           toast.dismiss();
           setVerifyMessage("Internal server communication error during verification.");
           setVerificationStatus("error");
@@ -72,6 +91,7 @@ export default function Home() {
 
       verifyPayment();
     } else if (status === "cancelled") {
+      console.log("[Success page loaded] Payment was cancelled by user.");
       toast.error("The transaction checkout flow was cancelled.");
       router.replace("/");
     }

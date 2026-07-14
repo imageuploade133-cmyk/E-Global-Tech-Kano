@@ -17,7 +17,16 @@ export async function POST(req: Request) {
     // Build standard, traceable unique references
     const tx_ref = `flw-tx-${userId || "anon"}-${Date.now()}`;
 
-    console.log(`[Flutterwave Payment Initialization] Ref: ${tx_ref}, User: ${userId || "anon"}, Amount: ${amount}`);
+    console.log(`[payment initialization] INITIALIZATION REQUEST:`, {
+      amount: Number(amount),
+      currency: currency || "NGN",
+      email,
+      name,
+      phone,
+      userId: userId || "anon",
+      tx_ref,
+      redirect_url: redirectUrl || "https://e-global-tech-kano.vercel.app/history"
+    });
 
     const resData = await flutterwaveService.initializePayment({
       tx_ref,

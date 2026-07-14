@@ -12,12 +12,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing required parameter: Transaction ID 'id'." }, { status: 400 });
     }
 
-    console.log(`[Flutterwave Verification Started] Checking Transaction ID: ${transactionId}`);
+    console.log(`[callback received] REQUEST DETECTED: Verification query triggered for Transaction ID: ${transactionId}`);
+    console.log(`[verification started] Fetching transaction status from Flutterwave rail for ID: ${transactionId}`);
 
     // 1. Verify with Flutterwave's Verify API first before crediting any wallet
     const flwRes = await flutterwaveService.verifyTransaction(transactionId);
 
     if (flwRes.status !== "success" || flwRes.data.status !== "successful") {
+      console.warn(`[verification failed] Flutterwave status check was negative:`, flwRes);
       return NextResponse.json(
         {
           success: false,
@@ -29,6 +31,7 @@ export async function GET(req: Request) {
     }
 
     const { amount, currency, tx_ref, customer } = flwRes.data;
+    console.log(`[verification successful] Flutterwave returned success status for ID: ${transactionId}. Ref: ${tx_ref}, Amount: ${amount}, Currency: ${currency}`);
 
     // Retrieve custom user details encoded inside reference or match email
     // Reference format: flw-tx-{userId}-{timestamp}
@@ -68,9 +71,10 @@ export async function GET(req: Request) {
       // Increment atomic balance
       const newBalance = currentBalance + fundedAmount;
       transaction.update(userDocRef, { balance: newBalance });
+      console.log(`[wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW BALANCE: ₦${newBalance}`);
 
       // Save transaction record to prevent duplicate processing and establish history audits
-      transaction.set(flwTxRef, {
+      const txRecord = {
         userId,
         amount: fundedAmount,
         currency: currency || "NGN",
@@ -84,7 +88,9 @@ export async function GET(req: Request) {
         time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         fee: 0.00,
         createdAt: new Date().toISOString(),
-      });
+      };
+      transaction.set(flwTxRef, txRecord);
+      console.log(`[transaction saved] ID: ${transactionId}, REFERENCE: ${tx_ref}, RECORD:`, txRecord);
 
       return {
         duplicate: false,
