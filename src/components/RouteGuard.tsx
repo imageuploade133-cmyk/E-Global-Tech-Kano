@@ -1,15 +1,94 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, isPinVerified, userData } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  const [flwVerifying, setFlwVerifying] = useState(false);
+  const [flwMessage, setFlwMessage] = useState("");
+
+  // Detect and verify Flutterwave redirects globally on app startup before any guards or locks activate
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const verify = params.get("verify");
+    const status = params.get("status");
+    const transactionId = params.get("transaction_id") || params.get("transactionId");
+    const txRef = params.get("tx_ref") || params.get("txRef");
+
+    if (verify === "flw" || transactionId || status === "successful" || status === "completed") {
+      console.log("[Redirect Detected] Flutterwave parameters detected on app startup:", {
+        verify,
+        status,
+        transactionId,
+        txRef
+      });
+
+      if (!transactionId) {
+        console.warn("[Redirect Detected] missing transaction_id parameter. Skipping verification.");
+        return;
+      }
+
+      const verifyTransaction = async () => {
+        setFlwVerifying(true);
+        setFlwMessage("Securing settlement credentials...");
+
+        console.log(`[Calling Verify Endpoint] POST /api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
+
+        try {
+          const res = await fetch("/api/flutterwave/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transactionId, txRef })
+          });
+          const data = await res.json();
+
+          console.log("[Verification Complete] Server response received:", data);
+
+          if (data.success) {
+            // Remove the query parameters from the URL
+            const url = new URL(window.location.href);
+            url.search = "";
+            window.history.replaceState({}, "", url.toString());
+
+            console.log(`[Wallet Refreshed] Successfully credited ₦${data.fundedAmount || "N/A"}. New balance verified: ₦${data.newBalance || "N/A"}`);
+
+            // Show success toast using sonner
+            toast.success("Wallet funded successfully!", {
+              description: `Amount ₦${(data.fundedAmount || 0).toLocaleString()} credited.`
+            });
+          } else {
+            console.error("[Verification Complete] Verification unsuccessful:", data.error);
+            toast.error("Payment settlement was rejected.", {
+              description: data.error || "Please contact customer support."
+            });
+            // Clear URL params to prevent loop
+            const url = new URL(window.location.href);
+            url.search = "";
+            window.history.replaceState({}, "", url.toString());
+          }
+        } catch (err) {
+          console.error("[Verification Complete] Endpoint execution error:", err);
+          toast.error("Verification failed.", {
+            description: "Connection error with settlement gateway."
+          });
+        } finally {
+          setFlwVerifying(false);
+        }
+      };
+
+      verifyTransaction();
+    }
+  }, []);
 
   // Smooth scroll and keyboard focus positions reset to prevent page shifting/gaps
   useEffect(() => {
@@ -61,6 +140,30 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       }
     }
   }, [user, loading, isPinVerified, userData, pathname, router]);
+
+  if (flwVerifying) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
+        <div className="relative flex flex-col items-center">
+          <div className="flex flex-col items-center p-6 rounded-3xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50 shadow-[0_8px_32px_rgba(0,0,0,0.03)] max-w-xs text-center">
+            <div className="relative w-12 h-12 flex items-center justify-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1.0, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-[3px] border-gray-100/80 border-t-[#FC7A00] border-r-[#0b513d]"
+              />
+              <span className="material-symbols-outlined text-[#FC7A00] text-[20px] font-bold animate-pulse">lock_clock</span>
+            </div>
+
+            <h3 className="font-hanken font-extrabold text-xs text-gray-900 uppercase tracking-wider mt-4">Verifying Settlement</h3>
+            <p className="font-hanken text-[10px] text-gray-500 mt-1.5 font-semibold leading-relaxed">
+              {flwMessage || "Connecting to Flutterwave rails to verify your secure transaction deposit..."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
