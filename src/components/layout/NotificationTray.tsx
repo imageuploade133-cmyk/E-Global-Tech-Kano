@@ -43,14 +43,14 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
       // Push state representing main tray open
       window.history.pushState({ notificationsOpen: true }, "");
 
-      const handlePopState = () => {
-        // Intercept back actions
-        if (selectedRef.current) {
-          // If sub-drawer is open, dismiss it first
-          setSelectedNotification(null);
-        } else {
-          // Otherwise, close the main notification panel
-          onClose();
+      const handlePopState = (e: PopStateEvent) => {
+        // Only respond if this state actually is ours to avoid closing other modals (like LogoutDrawer)
+        if (e.state && (e.state.notificationsOpen || e.state.detailOpen)) {
+          if (selectedRef.current) {
+            setSelectedNotification(null);
+          } else {
+            onClose();
+          }
         }
       };
 
