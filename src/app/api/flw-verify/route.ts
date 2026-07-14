@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const baseUrl = process.env.FLW_BASE_URL || "https://api.flutterwave.com/v3";
+  const rawBaseUrl = process.env.FLW_BASE_URL || "";
+  // Normalize and enforce correct API URL if Vercel is configured with an invalid webhook
+  const baseUrl = rawBaseUrl.includes("api.flutterwave.com")
+    ? rawBaseUrl
+    : "https://api.flutterwave.com/v3";
+
   const publicKey = process.env.FLW_PUBLIC_KEY;
   const secretKey = process.env.FLW_SECRET_KEY;
   const webhookSecret = process.env.FLW_WEBHOOK_SECRET;
