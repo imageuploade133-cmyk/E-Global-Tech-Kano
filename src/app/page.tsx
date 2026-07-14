@@ -34,24 +34,33 @@ export default function Home() {
     const status = searchParams.get("status");
     const verifyParam = searchParams.get("verify");
 
-    if (verifyParam === "flw" && transactionId) {
+    if ((verifyParam === "flw" && transactionId) || verifyParam === "flw_success") {
       const verifyPayment = async () => {
         setVerificationStatus("verifying");
         toast.loading("Verifying Flutterwave transaction details...");
 
         try {
-          const res = await fetch(`/api/flutterwave/verify?id=${transactionId}`);
-          const data = await res.json();
-          toast.dismiss();
+          // If we redirected inside same tab
+          if (transactionId) {
+            const res = await fetch(`/api/flutterwave/verify?id=${transactionId}`);
+            const data = await res.json();
+            toast.dismiss();
 
-          if (data.success) {
-            setVerifiedAmount(data.fundedAmount || 0);
-            setVerificationStatus("success");
-            toast.success("Wallet successfully funded!");
+            if (data.success) {
+              setVerifiedAmount(data.fundedAmount || 0);
+              setVerificationStatus("success");
+              toast.success("Wallet successfully funded!");
+            } else {
+              setVerifyMessage(data.error || "Verification was rejected by the gateway.");
+              setVerificationStatus("error");
+              toast.error("Wallet funding was unsuccessful.");
+            }
           } else {
-            setVerifyMessage(data.error || "Verification was rejected by the gateway.");
-            setVerificationStatus("error");
-            toast.error("Wallet funding was unsuccessful.");
+            // Direct successful iframe completion
+            setVerifiedAmount(0);
+            setVerificationStatus("success");
+            toast.dismiss();
+            toast.success("Wallet successfully funded!");
           }
         } catch {
           toast.dismiss();
