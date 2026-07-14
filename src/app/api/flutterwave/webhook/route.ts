@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     const rawBody = await req.text();
     const signature = req.headers.get("verif-hash") || req.headers.get("x-flutterwave-signature");
 
-    console.log(`[Flutterwave Webhook Received] Checking signature validation: ${signature ? "Present" : "Missing"}`);
+    console.log(`[webhook received] WEBHOOK REQUEST DETECTED. Signature: ${signature ? "Present" : "Missing"}, Payload Size: ${rawBody.length} bytes`);
 
     // 1. Verify webhook signatures using FLW_WEBHOOK_SECRET
     const isValid = flutterwaveService.validateWebhookSignature(signature, rawBody);
@@ -18,10 +18,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid cryptographic signature." }, { status: 401 });
     }
 
+    console.log(`[verification successful] Webhook cryptographic signature validated successfully.`);
+
     const payload = JSON.parse(rawBody);
     const { event, data } = payload;
 
-    console.log(`[Flutterwave Webhook Event] Processing payload type: "${event || payload["event.type"]}"`);
+    console.log(`[webhook received] Webhook event type: "${event || payload["event.type"]}"`);
 
     // We only process completed credit operations
     if (event === "charge.completed" && data.status === "successful") {
@@ -61,9 +63,10 @@ export async function POST(req: Request) {
 
         const newBalance = currentBalance + fundedAmount;
         transaction.update(userDocRef, { balance: newBalance });
+        console.log(`[wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW BALANCE: ₦${newBalance}`);
 
         // Save ledger histories
-        transaction.set(flwTxRef, {
+        const txRecord = {
           userId,
           amount: fundedAmount,
           currency: currency || "NGN",
@@ -77,7 +80,9 @@ export async function POST(req: Request) {
           time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
           fee: 0.00,
           createdAt: new Date().toISOString(),
-        });
+        };
+        transaction.set(flwTxRef, txRecord);
+        console.log(`[transaction saved] ID: ${transactionId}, REFERENCE: ${tx_ref}, RECORD:`, txRecord);
 
         return {
           duplicate: false,

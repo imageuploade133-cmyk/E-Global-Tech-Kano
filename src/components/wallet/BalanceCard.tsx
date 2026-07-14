@@ -87,11 +87,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [addAmount, setAddAmount] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
 
-  // Iframe modal parameters
-  const [isIframeOpen, setIsIframeOpen] = useState(false);
-  const [iframeUrl, setIframeUrl] = useState("");
-  const [currentTxRef, setCurrentTxRef] = useState("");
-
   const handlePresetClick = (val: number) => {
     setAddAmount(val.toString());
   };
@@ -128,11 +123,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       toast.dismiss();
 
       if (data.success && data.paymentLink) {
-        toast.success("Initializing secure popup checkout...");
-        setIframeUrl(data.paymentLink);
-        setCurrentTxRef(data.txRef || "");
-        setIsAddMoneyOpen(false);
-        setIsIframeOpen(true);
+        toast.success("Redirecting to secure Flutterwave checkout...");
+        // Direct first-party redirect to prevent sessionStorage blockages in iframe
+        window.location.href = data.paymentLink;
       } else {
         toast.error(data.error || "Failed to initialize Flutterwave transaction link.");
       }
@@ -143,57 +136,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setIsInitializing(false);
     }
   };
-
-  // Safe manual verify trigger inside the iframe overlay modal
-  const handleManualVerifyCheck = async () => {
-    setIsInitializing(true);
-    toast.loading("Querying payment logs for verification...");
-
-    try {
-      // Query transactions collection for this tx_ref
-      const { collection, query, where, getDocs } = await import("firebase/firestore");
-      const { db } = await import("@/lib/firebase");
-
-      const q = query(collection(db, "transactions"), where("reference", "==", currentTxRef));
-      const snap = await getDocs(q);
-
-      toast.dismiss();
-      if (!snap.empty) {
-        toast.success("Payment verified! Wallet balance credited.");
-        setIsIframeOpen(false);
-        window.location.replace("/?verify=flw_success");
-      } else {
-        toast.info("No credit record settled yet. If you have paid, please complete the flow inside checkout.");
-      }
-    } catch {
-      toast.dismiss();
-      toast.error("Could not complete background verification check.");
-    } finally {
-      setIsInitializing(false);
-    }
-  };
-
-  // Sync state with browser back history for swipe-to-dismiss behavior of the Iframe Drawer
-  React.useEffect(() => {
-    if (isIframeOpen) {
-      window.history.pushState({ flwIframeOpen: true }, "");
-
-      const handlePopState = (e: PopStateEvent) => {
-        if (e.state && e.state.flwIframeOpen) {
-          setIsIframeOpen(false);
-        }
-      };
-
-      window.addEventListener("popstate", handlePopState);
-      return () => {
-        window.removeEventListener("popstate", handlePopState);
-        // pop back state if closed manually through click triggers
-        if (window.history.state?.flwIframeOpen) {
-          window.history.back();
-        }
-      };
-    }
-  }, [isIframeOpen]);
 
   return (
     <>
@@ -436,82 +378,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </button>
               </div>
             </form>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-
-    {/* Live Iframe 95% Height Flutterwave Checkout Drawer */}
-    <AnimatePresence>
-      {isIframeOpen && (
-        <>
-          {/* Backdrop overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsIframeOpen(false)}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[99998]"
-          />
-
-          {/* Collapsible Iframe popup container */}
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            drag="y"
-            dragDirectionLock
-            dragConstraints={{ top: 0, bottom: 450 }}
-            dragElastic={{ top: 0, bottom: 0.2 }}
-            onDragEnd={(event, info) => {
-              if (info.offset.y > 150 || info.velocity.y > 500) {
-                setIsIframeOpen(false);
-              }
-            }}
-            className="fixed bottom-0 left-0 right-0 max-w-md h-[95dvh] mx-auto bg-[#f8f9fa] rounded-t-[32px] z-[99999] flex flex-col overflow-hidden shadow-2xl"
-          >
-            {/* Grab draggable pill */}
-            <div className="w-12 h-1.5 bg-gray-300 rounded-full mt-3 mb-2 mx-auto shrink-0 cursor-grab active:cursor-grabbing" />
-
-            {/* Header control line */}
-            <div className="px-6 py-2.5 bg-white border-b border-gray-150 flex items-center justify-between shrink-0">
-              <button
-                type="button"
-                onClick={handleManualVerifyCheck}
-                className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-[#FC7A00] rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-              >
-                Verify Deposit
-              </button>
-
-              <span className="font-hanken font-bold text-xs text-gray-800">Flutterwave Gateway</span>
-
-              <button
-                type="button"
-                onClick={() => setIsIframeOpen(false)}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
-              </button>
-            </div>
-
-            {/* In-app secure frame */}
-            <div className="flex-1 w-full bg-white relative">
-              <iframe
-                src={iframeUrl}
-                className="w-full h-full border-none"
-                title="Flutterwave Secured Checkout"
-                sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-              />
-            </div>
-
-            {/* Iframe Action Hint */}
-            <div className="p-4 bg-white border-t border-gray-150 shrink-0 text-center space-y-1">
-              <p className="font-hanken text-[9.5px] text-gray-400 font-extrabold uppercase tracking-wide">Secure Encryption Protocol Active</p>
-              <p className="font-hanken text-[10px] text-gray-500 leading-normal">
-                Once payment completes, verify your balance or swipe down/drag to close this window.
-              </p>
-            </div>
           </motion.div>
         </>
       )}
