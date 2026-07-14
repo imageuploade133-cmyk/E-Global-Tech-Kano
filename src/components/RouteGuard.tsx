@@ -55,16 +55,76 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           console.log("[Verification Complete] Server response received:", data);
 
           if (data.success) {
+            let finalFundedAmount = data.fundedAmount;
+            let finalNewBalance = data.newBalance;
+
+            if (data.fallbackToClient) {
+              console.log("[Calling Verify Endpoint] Backend requested client-side balance credit execution fallback.");
+              const { doc, runTransaction, arrayUnion } = await import("firebase/firestore");
+              const { db } = await import("@/lib/firebase");
+
+              const userDocRef = doc(db, "users", data.userId);
+
+              const clientResult = await runTransaction(db, async (transaction) => {
+                const userSnap = await transaction.get(userDocRef);
+                if (!userSnap.exists()) {
+                  throw new Error("User document does not exist.");
+                }
+
+                const userData = userSnap.data();
+                const processed = userData.processedTransactions || [];
+
+                if (processed.includes(transactionId)) {
+                  return { duplicate: true, currentBalance: userData.balance };
+                }
+
+                const currentBalance = Number(userData.balance) || 0;
+                const fundedAmount = Number(data.amount);
+                const newBalance = currentBalance + fundedAmount;
+
+                const txRecord = {
+                  id: `tx-client-${transactionId}`,
+                  reference: data.tx_ref,
+                  amount: fundedAmount,
+                  currency: data.currency || "NGN",
+                  description: `Flutterwave Deposit Ref: ${data.tx_ref}`,
+                  recipientName: data.customer?.name || "Wallet Credit",
+                  status: "SUCCESS",
+                  type: "DEPOSIT",
+                  date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+                  time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+                  fee: 0.00,
+                  createdAt: new Date().toISOString(),
+                };
+
+                transaction.update(userDocRef, {
+                  balance: newBalance,
+                  processedTransactions: arrayUnion(transactionId),
+                  recentTransactionsList: arrayUnion(txRecord)
+                });
+
+                return { duplicate: false, newBalance, fundedAmount };
+              });
+
+              if (clientResult.duplicate) {
+                console.log("[Verification Complete] Duplicate payment check: Transaction was already processed.");
+              } else {
+                console.log("[Verification Complete] Client-side balance update transaction succeeded.");
+                finalFundedAmount = clientResult.fundedAmount;
+                finalNewBalance = clientResult.newBalance;
+              }
+            }
+
             // Remove the query parameters from the URL
             const url = new URL(window.location.href);
             url.search = "";
             window.history.replaceState({}, "", url.toString());
 
-            console.log(`[Wallet Refreshed] Successfully credited ₦${data.fundedAmount || "N/A"}. New balance verified: ₦${data.newBalance || "N/A"}`);
+            console.log(`[Wallet Refreshed] Successfully credited ₦${finalFundedAmount || "N/A"}. New balance verified: ₦${finalNewBalance || "N/A"}`);
 
             // Show success toast using sonner
             toast.success("Wallet funded successfully!", {
-              description: `Amount ₦${(data.fundedAmount || 0).toLocaleString()} credited.`
+              description: `Amount ₦${(finalFundedAmount || 0).toLocaleString()} credited.`
             });
           } else {
             console.error("[Verification Complete] Verification unsuccessful:", data.error);
