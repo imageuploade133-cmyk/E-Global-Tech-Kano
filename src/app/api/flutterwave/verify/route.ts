@@ -1,69 +1,110 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { db } from "@/lib/firebase";
-import { doc, runTransaction } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 
-async function executeVerification(transactionId: string) {
-  console.log(`[callback received] REQUEST DETECTED: Verification query triggered for Transaction ID: ${transactionId}`);
-  console.log(`[verification started] Fetching transaction status from Flutterwave rail for ID: ${transactionId}`);
-
-  // 1. Verify with Flutterwave's Verify API first before crediting any wallet
-  const flwRes = await flutterwaveService.verifyTransaction(transactionId);
-
-  if (flwRes.status !== "success" || flwRes.data.status !== "successful") {
-    console.warn(`[verification failed] Flutterwave status check was negative:`, flwRes);
-    return {
-      success: false,
-      status: flwRes.data?.status || "failed",
-      error: "Transaction was not successfully settled on Flutterwave rail.",
-    };
-  }
-
-  const { amount, currency, tx_ref, customer } = flwRes.data;
-  console.log(`[verification successful] Flutterwave returned success status for ID: ${transactionId}. Ref: ${tx_ref}, Amount: ${amount}, Currency: ${currency}`);
-
-  // Retrieve custom user details encoded inside reference or match email
-  // Reference format: flw-tx-{userId}-{timestamp}
-  const parts = tx_ref.split("-");
-  const userId = parts[2] && parts[2] !== "anon" ? parts[2] : null;
-
-  if (!userId) {
-    return {
-      success: false,
-      error: "Verification Failed: User ID context not resolved from transaction reference.",
-    };
-  }
-
-  // 2. Perform safe, atomic database transaction to update balances and log records
-  const userDocRef = doc(db, "users", userId);
-  const flwTxRef = doc(db, "transactions", transactionId);
-
+export async function POST(req: Request) {
+  let transactionId = "";
   try {
-    const result = await runTransaction(db, async (transaction) => {
-      // Prevent duplicate wallet credits by checking if this transaction ID/ref was already processed
-      const txDoc = await transaction.get(flwTxRef);
-      if (txDoc.exists()) {
+    const body = await req.json();
+    transactionId = body.transactionId;
+
+    if (!transactionId) {
+      return NextResponse.json({ error: "Missing required parameter: 'transactionId'." }, { status: 400 });
+    }
+
+    console.log(`[Payment verification started] Verification query triggered for Transaction ID: ${transactionId}`);
+
+    // 1. Verify with Flutterwave's Verify API first before crediting any wallet
+    const flwRes = await flutterwaveService.verifyTransaction(transactionId);
+
+    // Validate payment status
+    if (flwRes.status !== "success" || flwRes.data.status !== "successful") {
+      console.warn(`[verification failed] Flutterwave status check was negative:`, flwRes);
+      return NextResponse.json(
+        {
+          success: false,
+          status: flwRes.data?.status || "failed",
+          error: "Transaction was not successfully settled on Flutterwave rail.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { amount, currency, tx_ref, customer } = flwRes.data;
+
+    // Validate payment amount before crediting
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return NextResponse.json({ error: "Invalid payment amount. Validation failed." }, { status: 400 });
+    }
+
+    // Validate currency before crediting
+    if (currency !== "NGN" && currency !== "USD") {
+      return NextResponse.json({ error: `Unsupported transaction currency: ${currency}` }, { status: 400 });
+    }
+
+    // Validate transaction reference format
+    if (!tx_ref || !tx_ref.startsWith("flw-tx-")) {
+      return NextResponse.json({ error: "Invalid transaction reference prefix." }, { status: 400 });
+    }
+
+    console.log(`[Payment verified] Flutterwave returned success status for ID: ${transactionId}. Ref: ${tx_ref}, Amount: ${amount}, Currency: ${currency}`);
+
+    // Retrieve custom user details encoded inside reference or match email
+    // Reference format: flw-tx-{userId}-{timestamp}
+    const parts = tx_ref.split("-");
+    const userId = parts[2] && parts[2] !== "anon" ? parts[2] : null;
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Verification Failed: User ID context not resolved from transaction reference." },
+        { status: 400 }
+      );
+    }
+
+    console.log(`[Firestore transaction started] Running atomic transaction to check duplicates and credit balance.`);
+
+    // 2. Perform safe, atomic database transaction to update balances and log records using Firebase Admin SDK
+    const result = await adminDb.runTransaction(async (transaction) => {
+      // Check if duplicate already processed inside flutterwave_transactions collection
+      const flwTxRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
+      const flwTxDoc = await transaction.get(flwTxRef);
+
+      if (flwTxDoc.exists) {
         return {
           duplicate: true,
-          message: "Transaction already processed and wallet credited.",
+          message: "Already processed",
         };
       }
 
+      const userDocRef = adminDb.collection("users").doc(userId);
       const userDoc = await transaction.get(userDocRef);
-      if (!userDoc.exists()) {
+
+      if (!userDoc.exists) {
         throw new Error("Target user profile was not found in Firestore.");
       }
 
-      const userData = userDoc.data();
+      const userData = userDoc.data() || {};
       const currentBalance = Number(userData.balance) || 0;
       const fundedAmount = Number(amount);
 
       // Increment atomic balance
       const newBalance = currentBalance + fundedAmount;
       transaction.update(userDocRef, { balance: newBalance });
-      console.log(`[wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW BALANCE: ₦${newBalance}`);
+      console.log(`[Wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW BALANCE: ₦${newBalance}`);
 
-      // Save transaction record to prevent duplicate processing and establish history audits
+      // Create document in flutterwave_transactions to prevent duplicates
+      transaction.set(flwTxRef, {
+        userId,
+        amount: fundedAmount,
+        currency,
+        reference: tx_ref,
+        flwId: transactionId,
+        status: "SUCCESSFUL",
+        processedAt: new Date().toISOString(),
+      });
+
+      // Save transaction record inside transactions collection for general ledger logging
+      const ledgerRef = adminDb.collection("transactions").doc();
       const txRecord = {
         userId,
         amount: fundedAmount,
@@ -79,8 +120,8 @@ async function executeVerification(transactionId: string) {
         fee: 0.00,
         createdAt: new Date().toISOString(),
       };
-      transaction.set(flwTxRef, txRecord);
-      console.log(`[transaction saved] ID: ${transactionId}, REFERENCE: ${tx_ref}, RECORD:`, txRecord);
+      transaction.set(ledgerRef, txRecord);
+      console.log(`[Transaction recorded] Ledger history entry recorded successfully.`);
 
       return {
         duplicate: false,
@@ -90,37 +131,31 @@ async function executeVerification(transactionId: string) {
     });
 
     if (result.duplicate) {
-      console.log(`[Flutterwave Duplicate Prevention] Reference already credited: ${transactionId}`);
-      return {
+      console.log(`[Duplicate prevented] Reference already credited: ${transactionId}`);
+      return NextResponse.json({
         success: true,
         message: result.message,
-        duplicate: true,
-      };
+        details: "No double-spending allowed.",
+      });
     }
 
-    console.log(`[Flutterwave Verification Completed] Success! User: ${userId}, Funded: ₦${amount}. New balance: ₦${result.newBalance}`);
+    console.log(`[Transaction committed] Firestore atomic updates successfully committed.`);
+    console.log(`[Verification complete] Success! User: ${userId}, Funded: ₦${amount}. New balance: ₦${result.newBalance}`);
 
-    return {
+    return NextResponse.json({
       success: true,
       message: "Transaction verified and wallet funded successfully!",
       fundedAmount: result.fundedAmount,
       newBalance: result.newBalance,
-    };
-  } catch (dbErr: unknown) {
-    const errMsg = dbErr instanceof Error ? dbErr.message : String(dbErr);
-    console.warn("[Flutterwave API Backend Warning] Firestore rules blocked direct server-side write. Falling back to authenticated client-side execution:", errMsg);
-    return {
-      success: true,
-      fallbackToClient: true,
-      userId,
-      amount: Number(amount),
-      currency: currency || "NGN",
-      tx_ref,
-      customer
-    };
+    });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error(`[Verification Error Failed] ID: ${transactionId || "N/A"} Error Details:`, error.message, error.stack);
+    return NextResponse.json({ error: "Internal Server Verification Error", details: error.message }, { status: 500 });
   }
 }
 
+// Keep GET for backwards compatibility / web redirect checks
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -130,29 +165,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing required parameter: Transaction ID 'id'." }, { status: 400 });
     }
 
-    const result = await executeVerification(transactionId);
-    return NextResponse.json(result);
+    // Call identical logic
+    const response = await fetch(`${new URL(req.url).origin}/api/flutterwave/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transactionId }),
+    });
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("[Flutterwave Verification Exception] Failed atomic verify operation:", errorMsg);
-    return NextResponse.json({ error: "Internal Server Verification Error", details: errorMsg }, { status: 500 });
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { transactionId } = body;
-
-    if (!transactionId) {
-      return NextResponse.json({ error: "Missing required parameter: 'transactionId'." }, { status: 400 });
-    }
-
-    const result = await executeVerification(transactionId);
-    return NextResponse.json(result);
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("[Flutterwave Verification Exception] Failed POST verify operation:", errorMsg);
-    return NextResponse.json({ error: "Internal Server Verification Error", details: errorMsg }, { status: 500 });
+    const error = err as Error;
+    console.error("[Flutterwave Verification Exception] Failed GET verify operation:", error.message, error.stack);
+    return NextResponse.json({ error: "Internal Server Verification Error", details: error.message }, { status: 500 });
   }
 }

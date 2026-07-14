@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { db } from "@/lib/firebase";
-import { doc, runTransaction } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
   try {
@@ -39,25 +38,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Context user reference unresolved." }, { status: 400 });
       }
 
-      const userDocRef = doc(db, "users", userId);
-      const flwTxRef = doc(db, "transactions", transactionId);
+      // Check duplicate inside flutterwave_transactions to prevent double crediting using Admin SDK
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const flwTxRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
+        const flwTxDoc = await transaction.get(flwTxRef);
 
-      // 2. Use Firestore transactions to guarantee balance increment and prevent double spend
-      const result = await runTransaction(db, async (transaction) => {
-        const txDoc = await transaction.get(flwTxRef);
-        if (txDoc.exists()) {
+        if (flwTxDoc.exists) {
           return {
             duplicate: true,
             message: "Duplicate prevented. Webhook already processed this transaction ID.",
           };
         }
 
+        const userDocRef = adminDb.collection("users").doc(userId);
         const userDoc = await transaction.get(userDocRef);
-        if (!userDoc.exists()) {
+        if (!userDoc.exists) {
           throw new Error("Target user profile was not found in Firestore.");
         }
 
-        const userData = userDoc.data();
+        const userData = userDoc.data() || {};
         const currentBalance = Number(userData.balance) || 0;
         const fundedAmount = Number(amount);
 
@@ -65,7 +64,19 @@ export async function POST(req: Request) {
         transaction.update(userDocRef, { balance: newBalance });
         console.log(`[wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW BALANCE: ₦${newBalance}`);
 
+        // Mark payment processed inside flutterwave_transactions
+        transaction.set(flwTxRef, {
+          userId,
+          amount: fundedAmount,
+          currency,
+          reference: tx_ref,
+          flwId: transactionId,
+          status: "SUCCESSFUL",
+          processedAt: new Date().toISOString(),
+        });
+
         // Save ledger histories
+        const ledgerRef = adminDb.collection("transactions").doc();
         const txRecord = {
           userId,
           amount: fundedAmount,
@@ -81,7 +92,7 @@ export async function POST(req: Request) {
           fee: 0.00,
           createdAt: new Date().toISOString(),
         };
-        transaction.set(flwTxRef, txRecord);
+        transaction.set(ledgerRef, txRecord);
         console.log(`[transaction saved] ID: ${transactionId}, REFERENCE: ${tx_ref}, RECORD:`, txRecord);
 
         return {

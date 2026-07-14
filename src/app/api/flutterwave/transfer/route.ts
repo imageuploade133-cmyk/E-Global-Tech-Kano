@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { db } from "@/lib/firebase";
-import { doc, runTransaction } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
   try {
@@ -22,17 +21,17 @@ export async function POST(req: Request) {
 
     console.log(`[Flutterwave Transfer Initiated] User: ${userId}, Amount: ${transferAmount}, Ref: ${ref_id}`);
 
-    const userDocRef = doc(db, "users", userId);
-    const trfRef = doc(db, "transactions", ref_id);
+    const userDocRef = adminDb.collection("users").doc(userId);
+    const trfRef = adminDb.collection("transactions").doc(ref_id);
 
     // Perform atomic transaction to verify sufficient balance and debit user BEFORE calling Flutterwave
-    const result = await runTransaction(db, async (transaction) => {
+    const result = await adminDb.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userDocRef);
-      if (!userDoc.exists()) {
+      if (!userDoc.exists) {
         throw new Error("Target user profile was not found in Firestore.");
       }
 
-      const userData = userDoc.data();
+      const userData = userDoc.data() || {};
       const currentBalance = Number(userData.balance) || 0;
 
       if (currentBalance < transferAmount) {
@@ -86,7 +85,7 @@ export async function POST(req: Request) {
 
       if (flwRes.status === "success") {
         // Update transaction status to SUCCESS upon verification response
-        await runTransaction(db, async (transaction) => {
+        await adminDb.runTransaction(async (transaction) => {
           transaction.update(trfRef, {
             status: "SUCCESS",
             recipientName: flwRes.data.full_name || `Acc: ${accountNumber}`,
@@ -103,10 +102,10 @@ export async function POST(req: Request) {
         });
       } else {
         // Fallback: If Flutterwave fails, refund the user balance and fail the ledger record
-        await runTransaction(db, async (transaction) => {
+        await adminDb.runTransaction(async (transaction) => {
           const userDoc = await transaction.get(userDocRef);
-          if (userDoc.exists()) {
-            const currentBal = Number(userDoc.data().balance) || 0;
+          if (userDoc.exists) {
+            const currentBal = Number(userDoc.data()?.balance) || 0;
             transaction.update(userDocRef, { balance: currentBal + transferAmount });
           }
           transaction.update(trfRef, { status: "FAILED", description: `FAILED: ${flwRes.message}` });
@@ -118,10 +117,10 @@ export async function POST(req: Request) {
     } catch (err: unknown) {
       // Refund user balance and fail ledger in case of network timeout / crash
       const errorMsg = err instanceof Error ? err.message : String(err);
-      await runTransaction(db, async (transaction) => {
+      await adminDb.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userDocRef);
-        if (userDoc.exists()) {
-          const currentBal = Number(userDoc.data().balance) || 0;
+        if (userDoc.exists) {
+          const currentBal = Number(userDoc.data()?.balance) || 0;
           transaction.update(userDocRef, { balance: currentBal + transferAmount });
         }
         transaction.update(trfRef, { status: "FAILED", description: `FAILED: API error: ${errorMsg}` });
