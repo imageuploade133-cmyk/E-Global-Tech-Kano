@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { toast } from "sonner";
 
 interface BalanceCardProps {
   balance: number;
@@ -82,7 +83,62 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     fontSizeClass = "text-[18px] min-[360px]:text-[21px] min-[400px]:text-[24px]";
   }
 
+  const [isAddMoneyOpen, setIsAddMoneyOpen] = useState(false);
+  const [addAmount, setAddAmount] = useState("");
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  const handlePresetClick = (val: number) => {
+    setAddAmount(val.toString());
+  };
+
+  const handleAddMoneySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsedAmount = parseFloat(addAmount);
+
+    if (isNaN(parsedAmount) || parsedAmount < 100) {
+      toast.error("Minimum allowed funding amount is ₦100.00");
+      return;
+    }
+
+    setIsInitializing(true);
+    toast.loading("Contacting Flutterwave secure payment gateway...");
+
+    try {
+      const payload = {
+        amount: parsedAmount,
+        currency: "NGN",
+        email: user?.email || "captain@example.com",
+        name: userData?.name || user?.displayName || "Captain Wallet",
+        userId: user?.uid || "anon",
+        redirectUrl: `${window.location.origin}/?verify=flw`,
+      };
+
+      const res = await fetch("/api/flutterwave/initialize-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success && data.paymentLink) {
+        toast.success("Redirecting to Flutterwave checkout...");
+        // Redirect browser to Flutterwave secure checkout portal
+        window.location.href = data.paymentLink;
+      } else {
+        toast.error(data.error || "Failed to initialize Flutterwave transaction link.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Internal connection error while generating checkout page.");
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
   return (
+    <>
     <motion.section
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -192,6 +248,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         <motion.button
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
+          onClick={() => setIsAddMoneyOpen(true)}
           className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 min-[360px]:gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           {/* Shine effect overlay */}
@@ -223,5 +280,108 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </motion.button>
       </div>
     </motion.section>
+
+    {/* Add Money Bottom Sheet Overlay Modal */}
+    <AnimatePresence>
+      {isAddMoneyOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsAddMoneyOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+          />
+
+          {/* Bottom Sheet form */}
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+            drag="y"
+            dragDirectionLock
+            dragConstraints={{ top: 0, bottom: 450 }}
+            dragElastic={{ top: 0, bottom: 0.2 }}
+            onDragEnd={(event, info) => {
+              if (info.offset.y > 100 || info.velocity.y > 500) {
+                setIsAddMoneyOpen(false);
+              }
+            }}
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-hidden touch-none"
+          >
+            {/* Drag handle */}
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
+
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+              <div className="w-8" />
+              <h3 className="font-hanken font-bold text-base text-black text-center">
+                Fund Wallet (Flutterwave)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddMoneyOpen(false)}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleAddMoneySubmit} className="space-y-5">
+              {/* Amount input */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Fund (NGN)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
+                  <input
+                    type="number"
+                    value={addAmount}
+                    onChange={(e) => setAddAmount(e.target.value)}
+                    placeholder="Enter amount (e.g. 5000)"
+                    required
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                  />
+                </div>
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mt-1">Minimum funding threshold is ₦100.00</p>
+              </div>
+
+              {/* Preset Quick select buttons */}
+              <div className="grid grid-cols-4 gap-2">
+                {[1000, 5000, 10000, 20000].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => handlePresetClick(preset)}
+                    className="py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-150 text-xs font-mono font-bold text-gray-800 rounded-xl transition-all cursor-pointer text-center"
+                  >
+                    +₦{preset / 1000}K
+                  </button>
+                ))}
+              </div>
+
+              {/* Action submission buttons */}
+              <div className="flex flex-col gap-2.5 pt-3">
+                <button
+                  type="submit"
+                  disabled={isInitializing}
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                >
+                  {isInitializing ? "Initializing Gateway..." : "Continue to Checkout"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddMoneyOpen(false)}
+                  className="w-full py-4 bg-white hover:bg-gray-50 border border-gray-200 text-black text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer active:scale-98 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+    </>
   );
 };
