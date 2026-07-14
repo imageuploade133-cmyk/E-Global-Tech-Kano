@@ -1,6 +1,11 @@
 import crypto from "crypto";
 
-const FLW_BASE_URL = process.env.FLW_BASE_URL || "https://api.flutterwave.com/v3";
+const rawBaseUrl = process.env.FLW_BASE_URL || "";
+// Strictly verify the API Base URL doesn't point to an external webhook url like Odoo
+const FLW_BASE_URL = rawBaseUrl.includes("api.flutterwave.com")
+  ? rawBaseUrl
+  : "https://api.flutterwave.com/v3";
+
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
 const FLW_WEBHOOK_SECRET = process.env.FLW_WEBHOOK_SECRET || "";
 
