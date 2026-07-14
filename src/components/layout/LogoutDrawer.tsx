@@ -21,9 +21,11 @@ export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onC
       hasPushedState.current = true;
 
       const handlePopState = (e: PopStateEvent) => {
-        e.preventDefault();
-        hasPushedState.current = false;
-        onClose();
+        // Only trigger close if this is the explicit drawer state
+        if (e.state && e.state.drawerOpen) {
+          hasPushedState.current = false;
+          onClose();
+        }
       };
 
       window.addEventListener("popstate", handlePopState);

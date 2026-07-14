@@ -46,9 +46,10 @@ export const RecentTransactions: React.FC = () => {
       hasPushedState.current = true;
 
       const handlePopState = (e: PopStateEvent) => {
-        e.preventDefault();
-        hasPushedState.current = false;
-        setSelectedTx(null);
+        if (e.state && e.state.receiptOpen) {
+          hasPushedState.current = false;
+          setSelectedTx(null);
+        }
       };
 
       window.addEventListener("popstate", handlePopState);
@@ -63,25 +64,25 @@ export const RecentTransactions: React.FC = () => {
   }, [selectedTx]);
 
   return (
-    <section className="mb-stack-lg">
-      {/* Header section */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[18px] text-[#FC7A00] font-bold">history</span>
-          <h3 className="font-headline-md text-[15px] min-[360px]:text-[17px] text-on-surface font-black uppercase tracking-wider">
+    <section className="mb-stack-lg space-y-3.5">
+      {/* Premium Header section */}
+      <div className="flex justify-between items-end px-1">
+        <div>
+          <h3 className="font-headline-md text-[16px] min-[360px]:text-[19px] text-gray-900 font-bold tracking-tight">
             Quick Activity
           </h3>
+          <p className="font-hanken text-[9.5px] text-gray-400 font-extrabold uppercase tracking-widest mt-0.5">Real-time ledger feeds</p>
         </div>
         <Link
           href="/history"
-          className="font-label-sm text-[11px] min-[360px]:text-xs text-[#FC7A00] font-extrabold hover:underline flex items-center gap-0.5"
+          className="font-label-sm text-[11px] min-[360px]:text-xs text-[#FC7A00] font-black hover:brightness-110 flex items-center gap-0.5 transition-all"
         >
           See All
-          <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+          <span className="material-symbols-outlined text-[15px] font-bold">arrow_forward</span>
         </Link>
       </div>
 
-      {/* Transaction Rows */}
+      {/* Glossy Tri-Gradient Transaction Cards */}
       <div className="space-y-3">
         {RECENT_ITEMS.map((tx) => {
           const isDeposit = tx.type === "DEPOSIT";
@@ -92,42 +93,42 @@ export const RecentTransactions: React.FC = () => {
               whileTap={{ scale: 0.98 }}
               onClick={() => setSelectedTx(tx)}
               className={cn(
-                "w-full text-left relative overflow-hidden rounded-2xl p-4 flex items-center justify-between gap-3 border transition-all cursor-pointer shadow-xs",
+                "w-full text-left relative overflow-hidden rounded-[20px] p-4.5 flex items-center justify-between gap-3 border transition-all cursor-pointer shadow-xs",
                 isDeposit
-                  ? "bg-gradient-to-r from-emerald-500/[0.04] via-emerald-500/[0.01] to-white border-emerald-500/15 hover:border-emerald-500/30"
-                  : "bg-gradient-to-r from-[#FC7A00]/[0.04] via-[#FC7A00]/[0.01] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/30"
+                  ? "bg-gradient-to-r from-emerald-500/[0.04] via-emerald-500/[0.01] to-white border-emerald-500/15 hover:border-emerald-500/35 hover:shadow-sm"
+                  : "bg-gradient-to-r from-[#FC7A00]/[0.04] via-[#FC7A00]/[0.01] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35 hover:shadow-sm"
               )}
             >
-              {/* Colored Side Accent Gradient Strip */}
+              {/* Premium Multi-Color Side Accent Gradient Strip */}
               <div
                 className={cn(
-                  "absolute left-0 top-0 bottom-0 w-[4px]",
+                  "absolute left-0 top-0 bottom-0 w-[4.5px]",
                   isDeposit
-                    ? "bg-gradient-to-b from-emerald-500 to-emerald-600"
-                    : "bg-gradient-to-b from-[#FC7A00] to-[#E06600]"
+                    ? "bg-gradient-to-b from-[#07B038] via-emerald-500 to-[#034A17]"
+                    : "bg-gradient-to-b from-[#FC7A00] via-[#FF9E40] to-[#B35200]"
                 )}
               />
 
-              <div className="flex items-center gap-3.5 min-w-0">
-                {/* Gradient-colored circle icon wrapper */}
+              <div className="flex items-center gap-4 min-w-0">
+                {/* Glossy Backdrop Blurred Gradient icon container */}
                 <div
                   className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-inner",
+                    "w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border",
                     isDeposit
-                      ? "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600"
-                      : "bg-gradient-to-br from-[#FFF2E6] to-[#FFE4CC] text-[#FC7A00]"
+                      ? "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 border-emerald-200/50"
+                      : "bg-gradient-to-br from-[#FFF2E6] to-[#FFE4CC] text-[#FC7A00] border-[#FFE4CC]/50"
                   )}
                 >
-                  <span className="material-symbols-outlined text-[19px] font-extrabold">
+                  <span className="material-symbols-outlined text-[20px] font-black">
                     {isDeposit ? "south_west" : "north_east"}
                   </span>
                 </div>
 
                 <div className="min-w-0">
-                  <p className="font-hanken font-extrabold text-[12.5px] text-black leading-tight truncate">
+                  <p className="font-hanken font-extrabold text-[13px] text-gray-900 leading-tight truncate">
                     {tx.description}
                   </p>
-                  <p className="font-hanken text-[9.5px] text-gray-400 mt-1 font-bold uppercase tracking-wider flex items-center gap-1">
+                  <p className="font-hanken text-[9.5px] text-gray-400 mt-1 font-bold uppercase tracking-wider flex items-center gap-1.5">
                     <span>{tx.date}</span>
                     <span className="w-1 h-1 rounded-full bg-gray-300" />
                     <span>{tx.time}</span>
@@ -135,24 +136,24 @@ export const RecentTransactions: React.FC = () => {
                 </div>
               </div>
 
-              {/* Amount and Status */}
+              {/* Amount and Status Pill layout */}
               <div className="text-right flex-shrink-0">
                 <p
                   className={cn(
-                    "font-mono text-[13.5px] min-[360px]:text-[14.5px] font-black tracking-tight",
-                    isDeposit ? "text-emerald-600" : "text-black"
+                    "font-mono text-[14px] min-[360px]:text-[15px] font-black tracking-tight",
+                    isDeposit ? "text-emerald-600" : "text-gray-950"
                   )}
                 >
                   {isDeposit ? "+" : "-"}
                   ₦{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
 
-                <div className="flex items-center justify-end gap-1 mt-1">
+                <div className="inline-flex items-center gap-1 bg-gray-50 border border-gray-150 rounded-full px-2 py-0.5 mt-1.5 shadow-3xs">
                   <span className={cn(
-                    "w-1.5 h-1.5 rounded-full",
+                    "w-1.5 h-1.5 rounded-full animate-pulse",
                     isDeposit ? "bg-emerald-500" : "bg-[#FC7A00]"
                   )} />
-                  <span className="font-hanken text-[8.5px] font-black uppercase tracking-widest text-gray-500">
+                  <span className="font-hanken text-[8px] font-black uppercase tracking-widest text-gray-500">
                     {tx.status}
                   </span>
                 </div>
