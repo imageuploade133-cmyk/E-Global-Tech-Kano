@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { isRateLimited } from "@/lib/rate-limiter";
 import crypto from "crypto";
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
@@ -89,6 +90,13 @@ function extractUserIdFromTxRef(txRef: string): string | null {
 export async function POST(req: Request) {
   let txRef = "";
   let authenticatedUid = "";
+
+  // Rate limiting protection
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
+  if (isRateLimited(ip, 30, 60 * 1000)) { // 30 requests per minute
+    console.warn(`[Rate Limited] IP blocked: ${ip}`);
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
 
   try {
     const body = await req.json();
@@ -192,6 +200,6 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const error = err as Error;
     console.error(`[Cancellation Error] Failed to process cancel cleanup for ${txRef || "N/A"}:`, error.message, error.stack);
-    return NextResponse.json({ error: "Internal Server Cancellation Error", details: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Cancellation Error" }, { status: 500 });
   }
 }
