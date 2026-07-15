@@ -73,12 +73,19 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             url.search = "";
             window.history.replaceState({}, "", url.toString());
 
-            console.log(`[Wallet Refreshed] Successfully verified transaction. Amount: ₦${data.fundedAmount || "N/A"}. New balance: ₦${data.newBalance || "N/A"}`);
+            if (data.duplicate) {
+              console.log("[Duplicate Detected] Transaction was already processed.");
+              toast.info("Transaction already processed", {
+                description: "This transaction has already been processed. Your wallet was not credited again."
+              });
+            } else {
+              console.log(`[Wallet Refreshed] Successfully verified transaction. Amount: ₦${data.fundedAmount || "N/A"}. New balance: ₦${data.newBalance || "N/A"}`);
 
-            // Show success toast using sonner
-            toast.success("Wallet funded successfully!", {
-              description: data.message || "Your payment was verified and credited."
-            });
+              // Show success toast using sonner
+              toast.success("Wallet funded successfully!", {
+                description: data.message || "Your payment was verified and credited."
+              });
+            }
           } else {
             console.error("[Verification Complete] Verification unsuccessful:", data.error);
             toast.error("Payment settlement was rejected.", {
