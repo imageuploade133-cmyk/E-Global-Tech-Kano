@@ -1,118 +1,55 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { adminDb, hasAdminCredentials } from "@/lib/firebase-admin";
+import { verifyAndCreditWallet } from "@/lib/wallet-funding";
 
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
     const signature = req.headers.get("verif-hash") || req.headers.get("x-flutterwave-signature");
 
-    console.log(`[webhook received] WEBHOOK REQUEST DETECTED. Signature: ${signature ? "Present" : "Missing"}, Payload Size: ${rawBody.length} bytes`);
+    console.log(`[Webhook Received] Webhook request detected. Signature: ${signature ? "Present" : "Missing"}, Payload Size: ${rawBody.length} bytes`);
 
-    // 1. Verify webhook signatures using FLW_WEBHOOK_SECRET
+    // 1. Verify webhook signature using FLW_WEBHOOK_SECRET
     const isValid = flutterwaveService.validateWebhookSignature(signature, rawBody);
+    console.log(`[Webhook Signature Validation Result] Webhook signature validation result: ${isValid}`);
 
     if (!isValid) {
       console.warn("[Flutterwave Webhook Error] Invalid signature header check. Rejection triggered.");
       return NextResponse.json({ error: "Invalid cryptographic signature." }, { status: 401 });
     }
 
-    console.log(`[verification successful] Webhook cryptographic signature validated successfully.`);
-
     const payload = JSON.parse(rawBody);
     const { event, data } = payload;
 
-    console.log(`[webhook received] Webhook event type: "${event || payload["event.type"]}"`);
+    console.log(`[Webhook Event] Webhook event type: "${event || payload["event.type"]}"`);
 
     // We only process completed credit operations
     if (event === "charge.completed" && data.status === "successful") {
       const transactionId = String(data.id);
-      const { amount, currency, tx_ref, customer } = data;
+      const tx_ref = data.tx_ref;
 
-      // Extract userId from reference: flw-tx-{userId}-{timestamp}
-      const parts = tx_ref.split("-");
-      const userId = parts[2] && parts[2] !== "anon" ? parts[2] : null;
+      console.log(`[Webhook Processing] Transaction ID: ${transactionId}, tx_ref: ${tx_ref}`);
 
-      if (!userId) {
-        console.warn(`[Flutterwave Webhook Warning] User ID could not be matched for tx_ref: ${tx_ref}`);
-        return NextResponse.json({ error: "Context user reference unresolved." }, { status: 400 });
-      }
-
-      // Prevent background credentials-lookup failure on Vercel
-      if (!hasAdminCredentials) {
-        console.error("[Firebase Admin Error] Missing service account credentials on Vercel webhook handler. Aborting transaction.");
-        return NextResponse.json({ error: "Configuration Error: Firebase Service Account Credentials are not configured on Vercel." }, { status: 500 });
-      }
-
-      // Check duplicate inside flutterwave_transactions to prevent double crediting using Admin SDK
-      const result = await adminDb.runTransaction(async (transaction) => {
-        const flwTxRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
-        const flwTxDoc = await transaction.get(flwTxRef);
-
-        if (flwTxDoc.exists) {
-          return {
-            duplicate: true,
-            message: "Duplicate prevented. Webhook already processed this transaction ID.",
-          };
-        }
-
-        const userDocRef = adminDb.collection("users").doc(userId);
-        const userDoc = await transaction.get(userDocRef);
-        if (!userDoc.exists) {
-          throw new Error("Target user profile was not found in Firestore.");
-        }
-
-        const userData = userDoc.data() || {};
-        const currentBalance = Number(userData.balance) || 0;
-        const fundedAmount = Number(amount);
-
-        const newBalance = currentBalance + fundedAmount;
-        transaction.update(userDocRef, { balance: newBalance });
-        console.log(`[wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW BALANCE: ₦${newBalance}`);
-
-        // Mark payment processed inside flutterwave_transactions
-        transaction.set(flwTxRef, {
-          userId,
-          amount: fundedAmount,
-          currency,
-          reference: tx_ref,
-          flwId: transactionId,
-          status: "SUCCESSFUL",
-          processedAt: new Date().toISOString(),
-        });
-
-        // Save ledger histories
-        const ledgerRef = adminDb.collection("transactions").doc();
-        const txRecord = {
-          userId,
-          amount: fundedAmount,
-          currency: currency || "NGN",
-          reference: tx_ref,
-          flwId: transactionId,
-          type: "DEPOSIT",
-          description: `Flutterwave Webhook: ${tx_ref}`,
-          recipientName: customer.name || "Webhook Fund",
-          status: "SUCCESS",
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          fee: 0.00,
-          createdAt: new Date().toISOString(),
-        };
-        transaction.set(ledgerRef, txRecord);
-        console.log(`[transaction saved] ID: ${transactionId}, REFERENCE: ${tx_ref}, RECORD:`, txRecord);
-
-        return {
-          duplicate: false,
-          newBalance,
-        };
-      });
+      // Call the exact same reusable backend verification logic
+      console.log(`[Webhook Verification Result] Passing transaction to verifyAndCreditWallet...`);
+      const result = await verifyAndCreditWallet(transactionId);
+      console.log(`[Webhook Wallet Funding Result] Wallet funding result:`, result);
 
       if (result.duplicate) {
-        console.log(`[Flutterwave Webhook Duplicate Blocked] Trans ID: ${transactionId}`);
-        return NextResponse.json({ success: true, message: result.message });
+        console.log(`[Webhook Duplicate Detection] Webhook duplicate detected: ${transactionId}`);
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          message: "Transaction already processed."
+        }, { status: 200 }); // never return 500 for duplicates!
       }
 
-      console.log(`[Flutterwave Webhook Success] Atomic credit complete. User: ${userId}, Balance: ₦${result.newBalance}`);
+      if (!result.success) {
+        console.error(`[Webhook Verification Error] Failed to fund: ${result.message}`);
+        return NextResponse.json({ error: result.message }, { status: 400 });
+      }
+    } else {
+      console.log(`[Webhook Ignored] Ignored event type or status: ${event} / ${data?.status}`);
     }
 
     // Always acknowledge the webhook event with HTTP 200
