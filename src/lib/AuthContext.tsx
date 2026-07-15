@@ -100,6 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               isPinRequired: true,
               isFaceIdEnabled: false,
               dailyLimit: 500000,
+              balance: data.balance !== undefined ? data.balance : 10000.00,
+              name: (data.displayName as string | undefined) || data.name || "",
               ...data
             });
           }

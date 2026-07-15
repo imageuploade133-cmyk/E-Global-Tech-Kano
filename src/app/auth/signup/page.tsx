@@ -200,13 +200,11 @@ export default function SignUpPage() {
       await updateProfile(user, { displayName: name, photoURL: photo });
 
       await setDoc(doc(db, "users", user.uid), {
-        name,
+        displayName: name,
         email,
         uid: user.uid,
         photoURL: photo,
         createdAt: new Date().toISOString(),
-        balance: 10000.00,
-        pin: null,
       });
 
       toast.success("Account created successfully!");
