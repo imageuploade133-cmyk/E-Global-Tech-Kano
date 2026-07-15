@@ -72,6 +72,7 @@ export const flutterwaveService = {
       description?: string;
       logo?: string;
     };
+    meta?: Record<string, string | number | boolean | undefined>;
   }) {
     return flwRequest("/payments", {
       method: "POST",

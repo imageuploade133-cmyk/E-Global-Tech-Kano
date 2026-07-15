@@ -73,6 +73,24 @@ async function verifyFirebaseIdToken(token: string, projectId: string): Promise<
   return { uid: payloadJson.sub };
 }
 
+// A robust parser that extracts the userId correctly even if the UID format changes in the future.
+// Reference format: flw-tx-{userId}-{timestamp}
+function extractUserIdFromTxRef(txRef: string): string | null {
+  if (!txRef || !txRef.startsWith("flw-tx-")) return null;
+  // Strip "flw-tx-"
+  const remaining = txRef.substring("flw-tx-".length);
+  // Split by "-" and remove the last part if it is a numeric timestamp
+  const parts = remaining.split("-");
+  if (parts.length > 0) {
+    const lastPart = parts[parts.length - 1];
+    if (/^\d+$/.test(lastPart)) {
+      parts.pop(); // remove timestamp
+    }
+    return parts.join("-");
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
   let transactionId = "";
   try {
@@ -120,14 +138,17 @@ export async function POST(req: Request) {
 
     console.log(`[Payment verified] Flutterwave returned success status for ID: ${transactionId}. Ref: ${tx_ref}, Amount: ${amount}, Currency: ${currency}`);
 
-    // Retrieve custom user details encoded inside reference or match email
-    // Reference format: flw-tx-{userId}-{timestamp}
-    const parts = tx_ref.split("-");
-    const userId = parts[2] && parts[2] !== "anon" ? parts[2] : null;
+    // Retrieve userId: first choice is metadata, fallback to safe tx_ref parser for backwards compatibility
+    let userId = flwRes.data.meta?.userId || flwRes.data.metadata?.userId;
+
+    if (!userId) {
+      console.log(`[Verification] Metadata is missing. Falling back to parsing tx_ref: ${tx_ref}`);
+      userId = extractUserIdFromTxRef(tx_ref);
+    }
 
     if (!userId) {
       return NextResponse.json(
-        { error: "Verification Failed: User ID context not resolved from transaction reference." },
+        { error: "Verification Failed: User ID context not resolved from transaction reference or metadata." },
         { status: 400 }
       );
     }
@@ -177,6 +198,11 @@ export async function POST(req: Request) {
     }
 
     console.log(`[Firestore transaction started] Running atomic transaction to check duplicates, validate pending payments, and credit balance.`);
+
+    // Log extra debugging details
+    console.log(`[Verification debug] tx_ref: ${tx_ref}`);
+    console.log(`[Verification debug] Flutterwave transaction ID: ${transactionId}`);
+    console.log(`[Verification debug] pending payment document ID: ${tx_ref}`);
 
     let currentOperation = "";
     let currentDocPath = "";
@@ -263,12 +289,14 @@ export async function POST(req: Request) {
         console.log("Updating wallet...");
         transaction.update(userDocRef, { balance: FieldValue.increment(fundedAmount) });
         console.log(`[Wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW ESTIMATED BALANCE: ₦${newBalance}`);
+        console.log(`[Verification debug] wallet balance before funding: ₦${currentBalance}`);
+        console.log(`[Verification debug] wallet balance after funding (estimated): ₦${newBalance}`);
 
-        // E. Update pending payment request status to "completed"
-        currentOperation = "Completing pending payment";
+        // E. Delete the completed pending payment request document
+        currentOperation = "Deleting pending payment";
         currentDocPath = `pending_payments/${tx_ref}`;
-        console.log("Completing pending payment...");
-        transaction.update(pendingPayRef, { status: "completed", processedAt: new Date().toISOString() });
+        console.log("Deleting pending payment...");
+        transaction.delete(pendingPayRef);
 
         // F. Create document in flutterwave_transactions to prevent duplicates
         currentOperation = "Creating duplicate record";

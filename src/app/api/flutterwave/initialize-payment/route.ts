@@ -56,6 +56,9 @@ export async function POST(req: Request) {
         description: "Wallet Provisioning Settlement Link",
         logo: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
       },
+      meta: {
+        userId: targetUserId,
+      },
     });
 
     if (resData.status === "success") {
