@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { adminDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase";
+import { doc, runTransaction } from "firebase/firestore";
 
 export async function POST(req: Request) {
   let transactionId = "";
@@ -61,30 +62,40 @@ export async function POST(req: Request) {
       );
     }
 
+    // Prevent background credential lookup crashes on Vercel by verifying presence of credentials first
+    const { hasAdminCredentials } = await import("@/lib/firebase-admin");
+    if (!hasAdminCredentials) {
+      console.error("[Firebase Admin Error] Missing service account credentials. Aborting transaction to prevent Vercel crash.");
+      return NextResponse.json({
+        error: "Configuration Error: Firebase Service Account Credentials are not configured on Vercel.",
+        details: "To securely credit wallet balances on the backend, please generate a Firebase Service Account private key JSON in your Firebase Console (Project Settings -> Service Accounts), and add it as the FIREBASE_SERVICE_ACCOUNT_KEY environment variable in your Vercel project settings."
+      }, { status: 500 });
+    }
+
     console.log(`[Firestore transaction started] Running atomic transaction to check duplicates and credit balance.`);
 
-    // 2. Perform safe, atomic database transaction to update balances and log records using Firebase Admin SDK
-    const result = await adminDb.runTransaction(async (transaction) => {
+    // 2. Perform safe, atomic database transaction to update balances and log records
+    const result = await runTransaction(db, async (transaction) => {
       // Check if duplicate already processed inside flutterwave_transactions collection
-      const flwTxRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
+      const flwTxRef = doc(db, "flutterwave_transactions", transactionId);
       const flwTxDoc = await transaction.get(flwTxRef);
 
-      if (flwTxDoc.exists) {
+      if (flwTxDoc.exists()) {
         return {
           duplicate: true,
           message: "Already processed",
         };
       }
 
-      const userDocRef = adminDb.collection("users").doc(userId);
+      const userDocRef = doc(db, "users", userId);
       const userDoc = await transaction.get(userDocRef);
 
-      if (!userDoc.exists) {
+      if (!userDoc.exists()) {
         throw new Error("Target user profile was not found in Firestore.");
       }
 
-      const userData = userDoc.data() || {};
-      const currentBalance = Number(userData.balance) || 0;
+      const userData = userDoc.data();
+      const currentBalance = Number(userData?.balance) || 0;
       const fundedAmount = Number(amount);
 
       // Increment atomic balance
@@ -104,7 +115,7 @@ export async function POST(req: Request) {
       });
 
       // Save transaction record inside transactions collection for general ledger logging
-      const ledgerRef = adminDb.collection("transactions").doc();
+      const ledgerRef = doc(db, "transactions", `tx-${transactionId}`);
       const txRecord = {
         userId,
         amount: fundedAmount,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, hasAdminCredentials } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
   try {
@@ -36,6 +36,12 @@ export async function POST(req: Request) {
       if (!userId) {
         console.warn(`[Flutterwave Webhook Warning] User ID could not be matched for tx_ref: ${tx_ref}`);
         return NextResponse.json({ error: "Context user reference unresolved." }, { status: 400 });
+      }
+
+      // Prevent background credentials-lookup failure on Vercel
+      if (!hasAdminCredentials) {
+        console.error("[Firebase Admin Error] Missing service account credentials on Vercel webhook handler. Aborting transaction.");
+        return NextResponse.json({ error: "Configuration Error: Firebase Service Account Credentials are not configured on Vercel." }, { status: 500 });
       }
 
       // Check duplicate inside flutterwave_transactions to prevent double crediting using Admin SDK
