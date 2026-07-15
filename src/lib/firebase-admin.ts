@@ -40,15 +40,20 @@ if (apps.length > 0) {
   adminApp = apps[0];
 } else {
   const credential = getCredentials();
+  const fallbackProjectId = projectId || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
+
   if (credential) {
     adminApp = initializeApp({
       credential,
+      projectId: fallbackProjectId,
     });
-    console.log("[Firebase Admin] Initialized with explicit service account credentials.");
+    console.log(`[Firebase Admin] Initialized with explicit service account credentials. ProjectId: ${fallbackProjectId}`);
   } else {
-    // If no explicit credentials, initialize empty (for local emulators or ADC fallback)
-    adminApp = initializeApp();
-    console.log("[Firebase Admin] Initialized with default server credentials.");
+    // Initialize explicitly with the public projectId as fallback to avoid ADC resolution crash on Vercel
+    adminApp = initializeApp({
+      projectId: fallbackProjectId,
+    });
+    console.log(`[Firebase Admin] Initialized with explicit fallback projectId: ${fallbackProjectId}`);
   }
 }
 
