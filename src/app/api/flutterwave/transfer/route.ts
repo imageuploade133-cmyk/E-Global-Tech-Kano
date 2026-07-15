@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, hasAdminCredentials } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
   try {
@@ -20,6 +20,15 @@ export async function POST(req: Request) {
     const ref_id = `flw-trf-${userId}-${Date.now()}`;
 
     console.log(`[Flutterwave Transfer Initiated] User: ${userId}, Amount: ${transferAmount}, Ref: ${ref_id}`);
+
+    // Prevent background credentials-lookup failure on Vercel
+    if (!hasAdminCredentials) {
+      console.error("[Firebase Admin Error] Missing service account credentials. Aborting transaction to prevent Vercel crash.");
+      return NextResponse.json({
+        error: "Configuration Error: Firebase Service Account Credentials are not configured on Vercel.",
+        details: "To securely debit wallet balances on the backend, please generate a Firebase Service Account private key JSON in your Firebase Console (Project Settings -> Service Accounts), and add it as the FIREBASE_SERVICE_ACCOUNT_KEY environment variable in your Vercel project settings."
+      }, { status: 500 });
+    }
 
     const userDocRef = adminDb.collection("users").doc(userId);
     const trfRef = adminDb.collection("transactions").doc(ref_id);

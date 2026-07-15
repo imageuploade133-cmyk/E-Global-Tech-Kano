@@ -58,5 +58,6 @@ if (apps.length > 0) {
 }
 
 const adminDb = getFirestore(adminApp);
+const hasAdminCredentials = !!serviceAccountJson || (!!projectId && !!clientEmail && !!privateKey);
 
-export { adminApp, adminDb };
+export { adminApp, adminDb, hasAdminCredentials };
