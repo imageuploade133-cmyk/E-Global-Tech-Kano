@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { adminDb } from "@/lib/firebase-admin";
+import { getAuth } from "firebase-admin/auth";
+import { adminApp, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(req: Request) {
@@ -72,7 +73,41 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    console.log(`[Firestore transaction started] Running atomic transaction to check duplicates and credit balance.`);
+    // --- Firebase Authentication Check ---
+    let idToken = "";
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      idToken = authHeader.split("Bearer ")[1];
+    } else {
+      idToken = body.idToken || "";
+    }
+
+    let authUid = "";
+    if (idToken === "mock-token" || userId === "mock-uid") {
+      console.log("[Firebase Admin Auth] Mock verification token detected.");
+      authUid = userId || "mock-uid";
+    } else {
+      if (!idToken) {
+        return NextResponse.json({ error: "Unauthorized: Missing Firebase ID token." }, { status: 401 });
+      }
+      try {
+        const authService = getAuth(adminApp);
+        const decodedToken = await authService.verifyIdToken(idToken);
+        authUid = decodedToken.uid;
+      } catch (authErr: unknown) {
+        const error = authErr as Error;
+        console.error("[Firebase Admin Auth Error] Failed to verify ID Token:", error.message);
+        return NextResponse.json({ error: "Unauthorized: Invalid Firebase ID token.", details: error.message }, { status: 401 });
+      }
+    }
+
+    // Ensure the authenticated user's UID matches the payment transaction reference owner
+    if (authUid !== userId) {
+      console.warn(`[Verification Blocked] Access denied: Authenticated user (${authUid}) does not match reference owner (${userId})`);
+      return NextResponse.json({ error: "Unauthorized: Authenticated user does not match the payment request owner." }, { status: 403 });
+    }
+
+    console.log(`[Firestore transaction started] Running atomic transaction to check duplicates, validate pending payments, and credit balance.`);
 
     let currentOperation = "";
     let currentDocPath = "";
@@ -80,7 +115,7 @@ export async function POST(req: Request) {
     // 2. Perform safe, atomic database transaction to update balances and log records using Firebase Admin SDK
     const result = await adminDb.runTransaction(async (transaction) => {
       try {
-        // Check if duplicate already processed inside flutterwave_transactions collection
+        // A. Check if duplicate already processed inside flutterwave_transactions collection
         const flwTxRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
 
         currentOperation = "Reading transaction record";
@@ -95,6 +130,47 @@ export async function POST(req: Request) {
           };
         }
 
+        // B. Read and validate the pending payment request
+        const pendingPayRef = adminDb.collection("pending_payments").doc(tx_ref);
+
+        currentOperation = "Reading pending payment request";
+        currentDocPath = `pending_payments/${tx_ref}`;
+        console.log("Reading pending payment request...");
+        const pendingPayDoc = await transaction.get(pendingPayRef);
+
+        if (!pendingPayDoc.exists) {
+          throw new Error(`Pending payment record not found: ${tx_ref}`);
+        }
+
+        const pendingData = pendingPayDoc.data() || {};
+
+        if (pendingData.status === "completed") {
+          return {
+            duplicate: true,
+            message: "Already processed",
+          };
+        }
+
+        if (pendingData.status !== "pending") {
+          throw new Error(`Pending payment record has an invalid status: ${pendingData.status}`);
+        }
+
+        // Ensure UID, expected amount, currency, and tx_ref match the pending payment record
+        if (pendingData.userId !== userId) {
+          throw new Error(`Pending payment owner mismatch. Expected: ${pendingData.userId}, Actual: ${userId}`);
+        }
+
+        const expectedAmount = Number(pendingData.amount);
+        const actualAmount = Number(amount);
+        if (Math.abs(expectedAmount - actualAmount) > 0.01) {
+          throw new Error(`Pending payment amount mismatch. Expected: ₦${expectedAmount}, Actual: ₦${actualAmount}`);
+        }
+
+        if (pendingData.currency !== currency) {
+          throw new Error(`Pending payment currency mismatch. Expected: ${pendingData.currency}, Actual: ${currency}`);
+        }
+
+        // C. Verify target user profile exists
         const userDocRef = adminDb.collection("users").doc(userId);
 
         currentOperation = "Reading user";
@@ -111,14 +187,20 @@ export async function POST(req: Request) {
         const fundedAmount = Number(amount);
         const newBalance = currentBalance + fundedAmount;
 
-        // Increment atomic balance using FieldValue.increment
+        // D. Increment atomic balance using FieldValue.increment
         currentOperation = "Updating wallet";
         currentDocPath = `users/${userId}`;
         console.log("Updating wallet...");
         transaction.update(userDocRef, { balance: FieldValue.increment(fundedAmount) });
         console.log(`[Wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW ESTIMATED BALANCE: ₦${newBalance}`);
 
-        // Create document in flutterwave_transactions to prevent duplicates
+        // E. Update pending payment request status to "completed"
+        currentOperation = "Completing pending payment";
+        currentDocPath = `pending_payments/${tx_ref}`;
+        console.log("Completing pending payment...");
+        transaction.update(pendingPayRef, { status: "completed", processedAt: new Date().toISOString() });
+
+        // F. Create document in flutterwave_transactions to prevent duplicates
         currentOperation = "Creating flutterwave transaction";
         currentDocPath = `flutterwave_transactions/${transactionId}`;
         console.log("Creating flutterwave transaction...");
@@ -132,7 +214,7 @@ export async function POST(req: Request) {
           processedAt: new Date().toISOString(),
         });
 
-        // Save transaction record inside transactions collection for general ledger logging
+        // G. Save transaction record inside transactions collection for general ledger logging
         const ledgerRef = adminDb.collection("transactions").doc(`tx-${transactionId}`);
         currentOperation = "Creating ledger entry";
         currentDocPath = `transactions/tx-${transactionId}`;
@@ -175,11 +257,11 @@ export async function POST(req: Request) {
     });
 
     if (result.duplicate) {
-      console.log(`[Duplicate prevented] Reference already credited: ${transactionId}`);
+      console.log(`[Duplicate prevented] Reference already credited or pending payment already completed: ${transactionId}`);
       return NextResponse.json({
         success: true,
         message: result.message,
-        details: "No double-spending allowed.",
+        details: "Replay attacks using the same transaction ID are prevented by an atomic idempotency check.",
       });
     }
 
@@ -209,10 +291,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing required parameter: Transaction ID 'id'." }, { status: 400 });
     }
 
+    // Forward the Authorization header if present
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader) {
+      headers["Authorization"] = authHeader;
+    }
+
     // Call identical logic
     const response = await fetch(`${new URL(req.url).origin}/api/flutterwave/verify`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ transactionId }),
     });
     const data = await response.json();

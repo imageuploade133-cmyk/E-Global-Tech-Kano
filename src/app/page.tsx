@@ -54,8 +54,22 @@ export default function Home() {
 
         try {
           if (transactionId) {
+            let idToken = "mock-token";
+            const isMock = sessionStorage.getItem("mock") === "true";
+            if (!isMock && user) {
+              try {
+                idToken = await user.getIdToken();
+              } catch (tokenErr) {
+                console.error("Failed to retrieve client ID token:", tokenErr);
+              }
+            }
+
             console.log(`[Verify API called] Requesting /api/flutterwave/verify?id=${transactionId}`);
-            const res = await fetch(`/api/flutterwave/verify?id=${transactionId}`);
+            const res = await fetch(`/api/flutterwave/verify?id=${transactionId}`, {
+              headers: {
+                "Authorization": `Bearer ${idToken}`
+              }
+            });
             const data = await res.json();
             toast.dismiss();
 

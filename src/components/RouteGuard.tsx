@@ -45,9 +45,22 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         console.log(`[Calling Verify Endpoint] POST /api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
 
         try {
+          let idToken = "mock-token";
+          const isMock = sessionStorage.getItem("mock") === "true";
+          if (!isMock && user) {
+            try {
+              idToken = await user.getIdToken();
+            } catch (tokenErr) {
+              console.error("Failed to retrieve client ID token:", tokenErr);
+            }
+          }
+
           const res = await fetch("/api/flutterwave/verify", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`
+            },
             body: JSON.stringify({ transactionId, txRef })
           });
           const data = await res.json();
