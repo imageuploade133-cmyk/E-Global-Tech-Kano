@@ -185,17 +185,18 @@ export async function POST(req: Request) {
     const result = await adminDb.runTransaction(async (transaction) => {
       try {
         // A. Check if duplicate already processed inside flutterwave_transactions collection
-        const flwTxRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
+        const duplicateDocRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
 
-        currentOperation = "Reading transaction record";
+        currentOperation = "Checking duplicate";
         currentDocPath = `flutterwave_transactions/${transactionId}`;
-        console.log("Reading transaction record...");
-        const flwTxDoc = await transaction.get(flwTxRef);
+        console.log("Checking duplicate:", transactionId);
+        const duplicateDoc = await transaction.get(duplicateDocRef);
+        console.log("Duplicate document exists:", duplicateDoc.exists);
 
-        if (flwTxDoc.exists) {
+        if (duplicateDoc.exists) {
           return {
             duplicate: true,
-            message: "Already processed",
+            message: "Transaction already processed.",
           };
         }
 
@@ -216,7 +217,7 @@ export async function POST(req: Request) {
         if (pendingData.status === "completed") {
           return {
             duplicate: true,
-            message: "Already processed",
+            message: "Transaction already processed.",
           };
         }
 
@@ -270,10 +271,10 @@ export async function POST(req: Request) {
         transaction.update(pendingPayRef, { status: "completed", processedAt: new Date().toISOString() });
 
         // F. Create document in flutterwave_transactions to prevent duplicates
-        currentOperation = "Creating flutterwave transaction";
+        currentOperation = "Creating duplicate record";
         currentDocPath = `flutterwave_transactions/${transactionId}`;
-        console.log("Creating flutterwave transaction...");
-        transaction.set(flwTxRef, {
+        console.log("Creating duplicate record:", transactionId);
+        transaction.set(duplicateDocRef, {
           userId,
           amount: fundedAmount,
           currency,
@@ -329,11 +330,12 @@ export async function POST(req: Request) {
       console.log(`[Duplicate prevented] Reference already credited or pending payment already completed: ${transactionId}`);
       return NextResponse.json({
         success: true,
-        message: result.message,
-        details: "Replay attacks using the same transaction ID are prevented by an atomic idempotency check.",
+        duplicate: true,
+        message: "Transaction already processed."
       });
     }
 
+    console.log("Wallet credit committed.");
     console.log(`[Transaction committed] Firestore atomic updates successfully committed.`);
     console.log(`[Verification complete] Success! User: ${userId}, Funded: ₦${amount}. New balance: ₦${result.newBalance}`);
 
