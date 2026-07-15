@@ -25,13 +25,61 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     const transactionId = params.get("transaction_id") || params.get("transactionId");
     const txRef = params.get("tx_ref") || params.get("txRef");
 
-    if (verify === "flw" || transactionId || status === "successful" || status === "completed") {
+    if (verify === "flw" || transactionId || status === "successful" || status === "completed" || status === "cancelled") {
       console.log("[Redirect Detected] Flutterwave parameters detected on app startup:", {
         verify,
         status,
         transactionId,
         txRef
       });
+
+      if (status === "cancelled") {
+        console.log("[Redirect Detected] Payment was cancelled by user.");
+        toast.error("The transaction checkout flow was cancelled.");
+
+        if (txRef) {
+          const handleCancelCleanup = async () => {
+            try {
+              let idToken = "mock-token";
+              const isMock = sessionStorage.getItem("mock") === "true";
+              if (!isMock && user) {
+                try {
+                  idToken = await user.getIdToken();
+                } catch (tokenErr) {
+                  console.error("Failed to retrieve client ID token:", tokenErr);
+                }
+              }
+
+              console.log(`[Cancel Cleanup Started] Cleaning up pending payment: ${txRef}`);
+              const res = await fetch("/api/flutterwave/cancel", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ txRef })
+              });
+              const data = await res.json();
+              console.log("[Cancel Cleanup Complete] Server response received:", data);
+            } catch (err) {
+              console.error("[Cancel Cleanup Error] Failed to contact cancel clean endpoint:", err);
+            } finally {
+              // Clear URL params to prevent loop
+              const url = new URL(window.location.href);
+              url.search = "";
+              window.history.replaceState({}, "", url.toString());
+            }
+          };
+
+          handleCancelCleanup();
+        } else {
+          // Clear URL params to prevent loop
+          const url = new URL(window.location.href);
+          url.search = "";
+          window.history.replaceState({}, "", url.toString());
+        }
+        return;
+      }
 
       if (!transactionId) {
         console.warn("[Redirect Detected] missing transaction_id parameter. Skipping verification.");

@@ -17,9 +17,9 @@ async function verifyFirebaseIdToken(token: string, projectId: string): Promise<
 
   const [headerB64, payloadB64, signatureB64] = parts;
 
-  // 1. Base64 URL decode header and payload
-  const headerJson = JSON.parse(Buffer.from(headerB64, "base64").toString("utf8"));
-  const payloadJson = JSON.parse(Buffer.from(payloadB64, "base64").toString("utf8"));
+  // 1. Base64 URL decode header and payload safely using "base64url"
+  const headerJson = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf8"));
+  const payloadJson = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
 
   const kid = headerJson.kid;
   if (!kid) {
