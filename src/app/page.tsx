@@ -20,6 +20,7 @@ export default function Home() {
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
   const [verifiedAmount, setVerifiedAmount] = useState(0);
   const [verifyMessage, setVerifyMessage] = useState("");
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   const currentUser = {
     userName: userData?.name?.split(" ")[0]?.toUpperCase() || user?.displayName?.split(" ")[0]?.toUpperCase() || "CAPTAIN",
@@ -74,13 +75,21 @@ export default function Home() {
             toast.dismiss();
 
             if (data.success) {
-              console.log("[Verification successful] Response data:", data);
-              setVerifiedAmount(data.fundedAmount || 0);
-              setVerificationStatus("success");
-              toast.success("Wallet successfully funded!");
+              if (data.duplicate) {
+                setIsDuplicate(true);
+                setVerificationStatus("success");
+                toast.info("Transaction already processed.");
+                console.log("[Duplicate Detected] Transaction was already processed.");
+              } else {
+                setIsDuplicate(false);
+                console.log("[Verification successful] Response data:", data);
+                setVerifiedAmount(data.fundedAmount || 0);
+                setVerificationStatus("success");
+                toast.success("Wallet successfully funded!");
 
-              console.log(`[Wallet credited] Amount: ₦${data.fundedAmount || 0}, New Balance: ₦${data.newBalance || 0}`);
-              console.log("[Transaction saved] Ledger entry secured in Firestore database.");
+                console.log(`[Wallet credited] Amount: ₦${data.fundedAmount || 0}, New Balance: ₦${data.newBalance || 0}`);
+                console.log("[Transaction saved] Ledger entry secured in Firestore database.");
+              }
             } else {
               console.error("[Verification failed] Endpoint returned error:", data.error);
               setVerifyMessage(data.error || "Verification was rejected by the gateway.");
@@ -158,18 +167,28 @@ export default function Home() {
               animate={{ scale: 1, y: 0 }}
               className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-center space-y-5 border border-gray-100"
             >
-              <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner">
-                <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
-              </div>
+              {isDuplicate ? (
+                <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mx-auto shadow-inner">
+                  <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>info</span>
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner">
+                  <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
+                </div>
+              )}
 
               <div>
-                <h3 className="font-hanken font-black text-lg text-gray-900 leading-tight">Payment Verified!</h3>
+                <h3 className="font-hanken font-black text-lg text-gray-900 leading-tight">
+                  {isDuplicate ? "Already Processed" : "Payment Verified!"}
+                </h3>
                 <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed">
-                  Your transaction has been securely processed and confirmed. Your wallet balance has been credited.
+                  {isDuplicate
+                    ? "This transaction has already been processed. Your wallet was not credited again."
+                    : "Your transaction has been securely processed and confirmed. Your wallet balance has been credited."}
                 </p>
               </div>
 
-              {verifiedAmount > 0 && (
+              {!isDuplicate && verifiedAmount > 0 && (
                 <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150">
                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Credited Amount</p>
                   <p className="font-mono text-2xl font-black text-emerald-600 mt-0.5">
