@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
 import { verifyAndCreditWallet } from "@/lib/wallet-funding";
+import { logPaymentEvent } from "@/lib/payment-logger";
+import { isRateLimited } from "@/lib/rate-limiter";
 
 export async function POST(req: Request) {
+  const startTime = Date.now();
+  let transactionId = "N/A";
+  let tx_ref = "N/A";
+
+  // Rate limiting protection
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
+  if (isRateLimited(ip, 60, 60 * 1000)) { // 60 requests per minute for webhooks (more generous)
+    console.warn(`[Rate Limited] Webhook IP blocked: ${ip}`);
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+  }
+
   try {
     const rawBody = await req.text();
     const signature = req.headers.get("verif-hash") || req.headers.get("x-flutterwave-signature");
@@ -15,18 +28,33 @@ export async function POST(req: Request) {
 
     if (!isValid) {
       console.warn("[Flutterwave Webhook Error] Invalid signature header check. Rejection triggered.");
+      logPaymentEvent({
+        category: "Webhook Signature Failure",
+        message: "Cryptographic signature validation failed on webhook raw body.",
+        processingTimeMs: Date.now() - startTime,
+      });
       return NextResponse.json({ error: "Invalid cryptographic signature." }, { status: 401 });
     }
 
     const payload = JSON.parse(rawBody);
     const { event, data } = payload;
 
+    logPaymentEvent({
+      category: "Webhook Received",
+      transactionId: data?.id ? String(data.id) : undefined,
+      tx_ref: data?.tx_ref,
+      amount: data?.amount ? Number(data.amount) : undefined,
+      currency: data?.currency,
+      message: `Webhook event received: ${event}`,
+      processingTimeMs: Date.now() - startTime,
+    });
+
     console.log(`[Webhook Event] Webhook event type: "${event || payload["event.type"]}"`);
 
     // We only process completed credit operations
     if (event === "charge.completed" && data.status === "successful") {
-      const transactionId = String(data.id);
-      const tx_ref = data.tx_ref;
+      transactionId = String(data.id);
+      tx_ref = data.tx_ref;
 
       console.log(`[Webhook Processing] Transaction ID: ${transactionId}, tx_ref: ${tx_ref}`);
 
@@ -57,6 +85,15 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error("[Flutterwave Webhook Exception] Processing crash occurred:", errorMsg);
-    return NextResponse.json({ error: "Webhook Server Error", details: errorMsg }, { status: 500 });
+
+    logPaymentEvent({
+      category: "Internal Error",
+      transactionId,
+      tx_ref,
+      message: `Exception in webhook route handler: ${errorMsg}`,
+      processingTimeMs: Date.now() - startTime,
+    });
+
+    return NextResponse.json({ error: "Webhook Server Error" }, { status: 500 });
   }
 }

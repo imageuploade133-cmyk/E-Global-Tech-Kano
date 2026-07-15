@@ -9,9 +9,32 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Allow users to read and write only their own data, or allow administrators full access
+    // Protect user documents: clients can read/update their own profile fields
+    // but are strictly forbidden from writing or modifying 'balance' or 'role' fields directly.
     match /users/{userId} {
-      allow read, write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow create: if (request.auth != null && request.auth.uid == userId);
+      allow update: if ((request.auth != null && request.auth.uid == userId &&
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'role'])) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // General ledger transactions: Read-only for resource owner, no client-side writes
+    match /transactions/{txId} {
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // Flutterwave idempotency transaction tracking: Read-only for resource owner, no client-side writes
+    match /flutterwave_transactions/{txId} {
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // Server-managed pending payments: Read-only for resource owner, no client-side writes
+    match /pending_payments/{txRef} {
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false;
     }
 
     // Config parameters: allow read to all logged-in users, write restricted only to administrators
