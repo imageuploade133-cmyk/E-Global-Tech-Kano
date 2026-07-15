@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
-import { db } from "@/lib/firebase";
-import { doc, runTransaction } from "firebase/firestore";
+import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(req: Request) {
   let transactionId = "";
@@ -74,71 +74,104 @@ export async function POST(req: Request) {
 
     console.log(`[Firestore transaction started] Running atomic transaction to check duplicates and credit balance.`);
 
-    // 2. Perform safe, atomic database transaction to update balances and log records
-    const result = await runTransaction(db, async (transaction) => {
-      // Check if duplicate already processed inside flutterwave_transactions collection
-      const flwTxRef = doc(db, "flutterwave_transactions", transactionId);
-      const flwTxDoc = await transaction.get(flwTxRef);
+    let currentOperation = "";
+    let currentDocPath = "";
 
-      if (flwTxDoc.exists()) {
-        return {
-          duplicate: true,
-          message: "Already processed",
+    // 2. Perform safe, atomic database transaction to update balances and log records using Firebase Admin SDK
+    const result = await adminDb.runTransaction(async (transaction) => {
+      try {
+        // Check if duplicate already processed inside flutterwave_transactions collection
+        const flwTxRef = adminDb.collection("flutterwave_transactions").doc(transactionId);
+
+        currentOperation = "Reading transaction record";
+        currentDocPath = `flutterwave_transactions/${transactionId}`;
+        console.log("Reading transaction record...");
+        const flwTxDoc = await transaction.get(flwTxRef);
+
+        if (flwTxDoc.exists) {
+          return {
+            duplicate: true,
+            message: "Already processed",
+          };
+        }
+
+        const userDocRef = adminDb.collection("users").doc(userId);
+
+        currentOperation = "Reading user";
+        currentDocPath = `users/${userId}`;
+        console.log("Reading user...");
+        const userDoc = await transaction.get(userDocRef);
+
+        if (!userDoc.exists) {
+          throw new Error("Target user profile was not found in Firestore.");
+        }
+
+        const userData = userDoc.data();
+        const currentBalance = Number(userData?.balance) || 0;
+        const fundedAmount = Number(amount);
+        const newBalance = currentBalance + fundedAmount;
+
+        // Increment atomic balance using FieldValue.increment
+        currentOperation = "Updating wallet";
+        currentDocPath = `users/${userId}`;
+        console.log("Updating wallet...");
+        transaction.update(userDocRef, { balance: FieldValue.increment(fundedAmount) });
+        console.log(`[Wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW ESTIMATED BALANCE: ₦${newBalance}`);
+
+        // Create document in flutterwave_transactions to prevent duplicates
+        currentOperation = "Creating flutterwave transaction";
+        currentDocPath = `flutterwave_transactions/${transactionId}`;
+        console.log("Creating flutterwave transaction...");
+        transaction.set(flwTxRef, {
+          userId,
+          amount: fundedAmount,
+          currency,
+          reference: tx_ref,
+          flwId: transactionId,
+          status: "SUCCESSFUL",
+          processedAt: new Date().toISOString(),
+        });
+
+        // Save transaction record inside transactions collection for general ledger logging
+        const ledgerRef = adminDb.collection("transactions").doc(`tx-${transactionId}`);
+        currentOperation = "Creating ledger entry";
+        currentDocPath = `transactions/tx-${transactionId}`;
+        console.log("Creating ledger entry...");
+        const txRecord = {
+          userId,
+          amount: fundedAmount,
+          currency: currency || "NGN",
+          reference: tx_ref,
+          flwId: transactionId,
+          type: "DEPOSIT",
+          description: `Flutterwave Funding Ref: ${tx_ref}`,
+          recipientName: customer?.name || "Wallet Credit",
+          status: "SUCCESS",
+          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          fee: 0.00,
+          createdAt: new Date().toISOString(),
         };
+        transaction.set(ledgerRef, txRecord);
+        console.log(`[Transaction recorded] Ledger history entry recorded successfully.`);
+
+        // Log committing message before transaction completes/commits
+        currentOperation = "Committing transaction";
+        currentDocPath = "N/A";
+        console.log("Committing transaction...");
+
+        return {
+          duplicate: false,
+          newBalance,
+          fundedAmount,
+        };
+      } catch (innerError: unknown) {
+        const error = innerError as Error & { code?: string };
+        console.error(`[Firestore Operation Error] Failed during operation: "${currentOperation}" on document: "${currentDocPath}"`);
+        console.error(`Error Code: ${error.code || "N/A"}`);
+        console.error(`Error Stack:`, error.stack);
+        throw innerError; // rethrow to abort the transaction
       }
-
-      const userDocRef = doc(db, "users", userId);
-      const userDoc = await transaction.get(userDocRef);
-
-      if (!userDoc.exists()) {
-        throw new Error("Target user profile was not found in Firestore.");
-      }
-
-      const userData = userDoc.data();
-      const currentBalance = Number(userData?.balance) || 0;
-      const fundedAmount = Number(amount);
-
-      // Increment atomic balance
-      const newBalance = currentBalance + fundedAmount;
-      transaction.update(userDocRef, { balance: newBalance });
-      console.log(`[Wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW BALANCE: ₦${newBalance}`);
-
-      // Create document in flutterwave_transactions to prevent duplicates
-      transaction.set(flwTxRef, {
-        userId,
-        amount: fundedAmount,
-        currency,
-        reference: tx_ref,
-        flwId: transactionId,
-        status: "SUCCESSFUL",
-        processedAt: new Date().toISOString(),
-      });
-
-      // Save transaction record inside transactions collection for general ledger logging
-      const ledgerRef = doc(db, "transactions", `tx-${transactionId}`);
-      const txRecord = {
-        userId,
-        amount: fundedAmount,
-        currency: currency || "NGN",
-        reference: tx_ref,
-        flwId: transactionId,
-        type: "DEPOSIT",
-        description: `Flutterwave Funding Ref: ${tx_ref}`,
-        recipientName: customer.name || "Wallet Credit",
-        status: "SUCCESS",
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        fee: 0.00,
-        createdAt: new Date().toISOString(),
-      };
-      transaction.set(ledgerRef, txRecord);
-      console.log(`[Transaction recorded] Ledger history entry recorded successfully.`);
-
-      return {
-        duplicate: false,
-        newBalance,
-        fundedAmount,
-      };
     });
 
     if (result.duplicate) {
