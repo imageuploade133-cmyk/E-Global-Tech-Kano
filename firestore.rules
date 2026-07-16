@@ -11,8 +11,8 @@ service cloud.firestore {
 
     // Protect user documents:
     // 1. Only allow users to create their own document containing only whitelisted fields.
-    // 2. Allow updating normal profile fields, and allow client-side balance decreases (for investment locks)
-    //    but strictly block any client-side balance increases or modifications to other server-managed fields.
+    // 2. Allow updating normal profile fields, but strictly block any client-side balance
+    //    modifications, PIN credentials, lockout attempts, or other server-managed fields.
     match /users/{userId} {
       allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
 
@@ -23,9 +23,9 @@ service cloud.firestore {
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
                           'role', 'transactionPin', 'walletStatus', 'kycStatus',
                           'isVerified', 'isAdmin', 'totalDeposits', 'totalWithdrawals',
-                          'lastFundingAt', 'lastWithdrawalAt', 'createdAt'
-                        ]) &&
-                        (request.resource.data.balance == resource.data.balance || request.resource.data.balance < resource.data.balance)) || isAdmin());
+                          'lastFundingAt', 'lastWithdrawalAt', 'createdAt', 'balance',
+                          'pin', 'pinHash', 'pinAttempts', 'lockedUntil'
+                        ])) || isAdmin());
 
       allow delete: if isAdmin();
     }
@@ -44,6 +44,24 @@ service cloud.firestore {
 
     // Server-managed pending payments: Read-only for resource owner, no client-side writes
     match /pending_payments/{txRef} {
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // Secure Investments collection: Read-only for owner, no client-side writes
+    match /investments/{invId} {
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // Secure Withdrawals collection: Read-only for owner, no client-side writes
+    match /withdrawals/{wthId} {
+      allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // Secure Transfers collection: Read-only for owner, no client-side writes
+    match /transfers/{trfId} {
       allow read: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
       allow write: if false;
     }

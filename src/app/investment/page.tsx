@@ -191,38 +191,92 @@ export default function InvestmentPage() {
     const estimatedReward = getEstimatedReward();
 
     try {
-      // Simulate high-fidelity ledger ledger locks
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const isMock = sessionStorage.getItem("mock") === "true";
 
-      // Update local wallet balance state securely
-      const nextBalance = userBalance - amt;
-      await updateUserData({
-        balance: nextBalance
-      });
+      if (isMock) {
+        // Simulate high-fidelity ledger ledger locks
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Construct lock item
-      const newInvest: ActiveInvestment = {
-        id: "INV-" + Math.floor(100000 + Math.random() * 900000),
-        optionName: selectedOption.name,
-        amount: amt,
-        apr: selectedOption.apr,
-        reward: estimatedReward,
-        startDate: new Date().toLocaleDateString(),
-        endDate: new Date(maturityDate).toLocaleDateString(),
-        status: "ACTIVE"
-      };
+        // Update local wallet balance state securely
+        const nextBalance = userBalance - amt;
+        await updateUserData({
+          balance: nextBalance
+        });
 
-      const updatedList = [newInvest, ...activeInvestments];
-      saveInvestments(updatedList);
+        // Construct lock item
+        const newInvest: ActiveInvestment = {
+          id: "INV-" + Math.floor(100000 + Math.random() * 900000),
+          optionName: selectedOption.name,
+          amount: amt,
+          apr: selectedOption.apr,
+          reward: estimatedReward,
+          startDate: new Date().toLocaleDateString(),
+          endDate: new Date(maturityDate).toLocaleDateString(),
+          status: "ACTIVE"
+        };
 
-      // Trigger success notifications
-      toast.success("Locked-in Investment created successfully!");
+        const updatedList = [newInvest, ...activeInvestments];
+        saveInvestments(updatedList);
+
+        // Trigger success notifications
+        toast.success("Locked-in Investment created successfully!");
+      } else {
+        // Production: Call the secure server-side investment endpoint
+        if (!user) {
+          toast.error("Authentication required.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        const idToken = await user.getIdToken();
+        const res = await fetch("/api/wallet/investment", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            amount: amt,
+            currency: "NGN",
+            optionId: selectedOption.id,
+            optionName: selectedOption.name,
+            apr: selectedOption.apr,
+            maturityDate: maturityDate,
+            userId: user.uid,
+          })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          const newInvest: ActiveInvestment = {
+            id: data.reference || ("INV-" + Math.floor(100000 + Math.random() * 900000)),
+            optionName: selectedOption.name,
+            amount: amt,
+            apr: selectedOption.apr,
+            reward: estimatedReward,
+            startDate: new Date().toLocaleDateString(),
+            endDate: new Date(maturityDate).toLocaleDateString(),
+            status: "ACTIVE"
+          };
+
+          const updatedList = [newInvest, ...activeInvestments];
+          saveInvestments(updatedList);
+
+          toast.success("Locked-in Investment created successfully!");
+        } else {
+          toast.error(data.error || "Failed to establish secure vault lock.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       // Clear forms
       setAmountStr("");
       setMaturityDate("");
       setShowConfirmModal(false);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Investment Error:", err);
       toast.error("Failed to secure vault nodes. Please try again.");
     } finally {
       setIsSubmitting(false);
