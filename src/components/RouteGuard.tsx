@@ -188,7 +188,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       }
     } else {
       // User is logged in
-      const hasPin = Boolean(userData?.pin);
+      const hasPin = Boolean(userData?.pin || userData?.pinHash);
       const isPinRequired = userData?.isPinRequired !== false;
 
       // Allow /cpanel access even if pin or auth state verification is pending
@@ -282,9 +282,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Show nothing while redirecting
   if (!user && !isPublicRoute) return null;
   if (pathname === "/cpanel") return <>{children}</>;
-  if (user && !userData?.pin && pathname !== "/auth/pin-setup") return null;
+  if (user && !(userData?.pin || userData?.pinHash) && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
-  if (user && userData?.pin && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
+  if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
 
   return <>{children}</>;
 }
