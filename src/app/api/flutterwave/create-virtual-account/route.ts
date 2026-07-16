@@ -12,18 +12,22 @@ export async function POST(req: Request) {
   }
 
   let uid = "";
+  let emailFallback = "";
+  let nameFallback = "";
   try {
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
+    emailFallback = authResult.email || "";
+    nameFallback = authResult.name || "";
   } catch {
     return NextResponse.json({ error: "Unauthorized: Invalid or missing authentication token." }, { status: 401 });
   }
 
   try {
-    console.log(`[Permanent Account API] Triggered for user: ${uid}`);
+    console.log(`[Permanent Account API] Triggered for user: ${uid} (Fallback Email: ${emailFallback}, Fallback Name: ${nameFallback})`);
 
     // Call virtual account service to resolve existing or register a new one idempotently
-    const account = await VirtualAccountService.getOrCreateVirtualAccount(uid);
+    const account = await VirtualAccountService.getOrCreateVirtualAccount(uid, emailFallback, nameFallback);
 
     return NextResponse.json({
       success: true,
