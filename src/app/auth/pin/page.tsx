@@ -132,27 +132,69 @@ export default function PinPage() {
     shuffleKeypad();
   };
 
-  const verifyPin = (submittedPin: string) => {
+  const verifyPin = async (submittedPin: string) => {
     setIsVerifying(true);
     setVerifyingText("Decrypting security key...");
 
     // Stage 1 of loading animation
-    setTimeout(() => {
-      setVerifyingText("Authenticating signature...");
-    }, 800);
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    await delay(800);
+    setVerifyingText("Authenticating signature...");
 
-    // Stage 2: final resolution after 1.8 seconds delay
-    setTimeout(() => {
-      if (userData?.pin === submittedPin) {
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (isMock) {
+        await delay(1000);
+        if (userData?.pin === submittedPin) {
+          setPinVerified(true);
+          toast.success("Identity verified");
+          router.push("/");
+        } else {
+          toast.error("Incorrect PIN");
+          setPin("");
+          setIsVerifying(false);
+        }
+        return;
+      }
+
+      // Production server-side verify call
+      if (!user) {
+        toast.error("Authentication required.");
+        setIsVerifying(false);
+        return;
+      }
+
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          action: "verify",
+          pin: submittedPin
+        })
+      });
+
+      const data = await res.json();
+      await delay(500);
+
+      if (res.ok && data.success) {
         setPinVerified(true);
         toast.success("Identity verified");
         router.push("/");
       } else {
-        toast.error("Incorrect PIN");
+        toast.error(data.message || data.error || "Incorrect PIN");
         setPin("");
         setIsVerifying(false);
       }
-    }, 1800);
+    } catch (err) {
+      console.error("PIN verification error:", err);
+      toast.error("Server authentication failed. Please try again.");
+      setPin("");
+      setIsVerifying(false);
+    }
   };
 
   if (loading) return null;

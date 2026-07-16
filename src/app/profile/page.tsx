@@ -285,21 +285,79 @@ export default function ProfilePage() {
       return;
     }
 
-    // Verify Old PIN matches current user PIN
-    const currentStoredPin = userData?.pin || "1234"; // Default mock PIN is '1234'
-    if (oldPin !== currentStoredPin) {
-      toast.error("Incorrect current PIN. Access denied.");
-      return;
-    }
-
     setIsUpdatingPin(true);
     try {
-      await updateUserData({ pin: newPin });
-      toast.success("Access PIN updated successfully!");
+      const isMock = sessionStorage.getItem("mock") === "true";
+
+      if (isMock) {
+        // Verify Old PIN matches current user PIN
+        const currentStoredPin = userData?.pin || "1234"; // Default mock PIN is '1234'
+        if (oldPin !== currentStoredPin) {
+          toast.error("Incorrect current PIN. Access denied.");
+          setIsUpdatingPin(false);
+          return;
+        }
+
+        await updateUserData({ pin: newPin });
+        toast.success("Access PIN updated successfully!");
+      } else {
+        // Production: Server-side secure PIN update using authentication token
+        if (!user) {
+          toast.error("Authentication required.");
+          setIsUpdatingPin(false);
+          return;
+        }
+
+        const idToken = await user.getIdToken();
+
+        // 1. Verify old PIN securely on the backend
+        const verifyRes = await fetch("/api/auth/pin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            action: "verify",
+            pin: oldPin
+          })
+        });
+
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok || !verifyData.success) {
+          toast.error(verifyData.message || verifyData.error || "Incorrect current PIN. Access denied.");
+          setIsUpdatingPin(false);
+          return;
+        }
+
+        // 2. Set new PIN securely on the backend (hashes on the server)
+        const setRes = await fetch("/api/auth/pin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            action: "set",
+            pin: newPin
+          })
+        });
+
+        const setData = await setRes.json();
+        if (setRes.ok && setData.success) {
+          toast.success("Access PIN updated successfully!");
+        } else {
+          toast.error(setData.error || "Failed to set new PIN securely.");
+          setIsUpdatingPin(false);
+          return;
+        }
+      }
+
       setOldPin("");
       setNewPin("");
       setConfirmPin("");
-    } catch {
+    } catch (err: unknown) {
+      console.error("PIN Update Error:", err);
       toast.error("Failed to update Access PIN");
     } finally {
       setIsUpdatingPin(false);

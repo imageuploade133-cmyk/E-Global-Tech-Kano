@@ -1,6 +1,6 @@
 import { flutterwaveService } from "@/lib/flutterwave";
 import { adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { WalletService } from "@/lib/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 
 // A robust parser that extracts the userId correctly from tx_ref for backup checks
@@ -209,37 +209,28 @@ export async function verifyAndCreditWallet(
           throw new Error(`Pending payment currency mismatch. Expected: ${pendingData.currency}, Actual: ${currency}`);
         }
 
-        // C. Verify target user profile exists
-        const userDocRef = adminDb.collection("users").doc(userId);
+        // C. Credit balance using centralized WalletService (also logs transaction in general ledger)
+        console.log("Updating wallet balance via WalletService...");
+        const creditRes = await WalletService.creditWallet(transaction, {
+          userId,
+          amount: actualAmount,
+          currency,
+          reference: tx_ref,
+          flwId: transactionId,
+          docId: `tx-${transactionId}`, // Keep identical doc ID format to prevent ledger duplication
+          description: `Flutterwave Funding Ref: ${tx_ref}`,
+          recipientName: customer?.name || "Wallet Credit",
+        });
 
-        console.log("Reading user...");
-        const userDoc = await transaction.get(userDocRef);
-
-        if (!userDoc.exists) {
-          throw new Error("Target user profile was not found in Firestore.");
-        }
-
-        const userData = userDoc.data();
-        const currentBalance = Number(userData?.balance) || 0;
-        const fundedAmount = Number(amount);
-        const newBalance = currentBalance + fundedAmount;
-
-        // D. Increment atomic balance using FieldValue.increment
-        console.log("Updating wallet...");
-        transaction.update(userDocRef, { balance: FieldValue.increment(fundedAmount) });
-        console.log(`[Wallet credited] USER ID: ${userId}, PREVIOUS BALANCE: ₦${currentBalance}, FUNDING AMOUNT: ₦${fundedAmount}, NEW ESTIMATED BALANCE: ₦${newBalance}`);
-        console.log(`[Verification debug] wallet balance before funding: ₦${currentBalance}`);
-        console.log(`[Verification debug] wallet balance after funding (estimated): ₦${newBalance}`);
-
-        // E. Delete the completed pending payment request document
+        // D. Delete the completed pending payment request document
         console.log("Deleting pending payment...");
         transaction.delete(pendingPayRef);
 
-        // F. Create document in flutterwave_transactions to prevent duplicates
+        // E. Create document in flutterwave_transactions to prevent duplicates
         console.log("Creating duplicate record:", transactionId);
         transaction.set(duplicateDocRef, {
           userId,
-          amount: fundedAmount,
+          amount: actualAmount,
           currency,
           reference: tx_ref,
           flwId: transactionId,
@@ -247,35 +238,14 @@ export async function verifyAndCreditWallet(
           processedAt: new Date().toISOString(),
         });
 
-        // G. Save transaction record inside transactions collection for general ledger logging
-        const ledgerRef = adminDb.collection("transactions").doc(`tx-${transactionId}`);
-        console.log("Creating ledger entry...");
-        const txRecord = {
-          userId,
-          amount: fundedAmount,
-          currency: currency || "NGN",
-          reference: tx_ref,
-          flwId: transactionId,
-          type: "DEPOSIT",
-          description: `Flutterwave Funding Ref: ${tx_ref}`,
-          recipientName: customer?.name || "Wallet Credit",
-          status: "SUCCESS",
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          fee: 0.00,
-          createdAt: new Date().toISOString(),
-        };
-        transaction.set(ledgerRef, txRecord);
-        console.log(`[Transaction recorded] Ledger history entry recorded successfully.`);
-
         // Log committing message before transaction completes/commits
         console.log("Committing transaction...");
 
         return {
           duplicate: false,
-          newBalance,
-          fundedAmount,
-          currentBalance,
+          newBalance: creditRes.newBalance,
+          fundedAmount: actualAmount,
+          currentBalance: creditRes.previousBalance,
         };
       } catch (innerError: unknown) {
         const error = innerError as Error & { code?: string };

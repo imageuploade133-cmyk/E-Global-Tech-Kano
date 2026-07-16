@@ -69,11 +69,38 @@ export default function PinSetupPage() {
   const savePin = async (finalPin: string) => {
     if (!user) return;
     try {
-      await setDoc(doc(db, "users", user.uid), {
-        pin: finalPin,
-      }, { merge: true });
-      toast.success("PIN set successfully");
-      router.push("/auth/pin");
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (isMock) {
+        // Mock save
+        await setDoc(doc(db, "users", user.uid), {
+          pin: finalPin,
+        }, { merge: true });
+        toast.success("PIN set successfully");
+        router.push("/auth/pin");
+        return;
+      }
+
+      // Production backend PIN hashing save
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          action: "set",
+          pin: finalPin
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("PIN set successfully");
+        router.push("/auth/pin");
+      } else {
+        toast.error(data.error || "Failed to set PIN securely on server.");
+      }
     } catch (error) {
       console.error("Save PIN Error:", error);
       toast.error("Failed to save PIN");

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { flutterwaveService } from "@/lib/flutterwave";
 import { adminDb, hasAdminCredentials } from "@/lib/firebase-admin";
+import { WalletService } from "@/lib/wallet-service";
 
 export async function POST(req: Request) {
   try {
@@ -30,55 +31,39 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    const userDocRef = adminDb.collection("users").doc(userId);
-    const trfRef = adminDb.collection("transactions").doc(ref_id);
+    const trfRef = adminDb.collection("transactions").doc(`tx-${ref_id}`);
 
     // Perform atomic transaction to verify sufficient balance and debit user BEFORE calling Flutterwave
     const result = await adminDb.runTransaction(async (transaction) => {
-      const userDoc = await transaction.get(userDocRef);
-      if (!userDoc.exists) {
-        throw new Error("Target user profile was not found in Firestore.");
-      }
+      try {
+        const debitRes = await WalletService.debitWallet(transaction, {
+          userId,
+          amount: transferAmount,
+          currency: transferCurrency,
+          reference: ref_id,
+          docId: `tx-${ref_id}`,
+          type: "TRANSFER",
+          description: narration || `Outward Settlement to ${accountNumber}`,
+          recipientName: `Acc: ${accountNumber} (Pending)`,
+          fee: 10.00, // standard transfer fee
+          isPending: true, // starts as PENDING until confirmed by FLW
+        });
 
-      const userData = userDoc.data() || {};
-      const currentBalance = Number(userData.balance) || 0;
-
-      if (currentBalance < transferAmount) {
+        return {
+          success: true,
+          newBalance: debitRes.newBalance,
+        };
+      } catch (err: unknown) {
+        const error = err as Error;
         return {
           success: false,
-          error: "Insufficient wallet funds to complete outward transfer.",
-          currentBalance,
+          error: error.message,
         };
       }
-
-      // Debit atomic wallet balance
-      const newBalance = currentBalance - transferAmount;
-      transaction.update(userDocRef, { balance: newBalance });
-
-      // Create a pending outward ledger transaction record
-      transaction.set(trfRef, {
-        userId,
-        amount: transferAmount,
-        currency: transferCurrency,
-        reference: ref_id,
-        type: "TRANSFER",
-        description: narration || `Outward Settlement to ${accountNumber}`,
-        recipientName: `Acc: ${accountNumber} (Pending)`,
-        status: "PENDING",
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        fee: 10.00, // standard transfer fee
-        createdAt: new Date().toISOString(),
-      });
-
-      return {
-        success: true,
-        newBalance,
-      };
     });
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error, currentBalance: result.currentBalance }, { status: 400 });
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
     // Call Flutterwave to perform transfer
@@ -112,11 +97,15 @@ export async function POST(req: Request) {
       } else {
         // Fallback: If Flutterwave fails, refund the user balance and fail the ledger record
         await adminDb.runTransaction(async (transaction) => {
-          const userDoc = await transaction.get(userDocRef);
-          if (userDoc.exists) {
-            const currentBal = Number(userDoc.data()?.balance) || 0;
-            transaction.update(userDocRef, { balance: currentBal + transferAmount });
-          }
+          await WalletService.creditWallet(transaction, {
+            userId,
+            amount: transferAmount,
+            currency: transferCurrency,
+            reference: `${ref_id}-refund`,
+            docId: `tx-${ref_id}-refund`,
+            description: `Refund: Outward transfer failed: ${flwRes.message}`,
+            recipientName: "System Refund",
+          });
           transaction.update(trfRef, { status: "FAILED", description: `FAILED: ${flwRes.message}` });
         });
 
@@ -127,11 +116,15 @@ export async function POST(req: Request) {
       // Refund user balance and fail ledger in case of network timeout / crash
       const errorMsg = err instanceof Error ? err.message : String(err);
       await adminDb.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userDocRef);
-        if (userDoc.exists) {
-          const currentBal = Number(userDoc.data()?.balance) || 0;
-          transaction.update(userDocRef, { balance: currentBal + transferAmount });
-        }
+        await WalletService.creditWallet(transaction, {
+          userId,
+          amount: transferAmount,
+          currency: transferCurrency,
+          reference: `${ref_id}-refund`,
+          docId: `tx-${ref_id}-refund`,
+          description: `Refund: Outward transfer error: ${errorMsg}`,
+          recipientName: "System Refund",
+        });
         transaction.update(trfRef, { status: "FAILED", description: `FAILED: API error: ${errorMsg}` });
       });
 

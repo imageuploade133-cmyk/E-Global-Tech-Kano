@@ -1,14 +1,23 @@
 export interface PaymentLogPayload {
   category:
     | "Payment Initialization"
+    | "Payment Initialized"
     | "Webhook Received"
     | "Redirect Verification"
     | "Duplicate Transaction"
     | "Wallet Credited"
+    | "Wallet Debited"
+    | "Transfer"
+    | "Withdrawal"
+    | "Duplicate"
     | "Pending Payment Deleted"
+    | "Pending Deleted"
+    | "Investment Created"
+    | "PIN Verification"
     | "Verification Failed"
     | "Webhook Signature Failure"
     | "Cancelled Payment"
+    | "Errors"
     | "Internal Error";
   transactionId?: string;
   tx_ref?: string;
@@ -16,6 +25,7 @@ export interface PaymentLogPayload {
   amount?: number;
   currency?: string;
   processingTimeMs?: number;
+  requestId?: string;
   message?: string;
   details?: Record<string, unknown>;
 }
