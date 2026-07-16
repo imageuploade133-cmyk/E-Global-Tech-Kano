@@ -209,9 +209,17 @@ export class PaymentService {
     const resData = await response.json();
 
     if (!response.ok) {
-      if (response.status === 404) {
+      const errorMsg = resData.message || "";
+      const isNotFound = response.status === 404 ||
+                         response.status === 400 ||
+                         errorMsg.toLowerCase().includes("no transaction") ||
+                         errorMsg.toLowerCase().includes("not found");
+
+      if (isNotFound) {
+        console.log(`[Polling Status Info] Transaction reference ${txRef} is not yet settled on Flutterwave rail (unpaid/not found). Status: PENDING`);
         return { status: "PENDING" };
       }
+
       throw new Error(resData.message || "Failed to contact Flutterwave verification api.");
     }
 
