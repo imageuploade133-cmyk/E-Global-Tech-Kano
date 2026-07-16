@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
@@ -12,14 +12,61 @@ interface BalanceCardProps {
   userName?: string;
 }
 
+const NIGERIAN_BANKS = [
+  { name: "GTBank", code: "058", dialCode: "*737#" },
+  { name: "Access Bank", code: "044", dialCode: "*901#" },
+  { name: "UBA", code: "033", dialCode: "*919#" },
+  { name: "Zenith Bank", code: "057", dialCode: "*966#" },
+  { name: "First Bank", code: "011", dialCode: "*894#" },
+  { name: "Fidelity Bank", code: "070", dialCode: "*770#" },
+  { name: "FCMB", code: "214", dialCode: "*329#" },
+  { name: "Sterling Bank", code: "050", dialCode: "*822#" },
+  { name: "Wema Bank", code: "035", dialCode: "*945#" },
+  { name: "Keystone Bank", code: "082", dialCode: "*7111#" },
+  { name: "Polaris Bank", code: "076", dialCode: "*833#" },
+  { name: "Stanbic IBTC", code: "039", dialCode: "*909#" },
+  { name: "Union Bank", code: "032", dialCode: "*826#" },
+  { name: "Ecobank", code: "050", dialCode: "*326#" },
+  { name: "Providus Bank", code: "101", dialCode: "*901#" },
+  { name: "Unity Bank", code: "215", dialCode: "*7799#" },
+  { name: "Jaiz Bank", code: "301", dialCode: "*773#" },
+  { name: "Opay", code: "999992", dialCode: "*955#" },
+  { name: "Moniepoint", code: "50515", dialCode: "*5573#" },
+];
+
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
   const [isVisible, setIsVisible] = useState(true);
   const { userData, user } = useAuth();
   const { config } = useAppConfig();
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
 
+  // Add Money Wizard States
+  const [isAddMoneyOpen, setIsAddMoneyOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState<"amount" | "methods" | "ussd-bank" | "ussd-pay" | "transfer-pay" | "success">("amount");
+  const [addAmount, setAddAmount] = useState("");
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedBank, setSelectedBank] = useState<typeof NIGERIAN_BANKS[0] | null>(null);
+
+  // Active checkout data
+  const [activeTxRef, setActiveTxRef] = useState("");
+  const [ussdCode, setUssdCode] = useState("");
+  const [transferDetails, setTransferDetails] = useState<{
+    transferAccount: string;
+    transferBank: string;
+    transferAmount: number;
+    transferReference: string;
+    transferNote: string;
+  } | null>(null);
+
+  // Timer & Polling Refs
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes default
+  const [paymentStatus, setPaymentStatus] = useState<"PENDING" | "PROCESSING" | "PAID" | "EXPIRED" | "FAILED">("PENDING");
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Safely calculate active locked savings from sessionStorage
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = sessionStorage.getItem("active_investments");
       if (saved) {
@@ -35,7 +82,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       }
     }
 
-    // Set up custom listener/interval to sync investment updates in real-time
     const interval = setInterval(() => {
       const saved = sessionStorage.getItem("active_investments");
       if (saved) {
@@ -56,6 +102,88 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     return () => clearInterval(interval);
   }, []);
 
+  // Timer Countdown Effect
+  useEffect(() => {
+    if (isAddMoneyOpen && (wizardStep === "ussd-pay" || wizardStep === "transfer-pay")) {
+      setTimeLeft(600);
+      setPaymentStatus("PENDING");
+
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current!);
+            setPaymentStatus("EXPIRED");
+            stopPolling();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isAddMoneyOpen, wizardStep]);
+
+  // Status Polling Effect
+  const startPolling = (txRef: string) => {
+    stopPolling();
+    console.log(`[Polling Started] Checking status for txRef: ${txRef}`);
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/payments/status?txRef=${txRef}`);
+        const data = await res.json();
+
+        if (data.success) {
+          if (data.status === "SUCCESS") {
+            setPaymentStatus("PAID");
+            stopPolling();
+            if (timerRef.current) clearInterval(timerRef.current);
+            setWizardStep("success");
+            toast.success("Wallet credited successfully!");
+          } else if (data.status === "FAILED") {
+            setPaymentStatus("FAILED");
+            stopPolling();
+            if (timerRef.current) clearInterval(timerRef.current);
+          }
+        }
+      } catch (err) {
+        console.error("Polling Error:", err);
+      }
+    }, 4000); // Poll every 4 seconds
+  };
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  // Clean up polling and timers when closing modal
+  const handleCloseModal = () => {
+    setIsAddMoneyOpen(false);
+    stopPolling();
+    if (timerRef.current) clearInterval(timerRef.current);
+    // Reset steps
+    setTimeout(() => {
+      setWizardStep("amount");
+      setAddAmount("");
+      setSearchQuery("");
+      setSelectedBank(null);
+      setUssdCode("");
+      setTransferDetails(null);
+    }, 300);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
   const resolvedName = (
     userName ||
     userData?.name ||
@@ -71,7 +199,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   const balanceStr = isVisible ? formattedBalance : "₦ •••,•••.••";
 
-  // Highly robust dynamic font size scaling based on balance length to prevent any overflow
+  // Dynamic font scaling
   let fontSizeClass = "text-[20px] min-[360px]:text-[24px] min-[400px]:text-[30px] md:text-[36px] lg:text-[40px]";
   if (balanceStr.length > 24) {
     fontSizeClass = "text-[12px] min-[360px]:text-[14px] min-[400px]:text-[16px]";
@@ -83,15 +211,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     fontSizeClass = "text-[18px] min-[360px]:text-[21px] min-[400px]:text-[24px]";
   }
 
-  const [isAddMoneyOpen, setIsAddMoneyOpen] = useState(false);
-  const [addAmount, setAddAmount] = useState("");
-  const [isInitializing, setIsInitializing] = useState(false);
-
   const handlePresetClick = (val: number) => {
     setAddAmount(val.toString());
   };
 
-  const handleAddMoneySubmit = async (e: React.FormEvent) => {
+  const handleAmountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = parseFloat(addAmount);
 
@@ -100,12 +224,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       return;
     }
 
+    setWizardStep("methods");
+  };
+
+  // Card payment initialization (using safest/existing hosted checkout approach as allowed)
+  const handleCardPaymentSubmit = async () => {
     setIsInitializing(true);
-    toast.loading("Contacting Flutterwave secure payment gateway...");
+    toast.loading("Contacting Flutterwave secure payment element...");
 
     try {
       const payload = {
-        amount: parsedAmount,
+        amount: parseFloat(addAmount),
         currency: "NGN",
         email: user?.email || "captain@example.com",
         name: userData?.name || user?.displayName || "Captain Wallet",
@@ -123,19 +252,126 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       toast.dismiss();
 
       if (data.success && data.paymentLink) {
-        toast.success("Redirecting to secure Flutterwave checkout...");
-        // Direct first-party redirect to prevent sessionStorage blockages in iframe
+        toast.success("Redirecting to secure card gateway...");
         window.location.href = data.paymentLink;
       } else {
-        toast.error(data.error || "Failed to initialize Flutterwave transaction link.");
+        toast.error(data.error || "Failed to initialize payment gateway.");
       }
     } catch {
       toast.dismiss();
-      toast.error("Internal connection error while generating checkout page.");
+      toast.error("Network communication error.");
     } finally {
       setIsInitializing(false);
     }
   };
+
+  // USSD Bank Selection Action
+  const handleBankSelect = async (bank: typeof NIGERIAN_BANKS[0]) => {
+    setSelectedBank(bank);
+    setIsInitializing(true);
+    toast.loading(`Generating USSD dialing instructions for ${bank.name}...`);
+
+    try {
+      let idToken = "mock-token";
+      if (user && sessionStorage.getItem("mock") !== "true") {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/payments/ussd", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          amount: parseFloat(addAmount),
+          currency: "NGN",
+          bankCode: bank.code,
+          email: user?.email || "captain@example.com",
+          name: userData?.name || user?.displayName || "Captain Wallet",
+          phone: userData?.phoneNumber || "08012345678",
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success) {
+        setUssdCode(data.ussdCode);
+        setActiveTxRef(data.txRef);
+        setWizardStep("ussd-pay");
+        startPolling(data.txRef);
+      } else {
+        toast.error(data.error || "Selected bank is temporarily offline.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Internal connection error.");
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  // Bank Transfer Payment Generation Action
+  const handleBankTransferInit = async () => {
+    setIsInitializing(true);
+    toast.loading("Allocating secure dynamic Wema virtual account...");
+
+    try {
+      let idToken = "mock-token";
+      if (user && sessionStorage.getItem("mock") !== "true") {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/payments/bank-transfer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          amount: parseFloat(addAmount),
+          currency: "NGN",
+          email: user?.email || "captain@example.com",
+          name: userData?.name || user?.displayName || "Captain Wallet",
+          phone: userData?.phoneNumber || "08012345678",
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success) {
+        setTransferDetails({
+          transferAccount: data.transferAccount,
+          transferBank: data.transferBank,
+          transferAmount: data.transferAmount,
+          transferReference: data.transferReference,
+          transferNote: data.transferNote,
+        });
+        setActiveTxRef(data.txRef);
+        setWizardStep("transfer-pay");
+        startPolling(data.txRef);
+      } else {
+        toast.error(data.error || "Dynamic account allocation failed.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Internal connection error.");
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard!`);
+  };
+
+  // Filter bank query
+  const filteredBanks = NIGERIAN_BANKS.filter(b =>
+    b.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <>
@@ -145,9 +381,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="mb-stack-lg text-black w-full"
     >
-      {/* Physical Card Design - optimized vertically and horizontally to prevent spilling */}
+      {/* Physical Card Design */}
       <div className="relative aspect-[1.586/1] w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 group min-h-[175px] min-[360px]:min-h-[195px]">
-        {/* Card Background - Premium Obsidian Mesh */}
         <div className="absolute inset-0 bg-[#0c1324]">
             <div className="absolute inset-0 opacity-40"
                  style={{
@@ -221,12 +456,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
           {/* Bottom section: Card Number, User Name, Expiry/infinite badge */}
           <div className="space-y-1.5 w-full overflow-hidden flex-shrink-0">
-            {/* Card Number Mockup - using ACCOUNT HOLDER name as the number */}
             <div className="font-mono text-[9px] min-[360px]:text-[11px] text-[#FFFFFF]/80 tracking-[0.15em] uppercase truncate max-w-full" title={resolvedName}>
               {resolvedName}
             </div>
 
-            {/* Bottom: User Name and Type */}
             <div className="flex justify-between items-end gap-2 w-full overflow-hidden">
               <div className="flex-1 min-w-0">
                   <p className="font-label-sm text-[7px] min-[360px]:text-[8px] uppercase tracking-wider text-[#FFFFFF]/60 mb-0.5 font-medium truncate">Account Holder</p>
@@ -242,18 +475,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </div>
       </div>
 
-      {/* Action Buttons Below Card - Shadow removed as requested */}
+      {/* Action Buttons Below Card */}
       <div className="mt-4 min-[360px]:mt-5 flex gap-2.5 min-[360px]:gap-4">
-        {/* Add Money - Deep Emerald Gradient based on #07B038 */}
         <motion.button
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           onClick={() => setIsAddMoneyOpen(true)}
           className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 min-[360px]:gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
-          {/* Shine effect overlay */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-
           <div className="w-5.5 h-5.5 min-[360px]:w-7 min-[360px]:h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[12px] min-[360px]:text-[16px] font-bold block">add_card</span>
           </div>
@@ -262,15 +492,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </span>
         </motion.button>
 
-        {/* Transfer - Deep Sunset Orange Gradient based on #FC7A00 */}
         <motion.button
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 min-[360px]:gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
-          {/* Shine effect overlay */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-
           <div className="w-5.5 h-5.5 min-[360px]:w-7 min-[360px]:h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[12px] min-[360px]:text-[16px] font-bold block">send</span>
           </div>
@@ -290,94 +517,423 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setIsAddMoneyOpen(false)}
+            onClick={handleCloseModal}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
           />
 
-          {/* Bottom Sheet form */}
+          {/* Bottom Sheet form container */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            drag="y"
-            dragDirectionLock
-            dragConstraints={{ top: 0, bottom: 450 }}
-            dragElastic={{ top: 0, bottom: 0.2 }}
-            onDragEnd={(event, info) => {
-              if (info.offset.y > 100 || info.velocity.y > 500) {
-                setIsAddMoneyOpen(false);
-              }
-            }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-hidden touch-none"
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar"
           >
             {/* Drag handle */}
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
 
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
-              <div className="w-8" />
+              {wizardStep !== "amount" && wizardStep !== "success" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (wizardStep === "methods") setWizardStep("amount");
+                    else if (wizardStep === "ussd-bank") setWizardStep("methods");
+                    else if (wizardStep === "ussd-pay") {
+                      stopPolling();
+                      setWizardStep("ussd-bank");
+                    } else if (wizardStep === "transfer-pay") {
+                      stopPolling();
+                      setWizardStep("methods");
+                    }
+                  }}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">arrow_back</span>
+                </button>
+              ) : (
+                <div className="w-8" />
+              )}
               <h3 className="font-hanken font-bold text-base text-black text-center">
-                Fund Wallet (Flutterwave)
+                Fund Wallet (Direct Checkout)
               </h3>
               <button
                 type="button"
-                onClick={() => setIsAddMoneyOpen(false)}
+                onClick={handleCloseModal}
                 className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px] font-bold">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleAddMoneySubmit} className="space-y-5">
-              {/* Amount input */}
-              <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Fund (NGN)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
-                  <input
-                    type="number"
-                    value={addAmount}
-                    onChange={(e) => setAddAmount(e.target.value)}
-                    placeholder="Enter amount (e.g. 5000)"
-                    required
-                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
-                  />
-                </div>
-                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mt-1">Minimum funding threshold is ₦100.00</p>
-              </div>
+            <AnimatePresence mode="wait">
+              {/* STEP 1: Enter Amount */}
+              {wizardStep === "amount" && (
+                <motion.form
+                  key="step-amount"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  onSubmit={handleAmountSubmit}
+                  className="space-y-5"
+                >
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Fund (NGN)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
+                      <input
+                        type="number"
+                        value={addAmount}
+                        onChange={(e) => setAddAmount(e.target.value)}
+                        placeholder="Enter amount (e.g. 5000)"
+                        required
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                      />
+                    </div>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mt-1">Minimum funding threshold is ₦100.00</p>
+                  </div>
 
-              {/* Preset Quick select buttons */}
-              <div className="grid grid-cols-4 gap-2">
-                {[1000, 5000, 10000, 20000].map((preset) => (
+                  {/* Preset select */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1000, 5000, 10000, 20000].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handlePresetClick(preset)}
+                        className="py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-150 text-xs font-mono font-bold text-gray-800 rounded-xl transition-all cursor-pointer text-center"
+                      >
+                        +₦{preset / 1000}K
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col gap-2.5 pt-3">
+                    <button
+                      type="submit"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
+                    >
+                      Choose Payment Method
+                    </button>
+                  </div>
+                </motion.form>
+              )}
+
+              {/* STEP 2: Choose Payment Method */}
+              {wizardStep === "methods" && (
+                <motion.div
+                  key="step-methods"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-4"
+                >
+                  <p className="text-left font-hanken text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    Select Your Preferred Option for ₦{parseFloat(addAmount).toLocaleString()}
+                  </p>
+
+                  <div className="flex flex-col gap-3">
+                    {/* Method: Card */}
+                    <button
+                      type="button"
+                      disabled={isInitializing}
+                      onClick={handleCardPaymentSubmit}
+                      className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">credit_card</span>
+                        </div>
+                        <div className="text-left">
+                          <p className="font-hanken font-extrabold text-xs text-black">Pay with Card</p>
+                          <p className="font-hanken text-[10px] text-gray-400">Secure Direct Checkout Element</p>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
+                    </button>
+
+                    {/* Method: USSD */}
+                    <button
+                      type="button"
+                      disabled={isInitializing}
+                      onClick={() => setWizardStep("ussd-bank")}
+                      className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">cell_tower</span>
+                        </div>
+                        <div className="text-left">
+                          <p className="font-hanken font-extrabold text-xs text-black">Pay with USSD Dial Code</p>
+                          <p className="font-hanken text-[10px] text-gray-400">Instant code generation for all bank dials</p>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
+                    </button>
+
+                    {/* Method: Bank Transfer */}
+                    <button
+                      type="button"
+                      disabled={isInitializing}
+                      onClick={handleBankTransferInit}
+                      className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[20px]">account_balance</span>
+                        </div>
+                        <div className="text-left">
+                          <p className="font-hanken font-extrabold text-xs text-black">Pay with Direct Bank Transfer</p>
+                          <p className="font-hanken text-[10px] text-gray-400">Generate temporary Wema Virtual Account</p>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 3: USSD Bank Selector */}
+              {wizardStep === "ussd-bank" && (
+                <motion.div
+                  key="step-ussd-bank"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-4"
+                >
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search bank (e.g. GTBank, Opay)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3 font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <div className="max-h-[220px] overflow-y-auto border border-gray-100 rounded-xl flex flex-col no-scrollbar">
+                    {filteredBanks.length === 0 ? (
+                      <p className="py-8 text-center text-gray-400 font-hanken text-xs font-semibold">No banks matched.</p>
+                    ) : (
+                      filteredBanks.map((bank) => (
+                        <button
+                          key={bank.code}
+                          type="button"
+                          onClick={() => handleBankSelect(bank)}
+                          className="w-full px-4 py-3.5 hover:bg-[#FFF9F5] border-b border-gray-50 text-left font-hanken text-xs font-extrabold text-gray-800 transition-colors cursor-pointer flex items-center justify-between"
+                        >
+                          <span>{bank.name}</span>
+                          <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-mono font-bold">
+                            {bank.dialCode}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 4: USSD Checkout/Status Dial Screen */}
+              {wizardStep === "ussd-pay" && (
+                <motion.div
+                  key="step-ussd-pay"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-5 text-center flex flex-col items-center"
+                >
+                  <div className="w-14 h-14 bg-orange-50 border border-orange-100 text-orange-600 rounded-full flex items-center justify-center animate-pulse">
+                    <span className="material-symbols-outlined text-[28px]">cell_tower</span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-hanken font-extrabold text-base text-black">Dial to Complete Payment</h4>
+                    <p className="font-hanken text-[11px] text-gray-400 mt-1 max-w-[280px] mx-auto leading-relaxed">
+                      Please dial the secure USSD code below on your registered phone to approve the transaction.
+                    </p>
+                  </div>
+
+                  {/* Code Card */}
+                  <div className="w-full bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-5 space-y-3">
+                    <div className="flex justify-between font-hanken text-[11px] border-b border-[#FFECD8] pb-2 text-gray-500">
+                      <span className="font-bold">Bank Name</span>
+                      <span className="text-black font-extrabold">{selectedBank?.name}</span>
+                    </div>
+                    <div className="flex justify-between font-hanken text-[11px] border-b border-[#FFECD8] pb-2 text-gray-500">
+                      <span className="font-bold">Amount to Pay</span>
+                      <span className="text-emerald-600 font-black">₦{parseFloat(addAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between font-hanken text-[11px] border-b border-[#FFECD8] pb-2 text-gray-500">
+                      <span className="font-bold">Payment Reference</span>
+                      <span className="text-black font-mono font-semibold truncate max-w-[180px]">{activeTxRef}</span>
+                    </div>
+
+                    <div className="py-2.5 bg-white border border-[#FFECD8] rounded-xl flex items-center justify-between px-4 mt-2">
+                      <p className="font-mono font-extrabold text-sm text-black select-all tracking-wide">
+                        {ussdCode}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(ussdCode, "USSD code")}
+                        className="text-xs font-bold text-primary hover:text-primary-dark font-hanken bg-[#FFF0E0] px-2.5 py-1 rounded-md"
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    {/* Direct dial anchor */}
+                    <a
+                      href={`tel:${ussdCode.replace("#", "%23")}`}
+                      className="w-full inline-flex py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-hanken text-xs font-extrabold tracking-wide active:scale-98 transition-all items-center justify-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">call</span>
+                      Dial Instantly
+                    </a>
+                  </div>
+
+                  {/* Polling / Pending status indicators */}
+                  <div className="w-full bg-gray-50 border border-gray-150 rounded-xl p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-[18px] animate-spin">
+                        progress_activity
+                      </span>
+                      <span className="font-hanken text-[11px] text-gray-500 font-extrabold">
+                        {paymentStatus === "PROCESSING" ? "Processing checkout..." : "Waiting for payment..."}
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="block font-hanken text-[9px] text-gray-400 font-bold uppercase tracking-wide">Expires In</span>
+                      <span className="font-mono text-[11px] font-black text-rose-500">
+                        {formatTime(timeLeft)}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 5: Bank Transfer dynamic screen */}
+              {wizardStep === "transfer-pay" && transferDetails && (
+                <motion.div
+                  key="step-transfer-pay"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-5 text-center flex flex-col items-center"
+                >
+                  <div className="w-14 h-14 bg-green-50 border border-green-100 text-green-600 rounded-full flex items-center justify-center animate-pulse">
+                    <span className="material-symbols-outlined text-[28px]">account_balance_wallet</span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-hanken font-extrabold text-base text-black">Make Direct Transfer</h4>
+                    <p className="font-hanken text-[11px] text-gray-400 mt-1 max-w-[280px] mx-auto leading-relaxed">
+                      Please transfer the exact amount to the allocated temporary virtual account below.
+                    </p>
+                  </div>
+
+                  {/* Code Card */}
+                  <div className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-3.5 text-left">
+                    <div className="flex justify-between font-hanken text-[11px] border-b border-gray-200/60 pb-2 text-gray-500">
+                      <span className="font-bold">Bank Name</span>
+                      <span className="text-black font-extrabold">{transferDetails.transferBank}</span>
+                    </div>
+
+                    <div className="flex justify-between font-hanken text-[11px] border-b border-gray-200/60 pb-2 text-gray-500">
+                      <span className="font-bold">Account Holder Name</span>
+                      <span className="text-black font-extrabold">E-Tech Global Hub</span>
+                    </div>
+
+                    <div className="flex justify-between font-hanken text-[11px] border-b border-gray-200/60 pb-2 text-gray-500">
+                      <span className="font-bold">Amount to Transfer</span>
+                      <span className="text-emerald-600 font-black text-xs">₦{transferDetails.transferAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="flex justify-between font-hanken text-[11px] border-b border-gray-200/60 pb-2 text-gray-500">
+                      <span className="font-bold">Transfer Reference</span>
+                      <span className="text-black font-mono font-bold select-all">{transferDetails.transferReference}</span>
+                    </div>
+
+                    {/* Account Number element */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex items-center justify-between">
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Account Number</p>
+                        <p className="font-mono font-black text-base text-black tracking-widest mt-0.5 select-all">
+                          {transferDetails.transferAccount}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(transferDetails.transferAccount, "Account number")}
+                        className="text-xs font-bold text-primary hover:text-primary-dark font-hanken bg-[#FFF0E0] px-3.5 py-2.5 rounded-xl transition-all active:scale-95 flex items-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Polling status indicator */}
+                  <div className="w-full bg-gray-50 border border-gray-150 rounded-xl p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-[18px] animate-spin">
+                        progress_activity
+                      </span>
+                      <span className="font-hanken text-[11px] text-gray-500 font-extrabold">
+                        {paymentStatus === "PROCESSING" ? "Processing transfer..." : "Waiting for payment..."}
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="block font-hanken text-[9px] text-gray-400 font-bold uppercase tracking-wide">Expires In</span>
+                      <span className="font-mono text-[11px] font-black text-rose-500">
+                        {formatTime(timeLeft)}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 6: Direct Success Screen */}
+              {wizardStep === "success" && (
+                <motion.div
+                  key="step-success"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-5 text-center flex flex-col items-center py-4"
+                >
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner animate-bounce">
+                    <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">Payment Successful!</h4>
+                    <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed max-w-[280px]">
+                      Your wallet has been automatically credited and a receipt generated in your ledger.
+                    </p>
+                  </div>
+
+                  <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Credited Amount</p>
+                    <p className="font-mono text-2xl font-black text-emerald-600 mt-0.5">
+                      +₦{parseFloat(addAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+
                   <button
-                    key={preset}
                     type="button"
-                    onClick={() => handlePresetClick(preset)}
-                    className="py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-150 text-xs font-mono font-bold text-gray-800 rounded-xl transition-all cursor-pointer text-center"
+                    onClick={handleCloseModal}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
                   >
-                    +₦{preset / 1000}K
+                    Back to Dashboard
                   </button>
-                ))}
-              </div>
-
-              {/* Action submission buttons */}
-              <div className="flex flex-col gap-2.5 pt-3">
-                <button
-                  type="submit"
-                  disabled={isInitializing}
-                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                >
-                  {isInitializing ? "Initializing Gateway..." : "Continue to Checkout"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddMoneyOpen(false)}
-                  className="w-full py-4 bg-white hover:bg-gray-50 border border-gray-200 text-black text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer active:scale-98 transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </>
       )}

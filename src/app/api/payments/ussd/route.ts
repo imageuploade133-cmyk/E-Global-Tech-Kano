@@ -1,0 +1,84 @@
+import { NextResponse } from "next/server";
+import { authenticateUserRequest } from "@/lib/auth-util";
+import { PaymentService } from "@/lib/payment-service";
+import { adminDb } from "@/lib/firebase-admin";
+import { isRateLimited } from "@/lib/rate-limiter";
+import { logPaymentEvent } from "@/lib/payment-logger";
+
+export async function POST(req: Request) {
+  const startTime = Date.now();
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
+
+  // Rate Limiting: 20 payment initializations per minute max
+  if (isRateLimited(ip, 20, 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
+
+  let uid = "";
+  try {
+    const authResult = await authenticateUserRequest(req);
+    uid = authResult.uid;
+  } catch {
+    return NextResponse.json({ error: "Unauthorized: Invalid or missing authorization token." }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { amount, currency, bankCode, email, name, phone } = body;
+
+    const payAmount = Number(amount);
+    const payCurrency = currency || "NGN";
+
+    // Validations
+    if (!amount || isNaN(payAmount) || payAmount <= 0) {
+      return NextResponse.json({ error: "Invalid payment amount." }, { status: 400 });
+    }
+    if (!bankCode) {
+      return NextResponse.json({ error: "Selected bank code is required." }, { status: 400 });
+    }
+    if (!email || !name) {
+      return NextResponse.json({ error: "Name and email are required customer fields." }, { status: 400 });
+    }
+
+    const tx_ref = `flw-tx-${uid}-${Date.now()}`;
+
+    // Create a server-managed pending payment record in Firestore first
+    console.log(`[USSD Payment Init] Creating pending payment record: pending_payments/${tx_ref}`);
+    await adminDb.collection("pending_payments").doc(tx_ref).set({
+      userId: uid,
+      amount: payAmount,
+      currency: payCurrency,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    });
+
+    // Request the USSD charging code from Flutterwave
+    const ussdDetails = await PaymentService.createUSSDPayment({
+      tx_ref,
+      amount: payAmount,
+      email,
+      phone_number: phone || "08012345678",
+      fullname: name,
+      bank_code: bankCode,
+    });
+
+    logPaymentEvent({
+      category: "Payment Initialized",
+      userId: uid,
+      tx_ref,
+      amount: payAmount,
+      currency: payCurrency,
+      message: `USSD Charge initiated successfully for bank ${ussdDetails.bankName}. Code: ${ussdDetails.ussdCode}`,
+      processingTimeMs: Date.now() - startTime,
+    });
+
+    return NextResponse.json({
+      success: true,
+      ...ussdDetails,
+    });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error("[USSD Payment API Exception] Initiating failed:", error.message, error.stack);
+    return NextResponse.json({ error: error.message || "Internal Server Error initiating USSD payment." }, { status: 500 });
+  }
+}
