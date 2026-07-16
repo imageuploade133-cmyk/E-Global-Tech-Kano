@@ -12,28 +12,6 @@ interface BalanceCardProps {
   userName?: string;
 }
 
-const NIGERIAN_BANKS = [
-  { name: "GTBank", code: "058", dialCode: "*737#" },
-  { name: "Access Bank", code: "044", dialCode: "*901#" },
-  { name: "UBA", code: "033", dialCode: "*919#" },
-  { name: "Zenith Bank", code: "057", dialCode: "*966#" },
-  { name: "First Bank", code: "011", dialCode: "*894#" },
-  { name: "Fidelity Bank", code: "070", dialCode: "*770#" },
-  { name: "FCMB", code: "214", dialCode: "*329#" },
-  { name: "Sterling Bank", code: "050", dialCode: "*822#" },
-  { name: "Wema Bank", code: "035", dialCode: "*945#" },
-  { name: "Keystone Bank", code: "082", dialCode: "*7111#" },
-  { name: "Polaris Bank", code: "076", dialCode: "*833#" },
-  { name: "Stanbic IBTC", code: "039", dialCode: "*909#" },
-  { name: "Union Bank", code: "032", dialCode: "*826#" },
-  { name: "Ecobank", code: "050", dialCode: "*326#" },
-  { name: "Providus Bank", code: "101", dialCode: "*901#" },
-  { name: "Unity Bank", code: "215", dialCode: "*7799#" },
-  { name: "Jaiz Bank", code: "301", dialCode: "*773#" },
-  { name: "Opay", code: "999992", dialCode: "*955#" },
-  { name: "Moniepoint", code: "50515", dialCode: "*5573#" },
-];
-
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
   const [isVisible, setIsVisible] = useState(true);
   const { userData, user } = useAuth();
@@ -46,7 +24,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [addAmount, setAddAmount] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedBank, setSelectedBank] = useState<typeof NIGERIAN_BANKS[0] | null>(null);
+
+  // Dynamic Bank Discovery States
+  const [banksList, setBanksList] = useState<Array<{ name: string; code: string }>>([]);
+  const [isBanksLoading, setIsBanksLoading] = useState(false);
+  const [selectedBank, setSelectedBank] = useState<{ name: string; code: string } | null>(null);
+  const [ussdErrorMessage, setUssdErrorMessage] = useState("");
 
   // Active checkout data
   const [activeTxRef, setActiveTxRef] = useState("");
@@ -64,6 +47,31 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [paymentStatus, setPaymentStatus] = useState<"PENDING" | "PROCESSING" | "PAID" | "EXPIRED" | "FAILED">("PENDING");
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch banks dynamically from our Discovery API endpoint
+  const fetchBanks = async () => {
+    setIsBanksLoading(true);
+    try {
+      const res = await fetch("/api/payments/banks");
+      if (res.ok) {
+        const data = await res.json();
+        setBanksList(data);
+      } else {
+        console.warn("Failed to retrieve dynamic bank codes. Using local cache.");
+      }
+    } catch (err) {
+      console.error("Error retrieving bank codes from server:", err);
+    } finally {
+      setIsBanksLoading(false);
+    }
+  };
+
+  // Trigger bank fetch on opening the modal to reduce startup lag
+  useEffect(() => {
+    if (isAddMoneyOpen && banksList.length === 0) {
+      fetchBanks();
+    }
+  }, [isAddMoneyOpen, banksList.length]);
 
   // Safely calculate active locked savings from sessionStorage
   useEffect(() => {
@@ -175,6 +183,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setSelectedBank(null);
       setUssdCode("");
       setTransferDetails(null);
+      setUssdErrorMessage("");
     }, 300);
   };
 
@@ -266,8 +275,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // USSD Bank Selection Action
-  const handleBankSelect = async (bank: typeof NIGERIAN_BANKS[0]) => {
+  const handleBankSelect = async (bank: { name: string; code: string }) => {
     setSelectedBank(bank);
+    setUssdErrorMessage("");
     setIsInitializing(true);
     toast.loading(`Generating USSD dialing instructions for ${bank.name}...`);
 
@@ -296,16 +306,21 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       const data = await res.json();
       toast.dismiss();
 
-      if (data.success) {
+      if (res.ok && data.success) {
         setUssdCode(data.ussdCode);
         setActiveTxRef(data.txRef);
         setWizardStep("ussd-pay");
         startPolling(data.txRef);
       } else {
-        toast.error(data.error || "Selected bank is temporarily offline.");
+        // Step 7 Fallback handling for unsupported USSD banks
+        const errMsg = data.error || "Selected bank is temporarily offline.";
+        console.warn("USSD initiation error:", errMsg);
+        setUssdErrorMessage("USSD payments are currently unavailable for this bank. Please choose another bank or use Bank Transfer.");
+        toast.error("USSD is not supported for this bank.");
       }
     } catch {
       toast.dismiss();
+      setUssdErrorMessage("USSD payments are currently unavailable for this bank. Please choose another bank or use Bank Transfer.");
       toast.error("Internal connection error.");
     } finally {
       setIsInitializing(false);
@@ -369,7 +384,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // Filter bank query
-  const filteredBanks = NIGERIAN_BANKS.filter(b =>
+  const filteredBanks = banksList.filter(b =>
     b.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -527,7 +542,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar"
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar animate-fade-in"
           >
             {/* Drag handle */}
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
@@ -692,7 +707,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
 
-              {/* STEP 3: USSD Bank Selector */}
+              {/* STEP 3: USSD Bank Selector (Dynamic Discovery API driven) */}
               {wizardStep === "ussd-bank" && (
                 <motion.div
                   key="step-ussd-bank"
@@ -701,21 +716,43 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   exit={{ opacity: 0, x: 10 }}
                   className="space-y-4"
                 >
+                  <p className="text-left font-hanken text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Select Your Bank
+                  </p>
+
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">
                       search
                     </span>
                     <input
                       type="text"
-                      placeholder="Search bank (e.g. GTBank, Opay)..."
+                      placeholder="Search bank (e.g. GTBank, Opay, Moniepoint)..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3 font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
                     />
                   </div>
 
-                  <div className="max-h-[220px] overflow-y-auto border border-gray-100 rounded-xl flex flex-col no-scrollbar">
-                    {filteredBanks.length === 0 ? (
+                  {/* Inline error alert banner if bank USSD fails (Step 7) */}
+                  {ussdErrorMessage && (
+                    <div className="p-3.5 bg-red-50 border border-red-100 text-red-600 rounded-xl font-hanken text-[10.5px] font-bold text-left leading-relaxed">
+                      {ussdErrorMessage}
+                    </div>
+                  )}
+
+                  {/* Bank list with loader skeletons */}
+                  <div className="max-h-[220px] overflow-y-auto border border-gray-150 rounded-2xl flex flex-col no-scrollbar">
+                    {isBanksLoading ? (
+                      // Skeleton loader rows for Moniepoint/OPay style premium experience
+                      <div className="p-4 space-y-3.5">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className="flex justify-between items-center animate-pulse">
+                            <div className="h-4 bg-gray-100 rounded w-1/3" />
+                            <div className="h-3 bg-gray-100 rounded w-10" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : filteredBanks.length === 0 ? (
                       <p className="py-8 text-center text-gray-400 font-hanken text-xs font-semibold">No banks matched.</p>
                     ) : (
                       filteredBanks.map((bank) => (
@@ -726,8 +763,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           className="w-full px-4 py-3.5 hover:bg-[#FFF9F5] border-b border-gray-50 text-left font-hanken text-xs font-extrabold text-gray-800 transition-colors cursor-pointer flex items-center justify-between"
                         >
                           <span>{bank.name}</span>
-                          <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-mono font-bold">
-                            {bank.dialCode}
+                          <span className="text-[10px] bg-gray-100 px-2.5 py-0.5 rounded text-gray-500 font-mono font-bold">
+                            Select
                           </span>
                         </button>
                       ))
