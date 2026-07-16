@@ -18,6 +18,9 @@ export interface BankTransferPayload {
   email: string;
   phone_number: string;
   fullname: string;
+  firstname?: string;
+  lastname?: string;
+  narration?: string;
 }
 
 // Map of bank codes to default high-fidelity test dial code templates for sandbox fallback
@@ -106,6 +109,10 @@ export class PaymentService {
       throw new Error("Configuration Error: Missing Flutterwave Secret Key.");
     }
 
+    const nameParts = (payload.fullname || "").trim().split(/\s+/);
+    const calculatedFirstname = payload.firstname || nameParts[0] || "Customer";
+    const calculatedLastname = payload.lastname || nameParts.slice(1).join(" ") || "Wallet";
+
     const response = await fetch(`${FLW_BASE_URL}/charges?type=bank_transfer`, {
       method: "POST",
       headers: {
@@ -119,7 +126,11 @@ export class PaymentService {
         email: payload.email,
         phone_number: payload.phone_number,
         fullname: payload.fullname,
+        firstname: calculatedFirstname,
+        lastname: calculatedLastname,
+        narration: payload.narration || "E-Tech Wallet Funding",
         type: "bank_transfer",
+        is_permanent: false,
       }),
     });
 
@@ -142,13 +153,22 @@ export class PaymentService {
       throw new Error("No dynamic virtual account was allocated by the payment gateway.");
     }
 
+    // Exact response schema required by the client/frontend
     return {
       status: "pending",
       flwId: flwData.id || "flw-test-id",
       txRef: payload.tx_ref,
-      transferAmount: Number(auth.transfer_amount || payload.amount),
-      transferBank: auth.transfer_bank || "Wema Bank",
+      accountNumber: auth.transfer_account,
+      bankName: auth.transfer_bank || "Wema Bank",
+      accountName: "E-Tech Global Hub",
+      amount: Number(auth.transfer_amount || payload.amount),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 60 minutes expiry
+      reference: auth.transfer_reference || payload.tx_ref,
+
+      // Backward-compatible properties to prevent any frontend regressions
       transferAccount: auth.transfer_account,
+      transferBank: auth.transfer_bank || "Wema Bank",
+      transferAmount: Number(auth.transfer_amount || payload.amount),
       transferReference: auth.transfer_reference || payload.tx_ref,
       transferNote: auth.transfer_note || "Make direct transfer to this account number",
     };
