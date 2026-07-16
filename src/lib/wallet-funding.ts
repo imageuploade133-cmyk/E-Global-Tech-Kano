@@ -5,7 +5,11 @@ import { logPaymentEvent } from "@/lib/payment-logger";
 
 // A robust parser that extracts the userId correctly from tx_ref for backup checks
 function extractUserIdFromTxRef(txRef: string): string | null {
-  if (!txRef || !txRef.startsWith("flw-tx-")) return null;
+  if (!txRef) return null;
+  if (txRef.startsWith("user-wallet-")) {
+    return txRef.substring("user-wallet-".length);
+  }
+  if (!txRef.startsWith("flw-tx-")) return null;
   const remaining = txRef.substring("flw-tx-".length);
   const parts = remaining.split("-");
   if (parts.length > 0) {
@@ -90,8 +94,8 @@ export async function verifyAndCreditWallet(
       return { success: false, message: `Unsupported transaction currency: ${currency}` };
     }
 
-    // Validate transaction reference format
-    if (!tx_ref || !tx_ref.startsWith("flw-tx-")) {
+    // Validate transaction reference format (Allow flw-tx- or user-wallet- prefixes)
+    if (!tx_ref || (!tx_ref.startsWith("flw-tx-") && !tx_ref.startsWith("user-wallet-"))) {
       logPaymentEvent({
         category: "Verification Failed",
         transactionId,
@@ -171,66 +175,73 @@ export async function verifyAndCreditWallet(
           };
         }
 
-        // B. Read and validate the pending payment request
-        const pendingPayRef = adminDb.collection("pending_payments").doc(tx_ref);
+        const isPermanentAccount = tx_ref.startsWith("user-wallet-");
+        let expectedAmount = numericAmount;
+        let expectedCurrency = currency;
 
-        console.log("Reading pending payment request...");
-        const pendingPayDoc = await transaction.get(pendingPayRef);
+        // B. Read and validate the pending payment request (only for dynamic checkouts)
+        if (!isPermanentAccount) {
+          const pendingPayRef = adminDb.collection("pending_payments").doc(tx_ref);
 
-        if (!pendingPayDoc.exists) {
-          throw new Error(`Pending payment record not found: ${tx_ref}`);
-        }
+          console.log("Reading pending payment request...");
+          const pendingPayDoc = await transaction.get(pendingPayRef);
 
-        const pendingData = pendingPayDoc.data() || {};
+          if (!pendingPayDoc.exists) {
+            throw new Error(`Pending payment record not found: ${tx_ref}`);
+          }
 
-        if (pendingData.status === "completed") {
-          return {
-            duplicate: true,
-            message: "Transaction already processed.",
-          };
-        }
+          const pendingData = pendingPayDoc.data() || {};
 
-        if (pendingData.status !== "pending") {
-          throw new Error(`Pending payment record has an invalid status: ${pendingData.status}`);
-        }
+          if (pendingData.status === "completed") {
+            return {
+              duplicate: true,
+              message: "Transaction already processed.",
+            };
+          }
 
-        // Ensure UID, expected amount, currency, and tx_ref match the pending payment record
-        if (pendingData.userId !== userId) {
-          throw new Error(`Pending payment owner mismatch. Expected: ${pendingData.userId}, Actual: ${userId}`);
-        }
+          if (pendingData.status !== "pending") {
+            throw new Error(`Pending payment record has an invalid status: ${pendingData.status}`);
+          }
 
-        const expectedAmount = Number(pendingData.amount);
-        const actualAmount = Number(amount);
-        if (Math.abs(expectedAmount - actualAmount) > 0.01) {
-          throw new Error(`Pending payment amount mismatch. Expected: ₦${expectedAmount}, Actual: ₦${actualAmount}`);
-        }
+          // Ensure UID, expected amount, currency, and tx_ref match the pending payment record
+          if (pendingData.userId !== userId) {
+            throw new Error(`Pending payment owner mismatch. Expected: ${pendingData.userId}, Actual: ${userId}`);
+          }
 
-        if (pendingData.currency !== currency) {
-          throw new Error(`Pending payment currency mismatch. Expected: ${pendingData.currency}, Actual: ${currency}`);
+          expectedAmount = Number(pendingData.amount);
+          expectedCurrency = pendingData.currency;
+
+          if (Math.abs(expectedAmount - numericAmount) > 0.01) {
+            throw new Error(`Pending payment amount mismatch. Expected: ₦${expectedAmount}, Actual: ₦${numericAmount}`);
+          }
+
+          if (expectedCurrency !== currency) {
+            throw new Error(`Pending payment currency mismatch. Expected: ${expectedCurrency}, Actual: ${currency}`);
+          }
+
+          // Delete the completed pending payment request document
+          console.log("Deleting pending payment...");
+          transaction.delete(pendingPayRef);
         }
 
         // C. Credit balance using centralized WalletService (also logs transaction in general ledger)
         console.log("Updating wallet balance via WalletService...");
         const creditRes = await WalletService.creditWallet(transaction, {
           userId,
-          amount: actualAmount,
+          amount: numericAmount,
           currency,
           reference: tx_ref,
           flwId: transactionId,
           docId: `tx-${transactionId}`, // Keep identical doc ID format to prevent ledger duplication
-          description: `Flutterwave Funding Ref: ${tx_ref}`,
+          description: isPermanentAccount ? "Funded via Permanent Virtual Account" : `Flutterwave Funding Ref: ${tx_ref}`,
           recipientName: customer?.name || "Wallet Credit",
         });
 
-        // D. Delete the completed pending payment request document
-        console.log("Deleting pending payment...");
-        transaction.delete(pendingPayRef);
-
-        // E. Create document in flutterwave_transactions to prevent duplicates
+        // D. Create document in flutterwave_transactions to prevent duplicates
         console.log("Creating duplicate record:", transactionId);
         transaction.set(duplicateDocRef, {
           userId,
-          amount: actualAmount,
+          amount: numericAmount,
           currency,
           reference: tx_ref,
           flwId: transactionId,
@@ -244,7 +255,7 @@ export async function verifyAndCreditWallet(
         return {
           duplicate: false,
           newBalance: creditRes.newBalance,
-          fundedAmount: actualAmount,
+          fundedAmount: numericAmount,
           currentBalance: creditRes.previousBalance,
         };
       } catch (innerError: unknown) {
@@ -291,17 +302,19 @@ export async function verifyAndCreditWallet(
       message: `Successfully credited wallet balance. Previous: ₦${result.currentBalance}, New: ₦${result.newBalance}`,
     });
 
-    // Structured Log: Pending Payment Deleted
-    logPaymentEvent({
-      category: "Pending Payment Deleted",
-      transactionId,
-      tx_ref,
-      userId,
-      amount: numericAmount,
-      currency,
-      processingTimeMs: Date.now() - startTime,
-      message: `Pending payment document pending_payments/${tx_ref} deleted on success.`,
-    });
+    // Structured Log: Pending Payment Deleted (only for dynamic checkouts)
+    if (!tx_ref.startsWith("user-wallet-")) {
+      logPaymentEvent({
+        category: "Pending Payment Deleted",
+        transactionId,
+        tx_ref,
+        userId,
+        amount: numericAmount,
+        currency,
+        processingTimeMs: Date.now() - startTime,
+        message: `Pending payment document pending_payments/${tx_ref} deleted on success.`,
+      });
+    }
 
     return {
       success: true,

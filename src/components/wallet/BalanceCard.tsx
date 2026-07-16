@@ -31,6 +31,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [selectedBank, setSelectedBank] = useState<{ name: string; code: string } | null>(null);
   const [ussdErrorMessage, setUssdErrorMessage] = useState("");
 
+  // Permanent Virtual Account States
+  const [permanentAccount, setPermanentAccount] = useState<{
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  } | null>(null);
+  const [isPermAccountLoading, setIsPermAccountLoading] = useState(false);
+
   // Active checkout data
   const [activeTxRef, setActiveTxRef] = useState("");
   const [ussdCode, setUssdCode] = useState("");
@@ -47,6 +55,63 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [paymentStatus, setPaymentStatus] = useState<"PENDING" | "PROCESSING" | "PAID" | "EXPIRED" | "FAILED">("PENDING");
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const resolvedName = (
+    userName ||
+    userData?.name ||
+    user?.displayName ||
+    "THE CAPTAIN"
+  ).toUpperCase();
+
+  // Load or create the permanent virtual account dynamically from server-side API (idempotent check)
+  const fetchPermanentVirtualAccount = async () => {
+    const isMock = sessionStorage.getItem("mock") === "true";
+    if (isMock) {
+      setPermanentAccount({
+        bankName: "Wema Bank",
+        accountNumber: "9921473281",
+        accountName: resolvedName,
+      });
+      return;
+    }
+
+    setIsPermAccountLoading(true);
+    try {
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/flutterwave/create-virtual-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.account) {
+          setPermanentAccount({
+            bankName: data.account.bankName,
+            accountNumber: data.account.accountNumber,
+            accountName: data.account.accountName,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error loading permanent account:", err);
+    } finally {
+      setIsPermAccountLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAddMoneyOpen) {
+      fetchPermanentVirtualAccount();
+    }
+  }, [isAddMoneyOpen]);
 
   // Fetch banks dynamically from our Discovery API endpoint
   const fetchBanks = async () => {
@@ -192,13 +257,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
-
-  const resolvedName = (
-    userName ||
-    userData?.name ||
-    user?.displayName ||
-    "THE CAPTAIN"
-  ).toUpperCase();
 
   const formattedBalance = new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -542,7 +600,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar animate-fade-in"
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar"
           >
             {/* Drag handle */}
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
@@ -592,6 +650,44 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   onSubmit={handleAmountSubmit}
                   className="space-y-5"
                 >
+                  {/* Personal Permanent Virtual Account display widget (Premium moniepoint/kuda style) */}
+                  {isPermAccountLoading ? (
+                    <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
+                      <div className="h-3 bg-gray-200 rounded w-1/4" />
+                      <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    </div>
+                  ) : permanentAccount ? (
+                    <div className="bg-gradient-to-r from-[#1E293B] to-[#0F172A] border border-white/5 rounded-2xl p-4 text-white relative overflow-hidden select-none">
+                      <div className="absolute right-0 bottom-0 opacity-15 text-[100px] select-none pointer-events-none translate-x-1/4 translate-y-1/4">
+                        <span className="material-symbols-outlined font-black text-white">account_balance</span>
+                      </div>
+
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-green-400 text-[15px] font-black">check_circle</span>
+                          <span className="font-hanken text-[9px] text-gray-300 font-bold uppercase tracking-wider">Your Personal Funding Account</span>
+                        </div>
+                        <span className="font-mono text-[8px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded uppercase font-bold">indefinite use</span>
+                      </div>
+
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <p className="font-hanken font-bold text-xs text-gray-300 leading-tight">Bank: <strong className="text-white">{permanentAccount.bankName}</strong></p>
+                          <p className="font-mono font-black text-sm text-[#FC7A00] tracking-wider mt-1 select-all">{permanentAccount.accountNumber}</p>
+                          <p className="font-hanken text-[9px] text-gray-400 font-bold uppercase mt-1 truncate max-w-[200px]">{permanentAccount.accountName}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(permanentAccount.accountNumber, "Account number")}
+                          className="bg-white/10 hover:bg-white/20 hover:text-white px-2.5 py-1.5 rounded-lg text-gray-200 text-[10px] font-bold tracking-wide active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="space-y-1.5 text-left">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Fund (NGN)</label>
                     <div className="relative">
@@ -707,7 +803,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
 
-              {/* STEP 3: USSD Bank Selector (Dynamic Discovery API driven) */}
+              {/* STEP 3: USSD Bank Selector */}
               {wizardStep === "ussd-bank" && (
                 <motion.div
                   key="step-ussd-bank"
@@ -733,17 +829,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     />
                   </div>
 
-                  {/* Inline error alert banner if bank USSD fails (Step 7) */}
                   {ussdErrorMessage && (
                     <div className="p-3.5 bg-red-50 border border-red-100 text-red-600 rounded-xl font-hanken text-[10.5px] font-bold text-left leading-relaxed">
                       {ussdErrorMessage}
                     </div>
                   )}
 
-                  {/* Bank list with loader skeletons */}
                   <div className="max-h-[220px] overflow-y-auto border border-gray-150 rounded-2xl flex flex-col no-scrollbar">
                     {isBanksLoading ? (
-                      // Skeleton loader rows for Moniepoint/OPay style premium experience
                       <div className="p-4 space-y-3.5">
                         {[1, 2, 3, 4].map((i) => (
                           <div key={i} className="flex justify-between items-center animate-pulse">

@@ -66,6 +66,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Secure Permanent Wallet Accounts collection: Read-only for owner, no client-side writes
+    match /wallet_accounts/{userId} {
+      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow write: if false;
+    }
+
     // Config parameters: allow read to all logged-in users, write restricted only to administrators
     match /config/app {
       allow read: if request.auth != null;
