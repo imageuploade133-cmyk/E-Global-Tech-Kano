@@ -2,12 +2,18 @@ import crypto from "crypto";
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
 
+export interface DecodedTokenResult {
+  uid: string;
+  email?: string;
+  name?: string;
+}
+
 /**
  * A lightweight, high-performance, 100% dependency-free Firebase ID Token verifier.
  * This relies purely on native Node.js crypto module and completely avoids loading
  * "firebase-admin/auth" or "jwks-rsa" to prevent require() ESM bundler conflicts on Vercel.
  */
-export async function verifyFirebaseIdToken(token: string, projectId: string = FIREBASE_PROJECT_ID): Promise<{ uid: string }> {
+export async function verifyFirebaseIdToken(token: string, projectId: string = FIREBASE_PROJECT_ID): Promise<DecodedTokenResult> {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new Error("Invalid JWT format. Token must have 3 parts.");
@@ -68,14 +74,18 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     throw new Error("Missing 'sub' (UID) claim in JWT payload.");
   }
 
-  return { uid: payloadJson.sub };
+  return {
+    uid: payloadJson.sub,
+    email: payloadJson.email,
+    name: payloadJson.name || payloadJson.display_name,
+  };
 }
 
 /**
  * Extracts and verifies ID Token from the Authorization header of an incoming HTTP Request.
  * Supports fallback to mock-token if mock parameters or mock sessionStorage is active on the request context.
  */
-export async function authenticateUserRequest(req: Request): Promise<{ uid: string }> {
+export async function authenticateUserRequest(req: Request): Promise<DecodedTokenResult> {
   let idToken = "";
   const authHeader = req.headers.get("Authorization");
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -89,11 +99,19 @@ export async function authenticateUserRequest(req: Request): Promise<{ uid: stri
   }
 
   if (idToken === "mock-token") {
-    return { uid: "mock-uid" };
+    return {
+      uid: "mock-uid",
+      email: "mock-user@example.com",
+      name: "MOCK USER",
+    };
   }
 
   if (idToken === "mock-admin-token") {
-    return { uid: "mock-admin-uid" };
+    return {
+      uid: "mock-admin-uid",
+      email: "mock-admin@example.com",
+      name: "MOCK ADMIN",
+    };
   }
 
   if (!idToken) {
@@ -101,5 +119,5 @@ export async function authenticateUserRequest(req: Request): Promise<{ uid: stri
   }
 
   const decoded = await verifyFirebaseIdToken(idToken);
-  return { uid: decoded.uid };
+  return decoded;
 }

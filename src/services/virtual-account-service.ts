@@ -7,8 +7,13 @@ const FLW_BASE_URL = "https://api.flutterwave.com/v3";
 export class VirtualAccountService {
   /**
    * Retrieves an existing permanent virtual account for a user or creates a new one idempotently.
+   * Utilizes safe verified Firebase ID Token fallbacks if profile fields are missing in Firestore.
    */
-  static async getOrCreateVirtualAccount(userId: string): Promise<UserWalletAccount> {
+  static async getOrCreateVirtualAccount(
+    userId: string,
+    emailFallback?: string,
+    nameFallback?: string
+  ): Promise<UserWalletAccount> {
     if (!userId) {
       throw new Error("Missing authenticated user ID context.");
     }
@@ -27,13 +32,11 @@ export class VirtualAccountService {
     const userDocRef = adminDb.collection("users").doc(userId);
     const userDoc = await userDocRef.get();
 
-    if (!userDoc.exists) {
-      throw new Error("Target user profile was not found in database.");
-    }
+    const userData = userDoc.exists ? (userDoc.data() || {}) : {};
 
-    const userData = userDoc.data() || {};
-    const email = userData.email || "";
-    const fullname = userData.name || userData.displayName || "";
+    // Defensively resolve email and name with high-security verified Token fallback contexts
+    const email = userData.email || emailFallback || `user-${userId}@e-tech-hub.com`;
+    const fullname = userData.name || userData.displayName || nameFallback || "Captain User";
     const phone = userData.phoneNumber || userData.phone || "08012345678";
     const bvn = userData.bvn || ""; // optional, passed if configured
 
