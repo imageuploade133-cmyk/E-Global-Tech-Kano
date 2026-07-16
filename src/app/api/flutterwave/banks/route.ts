@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-const BANKS_API_URL = "https://api.flutterwave.com/v3/banks/NG";
+const BANKS_API_URL = "https://api.flutterwave.com/v3";
 
 interface CachedBank {
   name: string;
@@ -43,7 +43,7 @@ export async function GET() {
       return NextResponse.json(FALLBACK_NIGERIAN_BANKS);
     }
 
-    const response = await fetch(BANKS_API_URL, {
+    const response = await fetch(`${BANKS_API_URL}/banks/NG`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${FLW_SECRET_KEY}`,
@@ -70,7 +70,7 @@ export async function GET() {
     lastFetchedTime = now;
 
     return NextResponse.json(simplifiedBanks);
-  } catch (err: unknown) {
+  } catch {
     if (cachedBanksList) {
       return NextResponse.json(cachedBanksList);
     }
