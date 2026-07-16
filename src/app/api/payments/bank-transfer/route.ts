@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { amount, currency, email, name, phone } = body;
+    const { amount, currency, email, name, phone, firstname, lastname, narration } = body;
 
     const payAmount = Number(amount);
     const payCurrency = currency || "NGN";
@@ -49,13 +49,16 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
     });
 
-    // Request the Virtual Account from Flutterwave
+    // Request the Virtual Account from Flutterwave (passes firstname, lastname, narration)
     const transferDetails = await PaymentService.createBankTransferPayment({
       tx_ref,
       amount: payAmount,
       email,
       phone_number: phone || "08012345678",
       fullname: name,
+      firstname,
+      lastname,
+      narration,
     });
 
     logPaymentEvent({
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
       tx_ref,
       amount: payAmount,
       currency: payCurrency,
-      message: `Bank Transfer virtual account created successfully for Wema. Account: ${transferDetails.transferAccount}`,
+      message: `Bank Transfer virtual account created successfully for Wema. Account: ${transferDetails.accountNumber}`,
       processingTimeMs: Date.now() - startTime,
     });
 
