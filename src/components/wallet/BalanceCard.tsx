@@ -39,6 +39,25 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   } | null>(null);
   const [isPermAccountLoading, setIsPermAccountLoading] = useState(false);
 
+  // Outward Transfer Wizard States
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [trfStep, setTrfStep] = useState<"input" | "amount" | "pin" | "completion">("input");
+  const [trfBank, setTrfBank] = useState<{ name: string; code: string } | null>(null);
+  const [trfAccount, setTrfAccount] = useState("");
+  const [trfAccountName, setTrfAccountName] = useState("");
+  const [isResolvingAccount, setIsResolvingAccount] = useState(false);
+  const [trfAmount, setTrfAmount] = useState("");
+  const [trfFee, setTrfFee] = useState(0);
+  const [trfTotalDebit, setTrfTotalDebit] = useState(0);
+  const [isFeeLoading, setIsFeeLoading] = useState(false);
+
+  // PIN states
+  const [trfPin, setTrfPin] = useState("");
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferResult, setTransferResult] = useState<{ success: boolean; message: string; reference?: string } | null>(null);
+  const [bankSearchQuery, setBankSearchQuery] = useState("");
+  const [showTrfBankSelector, setShowTrfBankSelector] = useState(false);
+
   // Active checkout data
   const [activeTxRef, setActiveTxRef] = useState("");
   const [ussdCode, setUssdCode] = useState("");
@@ -62,6 +81,89 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     user?.displayName ||
     "THE CAPTAIN"
   ).toUpperCase();
+
+  // Automatically resolve bank account details when 10 digits are inputted
+  useEffect(() => {
+    if (trfAccount.length === 10 && trfBank) {
+      const resolveAccount = async () => {
+        setIsResolvingAccount(true);
+        setTrfAccountName("");
+        try {
+          let idToken = "mock-token";
+          if (user && sessionStorage.getItem("mock") !== "true") {
+            idToken = await user.getIdToken();
+          }
+
+          const res = await fetch("/api/flutterwave/resolve-account", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              bankCode: trfBank.code,
+              accountNumber: trfAccount,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            setTrfAccountName(data.accountName);
+            toast.success("Recipient account verified!");
+          } else {
+            toast.error(data.error || "Could not resolve account details.");
+          }
+        } catch {
+          toast.error("Failed to connect to verification server.");
+        } finally {
+          setIsResolvingAccount(false);
+        }
+      };
+
+      resolveAccount();
+    }
+  }, [trfAccount, trfBank, user]);
+
+  // Automatically calculate transfer fee when transferAmount changes
+  useEffect(() => {
+    const amt = parseFloat(trfAmount);
+    if (!isNaN(amt) && amt > 0) {
+      const fetchFee = async () => {
+        setIsFeeLoading(true);
+        try {
+          let idToken = "mock-token";
+          if (user && sessionStorage.getItem("mock") !== "true") {
+            idToken = await user.getIdToken();
+          }
+
+          const res = await fetch(`/api/flutterwave/transfer-fee?amount=${amt}`, {
+            headers: {
+              "Authorization": `Bearer ${idToken}`,
+            },
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            setTrfFee(data.fee);
+            setTrfTotalDebit(data.totalDebit);
+          }
+        } catch {
+          const fallbackFee = 10.00;
+          setTrfFee(fallbackFee);
+          setTrfTotalDebit(amt + fallbackFee);
+        } finally {
+          setIsFeeLoading(false);
+        }
+      };
+
+      const delayDebounce = setTimeout(() => {
+        fetchFee();
+      }, 500);
+
+      return () => clearTimeout(delayDebounce);
+    } else {
+      setTrfFee(0);
+      setTrfTotalDebit(0);
+    }
+  }, [trfAmount, user]);
 
   // Load or create the permanent virtual account dynamically from server-side API (idempotent check)
   const fetchPermanentVirtualAccount = async () => {
@@ -133,10 +235,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   // Trigger bank fetch on opening the modal to reduce startup lag
   useEffect(() => {
-    if (isAddMoneyOpen && banksList.length === 0) {
+    if ((isAddMoneyOpen || isTransferOpen) && banksList.length === 0) {
       fetchBanks();
     }
-  }, [isAddMoneyOpen, banksList.length]);
+  }, [isAddMoneyOpen, isTransferOpen, banksList.length]);
 
   // Safely calculate active locked savings from sessionStorage
   useEffect(() => {
@@ -252,6 +354,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }, 300);
   };
 
+  // Close Outward Transfer Drawer
+  const handleCloseTransferModal = () => {
+    setIsTransferOpen(false);
+    setTimeout(() => {
+      setTrfStep("input");
+      setTrfBank(null);
+      setTrfAccount("");
+      setTrfAccountName("");
+      setTrfAmount("");
+      setTrfFee(0);
+      setTrfTotalDebit(0);
+      setTrfPin("");
+      setTransferResult(null);
+      setBankSearchQuery("");
+      setShowTrfBankSelector(false);
+    }, 300);
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -292,6 +412,37 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
 
     setWizardStep("methods");
+  };
+
+  const handleTransferInputSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trfBank) {
+      toast.error("Please select a recipient bank.");
+      return;
+    }
+    if (trfAccount.length !== 10 || isNaN(Number(trfAccount))) {
+      toast.error("Account number must be exactly 10 digits.");
+      return;
+    }
+    if (!trfAccountName) {
+      toast.error("Recipient account could not be verified.");
+      return;
+    }
+    setTrfStep("amount");
+  };
+
+  const handleTransferAmountSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(trfAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid transfer amount.");
+      return;
+    }
+    if (trfTotalDebit > balance) {
+      toast.error("Insufficient wallet balance for this transfer including fee.");
+      return;
+    }
+    setTrfStep("pin");
   };
 
   // Card payment initialization (using safest/existing hosted checkout approach as allowed)
@@ -370,7 +521,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         setWizardStep("ussd-pay");
         startPolling(data.txRef);
       } else {
-        // Step 7 Fallback handling for unsupported USSD banks
         const errMsg = data.error || "Selected bank is temporarily offline.";
         console.warn("USSD initiation error:", errMsg);
         setUssdErrorMessage("USSD payments are currently unavailable for this bank. Please choose another bank or use Bank Transfer.");
@@ -436,6 +586,70 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
   };
 
+  // Execute Direct Outward Transfer to Bank API Call
+  const executeOutwardTransfer = async (completedPin: string) => {
+    setIsTransferring(true);
+    toast.loading("Initiating secure outward transfer with bank...");
+
+    try {
+      let idToken = "mock-token";
+      if (user && sessionStorage.getItem("mock") !== "true") {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/flutterwave/transfer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          bankCode: trfBank?.code,
+          accountNumber: trfAccount,
+          amount: parseFloat(trfAmount),
+          narration: `Direct outward transfer to ${trfAccountName}`,
+          pin: completedPin,
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.success) {
+        setTransferResult({
+          success: true,
+          message: `Your outward bank transfer has been initiated successfully! ₦${parseFloat(trfAmount).toLocaleString()} is being settled to ${trfAccountName}.`,
+          reference: data.reference,
+        });
+        setTrfStep("completion");
+        toast.success("Transfer initiated successfully!");
+      } else {
+        setTrfPin("");
+        toast.error(data.error || "Transfer failed. Check details or PIN.");
+      }
+    } catch {
+      toast.dismiss();
+      setTrfPin("");
+      toast.error("Internal connection error during transfer.");
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const handleTrfPinPress = (num: string) => {
+    if (trfPin.length < 4) {
+      const nextPin = trfPin + num;
+      setTrfPin(nextPin);
+      if (nextPin.length === 4) {
+        executeOutwardTransfer(nextPin);
+      }
+    }
+  };
+
+  const handleTrfPinDelete = () => {
+    setTrfPin(trfPin.slice(0, -1));
+  };
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard!`);
@@ -444,6 +658,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   // Filter bank query
   const filteredBanks = banksList.filter(b =>
     b.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Filter bank query (Outward transfer)
+  const filteredTrfBanks = banksList.filter(b =>
+    b.name.toLowerCase().includes(bankSearchQuery.toLowerCase())
   );
 
   return (
@@ -568,6 +787,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         <motion.button
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
+          onClick={() => setIsTransferOpen(true)}
           className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 min-[360px]:gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
@@ -600,7 +820,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar"
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar animate-fade-in"
           >
             {/* Drag handle */}
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
@@ -650,7 +870,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   onSubmit={handleAmountSubmit}
                   className="space-y-5"
                 >
-                  {/* Personal Permanent Virtual Account display widget (Premium moniepoint/kuda style) */}
+                  {/* Personal Permanent Virtual Account display widget */}
                   {isPermAccountLoading ? (
                     <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
                       <div className="h-3 bg-gray-200 rounded w-1/4" />
@@ -853,7 +1073,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           key={bank.code}
                           type="button"
                           onClick={() => handleBankSelect(bank)}
-                          className="w-full px-4 py-3.5 hover:bg-[#FFF9F5] border-b border-gray-50 text-left font-hanken text-xs font-extrabold text-gray-800 transition-colors cursor-pointer flex items-center justify-between"
+                          className="w-full px-4 py-3.5 hover:bg-[#FFF9F5] border-b border-gray-50 text-left font-hanken text-[11px] font-extrabold text-gray-800 transition-colors cursor-pointer flex items-center justify-between"
                         >
                           <span>{bank.name}</span>
                           <span className="text-[10px] bg-gray-100 px-2.5 py-0.5 rounded text-gray-500 font-mono font-bold">
@@ -1060,6 +1280,333 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
                   >
                     Back to Dashboard
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+
+    {/* OUTWARD BANK TRANSFER BOTTOM SHEET MODAL (Premium Moniepoint/OPay style) */}
+    <AnimatePresence>
+      {isTransferOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleCloseTransferModal}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+          />
+
+          {/* Transfer drawer */}
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[90vh] no-scrollbar"
+          >
+            {/* Drag handle */}
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
+
+            {/* Header row */}
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+              {trfStep !== "input" && trfStep !== "completion" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (trfStep === "amount") setTrfStep("input");
+                    else if (trfStep === "pin") setTrfStep("amount");
+                  }}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">arrow_back</span>
+                </button>
+              ) : (
+                <div className="w-8" />
+              )}
+              <h3 className="font-hanken font-bold text-base text-black text-center">
+                Secure Outward Transfer
+              </h3>
+              <button
+                type="button"
+                onClick={handleCloseTransferModal}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+              </button>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {/* STAGE 1: Choose Bank & Enter Account */}
+              {trfStep === "input" && (
+                <motion.form
+                  key="trf-input"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  onSubmit={handleTransferInputSubmit}
+                  className="space-y-4 text-left"
+                >
+                  {/* Bank Selector Button */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Recipient Bank</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTrfBankSelector(true)}
+                      className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
+                    >
+                      <span>{trfBank ? trfBank.name : "Choose Bank..."}</span>
+                      <span className="material-symbols-outlined text-gray-400 text-[18px]">expand_more</span>
+                    </button>
+                  </div>
+
+                  {/* Bank Selection Overlay Dropdown */}
+                  {showTrfBankSelector && (
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[16px]">search</span>
+                        <input
+                          type="text"
+                          placeholder="Search bank name..."
+                          value={bankSearchQuery}
+                          onChange={(e) => setBankSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl font-hanken text-xs text-black outline-none focus:border-[#FC7A00]"
+                        />
+                      </div>
+                      <div className="max-h-[140px] overflow-y-auto flex flex-col rounded-xl border border-gray-100 bg-white no-scrollbar">
+                        {filteredTrfBanks.map((bank) => (
+                          <button
+                            key={bank.code}
+                            type="button"
+                            onClick={() => {
+                              setTrfBank(bank);
+                              setShowTrfBankSelector(false);
+                            }}
+                            className="w-full px-4 py-2.5 text-left font-hanken text-xs font-semibold hover:bg-gray-50 border-b border-gray-50 cursor-pointer"
+                          >
+                            {bank.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Account Number Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Account Number (10 Digits)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 0123456789"
+                      value={trfAccount}
+                      onChange={(e) => setTrfAccount(e.target.value.slice(0, 10))}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                    />
+                  </div>
+
+                  {/* Verification loader & resolved name */}
+                  {isResolvingAccount && (
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                      <span className="material-symbols-outlined text-blue-500 text-[16px] animate-spin">progress_activity</span>
+                      <span className="font-hanken text-[11px] font-bold text-blue-600">Verifying bank account details...</span>
+                    </div>
+                  )}
+
+                  {!isResolvingAccount && trfAccountName && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Account Name</p>
+                      <p className="font-hanken text-xs font-extrabold text-emerald-700 uppercase mt-0.5">{trfAccountName}</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={!trfAccountName || isResolvingAccount}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                  >
+                    Enter Amount
+                  </button>
+                </motion.form>
+              )}
+
+              {/* STAGE 2: Enter Amount & Live Fee Lookup */}
+              {trfStep === "amount" && (
+                <motion.form
+                  key="trf-amount"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  onSubmit={handleTransferAmountSubmit}
+                  className="space-y-4 text-left"
+                >
+                  {/* Recipient summary badge */}
+                  <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Sending To</p>
+                      <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfAccountName}</p>
+                      <p className="font-mono text-[10px] text-gray-500 font-bold uppercase mt-0.5">{trfBank?.name} - {trfAccount}</p>
+                    </div>
+                    <span className="material-symbols-outlined text-gray-400">account_circle</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Transfer Amount (NGN)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
+                      <input
+                        type="number"
+                        placeholder="Enter amount to send..."
+                        value={trfAmount}
+                        onChange={(e) => setTrfAmount(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Pricing break downs */}
+                  {parseFloat(trfAmount) > 0 && (
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs">
+                      <div className="flex justify-between text-gray-500">
+                        <span className="font-semibold">Transfer Amount</span>
+                        <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
+                        <span className="font-semibold">Transfer Fee</span>
+                        {isFeeLoading ? (
+                          <span className="w-8 h-3 bg-gray-200 animate-pulse rounded" />
+                        ) : (
+                          <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center text-sm font-black pt-1">
+                        <span>Total Debit Amount</span>
+                        {isFeeLoading ? (
+                          <span className="w-16 h-4 bg-gray-200 animate-pulse rounded" />
+                        ) : (
+                          <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isFeeLoading || !trfAmount || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                  >
+                    Confirm Transfer
+                  </button>
+                </motion.form>
+              )}
+
+              {/* STAGE 3: Hashed Transaction PIN Pad Overlay */}
+              {trfStep === "pin" && (
+                <motion.div
+                  key="trf-pin"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-5 text-center flex flex-col items-center"
+                >
+                  <div>
+                    <h4 className="font-hanken font-extrabold text-base text-black">Enter Transaction PIN</h4>
+                    <p className="font-hanken text-[11px] text-gray-400 mt-1">
+                      Provide your highly secure 4-digit PIN to approve this debit transfer.
+                    </p>
+                  </div>
+
+                  {/* Dot indicator indicators */}
+                  <div className="flex justify-center gap-3 py-1 mb-2">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 ${
+                          trfPin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* PIN Grid keypad */}
+                  <div className="grid grid-cols-3 gap-2 w-full max-w-[280px]">
+                    {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => handleTrfPinPress(num)}
+                        disabled={isTransferring}
+                        className="py-4 text-base font-black font-mono border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-black cursor-pointer"
+                      >
+                        {num}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={isTransferring}
+                      onClick={handleTrfPinDelete}
+                      className="py-4 text-xs font-bold font-hanken border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-rose-500 cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTrfPinPress("0")}
+                      disabled={isTransferring}
+                      className="py-4 text-base font-black font-mono border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-black cursor-pointer"
+                    >
+                      0
+                    </button>
+                    <div className="w-full h-full" />
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STAGE 4: Outward Transfer Completion Receipt Screen */}
+              {trfStep === "completion" && transferResult && (
+                <motion.div
+                  key="trf-completion"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-5 text-center flex flex-col items-center py-4"
+                >
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner animate-bounce">
+                    <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">Transfer Initiated!</h4>
+                    <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed max-w-[280px]">
+                      {transferResult.message}
+                    </p>
+                  </div>
+
+                  <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 text-left font-hanken text-xs">
+                    <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+                      <span>Ref Code</span>
+                      <span className="font-mono font-bold text-black select-all">{transferResult.reference}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+                      <span>Status</span>
+                      <span className="bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded uppercase font-bold text-[8px] tracking-wide">
+                        Pending
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-relaxed font-medium pt-1 text-center">
+                      Settlements usually take under 2 minutes. Check your transaction history for real-time status ledger updates.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCloseTransferModal}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
+                  >
+                    Close
                   </button>
                 </motion.div>
               )}
