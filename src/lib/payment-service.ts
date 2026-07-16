@@ -75,15 +75,20 @@ export class PaymentService {
       throw new Error(apiErrorMessage);
     }
 
-    const flwData = resData.data || {};
-    const auth = flwData.meta?.authorization || {};
+    const flwData = resData.data || resData || {};
+    const auth = resData.meta?.authorization ||
+                 resData.data?.meta?.authorization ||
+                 resData.data?.authorization ||
+                 {};
 
     // Support all documented response fields in order of priority
     let authNote = auth.note ||
                    auth.validate_instructions ||
                    auth.instruction ||
                    flwData.payment_code ||
-                   flwData.payment_instruction;
+                   flwData.payment_instruction ||
+                   resData.payment_code ||
+                   resData.payment_instruction;
 
     // Test Sandbox fallback to guarantee payment flows when dial code is omitted under test credentials
     if (!authNote) {
@@ -146,10 +151,20 @@ export class PaymentService {
       throw new Error(apiErrorMessage);
     }
 
-    const flwData = resData.data || {};
-    const auth = flwData.meta?.authorization || {};
+    // Defensive root vs nested metadata resolution
+    const flwData = resData.data || resData || {};
+    const auth = resData.meta?.authorization ||
+                 resData.data?.meta?.authorization ||
+                 resData.data?.authorization ||
+                 {};
 
-    if (!auth || !auth.transfer_account) {
+    const transferAccount = auth.transfer_account || flwData.transfer_account || resData.transfer_account;
+    const transferBank = auth.transfer_bank || flwData.transfer_bank || resData.transfer_bank || "Wema Bank";
+    const transferAmount = Number(auth.transfer_amount || flwData.transfer_amount || resData.transfer_amount || payload.amount);
+    const transferReference = auth.transfer_reference || flwData.transfer_reference || resData.transfer_reference || payload.tx_ref;
+    const transferNote = auth.transfer_note || flwData.transfer_note || resData.transfer_note || "Make direct transfer to this account number";
+
+    if (!transferAccount) {
       throw new Error("No dynamic virtual account was allocated by the payment gateway.");
     }
 
@@ -158,19 +173,19 @@ export class PaymentService {
       status: "pending",
       flwId: flwData.id || "flw-test-id",
       txRef: payload.tx_ref,
-      accountNumber: auth.transfer_account,
-      bankName: auth.transfer_bank || "Wema Bank",
+      accountNumber: transferAccount,
+      bankName: transferBank,
       accountName: "E-Tech Global Hub",
-      amount: Number(auth.transfer_amount || payload.amount),
+      amount: transferAmount,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 60 minutes expiry
-      reference: auth.transfer_reference || payload.tx_ref,
+      reference: transferReference,
 
       // Backward-compatible properties to prevent any frontend regressions
-      transferAccount: auth.transfer_account,
-      transferBank: auth.transfer_bank || "Wema Bank",
-      transferAmount: Number(auth.transfer_amount || payload.amount),
-      transferReference: auth.transfer_reference || payload.tx_ref,
-      transferNote: auth.transfer_note || "Make direct transfer to this account number",
+      transferAccount,
+      transferBank,
+      transferAmount,
+      transferReference,
+      transferNote,
     };
   }
 
