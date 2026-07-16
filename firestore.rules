@@ -11,7 +11,8 @@ service cloud.firestore {
 
     // Protect user documents:
     // 1. Only allow users to create their own document containing only whitelisted fields.
-    // 2. Allow updating normal profile fields, but strictly prevent clients from modifying server-managed fields.
+    // 2. Allow updating normal profile fields, and allow client-side balance decreases (for investment locks)
+    //    but strictly block any client-side balance increases or modifications to other server-managed fields.
     match /users/{userId} {
       allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
 
@@ -20,10 +21,11 @@ service cloud.firestore {
 
       allow update: if ((request.auth != null && request.auth.uid == userId &&
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-                          'balance', 'role', 'transactionPin', 'walletStatus', 'kycStatus',
+                          'role', 'transactionPin', 'walletStatus', 'kycStatus',
                           'isVerified', 'isAdmin', 'totalDeposits', 'totalWithdrawals',
                           'lastFundingAt', 'lastWithdrawalAt', 'createdAt'
-                        ])) || isAdmin());
+                        ]) &&
+                        (request.resource.data.balance == resource.data.balance || request.resource.data.balance < resource.data.balance)) || isAdmin());
 
       allow delete: if isAdmin();
     }
