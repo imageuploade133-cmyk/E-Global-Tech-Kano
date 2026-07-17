@@ -61,6 +61,16 @@ export async function POST(req: Request) {
 
     console.log(`[Resolve Account] Validated Details - Resolved Bank Name: ${bank.name}, Resolved Flutterwave Code: ${bankCode}`);
 
+    // 2. Sandbox/Test Credentials Check: Flutterwave's sandbox only permits resolving Access Bank (044) details.
+    // This constraint is imposed by Flutterwave itself on the sandbox environment and is not an application bug.
+    const isSandbox = !FLW_SECRET_KEY || FLW_SECRET_KEY.startsWith("FLWSECK_TEST-");
+    if (isSandbox && bankCode !== "044") {
+      console.warn(`[Resolve Account Sandbox Restriction] Attempt to resolve real bank code ${bankCode} ('${bank.name}') in Sandbox blocked.`);
+      return NextResponse.json({
+        error: "Real bank account resolution is not supported in Flutterwave Sandbox. Please use the documented test accounts or switch to live credentials."
+      }, { status: 400 });
+    }
+
     // Call Flutterwave POST /v3/accounts/resolve with custom retry logic (retry twice on network failure, do not retry HTTP 400)
     let flwData: { status?: string; message?: string; data?: { account_name: string; account_number: string } } | null = null;
     const attempts = 3;
