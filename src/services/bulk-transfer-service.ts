@@ -1,6 +1,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { BankService } from "@/services/bank-service";
 
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
 const FLW_BASE_URL = "https://api.flutterwave.com/v3";
@@ -30,12 +31,40 @@ export class BulkTransferService {
       throw new Error("Bulk transfer cannot exceed 200 recipients per batch.");
     }
 
+    // Resolve all bank codes asynchronously before initiating the validation and transaction
+    const resolvedRecipients: BulkTransferRecipientInput[] = [];
+    for (const recipient of recipients) {
+      const { accountNumber, amount, recipientName } = recipient;
+      const r = recipient as unknown as { bankId?: string; bankCode?: string };
+      const bankId = r.bankId;
+      let bankCode = r.bankCode;
+
+      if (bankId) {
+        const bank = await BankService.getBankById(bankId);
+        if (!bank) {
+          throw new Error(`Invalid bank selected for account ${accountNumber}.`);
+        }
+        bankCode = bank.code;
+      }
+
+      if (!bankCode) {
+        throw new Error(`Missing bank code or bank ID for account ${accountNumber}.`);
+      }
+
+      resolvedRecipients.push({
+        accountNumber,
+        bankCode,
+        recipientName,
+        amount,
+      });
+    }
+
     // 1. Validate recipients, check duplicate accounts/references, and calculate totals
     const uniqueAccounts = new Set<string>();
     let totalAmount = 0;
     const flatFeePerRecipient = 10.00; // standard flat transfer fee
 
-    for (const recipient of recipients) {
+    for (const recipient of resolvedRecipients) {
       const { accountNumber, bankCode, amount, recipientName } = recipient;
 
       if (!accountNumber || accountNumber.length !== 10 || isNaN(Number(accountNumber))) {
@@ -120,7 +149,7 @@ export class BulkTransferService {
       });
 
       // Write individual 'bulk_transfer_items' documents securely
-      recipients.forEach((recipient, index) => {
+      resolvedRecipients.forEach((recipient, index) => {
         const itemIndex = (index + 1).toString().padStart(3, "0");
         const itemRefId = `${batchReference}-${itemIndex}`; // unique per-recipient reference
 

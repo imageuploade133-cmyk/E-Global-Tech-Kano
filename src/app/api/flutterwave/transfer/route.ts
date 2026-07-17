@@ -5,6 +5,7 @@ import { WalletService } from "@/lib/wallet-service";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { flutterwaveService } from "@/lib/flutterwave";
+import { BankService } from "@/services/bank-service";
 import bcrypt from "bcryptjs";
 
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
@@ -39,11 +40,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { bankCode, accountNumber, amount, narration, pin } = body;
+    const { bankId, accountNumber, amount, narration, pin } = body;
 
     // Basic Input Validations
-    if (!bankCode || !accountNumber || !pin) {
-      return NextResponse.json({ error: "Bank code, account number, and transaction PIN are required." }, { status: 400 });
+    if (!bankId || !accountNumber || !pin) {
+      return NextResponse.json({ error: "Bank, account number, and transaction PIN are required." }, { status: 400 });
     }
 
     const transferAmount = Number(amount);
@@ -56,7 +57,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Single transfer amount cannot exceed ₦500,000.00" }, { status: 400 });
     }
 
-    console.log(`[Outward Transfer Initiated] User: ${uid}, Amount: ${transferAmount}, Bank: ${bankCode}`);
+    // Resolve bank from Firestore using BankService
+    const bank = await BankService.getBankById(bankId);
+    if (!bank) {
+      return NextResponse.json({ error: "Invalid bank selected." }, { status: 400 });
+    }
+
+    const bankCode = bank.code;
+    if (!bankCode || !/^\d+$/.test(bankCode)) {
+      return NextResponse.json({ error: "Selected bank has an invalid code." }, { status: 400 });
+    }
+
+    console.log(`[Outward Transfer Initiated] User: ${uid}, Amount: ${transferAmount}, Bank: ${bank.name} (${bankCode})`);
 
     // Fetch user's cumulative transfer total for today from Firestore (Daily Limit enforcement)
     const startOfToday = new Date();
