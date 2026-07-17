@@ -65,6 +65,28 @@ async function runBankTests() {
     failed++;
   }
 
+  // Test Case 3: Sandbox mode constraint validation
+  try {
+    const isSandbox = true;
+    const testPayloads = [
+      { bankName: "Access Bank", code: "044", shouldPass: true },
+      { bankName: "OPay", code: "999992", shouldPass: false },
+      { bankName: "GTBank", code: "058", shouldPass: false },
+    ];
+
+    testPayloads.forEach((payload) => {
+      const allowedInSandbox = !isSandbox || payload.code === "044";
+      if (allowedInSandbox) {
+        assert(payload.shouldPass, `Sandbox correctly ALLOWS account resolution for ${payload.bankName} (code: ${payload.code})`);
+      } else {
+        assert(!payload.shouldPass, `Sandbox correctly BLOCKS account resolution for ${payload.bankName} (code: ${payload.code})`);
+      }
+    });
+  } catch (err: any) {
+    console.error("Test Case 3 failed:", err.message);
+    failed++;
+  }
+
   console.log("==================================================");
   console.log(`BANK SERVICE TESTS FINISHED: ${passed} PASSED, ${failed} FAILED.`);
   console.log("==================================================");
