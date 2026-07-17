@@ -218,10 +218,6 @@ export async function verifyAndCreditWallet(
           if (expectedCurrency !== currency) {
             throw new Error(`Pending payment currency mismatch. Expected: ${expectedCurrency}, Actual: ${currency}`);
           }
-
-          // Delete the completed pending payment request document
-          console.log("Deleting pending payment...");
-          transaction.delete(pendingPayRef);
         }
 
         // C. Credit balance using centralized WalletService (also logs transaction in general ledger)
@@ -236,6 +232,13 @@ export async function verifyAndCreditWallet(
           description: isPermanentAccount ? "Funded via Permanent Virtual Account" : `Flutterwave Funding Ref: ${tx_ref}`,
           recipientName: customer?.name || "Wallet Credit",
         });
+
+        // Delete the completed pending payment request document (WRITES after READs)
+        if (!isPermanentAccount) {
+          console.log("Deleting pending payment...");
+          const pendingPayRef = adminDb.collection("pending_payments").doc(tx_ref);
+          transaction.delete(pendingPayRef);
+        }
 
         // D. Create document in flutterwave_transactions to prevent duplicates
         console.log("Creating duplicate record:", transactionId);
