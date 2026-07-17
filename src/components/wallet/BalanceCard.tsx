@@ -906,7 +906,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </button>
                       </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-amber-800 text-left">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-amber-600 text-[18px]">info</span>
+                        <p className="font-hanken font-bold text-xs">Personal Permanent Account Pending</p>
+                      </div>
+                      <p className="font-hanken text-[10.5px] leading-relaxed text-amber-700">
+                        BVN/NIN verification is required by Flutterwave to activate your permanent NGN account. To fund instantly, please click &quot;Choose Payment Method&quot; below to use dynamic checkouts.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5 text-left">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Fund (NGN)</label>

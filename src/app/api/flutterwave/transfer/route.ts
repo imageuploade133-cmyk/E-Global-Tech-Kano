@@ -51,11 +51,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid transfer amount." }, { status: 400 });
     }
 
+    // Single Transfer Limit (Max NGN 500,000 per transfer)
+    if (transferAmount > 500000) {
+      return NextResponse.json({ error: "Single transfer amount cannot exceed ₦500,000.00" }, { status: 400 });
+    }
+
     console.log(`[Outward Transfer Initiated] User: ${uid}, Amount: ${transferAmount}, Bank: ${bankCode}`);
+
+    // Fetch user's cumulative transfer total for today from Firestore (Daily Limit enforcement)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTodayStr = startOfToday.toISOString();
+
+    const todayTransfersSnap = await adminDb.collection("wallet_transfers")
+      .where("userId", "==", uid)
+      .where("status", "in", ["PROCESSING", "SUCCESS", "PROCESSING_DELAYED"])
+      .where("createdAt", ">=", startOfTodayStr)
+      .get();
+
+    let todayTransferTotal = 0;
+    todayTransfersSnap.forEach((doc) => {
+      const data = doc.data();
+      todayTransferTotal += Number(data.amount) || 0;
+    });
 
     const userRef = adminDb.collection("users").doc(uid);
 
-    // 2. Secure Transaction PIN verification with Lockout checks
+    // 2. Secure Transaction PIN verification with Lockout checks & Daily Limit verification
     const pinCheckResult = await adminDb.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
@@ -67,6 +89,17 @@ export async function POST(req: Request) {
       const currentPlainPin = userData.pin;
       let pinAttempts = Number(userData.pinAttempts) || 0;
       const lockedUntil = userData.lockedUntil;
+
+      // Extract user's specific daily cumulative limit (configured via profile selection)
+      const userDailyLimit = Number(userData.dailyLimit) || 1000000; // default to NGN 1,000,000
+
+      // Enforce Daily Cumulative Limit
+      if (todayTransferTotal + transferAmount > userDailyLimit) {
+        return {
+          success: false,
+          error: `Daily transfer limit of ₦${userDailyLimit.toLocaleString()} exceeded. You have already sent ₦${todayTransferTotal.toLocaleString()} today.`,
+        };
+      }
 
       if (lockedUntil) {
         const lockTime = new Date(lockedUntil).getTime();
