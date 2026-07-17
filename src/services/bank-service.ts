@@ -1,0 +1,207 @@
+import { adminDb } from "@/lib/firebase-admin";
+
+const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
+const BANKS_API_URL = "https://api.flutterwave.com/v3/banks/NG";
+
+export interface BankDoc {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
+  type: string;
+  is_active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// In-memory cache for fast subsequent lookups
+let cachedBanksList: BankDoc[] | null = null;
+
+export class BankService {
+  /**
+   * Clears the in-memory cache of banks.
+   */
+  static clearCache() {
+    cachedBanksList = null;
+    console.log("[BankService] In-memory banks cache cleared.");
+  }
+
+  /**
+   * Retrieves all banks from memory cache if available, or Firestore if not.
+   * Sorts banks alphabetically by name.
+   * If Firestore is completely empty, it automatically triggers startup sync.
+   */
+  static async getBanks(searchQuery?: string): Promise<BankDoc[]> {
+    if (cachedBanksList && cachedBanksList.length > 0) {
+      console.log(`[BankService] Serving ${cachedBanksList.length} banks from in-memory cache.`);
+      return this.filterAndSort(cachedBanksList, searchQuery);
+    }
+
+    console.log("[BankService] Cache miss. Fetching banks from Firestore...");
+    const banksSnap = await adminDb.collection("banks").get();
+
+    if (banksSnap.empty) {
+      console.log("[BankService] Firestore 'banks' collection is empty. Performing startup sync...");
+      await this.syncBanks();
+      // Re-fetch after sync
+      const freshSnap = await adminDb.collection("banks").get();
+      const banks: BankDoc[] = [];
+      freshSnap.forEach((doc) => {
+        banks.push(doc.data() as BankDoc);
+      });
+      cachedBanksList = banks;
+      return this.filterAndSort(banks, searchQuery);
+    }
+
+    const banks: BankDoc[] = [];
+    banksSnap.forEach((doc) => {
+      banks.push(doc.data() as BankDoc);
+    });
+
+    cachedBanksList = banks;
+    console.log(`[BankService] Loaded ${banks.length} banks from Firestore and cached in memory.`);
+    return this.filterAndSort(banks, searchQuery);
+  }
+
+  /**
+   * Retrieves a single bank from memory cache or Firestore by its ID.
+   */
+  static async getBankById(bankId: string): Promise<BankDoc | null> {
+    if (!bankId) return null;
+
+    // Try finding in cache first
+    if (cachedBanksList && cachedBanksList.length > 0) {
+      const cached = cachedBanksList.find((b) => b.id === bankId);
+      if (cached) return cached;
+    }
+
+    // Fallback to Firestore
+    const bankDoc = await adminDb.collection("banks").doc(bankId).get();
+    if (bankDoc.exists) {
+      const data = bankDoc.data() as BankDoc;
+      // If cached list is active, we can push it in
+      if (cachedBanksList) {
+        cachedBanksList.push(data);
+      }
+      return data;
+    }
+
+    return null;
+  }
+
+  /**
+   * Fetches latest bank codes from Flutterwave and syncs them to Firestore 'banks' collection.
+   * Uses batched writes for performance and robustness.
+   */
+  static async syncBanks(): Promise<{ success: boolean; count: number }> {
+    console.log("[BankService] Initiating banks sync with Flutterwave...");
+    if (!FLW_SECRET_KEY) {
+      console.error("[BankService Sync Error] Missing Flutterwave Secret Key (FLW_SECRET_KEY).");
+      throw new Error("Cannot sync banks. Flutterwave Secret Key is missing in server environment.");
+    }
+
+    // Call Flutterwave API with 15s timeout & retries
+    let response;
+    const retries = 2;
+    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        response = await fetch(BANKS_API_URL, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+            "Content-Type": "application/json",
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (response.ok) break;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (attempt === retries + 1) {
+          console.error(`[BankService Sync Error] API fetch failed after ${attempt} attempts:`, msg);
+          throw err;
+        }
+        await new Promise((res) => setTimeout(res, attempt * 1000));
+      }
+    }
+
+    if (!response || !response.ok) {
+      const errText = response ? await response.text() : "No response";
+      console.error(`[BankService Sync Error] Flutterwave returned non-OK status: ${response?.status}. ${errText}`);
+      throw new Error(`Flutterwave API bank sync failed: ${errText}`);
+    }
+
+    const resData = await response.json();
+    if (resData.status !== "success" || !Array.isArray(resData.data)) {
+      console.error("[BankService Sync Error] Unexpected payload structure:", resData);
+      throw new Error("Failed to sync banks: Unexpected Flutterwave API response payload.");
+    }
+
+    const rawBanks = resData.data;
+    console.log(`[BankService] Retrieved ${rawBanks.length} banks from Flutterwave. Saving to Firestore...`);
+
+    const nowStr = new Date().toISOString();
+    const batchSize = 200;
+    let batch = adminDb.batch();
+    let currentCount = 0;
+    let totalSaved = 0;
+
+    for (const bank of rawBanks) {
+      if (!bank.code) continue; // Skip banks with invalid codes
+
+      const bankId = bank.id?.toString() || bank.code;
+      const bankRef = adminDb.collection("banks").doc(bankId);
+
+      const bankDoc: BankDoc = {
+        id: bankId,
+        name: bank.name || "Unknown Bank",
+        code: bank.code.trim(),
+        country: bank.country || "NG",
+        type: bank.type || "NG",
+        is_active: bank.is_active !== undefined ? !!bank.is_active : true,
+        createdAt: bank.createdAt || nowStr,
+        updatedAt: nowStr,
+      };
+
+      batch.set(bankRef, bankDoc, { merge: true });
+      currentCount++;
+      totalSaved++;
+
+      if (currentCount >= batchSize) {
+        await batch.commit();
+        console.log(`[BankService] Committed batch of ${currentCount} banks.`);
+        batch = adminDb.batch();
+        currentCount = 0;
+      }
+    }
+
+    if (currentCount > 0) {
+      await batch.commit();
+      console.log(`[BankService] Committed final batch of ${currentCount} banks.`);
+    }
+
+    console.log(`[BankService] Successfully synced and saved ${totalSaved} banks to Firestore.`);
+
+    // Automatically refresh/clear the memory cache to reflect synced data
+    this.clearCache();
+
+    return { success: true, count: totalSaved };
+  }
+
+  /**
+   * Internal helper to filter and alphabetically sort the bank list.
+   */
+  private static filterAndSort(banks: BankDoc[], searchQuery?: string): BankDoc[] {
+    let list = [...banks];
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((b) => b.name.toLowerCase().includes(q));
+    }
+
+    // Sort alphabetically by name
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+}

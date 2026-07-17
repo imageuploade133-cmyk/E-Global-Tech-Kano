@@ -4,6 +4,7 @@ import { PaymentService } from "@/lib/payment-service";
 import { adminDb } from "@/lib/firebase-admin";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { BankService } from "@/services/bank-service";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { amount, currency, bankCode, email, name, phone } = body;
+    const { amount, currency, bankCode: rawBankCode, bankId, email, name, phone } = body;
 
     const payAmount = Number(amount);
     const payCurrency = currency || "NGN";
@@ -33,8 +34,18 @@ export async function POST(req: Request) {
     if (!amount || isNaN(payAmount) || payAmount <= 0) {
       return NextResponse.json({ error: "Invalid payment amount." }, { status: 400 });
     }
+
+    let bankCode = rawBankCode;
+    if (bankId) {
+      const bank = await BankService.getBankById(bankId);
+      if (!bank) {
+        return NextResponse.json({ error: "Invalid bank selected." }, { status: 400 });
+      }
+      bankCode = bank.code;
+    }
+
     if (!bankCode) {
-      return NextResponse.json({ error: "Selected bank code is required." }, { status: 400 });
+      return NextResponse.json({ error: "Selected bank is required." }, { status: 400 });
     }
     if (!email || !name) {
       return NextResponse.json({ error: "Name and email are required customer fields." }, { status: 400 });

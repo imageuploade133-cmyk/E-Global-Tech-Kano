@@ -26,9 +26,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [searchQuery, setSearchQuery] = useState("");
 
   // Dynamic Bank Discovery States
-  const [banksList, setBanksList] = useState<Array<{ name: string; code: string }>>([]);
+  const [banksList, setBanksList] = useState<Array<{ id: string; name: string }>>([]);
   const [isBanksLoading, setIsBanksLoading] = useState(false);
-  const [selectedBank, setSelectedBank] = useState<{ name: string; code: string } | null>(null);
+  const [selectedBank, setSelectedBank] = useState<{ id: string; name: string } | null>(null);
   const [ussdErrorMessage, setUssdErrorMessage] = useState("");
 
   // Permanent Virtual Account States
@@ -44,7 +44,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [trfStep, setTrfStep] = useState<"input" | "amount" | "pin" | "completion">("input");
 
   // Single Transfer states
-  const [trfBank, setTrfBank] = useState<{ name: string; code: string } | null>(null);
+  const [trfBank, setTrfBank] = useState<{ id: string; name: string } | null>(null);
   const [trfAccount, setTrfAccount] = useState("");
   const [trfAccountName, setTrfAccountName] = useState("");
   const [isResolvingAccount, setIsResolvingAccount] = useState(false);
@@ -57,14 +57,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [bulkRecipients, setBulkRecipients] = useState<Array<{
     accountNumber: string;
-    bankCode: string;
+    bankId: string;
     bankName: string;
     recipientName: string;
     amount: number;
   }>>([]);
 
   // Bulk inputs state
-  const [bulkBank, setBulkBank] = useState<{ name: string; code: string } | null>(null);
+  const [bulkBank, setBulkBank] = useState<{ id: string; name: string } | null>(null);
   const [bulkAccount, setBulkAccount] = useState("");
   const [bulkName, setBulkName] = useState("");
   const [bulkAmountVal, setBulkAmountVal] = useState("");
@@ -131,7 +131,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               "Authorization": `Bearer ${idToken}`,
             },
             body: JSON.stringify({
-              bankCode: bulkBank.code,
+              bankId: bulkBank.id,
               accountNumber: bulkAccount,
             }),
           });
@@ -182,7 +182,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               "Authorization": `Bearer ${idToken}`,
             },
             body: JSON.stringify({
-              bankCode: trfBank.code,
+              bankId: trfBank.id,
               accountNumber: trfAccount,
             }),
           });
@@ -313,7 +313,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const fetchBanks = async () => {
     setIsBanksLoading(true);
     try {
-      const res = await fetch("/api/payments/banks");
+      const res = await fetch("/api/banks");
       if (res.ok) {
         const data = await res.json();
         setBanksList(data);
@@ -563,8 +563,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       return;
     }
 
-    const uniqueKey = `${bulkBank.code}-${bulkAccount}`;
-    if (bulkRecipients.some(r => `${r.bankCode}-${r.accountNumber}` === uniqueKey)) {
+    const uniqueKey = `${bulkBank.id}-${bulkAccount}`;
+    if (bulkRecipients.some(r => `${r.bankId}-${r.accountNumber}` === uniqueKey)) {
       toast.error("This recipient is already added to this batch!");
       return;
     }
@@ -573,7 +573,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       ...bulkRecipients,
       {
         accountNumber: bulkAccount,
-        bankCode: bulkBank.code,
+        bankId: bulkBank.id,
         bankName: bulkBank.name,
         recipientName: bulkName,
         amount: amt,
@@ -630,7 +630,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // USSD Bank Selection Action
-  const handleBankSelect = async (bank: { name: string; code: string }) => {
+  const handleBankSelect = async (bank: { id: string; name: string }) => {
     setSelectedBank(bank);
     setUssdErrorMessage("");
     setIsInitializing(true);
@@ -651,7 +651,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         body: JSON.stringify({
           amount: parseFloat(addAmount),
           currency: "NGN",
-          bankCode: bank.code,
+          bankId: bank.id,
           email: user?.email || "captain@example.com",
           name: userData?.name || user?.displayName || "Captain Wallet",
           phone: userData?.phoneNumber || "08012345678",
@@ -796,7 +796,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           "Authorization": `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          bankCode: trfBank?.code,
+          bankId: trfBank?.id,
           accountNumber: trfAccount,
           amount: parseFloat(trfAmount),
           narration: `Direct outward transfer to ${trfAccountName}`,
@@ -1272,7 +1272,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     ) : (
                       filteredBanks.map((bank) => (
                         <button
-                          key={bank.code}
+                          key={bank.id}
                           type="button"
                           onClick={() => handleBankSelect(bank)}
                           className="w-full px-4 py-3.5 hover:bg-[#FFF9F5] border-b border-gray-50 text-left font-hanken text-[11px] font-extrabold text-gray-800 transition-colors cursor-pointer flex items-center justify-between"
@@ -1613,7 +1613,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           <div className="max-h-[140px] overflow-y-auto flex flex-col rounded-xl border border-gray-100 bg-white no-scrollbar">
                             {filteredTrfBanks.map((bank) => (
                               <button
-                                key={bank.code}
+                                key={bank.id}
                                 type="button"
                                 onClick={() => {
                                   setTrfBank(bank);
@@ -1690,7 +1690,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             <div className="max-h-[100px] overflow-y-auto flex flex-col bg-white">
                               {filteredTrfBanks.map((bank) => (
                                 <button
-                                  key={bank.code}
+                                  key={bank.id}
                                   type="button"
                                   onClick={() => {
                                     setBulkBank(bank);
