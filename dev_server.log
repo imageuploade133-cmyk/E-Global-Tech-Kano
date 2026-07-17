@@ -1,51 +1,34 @@
 
 > e-global-wallet@0.1.0 dev
-> next dev -p 3012
+> next dev
 
    ▲ Next.js 15.1.12
    - Local:        http://localhost:3012
    - Network:      http://192.168.0.2:3012
 
  ✓ Starting...
- ✓ Ready in 1978ms
+ ✓ Ready in 1934ms
  ○ Compiling / ...
- ✓ Compiled / in 16.4s (1683 modules)
- GET /?mock=true 200 in 18140ms
- ✓ Compiled in 4.6s (756 modules)
- GET /?mock=true 200 in 41ms
- ✓ Compiled in 382ms (756 modules)
- GET /?mock=true 200 in 43ms
- ✓ Compiled in 344ms (756 modules)
- GET /?mock=true 200 in 98ms
- ✓ Compiled in 330ms (756 modules)
- GET /?mock=true 200 in 30ms
- ✓ Compiled in 297ms (756 modules)
- GET /?mock=true 200 in 34ms
- ✓ Compiled in 269ms (756 modules)
- GET /?mock=true 200 in 31ms
- ✓ Compiled in 277ms (756 modules)
- ✓ Compiled in 377ms (756 modules)
- GET /?mock=true 200 in 86ms
- ✓ Compiled in 547ms (756 modules)
- ✓ Compiled in 317ms (756 modules)
- ✓ Compiled in 391ms (756 modules)
- ✓ Compiled in 489ms (756 modules)
- GET /?mock=true 200 in 53ms
- ✓ Compiled in 584ms (756 modules)
- ✓ Compiled in 296ms (756 modules)
- ✓ Compiled in 308ms (756 modules)
- ✓ Compiled in 468ms (756 modules)
- GET /?mock=true 200 in 51ms
- ✓ Compiled in 594ms (756 modules)
- ✓ Compiled in 314ms (756 modules)
- ✓ Compiled in 510ms (756 modules)
- GET /?mock=true 200 in 46ms
- ✓ Compiled in 289ms (756 modules)
- ✓ Compiled in 349ms (756 modules)
- ✓ Compiled in 283ms (756 modules)
- ✓ Compiled in 543ms (756 modules)
- GET /?mock=true 200 in 44ms
- ✓ Compiled in 492ms (756 modules)
- ✓ Compiled in 322ms (756 modules)
- ✓ Compiled in 241ms (756 modules)
-Killed
+ ✓ Compiled / in 12.1s (1727 modules)
+ HEAD / 200 in 13778ms
+ GET /?mock=true 200 in 99ms
+ GET /?mock=true 200 in 105ms
+ ○ Compiling /api/payments/banks ...
+ ✓ Compiled /api/payments/banks in 1818ms (1727 modules)
+[Banks Discovery] Cache expired or missing. Fetching Nigerian banks from Flutterwave...
+[Banks Discovery] Missing Flutterwave Secret Key. Serving fallback bank list.
+ GET /api/payments/banks 200 in 2010ms
+ GET /?mock=true 200 in 128ms
+ ○ Compiling /api/flutterwave/resolve-account ...
+ ✓ Compiled /api/flutterwave/resolve-account in 528ms (1718 modules)
+[Resolve Account Request] Authenticated User: mock-uid
+[Resolve Account Flutterwave Query] Bank Code: 044, Acc: 1234567890
+[Flutterwave API Error] Call to /accounts/resolve failed after 3 attempts: HTTP Error 401: {"status":"error","message":"Invalid authorization key","data":null}
+[Resolve Account Exception] Process crashed: HTTP Error 401: {"status":"error","message":"Invalid authorization key","data":null}
+ POST /api/flutterwave/resolve-account 500 in 4079ms
+ ✓ Compiled in 1246ms (1710 modules)
+ GET /?mock=true 200 in 694ms
+ ✓ Compiled /api/payments/banks in 324ms (970 modules)
+[Banks Discovery] Cache expired or missing. Fetching Nigerian banks from Flutterwave...
+[Banks Discovery] Missing Flutterwave Secret Key. Serving fallback bank list.
+ GET /api/payments/banks 200 in 539ms
