@@ -289,20 +289,29 @@ export default function GenericBillPage() {
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
         <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
-          {/* Title Row */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary text-[22px]">
-                {getPageIcon()}
-              </span>
-            </div>
-            <div>
-              <h1 className="font-bodoni text-[20px] font-bold tracking-tight text-black">
-                {getPageTitle()}
-              </h1>
-              <p className="font-hanken text-[11px] text-gray-500 font-medium">
-                Settle {getPageTitle().toLowerCase()} instantly using your NGN balance
-              </p>
+          {/* Title Row with Back History Button */}
+          <div className="flex items-center gap-4 mb-5">
+            <button
+              onClick={() => window.history.back()}
+              className="w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-300 active:scale-95 transition-all duration-300 cursor-pointer shadow-sm"
+              title="Go Back"
+            >
+              <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+            </button>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-primary text-[22px]">
+                  {getPageIcon()}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="font-bodoni text-[18px] min-[375px]:text-[20px] font-bold tracking-tight text-black truncate">
+                  {getPageTitle()}
+                </h1>
+                <p className="font-hanken text-[11px] text-gray-500 font-medium truncate">
+                  Settle {getPageTitle().toLowerCase()} instantly using your NGN balance
+                </p>
+              </div>
             </div>
           </div>
 
