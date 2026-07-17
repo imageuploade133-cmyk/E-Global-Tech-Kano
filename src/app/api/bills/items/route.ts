@@ -57,6 +57,15 @@ const MOCK_ITEMS: Record<string, Array<{ name: string; item_code: string; amount
     { name: "Spectranet 15GB Data Plan (30 Days)", item_code: "ITEM116A", amount: 4000 },
     { name: "Spectranet 30GB Data Plan (30 Days)", item_code: "ITEM116B", amount: 7000 },
   ],
+  BIL117: [
+    { name: "Bet9ja Fund Wallet", item_code: "ITEM117A", amount: 0 },
+  ],
+  BIL118: [
+    { name: "SportyBet Fund Wallet", item_code: "ITEM118A", amount: 0 },
+  ],
+  BIL119: [
+    { name: "Nairabet Fund Wallet", item_code: "ITEM119A", amount: 0 },
+  ],
 };
 
 export async function GET(req: Request) {
