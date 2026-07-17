@@ -30,6 +30,11 @@ const MOCK_BILLERS: Record<string, Array<{ name: string; biller_code: string; la
     { name: "Smile Internet", biller_code: "BIL115", label_name: "Smile Account Number" },
     { name: "Spectranet Internet", biller_code: "BIL116", label_name: "Spectranet Account ID" },
   ],
+  BETTING: [
+    { name: "Bet9ja", biller_code: "BIL117", label_name: "Bet9ja User ID" },
+    { name: "SportyBet", biller_code: "BIL118", label_name: "SportyBet Phone/User ID" },
+    { name: "Nairabet", biller_code: "BIL119", label_name: "Nairabet Customer ID" },
+  ],
 };
 
 export async function GET(req: Request) {

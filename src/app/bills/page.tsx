@@ -7,12 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
-
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-}
+import { useSearchParams } from "next/navigation";
 
 interface Biller {
   id: number;
@@ -30,24 +25,19 @@ interface BillItem {
   is_fixed_amount: boolean;
 }
 
-const CATEGORIES: Category[] = [
-  { id: "AIRTIME", name: "Airtime", icon: "call" },
-  { id: "DATA", name: "Mobile Data", icon: "network_wifi" },
-  { id: "CABLE", name: "Cable TV", icon: "tv" },
-  { id: "UTILITY", name: "Electricity", icon: "bolt" },
-  { id: "INTERNET", name: "Internet Fiber", icon: "language" },
-];
-
-export default function BillsPage() {
+export default function GenericBillPage() {
   const { userData, user } = useAuth();
+  const searchParams = useSearchParams();
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
   // Wallet Balance sync
   const balance = Number(userData?.balance) || 0;
 
+  // Determine Category from URL query or default to AIRTIME
+  const pageCategory = (searchParams.get("type") || "AIRTIME").toUpperCase();
+
   // Dynamic States
-  const [activeCategory, setActiveCategory] = useState<string>("AIRTIME");
   const [billers, setBillers] = useState<Biller[]>([]);
   const [items, setItems] = useState<BillItem[]>([]);
 
@@ -71,7 +61,31 @@ export default function BillsPage() {
   // Payment Success Screen States
   const [successReceipt, setSuccessReceipt] = useState<{ reference?: string; tx_ref?: string; amount?: number } | null>(null);
 
-  // Fetch billers when activeCategory changes
+  const getPageTitle = () => {
+    switch (pageCategory) {
+      case "AIRTIME": return "Buy Airtime";
+      case "DATA": return "Buy Mobile Data";
+      case "BETTING": return "Betting Account Funding";
+      case "CABLE": return "Cable TV Bills";
+      case "UTILITY": return "Electricity Utility Bills";
+      case "INTERNET": return "Internet Subscriptions";
+      default: return "Bill Payments";
+    }
+  };
+
+  const getPageIcon = () => {
+    switch (pageCategory) {
+      case "AIRTIME": return "call";
+      case "DATA": return "network_wifi";
+      case "BETTING": return "sports_basketball";
+      case "CABLE": return "tv";
+      case "UTILITY": return "bolt";
+      case "INTERNET": return "language";
+      default: return "payments";
+    }
+  };
+
+  // Fetch billers when pageCategory changes
   useEffect(() => {
     async function fetchBillers() {
       setIsBillersLoading(true);
@@ -83,7 +97,7 @@ export default function BillsPage() {
       setValidatedName("");
 
       try {
-        const res = await fetch(`/api/bills/billers?category=${activeCategory}`);
+        const res = await fetch(`/api/bills/billers?category=${pageCategory}`);
         if (!res.ok) throw new Error("Failed to load billing providers.");
         const data = await res.json();
         setBillers(data.data || []);
@@ -96,7 +110,7 @@ export default function BillsPage() {
       }
     }
     fetchBillers();
-  }, [activeCategory]);
+  }, [pageCategory]);
 
   // Fetch items/packages when selectedBiller changes
   useEffect(() => {
@@ -224,7 +238,7 @@ export default function BillsPage() {
           amount: finalAmount,
           customer_id: customerId,
           biller_name: selectedBiller?.name,
-          biller_type: activeCategory.toLowerCase(),
+          biller_type: pageCategory.toLowerCase(),
           pin,
         }),
       });
@@ -254,10 +268,12 @@ export default function BillsPage() {
   };
 
   const getCustomerFieldLabel = () => {
-    switch (activeCategory) {
+    switch (pageCategory) {
       case "AIRTIME":
       case "DATA":
         return "Phone Number";
+      case "BETTING":
+        return "User ID";
       case "CABLE":
         return "Smartcard / Decoder Number";
       case "UTILITY":
@@ -277,38 +293,17 @@ export default function BillsPage() {
           <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center">
               <span className="material-symbols-outlined text-primary text-[22px]">
-                payments
+                {getPageIcon()}
               </span>
             </div>
             <div>
               <h1 className="font-bodoni text-[20px] font-bold tracking-tight text-black">
-                Bill Payments Center
+                {getPageTitle()}
               </h1>
               <p className="font-hanken text-[11px] text-gray-500 font-medium">
-                Settle bills instantly using your NGN balance
+                Settle {getPageTitle().toLowerCase()} instantly using your NGN balance
               </p>
             </div>
-          </div>
-
-          {/* Interactive Category Selector (Fluid layout) */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 mb-6 w-full -mx-2 px-2">
-            {CATEGORIES.map((cat) => {
-              const isActive = cat.id === activeCategory;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border font-hanken text-[11px] font-bold tracking-wide uppercase transition-all duration-300 flex-shrink-0 cursor-pointer ${
-                    isActive
-                      ? "bg-gradient-to-r from-[#FC7A00] to-[#E06600] border-transparent text-white shadow-md shadow-orange-500/10"
-                      : "bg-white border-gray-150 hover:bg-gray-50 text-gray-500"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[15px]">{cat.icon}</span>
-                  {cat.name}
-                </button>
-              );
-            })}
           </div>
 
           <AnimatePresence mode="wait">

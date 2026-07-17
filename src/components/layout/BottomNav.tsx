@@ -9,7 +9,7 @@ const navItems = [
   { icon: "account_balance_wallet", label: "Wealth", href: "/" },
   { icon: "credit_card", label: "Cards", href: "/cards" },
   { icon: "history", label: "History", href: "/history" },
-  { icon: "storefront", label: "Store", href: "/store" },
+  { icon: "storefront", label: "Store", href: "/bills?type=data" },
   { icon: "trending_up", label: "Investment", href: "/investment" },
   { icon: "person", label: "Profile", href: "/profile" },
 ];

@@ -13,10 +13,10 @@ const primaryActions = [
 ];
 
 const services = [
-  { icon: "cell_tower", label: "Airtime", color: "text-secondary", href: "#" },
-  { icon: "swap_vert", label: "Data", color: "text-secondary", href: "#" },
-  { icon: "sports_basketball", label: "Betting", color: "text-secondary", href: "#" },
-  { icon: "tv", label: "TV", color: "text-secondary", href: "#" },
+  { icon: "cell_tower", label: "Airtime", color: "text-secondary", href: "/bills?type=airtime" },
+  { icon: "swap_vert", label: "Data", color: "text-secondary", href: "/bills?type=data" },
+  { icon: "sports_basketball", label: "Betting", color: "text-secondary", href: "/bills?type=betting" },
+  { icon: "tv", label: "TV", color: "text-secondary", href: "/bills?type=cable" },
   { icon: "credit_card", label: "Cards", color: "text-primary", href: "/cards", fill: true },
   { icon: "real_estate_agent", label: "Loan", color: "text-primary", href: "#" },
   { icon: "diamond", label: "Wealth", color: "text-primary", href: "#" },
