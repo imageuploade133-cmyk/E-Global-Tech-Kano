@@ -42,6 +42,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   // Outward Transfer Wizard States
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [trfStep, setTrfStep] = useState<"input" | "amount" | "pin" | "completion">("input");
+
+  // Single Transfer states
   const [trfBank, setTrfBank] = useState<{ name: string; code: string } | null>(null);
   const [trfAccount, setTrfAccount] = useState("");
   const [trfAccountName, setTrfAccountName] = useState("");
@@ -50,6 +52,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [trfFee, setTrfFee] = useState(0);
   const [trfTotalDebit, setTrfTotalDebit] = useState(0);
   const [isFeeLoading, setIsFeeLoading] = useState(false);
+
+  // Bulk Transfer States
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [bulkRecipients, setBulkRecipients] = useState<Array<{
+    accountNumber: string;
+    bankCode: string;
+    bankName: string;
+    recipientName: string;
+    amount: number;
+  }>>([]);
+
+  // Bulk inputs state
+  const [bulkBank, setBulkBank] = useState<{ name: string; code: string } | null>(null);
+  const [bulkAccount, setBulkAccount] = useState("");
+  const [bulkName, setBulkName] = useState("");
+  const [bulkAmountVal, setBulkAmountVal] = useState("");
+  const [isBulkResolving, setIsBulkResolving] = useState(false);
+  const [showBulkBankSelector, setShowBulkBankSelector] = useState(false);
 
   // PIN states
   const [trfPin, setTrfPin] = useState("");
@@ -82,12 +102,73 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     "THE CAPTAIN"
   ).toUpperCase();
 
+  // Resolve bulk recipient bank account details when 10 digits filled
+  useEffect(() => {
+    if (bulkAccount.length === 10 && bulkBank) {
+      const resolveBulkAccount = async () => {
+        setIsBulkResolving(true);
+        setBulkName("");
+
+        if (sessionStorage.getItem("mock") === "true") {
+          setTimeout(() => {
+            setBulkName("MOCK RECIPIENT USER");
+            setIsBulkResolving(false);
+            toast.success("Recipient account verified (MOCK)!");
+          }, 300);
+          return;
+        }
+
+        try {
+          let idToken = "mock-token";
+          if (user && sessionStorage.getItem("mock") !== "true") {
+            idToken = await user.getIdToken();
+          }
+
+          const res = await fetch("/api/flutterwave/resolve-account", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              bankCode: bulkBank.code,
+              accountNumber: bulkAccount,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            setBulkName(data.accountName);
+            toast.success("Recipient account verified!");
+          } else {
+            toast.error(data.error || "Could not resolve account details.");
+          }
+        } catch {
+          toast.error("Failed to connect to verification server.");
+        } finally {
+          setIsBulkResolving(false);
+        }
+      };
+
+      resolveBulkAccount();
+    }
+  }, [bulkAccount, bulkBank, user]);
+
   // Automatically resolve bank account details when 10 digits are inputted
   useEffect(() => {
     if (trfAccount.length === 10 && trfBank) {
       const resolveAccount = async () => {
         setIsResolvingAccount(true);
         setTrfAccountName("");
+
+        if (sessionStorage.getItem("mock") === "true") {
+          setTimeout(() => {
+            setTrfAccountName("MOCK SINGLE RECIPIENT");
+            setIsResolvingAccount(false);
+            toast.success("Recipient account verified (MOCK)!");
+          }, 300);
+          return;
+        }
+
         try {
           let idToken = "mock-token";
           if (user && sessionStorage.getItem("mock") !== "true") {
@@ -123,8 +204,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
   }, [trfAccount, trfBank, user]);
 
-  // Automatically calculate transfer fee when transferAmount changes
+  // Automatically calculate transfer fee when transferAmount changes (Single Mode)
   useEffect(() => {
+    if (isBulkMode) return;
     const amt = parseFloat(trfAmount);
     if (!isNaN(amt) && amt > 0) {
       const fetchFee = async () => {
@@ -163,7 +245,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setTrfFee(0);
       setTrfTotalDebit(0);
     }
-  }, [trfAmount, user]);
+  }, [trfAmount, user, isBulkMode]);
+
+  // Calculate Bulk Mode Totals Dynamically
+  useEffect(() => {
+    if (!isBulkMode) return;
+    const totalAmt = bulkRecipients.reduce((sum, curr) => sum + curr.amount, 0);
+    const flatFee = 10.00;
+    const totalFees = bulkRecipients.length * flatFee;
+
+    setTrfAmount(totalAmt.toString());
+    setTrfFee(totalFees);
+    setTrfTotalDebit(totalAmt + totalFees);
+  }, [bulkRecipients, isBulkMode]);
 
   // Load or create the permanent virtual account dynamically from server-side API (idempotent check)
   const fetchPermanentVirtualAccount = async () => {
@@ -369,6 +463,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setTransferResult(null);
       setBankSearchQuery("");
       setShowTrfBankSelector(false);
+      setIsBulkMode(false);
+      setBulkRecipients([]);
+      setBulkBank(null);
+      setBulkAccount("");
+      setBulkName("");
+      setBulkAmountVal("");
+      setShowBulkBankSelector(false);
     }, 300);
   };
 
@@ -416,6 +517,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   const handleTransferInputSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isBulkMode) {
+      if (bulkRecipients.length === 0) {
+        toast.error("Please add at least one bulk recipient.");
+        return;
+      }
+      setTrfStep("amount");
+      return;
+    }
+
     if (!trfBank) {
       toast.error("Please select a recipient bank.");
       return;
@@ -443,6 +554,41 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       return;
     }
     setTrfStep("pin");
+  };
+
+  const handleAddBulkRecipient = () => {
+    const amt = parseFloat(bulkAmountVal);
+    if (!bulkBank || bulkAccount.length !== 10 || !bulkName || isNaN(amt) || amt <= 0) {
+      toast.error("Complete verification and specify a positive amount first.");
+      return;
+    }
+
+    const uniqueKey = `${bulkBank.code}-${bulkAccount}`;
+    if (bulkRecipients.some(r => `${r.bankCode}-${r.accountNumber}` === uniqueKey)) {
+      toast.error("This recipient is already added to this batch!");
+      return;
+    }
+
+    setBulkRecipients([
+      ...bulkRecipients,
+      {
+        accountNumber: bulkAccount,
+        bankCode: bulkBank.code,
+        bankName: bulkBank.name,
+        recipientName: bulkName,
+        amount: amt,
+      }
+    ]);
+
+    // Reset inputs
+    setBulkAccount("");
+    setBulkName("");
+    setBulkAmountVal("");
+    toast.success("Recipient added successfully!");
+  };
+
+  const handleRemoveBulkRecipient = (index: number) => {
+    setBulkRecipients(bulkRecipients.filter((_, i) => i !== index));
   };
 
   // Card payment initialization (using safest/existing hosted checkout approach as allowed)
@@ -586,9 +732,55 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
   };
 
-  // Execute Direct Outward Transfer to Bank API Call
+  // Execute Direct Outward Transfer (Single or Bulk)
   const executeOutwardTransfer = async (completedPin: string) => {
     setIsTransferring(true);
+
+    if (isBulkMode) {
+      toast.loading("Queuing and verifying bulk transfer batch...");
+      try {
+        let idToken = "mock-token";
+        if (user && sessionStorage.getItem("mock") !== "true") {
+          idToken = await user.getIdToken();
+        }
+
+        const res = await fetch("/api/flutterwave/bulk-transfer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            title: "Staff December Settlement",
+            recipients: bulkRecipients,
+          }),
+        });
+
+        const data = await res.json();
+        toast.dismiss();
+
+        if (res.ok && data.success) {
+          setTransferResult({
+            success: true,
+            message: `Your bulk transfer of ${bulkRecipients.length} recipients has been successfully queued in the background!`,
+            reference: data.bulkTransferId,
+          });
+          setTrfStep("completion");
+          toast.success("Bulk batch queued successfully!");
+        } else {
+          setTrfPin("");
+          toast.error(data.error || "Bulk transfer queuing failed.");
+        }
+      } catch {
+        toast.dismiss();
+        setTrfPin("");
+        toast.error("Internal connection error.");
+      } finally {
+        setIsTransferring(false);
+      }
+      return;
+    }
+
     toast.loading("Initiating secure outward transfer with bank...");
 
     try {
@@ -1352,98 +1544,254 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </div>
 
             <AnimatePresence mode="wait">
-              {/* STAGE 1: Choose Bank & Enter Account */}
+              {/* STAGE 1: Single or Bulk Mode Recipient Selector */}
               {trfStep === "input" && (
-                <motion.form
+                <motion.div
                   key="trf-input"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
-                  onSubmit={handleTransferInputSubmit}
                   className="space-y-4 text-left"
                 >
-                  {/* Bank Selector Button */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Recipient Bank</label>
+                  {/* Single/Bulk Toggle Button Bar */}
+                  <div className="grid grid-cols-2 p-1 bg-gray-100 rounded-xl mb-2">
                     <button
                       type="button"
-                      onClick={() => setShowTrfBankSelector(true)}
-                      className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
+                      onClick={() => {
+                        setIsBulkMode(false);
+                        setTrfStep("input");
+                      }}
+                      className={`py-2 text-xs font-black font-hanken rounded-lg transition-all cursor-pointer ${
+                        !isBulkMode ? "bg-white text-black shadow-sm" : "bg-transparent text-gray-400"
+                      }`}
                     >
-                      <span>{trfBank ? trfBank.name : "Choose Bank..."}</span>
-                      <span className="material-symbols-outlined text-gray-400 text-[18px]">expand_more</span>
+                      Single Transfer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsBulkMode(true);
+                        setTrfStep("input");
+                      }}
+                      className={`py-2 text-xs font-black font-hanken rounded-lg transition-all cursor-pointer ${
+                        isBulkMode ? "bg-white text-black shadow-sm" : "bg-transparent text-gray-400"
+                      }`}
+                    >
+                      Bulk Transfer
                     </button>
                   </div>
 
-                  {/* Bank Selection Overlay Dropdown */}
-                  {showTrfBankSelector && (
-                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[16px]">search</span>
+                  {!isBulkMode ? (
+                    // --- SINGLE TRANSFER INPUT FORM ---
+                    <form onSubmit={handleTransferInputSubmit} className="space-y-4">
+                      {/* Bank Selector Button */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Recipient Bank</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowTrfBankSelector(true)}
+                          className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
+                        >
+                          <span>{trfBank ? trfBank.name : "Choose Bank..."}</span>
+                          <span className="material-symbols-outlined text-gray-400 text-[18px]">expand_more</span>
+                        </button>
+                      </div>
+
+                      {/* Bank Selection Overlay Dropdown */}
+                      {showTrfBankSelector && (
+                        <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[16px]">search</span>
+                            <input
+                              type="text"
+                              placeholder="Search bank name..."
+                              value={bankSearchQuery}
+                              onChange={(e) => setBankSearchQuery(e.target.value)}
+                              className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl font-hanken text-xs text-black outline-none focus:border-[#FC7A00]"
+                            />
+                          </div>
+                          <div className="max-h-[140px] overflow-y-auto flex flex-col rounded-xl border border-gray-100 bg-white no-scrollbar">
+                            {filteredTrfBanks.map((bank) => (
+                              <button
+                                key={bank.code}
+                                type="button"
+                                onClick={() => {
+                                  setTrfBank(bank);
+                                  setShowTrfBankSelector(false);
+                                }}
+                                className="w-full px-4 py-2.5 text-left font-hanken text-xs font-semibold hover:bg-gray-50 border-b border-gray-50 cursor-pointer"
+                              >
+                                {bank.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Account Number Input */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Account Number (10 Digits)</label>
                         <input
-                          type="text"
-                          placeholder="Search bank name..."
-                          value={bankSearchQuery}
-                          onChange={(e) => setBankSearchQuery(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl font-hanken text-xs text-black outline-none focus:border-[#FC7A00]"
+                          type="number"
+                          placeholder="e.g. 0123456789"
+                          value={trfAccount}
+                          onChange={(e) => setTrfAccount(e.target.value.slice(0, 10))}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
                         />
                       </div>
-                      <div className="max-h-[140px] overflow-y-auto flex flex-col rounded-xl border border-gray-100 bg-white no-scrollbar">
-                        {filteredTrfBanks.map((bank) => (
-                          <button
-                            key={bank.code}
-                            type="button"
-                            onClick={() => {
-                              setTrfBank(bank);
-                              setShowTrfBankSelector(false);
-                            }}
-                            className="w-full px-4 py-2.5 text-left font-hanken text-xs font-semibold hover:bg-gray-50 border-b border-gray-50 cursor-pointer"
-                          >
-                            {bank.name}
-                          </button>
-                        ))}
+
+                      {isResolvingAccount && (
+                        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl animate-pulse">
+                          <span className="material-symbols-outlined text-blue-500 text-[16px] animate-spin">progress_activity</span>
+                          <span className="font-hanken text-[11px] font-bold text-blue-600">Verifying bank account details...</span>
+                        </div>
+                      )}
+
+                      {!isResolvingAccount && trfAccountName && (
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                          <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Account Name</p>
+                          <p className="font-hanken text-xs font-extrabold text-emerald-700 uppercase mt-0.5">{trfAccountName}</p>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={!trfAccountName || isResolvingAccount}
+                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                      >
+                        Enter Amount
+                      </button>
+                    </form>
+                  ) : (
+                    // --- BULK BATCH RECIPIENT ADDER FORM ---
+                    <div className="space-y-4">
+                      <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Add Recipient to Batch</p>
+
+                        {/* Bank selector */}
+                        <button
+                          type="button"
+                          onClick={() => setShowBulkBankSelector(!showBulkBankSelector)}
+                          className="w-full px-3 py-3 bg-white border border-gray-200 rounded-xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
+                        >
+                          <span>{bulkBank ? bulkBank.name : "Choose Bank..."}</span>
+                          <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
+                        </button>
+
+                        {showBulkBankSelector && (
+                          <div className="p-2 bg-white border border-gray-200 rounded-xl space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Search bank name..."
+                              value={bankSearchQuery}
+                              onChange={(e) => setBankSearchQuery(e.target.value)}
+                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg font-hanken text-[11px] outline-none"
+                            />
+                            <div className="max-h-[100px] overflow-y-auto flex flex-col bg-white">
+                              {filteredTrfBanks.map((bank) => (
+                                <button
+                                  key={bank.code}
+                                  type="button"
+                                  onClick={() => {
+                                    setBulkBank(bank);
+                                    setShowBulkBankSelector(false);
+                                  }}
+                                  className="w-full px-3 py-1.5 text-left font-hanken text-[11px] font-semibold hover:bg-gray-50 cursor-pointer"
+                                >
+                                  {bank.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Account number */}
+                        <input
+                          type="number"
+                          placeholder="Recipient Account Number"
+                          value={bulkAccount}
+                          onChange={(e) => setBulkAccount(e.target.value.slice(0, 10))}
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00]"
+                        />
+
+                        {isBulkResolving && (
+                          <span className="block text-[10px] text-blue-500 font-bold animate-pulse">Resolving details...</span>
+                        )}
+
+                        {!isBulkResolving && bulkName && (
+                          <div className="p-2 bg-emerald-50 rounded-lg text-emerald-800 font-hanken text-[11px] font-bold uppercase truncate max-w-full">
+                            Resolved: {bulkName}
+                          </div>
+                        )}
+
+                        {/* Amount */}
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-gray-500">₦</span>
+                          <input
+                            type="number"
+                            placeholder="Recipient Amount"
+                            value={bulkAmountVal}
+                            onChange={(e) => setBulkAmountVal(e.target.value)}
+                            className="w-full bg-white border border-gray-200 rounded-xl pl-6 pr-3 py-3 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00]"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAddBulkRecipient}
+                          disabled={isBulkResolving || !bulkName || !bulkAmountVal}
+                          className="w-full py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-hanken text-xs font-bold transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">add_circle</span>
+                          Add to Batch
+                        </button>
                       </div>
+
+                      {/* Recipients array scroll list */}
+                      <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Recipients Added ({bulkRecipients.length})</p>
+
+                      <div className="max-h-[140px] overflow-y-auto border border-gray-150 rounded-2xl flex flex-col no-scrollbar">
+                        {bulkRecipients.length === 0 ? (
+                          <p className="py-8 text-center text-gray-400 font-hanken text-[10px] font-semibold">No recipients added yet.</p>
+                        ) : (
+                          bulkRecipients.map((rec, index) => (
+                            <div
+                              key={index}
+                              className="px-4 py-3 hover:bg-[#FFF9F5] border-b border-gray-150 flex items-center justify-between font-hanken text-xs"
+                            >
+                              <div>
+                                <p className="font-extrabold text-black uppercase leading-tight truncate max-w-[180px]">{rec.recipientName}</p>
+                                <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">{rec.bankName} - {rec.accountNumber}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="font-mono font-black text-black">₦{rec.amount.toLocaleString()}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveBulkRecipient(index)}
+                                  className="w-6 h-6 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-100 transition-colors cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleTransferInputSubmit}
+                        disabled={bulkRecipients.length === 0}
+                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                      >
+                        Verify & Calculate Fees
+                      </button>
                     </div>
                   )}
-
-                  {/* Account Number Input */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Account Number (10 Digits)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 0123456789"
-                      value={trfAccount}
-                      onChange={(e) => setTrfAccount(e.target.value.slice(0, 10))}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
-                    />
-                  </div>
-
-                  {/* Verification loader & resolved name */}
-                  {isResolvingAccount && (
-                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                      <span className="material-symbols-outlined text-blue-500 text-[16px] animate-spin">progress_activity</span>
-                      <span className="font-hanken text-[11px] font-bold text-blue-600">Verifying bank account details...</span>
-                    </div>
-                  )}
-
-                  {!isResolvingAccount && trfAccountName && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                      <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Account Name</p>
-                      <p className="font-hanken text-xs font-extrabold text-emerald-700 uppercase mt-0.5">{trfAccountName}</p>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={!trfAccountName || isResolvingAccount}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                  >
-                    Enter Amount
-                  </button>
-                </motion.form>
+                </motion.div>
               )}
 
-              {/* STAGE 2: Enter Amount & Live Fee Lookup */}
+              {/* STAGE 2: Enter Amount & Live Fee Lookup (Single / Cumulative summary display) */}
               {trfStep === "amount" && (
                 <motion.form
                   key="trf-amount"
@@ -1453,63 +1801,104 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   onSubmit={handleTransferAmountSubmit}
                   className="space-y-4 text-left"
                 >
-                  {/* Recipient summary badge */}
-                  <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Sending To</p>
-                      <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfAccountName}</p>
-                      <p className="font-mono text-[10px] text-gray-500 font-bold uppercase mt-0.5">{trfBank?.name} - {trfAccount}</p>
-                    </div>
-                    <span className="material-symbols-outlined text-gray-400">account_circle</span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Transfer Amount (NGN)</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
-                      <input
-                        type="number"
-                        placeholder="Enter amount to send..."
-                        value={trfAmount}
-                        onChange={(e) => setTrfAmount(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Pricing break downs */}
-                  {parseFloat(trfAmount) > 0 && (
-                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs">
-                      <div className="flex justify-between text-gray-500">
-                        <span className="font-semibold">Transfer Amount</span>
-                        <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                  {isBulkMode ? (
+                    // --- BULK MODE TOTALS SUMMARY SCREEN ---
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
+                        <div>
+                          <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Batch Type</p>
+                          <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">Bulk Salary Payment</p>
+                          <p className="font-mono text-[10px] text-gray-500 font-bold uppercase mt-0.5">{bulkRecipients.length} verified recipients added</p>
+                        </div>
+                        <span className="material-symbols-outlined text-gray-400">group_work</span>
                       </div>
-                      <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
-                        <span className="font-semibold">Transfer Fee</span>
-                        {isFeeLoading ? (
-                          <span className="w-8 h-3 bg-gray-200 animate-pulse rounded" />
-                        ) : (
+
+                      {/* Display calculations for bulk */}
+                      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs">
+                        <div className="flex justify-between text-gray-500">
+                          <span className="font-semibold">Batch Principal Amount</span>
+                          <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
+                          <span className="font-semibold">Cumulative Batch Fees (₦10 per rec)</span>
                           <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center text-sm font-black pt-1">
-                        <span>Total Debit Amount</span>
-                        {isFeeLoading ? (
-                          <span className="w-16 h-4 bg-gray-200 animate-pulse rounded" />
-                        ) : (
+                        </div>
+                        <div className="flex justify-between items-center text-sm font-black pt-1">
+                          <span>Total Batch Debit Amount</span>
                           <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                        )}
+                        </div>
                       </div>
+
+                      <button
+                        type="submit"
+                        disabled={trfTotalDebit > balance}
+                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                      >
+                        Confirm Bulk Transfer
+                      </button>
+                    </div>
+                  ) : (
+                    // --- SINGLE MODE TOTALS SUMMARY SCREEN ---
+                    <div className="space-y-4">
+                      {/* Recipient summary badge */}
+                      <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
+                        <div>
+                          <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Sending To</p>
+                          <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfAccountName}</p>
+                          <p className="font-mono text-[10px] text-gray-500 font-bold uppercase mt-0.5">{trfBank?.name} - {trfAccount}</p>
+                        </div>
+                        <span className="material-symbols-outlined text-gray-400">account_circle</span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Transfer Amount (NGN)</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
+                          <input
+                            type="number"
+                            placeholder="Enter amount to send..."
+                            value={trfAmount}
+                            onChange={(e) => setTrfAmount(e.target.value)}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Pricing break downs */}
+                      {parseFloat(trfAmount) > 0 && (
+                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs">
+                          <div className="flex justify-between text-gray-500">
+                            <span className="font-semibold">Transfer Amount</span>
+                            <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
+                            <span className="font-semibold">Transfer Fee</span>
+                            {isFeeLoading ? (
+                              <span className="w-8 h-3 bg-gray-200 animate-pulse rounded" />
+                            ) : (
+                              <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center text-sm font-black pt-1">
+                            <span>Total Debit Amount</span>
+                            {isFeeLoading ? (
+                              <span className="w-16 h-4 bg-gray-200 animate-pulse rounded" />
+                            ) : (
+                              <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={isFeeLoading || !trfAmount || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance}
+                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                      >
+                        Confirm Transfer
+                      </button>
                     </div>
                   )}
-
-                  <button
-                    type="submit"
-                    disabled={isFeeLoading || !trfAmount || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                  >
-                    Confirm Transfer
-                  </button>
                 </motion.form>
               )}
 
@@ -1589,7 +1978,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   <div>
-                    <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">Transfer Initiated!</h4>
+                    <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">
+                      {isBulkMode ? "Batch Queued!" : "Transfer Initiated!"}
+                    </h4>
                     <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed max-w-[280px]">
                       {transferResult.message}
                     </p>
@@ -1597,13 +1988,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                   <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 text-left font-hanken text-xs">
                     <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
-                      <span>Ref Code</span>
+                      <span>{isBulkMode ? "Batch ID" : "Ref Code"}</span>
                       <span className="font-mono font-bold text-black select-all">{transferResult.reference}</span>
                     </div>
                     <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
                       <span>Status</span>
                       <span className="bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded uppercase font-bold text-[8px] tracking-wide">
-                        Pending
+                        {isBulkMode ? "Queued" : "Pending"}
                       </span>
                     </div>
                     <p className="text-[10px] text-gray-400 leading-relaxed font-medium pt-1 text-center">
