@@ -34,7 +34,7 @@ const CATEGORIES: Category[] = [
   { id: "AIRTIME", name: "Airtime", icon: "call" },
   { id: "DATA", name: "Mobile Data", icon: "network_wifi" },
   { id: "CABLE", name: "Cable TV", icon: "tv" },
-  { id: "UTILITY", name: "Electricity Bills", icon: "bolt" },
+  { id: "UTILITY", name: "Electricity", icon: "bolt" },
   { id: "INTERNET", name: "Internet Fiber", icon: "language" },
 ];
 
@@ -149,7 +149,7 @@ export default function StorePage() {
       const resData = await res.json();
 
       if (!res.ok || !resData.success) {
-        throw new Error(resData.error || "Customer validation failed. Check customer number.");
+        throw new Error(resData.error || "Customer validation failed. Check customer ID.");
       }
 
       setValidatedName(resData.data.name || "VALIDATED CUSTOMER");
@@ -402,72 +402,114 @@ export default function StorePage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="bg-white rounded-[24px] border border-gray-150 p-6 shadow-xl space-y-5"
+                className="bg-white rounded-[24px] border border-gray-150 p-6 shadow-xl space-y-6"
               >
-                {/* Step 1: Select Biller Provider */}
-                <div className="space-y-1.5 text-left">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                    Select Utility Provider
+                {/* Step 1: Select Biller Provider (Nice UI Grid instead of select dropdown) */}
+                <div className="space-y-3 text-left">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                    Choose Network / Provider
                   </label>
                   {isBillersLoading ? (
-                    <div className="h-14 bg-gray-50 border border-gray-200 rounded-2xl animate-pulse" />
-                  ) : (
-                    <select
-                      value={selectedBiller?.id || ""}
-                      onChange={(e) => {
-                        const biller = billers.find((b) => b.id === Number(e.target.value)) || null;
-                        setSelectedBiller(biller);
-                      }}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-hanken text-xs font-extrabold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all cursor-pointer"
-                    >
-                      <option value="">Choose Provider...</option>
-                      {billers.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
+                    <div className="grid grid-cols-2 gap-3.5">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="h-14 bg-gray-50 border border-gray-200 rounded-2xl animate-pulse" />
                       ))}
-                    </select>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {billers.map((b) => {
+                        const isSelected = selectedBiller?.id === b.id;
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => setSelectedBiller(b)}
+                            className={`p-3 rounded-2xl border text-left transition-all duration-300 flex items-center gap-3 cursor-pointer ${
+                              isSelected
+                                ? "bg-orange-50/50 border-[#FC7A00] shadow-sm shadow-orange-500/5"
+                                : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                            }`}
+                          >
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm tracking-tight ${
+                              isSelected ? "bg-primary text-white" : "bg-gray-200 text-gray-600"
+                            }`}>
+                              {b.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-hanken text-[11px] font-extrabold text-black truncate leading-tight">
+                                {b.name}
+                              </p>
+                              <p className="font-hanken text-[8.5px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                                Select
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 
-                {/* Step 2: Select Package Item */}
+                {/* Step 2: Select Package / Plan (Elegant Grid/List of plan cards) */}
                 {selectedBiller && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    className="space-y-1.5 text-left"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-3 text-left border-t border-gray-100 pt-5"
                   >
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                      Select Package / Plan
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                      Choose Plan / Package
                     </label>
                     {isItemsLoading ? (
-                      <div className="h-14 bg-gray-50 border border-gray-200 rounded-2xl animate-pulse" />
-                    ) : (
-                      <select
-                        value={selectedItem?.id || ""}
-                        onChange={(e) => {
-                          const item = items.find((i) => i.id === Number(e.target.value)) || null;
-                          setSelectedItem(item);
-                        }}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-hanken text-xs font-extrabold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all cursor-pointer"
-                      >
-                        <option value="">Choose Package...</option>
-                        {items.map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.name} {i.is_fixed_amount ? `(₦${i.amount.toLocaleString()})` : "(Flexible price)"}
-                          </option>
+                      <div className="space-y-2">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="h-16 bg-gray-50 border border-gray-200 rounded-2xl animate-pulse" />
                         ))}
-                      </select>
+                      </div>
+                    ) : (
+                      <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 no-scrollbar">
+                        {items.map((i) => {
+                          const isSelected = selectedItem?.id === i.id;
+                          return (
+                            <button
+                              key={i.id}
+                              type="button"
+                              onClick={() => setSelectedItem(i)}
+                              className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                                isSelected
+                                  ? "bg-orange-50/50 border-[#FC7A00] shadow-md shadow-orange-500/5"
+                                  : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1 pr-3">
+                                <p className="font-hanken text-[12px] font-extrabold text-black leading-tight">
+                                  {i.name}
+                                </p>
+                                <p className="font-hanken text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-wider">
+                                  {i.is_fixed_amount ? "Provider Plan" : "Flexible Payment Option"}
+                                </p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className={`px-3 py-1.5 rounded-full font-mono text-[11px] font-black ${
+                                  isSelected ? "bg-[#FC7A00] text-white" : "bg-gray-100 text-gray-700"
+                                }`}>
+                                  {i.is_fixed_amount ? `₦${i.amount.toLocaleString()}` : "Flexible"}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
                   </motion.div>
                 )}
 
-                {/* Step 3: Enter Customer ID (Smartcard/Decoder/Meter/Phone) */}
+                {/* Step 3: Enter Customer ID (Decoder/Meter/Phone) */}
                 {selectedItem && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    className="space-y-4"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4 border-t border-gray-100 pt-5"
                   >
                     <div className="space-y-1.5 text-left">
                       <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
@@ -476,7 +518,7 @@ export default function StorePage() {
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder={`Enter ${getCustomerFieldLabel().toLowerCase()}`}
+                          placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
                           value={customerId}
                           onChange={(e) => setCustomerId(e.target.value)}
                           className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
@@ -489,7 +531,7 @@ export default function StorePage() {
                             disabled={isValidating}
                             className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#FFF0E0] hover:bg-[#FFE0CC] text-primary text-[10px] font-black uppercase px-3 py-2 rounded-xl active:scale-95 transition-all"
                           >
-                            {isValidating ? "Validating..." : "Verify Recipient"}
+                            {isValidating ? "Validating..." : "Verify"}
                           </button>
                         )}
                       </div>
@@ -633,7 +675,7 @@ export default function StorePage() {
                     <button
                       type="button"
                       onClick={handlePinDelete}
-                      className="py-4 text-xs font-bold font-hanken border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-rose-500 cursor-pointer"
+                      className="py-4 text-xs font-bold font-hanken border border-gray-150 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-rose-500 cursor-pointer"
                     >
                       Delete
                     </button>
