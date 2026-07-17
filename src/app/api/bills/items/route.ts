@@ -1,0 +1,94 @@
+import { NextResponse } from "next/server";
+
+const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
+
+const MOCK_ITEMS: Record<string, Array<{ name: string; item_code: string; amount: number }>> = {
+  BIL099: [{ name: "MTN Airtime Topup", item_code: "ITEM099", amount: 0 }],
+  BIL100: [{ name: "GLO Airtime Topup", item_code: "ITEM100", amount: 0 }],
+  BIL101: [{ name: "Airtel Airtime Topup", item_code: "ITEM101", amount: 0 }],
+  BIL102: [{ name: "9mobile Airtime Topup", item_code: "ITEM102", amount: 0 }],
+
+  BIL104: [
+    { name: "MTN 1GB Data Plan (30 Days)", item_code: "ITEM104A", amount: 350 },
+    { name: "MTN 2.5GB Data Plan (30 Days)", item_code: "ITEM104B", amount: 600 },
+    { name: "MTN 5GB Data Plan (30 Days)", item_code: "ITEM104C", amount: 1200 },
+    { name: "MTN 10GB Data Plan (30 Days)", item_code: "ITEM104D", amount: 2200 },
+  ],
+  BIL105: [
+    { name: "GLO 1.5GB Data Plan (30 Days)", item_code: "ITEM105A", amount: 300 },
+    { name: "GLO 3GB Data Plan (30 Days)", item_code: "ITEM105B", amount: 550 },
+    { name: "GLO 6GB Data Plan (30 Days)", item_code: "ITEM105C", amount: 1100 },
+  ],
+  BIL106: [
+    { name: "Airtel 1.5GB Data Plan (30 Days)", item_code: "ITEM106A", amount: 350 },
+    { name: "Airtel 3GB Data Plan (30 Days)", item_code: "ITEM106B", amount: 600 },
+    { name: "Airtel 6GB Data Plan (30 Days)", item_code: "ITEM106C", amount: 1200 },
+  ],
+  BIL107: [
+    { name: "9mobile 1.5GB Data Plan (30 Days)", item_code: "ITEM107A", amount: 300 },
+    { name: "9mobile 3GB Data Plan (30 Days)", item_code: "ITEM107B", amount: 500 },
+  ],
+
+  BIL108: [
+    { name: "DSTV Yanga (Monthly)", item_code: "ITEM108A", amount: 3500 },
+    { name: "DSTV Confam (Monthly)", item_code: "ITEM108B", amount: 6500 },
+    { name: "DSTV Compact (Monthly)", item_code: "ITEM108C", amount: 10500 },
+  ],
+  BIL109: [
+    { name: "GOTV Jinja (Monthly)", item_code: "ITEM109A", amount: 2500 },
+    { name: "GOTV Max (Monthly)", item_code: "ITEM109B", amount: 4850 },
+    { name: "GOTV Supa (Monthly)", item_code: "ITEM109C", amount: 6500 },
+  ],
+  BIL110: [
+    { name: "StarTimes Nova (Monthly)", item_code: "ITEM110A", amount: 1500 },
+    { name: "StarTimes Smart (Monthly)", item_code: "ITEM110B", amount: 3500 },
+  ],
+
+  BIL111: [{ name: "Ikeja Electricity Prepaid Token", item_code: "ITEM111A", amount: 0 }],
+  BIL112: [{ name: "Eko Electricity Prepaid Token", item_code: "ITEM112A", amount: 0 }],
+  BIL113: [{ name: "Abuja Electricity Prepaid Token", item_code: "ITEM113A", amount: 0 }],
+  BIL114: [{ name: "Kano Electricity Prepaid Token", item_code: "ITEM114A", amount: 0 }],
+
+  BIL115: [
+    { name: "Smile 10GB Data Plan (30 Days)", item_code: "ITEM115A", amount: 3000 },
+    { name: "Smile 20GB Data Plan (30 Days)", item_code: "ITEM115B", amount: 5000 },
+  ],
+  BIL116: [
+    { name: "Spectranet 15GB Data Plan (30 Days)", item_code: "ITEM116A", amount: 4000 },
+    { name: "Spectranet 30GB Data Plan (30 Days)", item_code: "ITEM116B", amount: 7000 },
+  ],
+};
+
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const biller_code = url.searchParams.get("biller_code") || "";
+    const country = url.searchParams.get("country") || "NG";
+
+    const isSandbox = !FLW_SECRET_KEY || FLW_SECRET_KEY.startsWith("FLWSECK_TEST-");
+
+    const fallback = MOCK_ITEMS[biller_code] || [{ name: "Custom Package", item_code: "ITEM_CUSTOM", amount: 0 }];
+
+    if (isSandbox) {
+      return NextResponse.json({ success: true, data: fallback });
+    }
+
+    const response = await fetch(`https://api.flutterwave.com/v3/bill-items?biller_code=${biller_code}&country=${country}`, {
+      headers: {
+        "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return NextResponse.json({ success: true, data: fallback });
+    }
+
+    const resData = await response.json();
+    return NextResponse.json({ success: true, data: resData.data || fallback });
+  } catch {
+    const url = new URL(req.url);
+    const biller_code = url.searchParams.get("biller_code") || "";
+    return NextResponse.json({ success: true, data: MOCK_ITEMS[biller_code] || [{ name: "Custom Package", item_code: "ITEM_CUSTOM", amount: 0 }] });
+  }
+}

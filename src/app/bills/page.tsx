@@ -38,7 +38,7 @@ const CATEGORIES: Category[] = [
   { id: "INTERNET", name: "Internet Fiber", icon: "language" },
 ];
 
-export default function StorePage() {
+export default function BillsPage() {
   const { userData, user } = useAuth();
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
@@ -633,7 +633,7 @@ export default function StorePage() {
                     <button
                       type="button"
                       onClick={handlePinDelete}
-                      className="py-4 text-xs font-bold font-hanken border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-rose-500 cursor-pointer"
+                      className="py-4 text-xs font-bold font-hanken border border-gray-150 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-rose-500 cursor-pointer"
                     >
                       Delete
                     </button>
