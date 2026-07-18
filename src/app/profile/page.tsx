@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import Image from "next/image";
 import { useAuth } from "@/lib/AuthContext";
@@ -12,8 +12,8 @@ import { auth } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { useRouter } from "next/navigation";
+import { useAppConfig } from "@/lib/ConfigContext";
 
-// The 4 distinct categories for daily transfer limit
 const LIMIT_CATEGORIES = [
   {
     id: "standard",
@@ -53,8 +53,6 @@ const LIMIT_CATEGORIES = [
   }
 ];
 
-import { useAppConfig } from "@/lib/ConfigContext";
-
 export default function ProfilePage() {
   const { userData, user, updateUserData } = useAuth();
   const { config } = useAppConfig();
@@ -64,6 +62,17 @@ export default function ProfilePage() {
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const userEmail = (userData?.email || user?.email || "captain@example.com") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
+
+  // Interactive KYC flow states
+  const [kycType, setKycType] = useState<"bvn" | "nin">("bvn");
+  const [idNumber, setIdNumber] = useState("");
+  const [verifyingKyc, setVerifyingKyc] = useState(false);
+  const [staticAccount, setStaticAccount] = useState<{
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  } | null>(null);
+  const [loadingAccount, setLoadingAccount] = useState(false);
 
   // Modal / Drawer States
   const [showCameraDrawer, setShowCameraDrawer] = useState(false);
@@ -93,6 +102,126 @@ export default function ProfilePage() {
   const [confirmPin, setConfirmPin] = useState("");
   const [isUpdatingPin, setIsUpdatingPin] = useState(false);
 
+  // Resolve or retrieve the permanent static account details if verified
+  const loadStaticAccount = async () => {
+    const isMock = sessionStorage.getItem("mock") === "true";
+    if (isMock) {
+      setStaticAccount({
+        bankName: "Wema Bank",
+        accountNumber: "9921473281",
+        accountName: `${userName.toUpperCase()} - E-Tech`,
+      });
+      return;
+    }
+
+    setLoadingAccount(true);
+    try {
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/flutterwave/create-virtual-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.account) {
+          setStaticAccount({
+            bankName: data.account.bankName,
+            accountNumber: data.account.accountNumber,
+            accountName: data.account.accountName,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error loading permanent account:", err);
+    } finally {
+      setLoadingAccount(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userData?.kycStatus === "VERIFIED") {
+      loadStaticAccount();
+    }
+  }, [userData?.kycStatus]);
+
+  // Execute verification call
+  const handleVerifyKyc = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!idNumber || !/^\d{11}$/.test(idNumber.trim())) {
+      toast.error("Identity number must be exactly 11 digits.");
+      return;
+    }
+
+    setVerifyingKyc(true);
+    toast.loading(`Verifying your ${kycType.toUpperCase()} with Flutterwave verification rails...`);
+
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+
+      if (isMock) {
+        setTimeout(async () => {
+          await updateUserData({ kycStatus: "VERIFIED", bvn: kycType === "bvn" ? idNumber : null, nin: kycType === "nin" ? idNumber : null });
+          toast.dismiss();
+          toast.success("Identity verified successfully (MOCK)!");
+          setStaticAccount({
+            bankName: "Wema Bank",
+            accountNumber: "9921473281",
+            accountName: `${userName.toUpperCase()} - E-Tech`,
+          });
+          setVerifyingKyc(false);
+        }, 1500);
+        return;
+      }
+
+      const idToken = await user?.getIdToken();
+      const res = await fetch("/api/profile/verify-kyc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          idNumber: idNumber.trim(),
+          type: kycType,
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.success) {
+        toast.success("Identity verified successfully! Static account number allocated.");
+        // Reload page or let snapshots update the state
+        if (data.account) {
+          setStaticAccount(data.account);
+        }
+        // Force state reload
+        window.location.reload();
+      } else {
+        toast.error(data.error || "Identity verification failed. Please try again.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Internal connection error while communicating with verification gateway.");
+    } finally {
+      setVerifyingKyc(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard!`);
+  };
+
   const stopCamera = React.useCallback(() => {
     setShowCameraDrawer(false);
     setIsScanning(false);
@@ -100,7 +229,6 @@ export default function ProfilePage() {
     setDiagnosticText("SYSTEM READY");
   }, []);
 
-  // Handle local image file upload - Uploading to Imgbb dynamically
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -150,7 +278,6 @@ export default function ProfilePage() {
     setScanProgress(0);
     setDiagnosticText("INITIALIZING 3D BIOMETRIC MESH...");
 
-    // Diagnostic text sequence
     const diagnostics = [
       "CALIBRATING SENSORS...",
       "STABILIZING POSITION: 99.4%",
@@ -167,7 +294,6 @@ export default function ProfilePage() {
       }
     }, 600);
 
-    // Progress counter
     const progressInterval = setInterval(() => {
       setScanProgress((prev) => {
         if (prev >= 100) {
@@ -185,7 +311,6 @@ export default function ProfilePage() {
     setFlash(true);
     setTimeout(() => setFlash(false), 300);
 
-    // Dynamic, diverse professional avatar assets from unsplash (fully configured in next.config)
     const premiumAvatars = [
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400",
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400",
@@ -193,10 +318,7 @@ export default function ProfilePage() {
       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=400"
     ];
 
-    // Pick a deterministic or random index
     const randomAvatar = premiumAvatars[Math.floor(Math.random() * premiumAvatars.length)];
-
-    // Instead of using unsplash directly, let's upload to Imgbb dynamically as if captured live!
     const key = config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005";
     setDiagnosticText("UPLOADING BIOMETRIC FACIAL PROFILE...");
 
@@ -211,12 +333,10 @@ export default function ProfilePage() {
         await updateUserData({ photoURL: uploadedUrl });
         toast.success("3D Biometric Face Scan complete & securely stored on Imgbb!");
       } else {
-        // fallback
         await updateUserData({ photoURL: randomAvatar });
         toast.success("3D Biometric Face Scan complete!");
       }
     } catch {
-      // fallback
       await updateUserData({ photoURL: randomAvatar });
       toast.success("3D Biometric Face Scan complete!");
     } finally {
@@ -230,7 +350,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Change Password Action with Old Password Verification
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!oldPassword) {
@@ -250,7 +369,6 @@ export default function ProfilePage() {
       } else {
         const currentUser = auth.currentUser;
         if (currentUser && currentUser.email) {
-          // Reauthenticate live user before changing password
           const credential = EmailAuthProvider.credential(currentUser.email, oldPassword);
           await reauthenticateWithCredential(currentUser, credential);
           await updatePassword(currentUser, newPassword);
@@ -269,7 +387,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Change PIN Action with Old PIN Verification
   const handleUpdatePin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (oldPin.length !== 4 || isNaN(Number(oldPin))) {
@@ -290,8 +407,7 @@ export default function ProfilePage() {
       const isMock = sessionStorage.getItem("mock") === "true";
 
       if (isMock) {
-        // Verify Old PIN matches current user PIN
-        const currentStoredPin = userData?.pin || "1234"; // Default mock PIN is '1234'
+        const currentStoredPin = userData?.pin || "1234";
         if (oldPin !== currentStoredPin) {
           toast.error("Incorrect current PIN. Access denied.");
           setIsUpdatingPin(false);
@@ -301,7 +417,6 @@ export default function ProfilePage() {
         await updateUserData({ pin: newPin });
         toast.success("Access PIN updated successfully!");
       } else {
-        // Production: Server-side secure PIN update using authentication token
         if (!user) {
           toast.error("Authentication required.");
           setIsUpdatingPin(false);
@@ -310,7 +425,6 @@ export default function ProfilePage() {
 
         const idToken = await user.getIdToken();
 
-        // 1. Verify old PIN securely on the backend
         const verifyRes = await fetch("/api/auth/pin", {
           method: "POST",
           headers: {
@@ -330,7 +444,6 @@ export default function ProfilePage() {
           return;
         }
 
-        // 2. Set new PIN securely on the backend (hashes on the server)
         const setRes = await fetch("/api/auth/pin", {
           method: "POST",
           headers: {
@@ -364,7 +477,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Toggle PIN on/off
   const handleTogglePinRequired = async () => {
     try {
       const targetState = !isPinRequired;
@@ -375,7 +487,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Toggle FaceID on/off
   const handleToggleFaceId = async () => {
     try {
       const targetState = !isFaceIdEnabled;
@@ -386,7 +497,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Category selection handler for Daily Transfer Limit
   const handleSelectLimitCategory = async (limit: number) => {
     try {
       await updateUserData({ dailyLimit: limit });
@@ -411,7 +521,7 @@ export default function ProfilePage() {
     <>
       <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
-      <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
+      <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black font-hanken">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -458,6 +568,154 @@ export default function ProfilePage() {
               <h2 className="font-hanken font-bold text-xl text-black tracking-tight">{userName}</h2>
               <p className="font-hanken text-xs text-gray-400 font-semibold">{userEmail}</p>
             </div>
+          </section>
+
+          {/* Dedicated Section: Identity Verification & KYC Flow */}
+          <section className="premium-gradient-card premium-gradient-border p-6 space-y-4">
+            <div className="border-b border-gray-100/60 pb-2.5">
+              <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500">
+                Identity Verification & Static Account (KYC)
+              </h3>
+              <p className="font-hanken text-[10px] text-gray-400 mt-0.5">Required to allocate permanent virtual bank accounts</p>
+            </div>
+
+            {userData?.kycStatus === "VERIFIED" ? (
+              // VERIFIED DISPLAY Badges & Details
+              <div className="space-y-4 text-left">
+                <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800">
+                  <span className="material-symbols-outlined text-emerald-600 font-black text-[22px]">check_circle</span>
+                  <div>
+                    <p className="font-hanken font-extrabold text-xs">KYC Identity Verified</p>
+                    <p className="text-[10px] text-emerald-600 font-semibold">Your permanent static account is active and verified.</p>
+                  </div>
+                </div>
+
+                {loadingAccount ? (
+                  <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
+                    <div className="h-3.5 bg-gray-200 rounded w-1/4" />
+                    <div className="h-4.5 bg-gray-200 rounded w-1/2" />
+                  </div>
+                ) : staticAccount ? (
+                  <div className="bg-[#0f172a] rounded-2xl p-4 text-white border border-white/5 space-y-3 relative overflow-hidden">
+                    <div className="absolute right-0 bottom-0 text-[100px] text-white/5 pointer-events-none select-none translate-x-1/4 translate-y-1/4">
+                      <span className="material-symbols-outlined">account_balance</span>
+                    </div>
+
+                    <div className="flex justify-between border-b border-white/10 pb-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                      <span>Assigned Bank Name</span>
+                      <span className="text-white font-black">{staticAccount.bankName}</span>
+                    </div>
+
+                    <div className="flex justify-between border-b border-white/10 pb-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                      <span>Account Holder Name</span>
+                      <span className="text-white font-black truncate max-w-[180px]">{staticAccount.accountName}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider pt-1">
+                      <div>
+                        <span>Static Account Number</span>
+                        <p className="font-mono text-base font-black text-[#FC7A00] tracking-widest mt-0.5 select-all">
+                          {staticAccount.accountNumber}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(staticAccount.accountNumber, "Static Account")}
+                        className="bg-white/10 hover:bg-white/20 text-[10px] font-bold py-1.5 px-3 rounded-lg text-gray-200 flex items-center gap-1 active:scale-95 transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 font-bold text-center">Static account details could not be loaded. Please contact support.</p>
+                )}
+              </div>
+            ) : (
+              // PENDING / FAILED INTERACTIVE FLOW CARD
+              <div className="space-y-4 text-left">
+                {userData?.kycStatus === "FAILED" && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-150 rounded-2xl text-red-700">
+                    <span className="material-symbols-outlined text-red-500 font-bold">error</span>
+                    <div>
+                      <p className="font-hanken font-bold text-xs">Verification Failed</p>
+                      <p className="text-[10px] text-red-500 leading-tight">The BVN or NIN provided could not be verified by Flutterwave gateway. Please try again with valid records.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 text-amber-800">
+                  <p className="font-hanken text-[11px] leading-relaxed font-semibold">
+                    Submit your valid 11-digit BVN or NIN to instantly verify your identity and generate your permanent, static virtual bank account for continuous, direct funding.
+                  </p>
+                </div>
+
+                <form onSubmit={handleVerifyKyc} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Select Verification Method</label>
+                    <div className="grid grid-cols-2 p-1 bg-gray-100 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setKycType("bvn");
+                          setIdNumber("");
+                        }}
+                        className={cn(
+                          "py-2 text-xs font-black font-hanken rounded-lg transition-all cursor-pointer",
+                          kycType === "bvn" ? "bg-white text-black shadow-sm" : "bg-transparent text-gray-400"
+                        )}
+                      >
+                        Bank Verification Number (BVN)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setKycType("nin");
+                          setIdNumber("");
+                        }}
+                        className={cn(
+                          "py-2 text-xs font-black font-hanken rounded-lg transition-all cursor-pointer",
+                          kycType === "nin" ? "bg-white text-black shadow-sm" : "bg-transparent text-gray-400"
+                        )}
+                      >
+                        National ID Number (NIN)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="idNumber" className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                      Enter {kycType.toUpperCase()} (11 Digits)
+                    </label>
+                    <input
+                      id="idNumber"
+                      type="number"
+                      required
+                      value={idNumber}
+                      onChange={(e) => setIdNumber(e.target.value.slice(0, 11))}
+                      placeholder={`Enter 11-digit ${kycType.toUpperCase()}...`}
+                      className="w-full bg-gray-50 border border-gray-250 rounded-2xl py-3 px-4 font-mono font-bold text-xs text-black outline-none focus:border-black focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={verifyingKyc || idNumber.length !== 11}
+                    className="w-full bg-gradient-to-r from-[#0F62FE] to-[#6C63FF] hover:brightness-110 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_15px_rgba(15,98,254,0.15)] flex items-center justify-center gap-2"
+                  >
+                    {verifyingKyc ? (
+                      <>
+                        <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        <span>Verifying...</span>
+                      </>
+                    ) : (
+                      "Verify & Allocate Account"
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
           </section>
 
           {/* Section: Security Preferences & Toggles */}
@@ -682,7 +940,6 @@ export default function ProfilePage() {
         </motion.div>
       </main>
 
-
       {/* Selfie Capture Sheet Modal */}
       <AnimatePresence>
         {showCameraDrawer && (
@@ -723,18 +980,13 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* Futuristic Scan Screen Area */}
               <div className="flex-grow flex flex-col justify-center items-center w-full px-6 relative">
-                {/* Tech scan grid bg */}
                 <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
 
                 <div className="relative w-full aspect-square max-w-[270px] rounded-[32px] overflow-hidden bg-black/60 flex items-center justify-center border-2 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.1)]">
-
-                  {/* Rotating Tech Radar Circles */}
                   <div className="absolute inset-0 border border-emerald-500/10 rounded-full scale-90 animate-spin" style={{ animationDuration: "12s" }} />
                   <div className="absolute inset-0 border border-dashed border-emerald-500/20 rounded-full scale-75 animate-spin" style={{ animationDuration: "8s" }} />
 
-                  {/* High fidelity face outline SVG wireframe */}
                   <svg
                     className={cn(
                       "w-48 h-48 text-emerald-400/75 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)] transition-all duration-300",
@@ -752,10 +1004,8 @@ export default function ProfilePage() {
                     />
                   </svg>
 
-                  {/* Pulsing Face Alignment Target */}
                   <div className="absolute w-44 h-52 rounded-[100px] border-2 border-dashed border-emerald-400/50 flex items-center justify-center animate-pulse" />
 
-                  {/* Moving laser scan line */}
                   {isScanning && (
                     <motion.div
                       initial={{ y: "-100%" }}
@@ -775,7 +1025,6 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* Progress Bar & Diagnostics */}
                 <div className="w-full max-w-[270px] mt-8 space-y-2 text-center">
                   <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-emerald-400/75 uppercase">
                     <span>{diagnosticText}</span>

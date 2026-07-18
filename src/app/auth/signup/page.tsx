@@ -3,8 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
@@ -12,12 +11,38 @@ import Image from "next/image";
 import { cn, formatFirebaseError } from "@/lib/utils";
 
 export default function SignUpPage() {
-  const [name, setName] = useState("");
+  // Personal Info States
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+
+  // Structured Address States
+  const [houseNumber, setHouseNumber] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [country, setCountry] = useState("Nigeria");
+  const [postalCode, setPostalCode] = useState("");
+
+  // Phone states (International Prefix Selector)
+  const [phonePrefix, setPhonePrefix] = useState("+234");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
+  // Account Info States
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Terms and Privacy check constraints
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+
+  // UI States
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [termsError, setTermsError] = useState("");
 
   // Custom Permission Drawer state
   const [showPermissionDrawer, setShowPermissionDrawer] = useState(false);
@@ -29,10 +54,50 @@ export default function SignUpPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
 
+  // Ripple Effect State for Create Account Button
+  const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const hasPushedState = useRef(false);
+
+  // Auto-set Prefix based on country selection
+  useEffect(() => {
+    if (country === "Nigeria") {
+      setPhonePrefix("+234");
+    } else if (country === "Niger") {
+      setPhonePrefix("+227");
+    }
+  }, [country]);
+
+  // Password Strength Calculation
+  const getPasswordStrength = (pass: string) => {
+    if (!pass) return { score: 0, label: "None", color: "bg-gray-200" };
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (/\d/.test(pass)) score++;
+    if (/[@$!%*?&]/.test(pass)) score++;
+
+    switch (score) {
+      case 1:
+        return { score: 1, label: "Very Weak", color: "bg-red-500" };
+      case 2:
+        return { score: 2, label: "Weak", color: "bg-orange-500" };
+      case 3:
+        return { score: 3, label: "Medium", color: "bg-yellow-500" };
+      case 4:
+        return { score: 4, label: "Strong", color: "bg-blue-500" };
+      case 5:
+        return { score: 5, label: "Excellent", color: "bg-green-500" };
+      default:
+        return { score: 0, label: "None", color: "bg-gray-200" };
+    }
+  };
+
+  const pStrength = getPasswordStrength(password);
 
   // Stop Camera Stream
   const stopCamera = React.useCallback(() => {
@@ -183,8 +248,99 @@ export default function SignUpPage() {
     }
   };
 
+  // Create Ripple Effect
+  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newRipple = { id: Date.now(), x, y };
+    setRipples((prev) => [...prev, newRipple]);
+    setTimeout(() => {
+      setRipples((prev) => prev.filter((r) => r.id !== newRipple.id));
+    }, 600);
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Reset Terms error
+    setTermsError("");
+
+    // Client-side Validations
+    if (!firstName || firstName.trim().length < 2) {
+      toast.error("First Name must be at least 2 characters.");
+      return;
+    }
+    if (!lastName || lastName.trim().length < 2) {
+      toast.error("Last Name must be at least 2 characters.");
+      return;
+    }
+    if (!dateOfBirth) {
+      toast.error("Date of Birth is required.");
+      return;
+    }
+
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(dob.getTime())) {
+      toast.error("Invalid Date of Birth.");
+      return;
+    }
+    if (dob >= today) {
+      toast.error("Date of Birth cannot be today or in the future.");
+      return;
+    }
+
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      toast.error("You must be at least 18 years old to proceed.");
+      return;
+    }
+
+    if (!houseNumber || houseNumber.trim().length === 0) {
+      toast.error("House Number is required.");
+      return;
+    }
+    if (!street || street.trim().length === 0) {
+      toast.error("Street name is required.");
+      return;
+    }
+    if (!city || city.trim().length === 0) {
+      toast.error("City is required.");
+      return;
+    }
+    if (!state || state.trim().length === 0) {
+      toast.error("State is required.");
+      return;
+    }
+
+    if (!phoneNumber || phoneNumber.trim().length === 0) {
+      toast.error("Phone Number is required.");
+      return;
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!password || !passwordRegex.test(password)) {
+      toast.error("Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    if (!acceptedTerms || !acceptedPrivacy) {
+      setTermsError("You must accept both the Terms & Conditions and Privacy Policy.");
+      toast.error("Please accept both the Terms and Privacy Policy.");
+      return;
+    }
 
     if (!photo) {
       toast.error("Please upload a profile picture or take a selfie to proceed.");
@@ -194,18 +350,74 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
+      // 1. Call secure server-side validation endpoint
+      const validateRes = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          dateOfBirth,
+          houseNumber,
+          street,
+          city,
+          state,
+          country,
+          postalCode,
+          phonePrefix,
+          phoneNumber,
+          email,
+          password,
+          acceptedTerms,
+          acceptedPrivacy,
+          acceptedTermsVersion: "v1.0.0",
+          acceptedPrivacyVersion: "v1.0.0",
+        }),
+      });
+
+      const validateData = await validateRes.json();
+      if (!validateRes.ok || !validateData.success) {
+        toast.error(validateData.error || "Server validation failed.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Create standard Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      await updateProfile(user, { displayName: name, photoURL: photo });
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
+      await updateProfile(user, { displayName: fullName, photoURL: photo });
 
-      await setDoc(doc(db, "users", user.uid), {
-        displayName: name,
-        email,
-        uid: user.uid,
-        photoURL: photo,
-        createdAt: new Date().toISOString(),
+      // 3. Call secure server-side endpoint to save the complete record
+      const idToken = await user.getIdToken();
+      const completeRes = await fetch("/api/auth/register-complete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          dateOfBirth,
+          houseNumber,
+          street,
+          city,
+          state,
+          country,
+          postalCode,
+          phonePrefix,
+          phoneNumber,
+        }),
       });
+
+      const completeData = await completeRes.json();
+      if (!completeRes.ok || !completeData.success) {
+        toast.error(completeData.error || "Failed to complete registration on database.");
+        setLoading(false);
+        return;
+      }
 
       toast.success("Account created successfully!");
       router.push("/auth/pin-setup");
@@ -219,11 +431,11 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-white p-6 justify-center">
+    <div className="flex flex-col min-h-screen bg-[#F8FAFC] p-4 min-[375px]:p-6 justify-center text-black">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md mx-auto"
+        className="w-full max-w-xl mx-auto bg-white rounded-3xl shadow-xl p-5 min-[375px]:p-8 border border-gray-100"
       >
         <div className="mb-8 flex flex-col items-center text-center">
           <div className="relative w-16 h-16 mb-3">
@@ -236,12 +448,12 @@ export default function SignUpPage() {
             />
           </div>
           <h1 className="font-hanken font-bold text-2xl tracking-tight text-black">E-TECH GLOBAL HUB</h1>
-          <p className="text-gray-500 font-hanken mt-1">Create your secure hub account</p>
+          <p className="text-gray-500 font-hanken mt-1 text-xs font-semibold">Create your modern premium fintech account</p>
         </div>
 
         {/* Profile Picture Upload & Selfie Selection Section */}
-        <div className="mb-6 flex flex-col items-center">
-          <label className="text-xs font-bold uppercase tracking-widest text-black mb-3">
+        <div className="mb-8 flex flex-col items-center">
+          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3 block">
             Profile Picture <span className="text-red-500">*</span>
           </label>
 
@@ -263,7 +475,7 @@ export default function SignUpPage() {
               <button
                 type="button"
                 onClick={() => setPhoto(null)}
-                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1"
+                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
                 Clear
@@ -271,7 +483,7 @@ export default function SignUpPage() {
             )}
           </div>
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex gap-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -282,7 +494,7 @@ export default function SignUpPage() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1 transition-all cursor-pointer border border-gray-200/50"
             >
               <span className="material-symbols-outlined text-[16px]">upload_file</span>
               Upload Image
@@ -290,7 +502,7 @@ export default function SignUpPage() {
             <button
               type="button"
               onClick={() => setShowPermissionDrawer(true)}
-              className="px-3 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+              className="px-3 py-2 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1 shadow-xs transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">photo_camera</span>
               Take Selfie
@@ -298,72 +510,331 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSignUp} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-black">Full Name</label>
+        <form onSubmit={handleSignUp} className="space-y-5">
+          {/* First & Last Name */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1 text-left">
+              <label htmlFor="firstName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name <span className="text-red-500">*</span></label>
+              <input
+                id="firstName"
+                type="text"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 px-4 outline-none focus:border-black focus:bg-white transition-all text-xs font-semibold text-black"
+                placeholder="John"
+                aria-required="true"
+              />
+            </div>
+
+            <div className="space-y-1 text-left">
+              <label htmlFor="lastName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Last Name <span className="text-red-500">*</span></label>
+              <input
+                id="lastName"
+                type="text"
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 px-4 outline-none focus:border-black focus:bg-white transition-all text-xs font-semibold text-black"
+                placeholder="Doe"
+                aria-required="true"
+              />
+            </div>
+          </div>
+
+          <p className="text-[10px] text-amber-600 font-bold leading-relaxed bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-left">
+            Please ensure your First Name and Last Name exactly match your BVN and NIN records. Incorrect information may prevent identity verification later.
+          </p>
+
+          {/* DoB */}
+          <div className="space-y-1 text-left">
+            <label htmlFor="dateOfBirth" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Date of Birth <span className="text-red-500">*</span></label>
             <input
-              type="text"
+              id="dateOfBirth"
+              type="date"
               required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-black"
-              placeholder="Captain John Doe"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 px-4 outline-none focus:border-black focus:bg-white transition-all text-xs font-semibold text-black"
+              aria-required="true"
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-black">Email Address</label>
+          {/* Structured Address Block */}
+          <div className="border border-gray-150 rounded-3xl p-4 bg-gray-50/50 space-y-4 text-left">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Residential Address</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="md:col-span-1 space-y-1">
+                <label htmlFor="houseNumber" className="text-[9px] font-bold text-gray-400 uppercase">House No. <span className="text-red-500">*</span></label>
+                <input
+                  id="houseNumber"
+                  type="text"
+                  required
+                  value={houseNumber}
+                  onChange={(e) => setHouseNumber(e.target.value)}
+                  placeholder="24B"
+                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 outline-none text-xs font-semibold text-black focus:border-black"
+                />
+              </div>
+              <div className="md:col-span-3 space-y-1">
+                <label htmlFor="street" className="text-[9px] font-bold text-gray-400 uppercase">Street Name <span className="text-red-500">*</span></label>
+                <input
+                  id="street"
+                  type="text"
+                  required
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  placeholder="Adetokunbo Ademola Street"
+                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 outline-none text-xs font-semibold text-black focus:border-black"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="city" className="text-[9px] font-bold text-gray-400 uppercase">City <span className="text-red-500">*</span></label>
+                <input
+                  id="city"
+                  type="text"
+                  required
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Victoria Island"
+                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 outline-none text-xs font-semibold text-black focus:border-black"
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="state" className="text-[9px] font-bold text-gray-400 uppercase">State <span className="text-red-500">*</span></label>
+                <input
+                  id="state"
+                  type="text"
+                  required
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  placeholder="Lagos"
+                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 outline-none text-xs font-semibold text-black focus:border-black"
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="postalCode" className="text-[9px] font-bold text-gray-400 uppercase">Postal Code</label>
+                <input
+                  id="postalCode"
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="101241"
+                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 outline-none text-xs font-semibold text-black focus:border-black"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="country" className="text-[9px] font-bold text-gray-400 uppercase">Country <span className="text-red-500">*</span></label>
+                <select
+                  id="country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 outline-none text-xs font-semibold text-black focus:border-black"
+                >
+                  <option value="Nigeria">Nigeria</option>
+                  <option value="Niger">Niger</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* International Phone Input */}
+          <div className="space-y-1 text-left">
+            <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
+            <div className="flex gap-2">
+              <select
+                id="phonePrefix"
+                value={phonePrefix}
+                onChange={(e) => setPhonePrefix(e.target.value)}
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-3 outline-none text-xs font-bold text-black focus:border-black"
+                aria-label="Phone Prefix"
+              >
+                <option value="+234">🇳🇬 +234</option>
+                <option value="+227">🇳🇪 +227</option>
+              </select>
+              <input
+                id="phoneNumber"
+                type="tel"
+                required
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                className="flex-grow bg-gray-50 border border-gray-200 rounded-2xl py-3 px-4 outline-none focus:border-black focus:bg-white transition-all text-xs font-semibold text-black font-mono"
+                placeholder="08012345678"
+                aria-required="true"
+              />
+            </div>
+          </div>
+
+          {/* Email Address */}
+          <div className="space-y-1 text-left">
+            <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address <span className="text-red-500">*</span></label>
             <input
+              id="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-black"
-              placeholder="captain@example.com"
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 px-4 outline-none focus:border-black focus:bg-white transition-all text-xs font-semibold text-black"
+              placeholder="doe@example.com"
+              aria-required="true"
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold uppercase tracking-widest text-black">Password</label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-50 border-b border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-black transition-colors text-black"
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer transition-colors p-1"
-              >
-                <span className="material-symbols-outlined text-[20px]">
-                  {showPassword ? "visibility" : "visibility_off"}
-                </span>
-              </button>
+          {/* Passwords */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1 text-left">
+              <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 pl-4 pr-10 outline-none focus:border-black focus:bg-white transition-all text-xs font-semibold text-black"
+                  placeholder="••••••••"
+                  aria-required="true"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer transition-colors p-1"
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {showPassword ? "visibility" : "visibility_off"}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1 text-left">
+              <label htmlFor="confirmPassword" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm Password <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 pl-4 pr-10 outline-none focus:border-black focus:bg-white transition-all text-xs font-semibold text-black"
+                  placeholder="••••••••"
+                  aria-required="true"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer transition-colors p-1"
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {showConfirmPassword ? "visibility" : "visibility_off"}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 shadow-md cursor-pointer flex items-center justify-center gap-2.5"
-          >
-            {loading ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-                  className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
+          {/* Password Strength Indicator */}
+          {password && (
+            <div className="space-y-1.5 text-left bg-gray-50 p-3 rounded-2xl border border-gray-150">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-black uppercase text-gray-400">Password Strength</span>
+                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded text-white", pStrength.color)}>
+                  {pStrength.label}
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-gray-250 rounded-full overflow-hidden">
+                <div
+                  className={cn("h-full transition-all duration-300", pStrength.color)}
+                  style={{ width: `${(pStrength.score / 5) * 100}%` }}
                 />
-                <span>Creating...</span>
-              </>
-            ) : (
-              "Create Account"
+              </div>
+              <p className="text-[8px] text-gray-400 font-semibold leading-tight">Must include at least 8 characters, an uppercase letter, a lowercase letter, a number, and a special character.</p>
+            </div>
+          )}
+
+          {/* Terms checkbox */}
+          <div className="space-y-3 text-left pt-2">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="termsCheck"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="w-4.5 h-4.5 rounded border-gray-300 text-[#0F62FE] focus:ring-[#0F62FE] cursor-pointer mt-0.5"
+              />
+              <label htmlFor="termsCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
+                I agree to the{" "}
+                <Link href="/auth/terms" className="text-[#0F62FE] hover:underline font-bold">
+                  Terms & Conditions
+                </Link> (v1.0.0).
+              </label>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="privacyCheck"
+                checked={acceptedPrivacy}
+                onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                className="w-4.5 h-4.5 rounded border-gray-300 text-[#0F62FE] focus:ring-[#0F62FE] cursor-pointer mt-0.5"
+              />
+              <label htmlFor="privacyCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
+                I agree to the{" "}
+                <Link href="/auth/privacy" className="text-[#0F62FE] hover:underline font-bold">
+                  Privacy Policy
+                </Link> (v1.0.0).
+              </label>
+            </div>
+
+            {termsError && (
+              <p className="text-[10px] text-red-500 font-bold text-left animate-pulse">{termsError}</p>
             )}
-          </button>
+          </div>
+
+          {/* Create Account Premium Button */}
+          <div className="pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              onClick={handleButtonClick}
+              className="relative overflow-hidden w-full bg-gradient-to-r from-[#0F62FE] to-[#6C63FF] hover:brightness-110 text-white py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_20px_rgba(15,98,254,0.25)] hover:shadow-[0_4px_25px_rgba(15,98,254,0.4)] cursor-pointer flex items-center justify-center gap-2.5"
+            >
+              {/* Ripple Elements */}
+              {ripples.map((ripple) => (
+                <span
+                  key={ripple.id}
+                  className="absolute bg-white/30 rounded-full pointer-events-none animate-ripple"
+                  style={{
+                    left: ripple.x,
+                    top: ripple.y,
+                    width: 100,
+                    height: 100,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                />
+              ))}
+
+              {loading ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                    className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
+                  />
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </button>
+          </div>
         </form>
 
         {/* Elegant Custom Camera Permission Bottom Drawer Modal */}
@@ -385,7 +856,7 @@ export default function SignUpPage() {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 28, stiffness: 260 }}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 z-[99999] flex flex-col items-center shadow-none"
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 z-[99999] flex flex-col items-center shadow-none text-black"
               >
                 {/* Grab Handle */}
                 <div className="w-10 h-1 bg-gray-300 rounded-full mb-5" />
@@ -459,7 +930,7 @@ export default function SignUpPage() {
                 dragConstraints={{ top: 0, bottom: 450 }}
                 dragElastic={{ top: 0, bottom: 0.2 }}
                 onDragEnd={handleDragEnd}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none touch-none"
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none touch-none text-black"
               >
                 {/* Drag handle */}
                 <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-4 mb-4 cursor-grab active:cursor-grabbing" />
