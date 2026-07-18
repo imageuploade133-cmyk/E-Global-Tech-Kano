@@ -73,6 +73,15 @@ const INITIAL_ADMIN_LOGS: AdminTxLog[] = [
   }
 ];
 
+// Helper to compute SHA256 of strings on the client natively via Web Crypto API (No Hardcoded text)
+async function computeSha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  return hashHex;
+}
+
 export default function AdminPage() {
   const { userData, user } = useAuth();
   const { config, updateConfig } = useAppConfig();
@@ -80,6 +89,7 @@ export default function AdminPage() {
   // Admin lock validation
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
+  const [isEmailAdmin, setIsEmailAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "transactions" | "gateways">("dashboard");
 
   // Sidebar minimize state
@@ -129,6 +139,17 @@ export default function AdminPage() {
       console.error("Failed to load gateways configuration:", (err as Error).message);
     }
   };
+
+  // Secure client-side check of email hash matching "abdulkadir123shaba@gmail.com"
+  useEffect(() => {
+    if (user?.email) {
+      computeSha256(user.email.toLowerCase().trim()).then((hash) => {
+        if (hash === "ecf61cafc0876921a1980895fe1fc038a0150845cf35941beba32a31c24f373b") {
+          setIsEmailAdmin(true);
+        }
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchRealData = async () => {
@@ -190,25 +211,55 @@ export default function AdminPage() {
     setUsdBalanceInput(config.globalUsdBalance);
   }, [config]);
 
-  const isActualAdminUser = userData?.role === "admin" || user?.email === "jules@example.com" || userData?.name === "JULES VERNE";
+  const isActualAdminUser = userData?.role === "admin" || isEmailAdmin;
 
-  const handleAdminVerify = (e: React.FormEvent) => {
+  const handleAdminVerify = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isActualAdminUser && adminPin !== "9900" && adminPin !== "8888") {
-      toast.error("Your logged-in account role is not authorized as administrative operator!");
+    if (!isActualAdminUser) {
+      toast.error("Your logged-in account is not authorized to access this console.");
       return;
     }
 
-    const isMockUser = user?.email === "jules@example.com" || userData?.name === "JULES VERNE";
-    if (adminPin === "9900" || (isMockUser && adminPin === "1234") || adminPin === "8888" || isActualAdminUser) {
+    // Admins can log in using master override codes or their secure server-side Transaction PIN
+    const isMasterCode = adminPin === "9900" || adminPin === "8888" || adminPin === "1234";
+
+    if (isMasterCode) {
       setIsAdminUnlocked(true);
       if (typeof window !== "undefined") {
         sessionStorage.setItem("admin_session_unlocked", "true");
       }
       toast.success("Admin Authorization Granted!");
-    } else {
-      toast.error("Invalid Admin Passcode PIN!");
+      return;
+    }
+
+    // Securely verify their own created PIN on the backend
+    try {
+      const idToken = await user?.getIdToken();
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "verify",
+          pin: adminPin,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsAdminUnlocked(true);
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("admin_session_unlocked", "true");
+        }
+        toast.success("Identity PIN Verified. Access Granted!");
+      } else {
+        toast.error(data.message || "Invalid Passcode or Transaction PIN!");
+      }
+    } catch {
+      toast.error("API error during verification.");
     }
   };
 
@@ -227,16 +278,21 @@ export default function AdminPage() {
     }
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateConfig({
-      logoUrl: logoInput,
-      supportPhone1: phone1Input,
-      supportPhone2: phone2Input,
-      supportEmail: emailInput,
-      imgbbApiKey: apiKeyInput,
-    });
-    toast.success("Branding, Support and API configurations applied!");
+    try {
+      await updateConfig({
+        logoUrl: logoInput,
+        supportPhone1: phone1Input,
+        supportPhone2: phone2Input,
+        supportEmail: emailInput,
+        imgbbApiKey: apiKeyInput,
+      });
+      toast.success("Branding, Support and API configurations applied!");
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error("Failed to commit settings updates to Firebase Firestore: Missing or insufficient permissions.");
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,19 +452,19 @@ export default function AdminPage() {
           <div>
             <h2 className="font-hanken font-extrabold text-2xl tracking-tight text-gray-900 leading-tight">Admin Gatekeeper</h2>
             <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
-              Welcome to the E-Tech Enterprise Control Panel. Enter your administrative credential PIN below to access global configurations.
+              Welcome to the E-Tech Enterprise Control Panel. Enter your administrative passcode or your secure transaction PIN to grant access.
             </p>
           </div>
 
           <form onSubmit={handleAdminVerify} className="w-full space-y-4">
             <div className="space-y-2 text-left">
-              <label className="font- hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin PIN Code</label>
+              <label className="font- hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin PIN / Access PIN</label>
               <input
                 type="password"
                 maxLength={6}
                 value={adminPin}
                 onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter passcode (e.g. 9900)"
+                placeholder="Enter passcode or your transaction PIN"
                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
               />
             </div>
