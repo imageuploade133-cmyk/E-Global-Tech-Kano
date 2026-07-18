@@ -767,11 +767,11 @@ export default function SignUpPage() {
                 id="termsCheck"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="w-4.5 h-4.5 rounded border-gray-300 text-[#0F62FE] focus:ring-[#0F62FE] cursor-pointer mt-0.5"
+                className="w-4.5 h-4.5 rounded border-gray-300 text-[#FC7A00] focus:ring-[#FC7A00] cursor-pointer mt-0.5"
               />
               <label htmlFor="termsCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
                 I agree to the{" "}
-                <Link href="/auth/terms" className="text-[#0F62FE] hover:underline font-bold">
+                <Link href="/auth/terms" className="text-[#FC7A00] hover:underline font-bold">
                   Terms & Conditions
                 </Link> (v1.0.0).
               </label>
@@ -783,11 +783,11 @@ export default function SignUpPage() {
                 id="privacyCheck"
                 checked={acceptedPrivacy}
                 onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-                className="w-4.5 h-4.5 rounded border-gray-300 text-[#0F62FE] focus:ring-[#0F62FE] cursor-pointer mt-0.5"
+                className="w-4.5 h-4.5 rounded border-gray-300 text-[#FC7A00] focus:ring-[#FC7A00] cursor-pointer mt-0.5"
               />
               <label htmlFor="privacyCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
                 I agree to the{" "}
-                <Link href="/auth/privacy" className="text-[#0F62FE] hover:underline font-bold">
+                <Link href="/auth/privacy" className="text-[#FC7A00] hover:underline font-bold">
                   Privacy Policy
                 </Link> (v1.0.0).
               </label>
@@ -804,7 +804,7 @@ export default function SignUpPage() {
               type="submit"
               disabled={loading}
               onClick={handleButtonClick}
-              className="relative overflow-hidden w-full bg-gradient-to-r from-[#0F62FE] to-[#6C63FF] hover:brightness-110 text-white py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_20px_rgba(15,98,254,0.25)] hover:shadow-[0_4px_25px_rgba(15,98,254,0.4)] cursor-pointer flex items-center justify-center gap-2.5"
+              className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_20px_rgba(252,122,0,0.25)] hover:shadow-[0_4px_25px_rgba(252,122,0,0.4)] cursor-pointer flex items-center justify-center gap-2.5"
             >
               {/* Ripple Elements */}
               {ripples.map((ripple) => (
