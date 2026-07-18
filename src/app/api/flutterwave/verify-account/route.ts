@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { BankService } from "@/services/bank-service";
+import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
 
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-const FLW_BASE_URL = "https://api.flutterwave.com/v3";
 
 export async function POST(req: Request) {
   try {
@@ -35,81 +35,34 @@ export async function POST(req: Request) {
 
     const bankCode = bank.code;
     if (!bankCode || !/^\d+$/.test(bankCode)) {
-      console.warn(`[Verify Account] Bank ${bank.name} has invalid/non-numeric Flutterwave code: ${bankCode}`);
+      console.warn(`[Verify Account] Bank ${bank.name} has invalid/non-numeric code: ${bankCode}`);
       return NextResponse.json({ error: "Invalid bank selected." }, { status: 400 });
     }
 
-    console.log(`[Verify Account] Validating via Flutterwave: Bank: ${bank.name}, Code: ${bankCode}`);
+    console.log(`[Verify Account] Validating: Bank: ${bank.name}, Code: ${bankCode}`);
 
-    // Sandbox/Test Credentials Check: Flutterwave's sandbox only permits resolving Access Bank (044) details.
-    // This constraint is imposed by Flutterwave itself on the sandbox environment and is not an application bug.
     const isSandbox = !FLW_SECRET_KEY || FLW_SECRET_KEY.startsWith("FLWSECK_TEST-");
     if (isSandbox && bankCode !== "044") {
       console.warn(`[Verify Account Sandbox Restriction] Attempt to resolve real bank code ${bankCode} ('${bank.name}') in Sandbox blocked.`);
       return NextResponse.json({
-        error: "Real bank account resolution is not supported in Flutterwave Sandbox. Please use the documented test accounts or switch to live credentials."
+        error: "Real bank account resolution is not supported in Sandbox. Please use the documented test accounts or switch to live credentials."
       }, { status: 400 });
     }
 
-    // Call Flutterwave POST /v3/accounts/resolve with custom retry logic
-    let flwData: { status?: string; message?: string; data?: { account_name: string; account_number: string } } | null = null;
-    const attempts = 3;
-    let lastError: Error | null = null;
+    // Call dynamic account resolution through PaymentGatewayManager
+    const res = await PaymentGatewayManager.resolveAccount({
+      bankId,
+      accountNumber,
+    });
 
-    for (let i = 1; i <= attempts; i++) {
-      try {
-        console.log(`[Verify Account] Outgoing Flutterwave Request (Attempt ${i}/3) for bank code: ${bankCode}`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        const response = await fetch(`${FLW_BASE_URL}/accounts/resolve`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${FLW_SECRET_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            account_number: accountNumber,
-            account_bank: bankCode,
-          }),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.status === 400) {
-          const errRes = await response.json().catch(() => ({}));
-          console.warn(`[Verify Account] Flutterwave rejected with 400 (no retry):`, errRes);
-          return NextResponse.json({ error: "Unable to verify account." }, { status: 400 });
-        }
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`HTTP Error ${response.status}: ${errText}`);
-        }
-
-        flwData = await response.json();
-        break;
-      } catch (err: unknown) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        console.warn(`[Verify Account] Attempt ${i} failed:`, lastError.message);
-        if (i === attempts) {
-          break;
-        }
-        await new Promise((res) => setTimeout(res, i * 1000));
-      }
-    }
-
-    console.log(`[Verify Account] Flutterwave Response:`, JSON.stringify(flwData ? { status: flwData.status, message: flwData.message, dataExists: !!flwData.data } : { error: lastError?.message }));
-
-    if (flwData && flwData.status === "success" && flwData.data) {
+    if (res.success) {
       return NextResponse.json({
         success: true,
-        accountName: flwData.data.account_name,
-        accountNumber: flwData.data.account_number,
+        accountName: res.accountName,
+        accountNumber: accountNumber,
       });
     } else {
-      return NextResponse.json({ error: "Unable to verify account." }, { status: 400 });
+      return NextResponse.json({ error: res.error || "Unable to verify account." }, { status: 400 });
     }
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);

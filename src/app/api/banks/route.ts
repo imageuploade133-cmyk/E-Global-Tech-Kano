@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { BankService } from "@/services/bank-service";
 
+import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const search = url.searchParams.get("search") || undefined;
+
+    // Trigger self-healing seeding checks on startup/fetch
+    await PaymentGatewayManager.getGatewayConfigs();
 
     const banks = await BankService.getBanks(search);
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { flutterwaveService } from "@/lib/flutterwave";
+import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
 import { adminDb } from "@/lib/firebase-admin";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { isRateLimited } from "@/lib/rate-limiter";
@@ -41,51 +41,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Customer name and email are required parameters." }, { status: 400 });
     }
 
-    // Build standard, traceable unique references
-    tx_ref = `flw-tx-${targetUserId}-${Date.now()}`;
-
-    console.log(`[payment initialization] INITIALIZATION REQUEST:`, {
+    // Call dynamic PaymentGatewayManager to initialize payment (supports dynamic country-currency routing and failovers)
+    const resData = await PaymentGatewayManager.initializePayment({
       amount: amountVal,
       currency: currencyVal,
       email,
       name,
+      userId: targetUserId,
+      redirectUrl: redirectUrl || "https://e-global-tech-kano.vercel.app/history",
       phone,
-      userId: targetUserId,
-      tx_ref,
-      redirect_url: redirectUrl || "https://e-global-tech-kano.vercel.app/history"
     });
 
-    // Create a server-managed pending payment record in Firestore
-    console.log(`[payment initialization] Creating pending payment record: pending_payments/${tx_ref}`);
-    await adminDb.collection("pending_payments").doc(tx_ref).set({
-      userId: targetUserId,
-      amount: amountVal,
-      currency: currencyVal,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    });
+    tx_ref = resData.reference;
 
-    const resData = await flutterwaveService.initializePayment({
-      tx_ref,
-      amount: amountVal,
-      currency: currencyVal,
-      redirect_url: redirectUrl || "https://e-global-tech-kano.vercel.app/history",
-      customer: {
-        email,
-        name,
-        phone_number: phone,
-      },
-      customizations: {
-        title: "E-Tech Global Wallet Fund",
-        description: "Wallet Provisioning Settlement Link",
-        logo: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
-      },
-      meta: {
+    if (resData.success) {
+      // Create a server-managed pending payment record in Firestore
+      console.log(`[Payment Initialization] Creating pending payment record: pending_payments/${tx_ref}`);
+      await adminDb.collection("pending_payments").doc(tx_ref).set({
         userId: targetUserId,
-      },
-    });
+        amount: amountVal,
+        currency: currencyVal,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      });
 
-    if (resData.status === "success") {
       logPaymentEvent({
         category: "Payment Initialization",
         userId: targetUserId,
@@ -98,31 +77,28 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        paymentLink: resData.data.link,
+        paymentLink: resData.paymentLink,
         txRef: tx_ref,
       });
     } else {
-      // Clean up the pending payment record if Flutterwave initialization failed
-      await adminDb.collection("pending_payments").doc(tx_ref).delete().catch(() => {});
-
       logPaymentEvent({
         category: "Internal Error",
         userId: targetUserId,
         tx_ref,
         amount: amountVal,
         currency: currencyVal,
-        message: `Flutterwave checkout link creation failed: ${resData.message}`,
+        message: `Payment initialization failed: ${resData.error}`,
         processingTimeMs: Date.now() - startTime,
       });
 
       return NextResponse.json(
-        { error: "Payment Link Initialization failed", details: resData.message },
+        { error: "Payment Link Initialization failed", details: resData.error },
         { status: 500 }
       );
     }
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error("[Flutterwave Init Error] Endpoint failure:", errorMsg);
+    console.error("[Payment Init Error] Endpoint failure:", errorMsg);
 
     logPaymentEvent({
       category: "Internal Error",

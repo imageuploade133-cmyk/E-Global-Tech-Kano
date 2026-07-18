@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAndCreditWallet } from "@/lib/wallet-funding";
+import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { isRateLimited } from "@/lib/rate-limiter";
 import crypto from "crypto";
@@ -7,8 +7,6 @@ import crypto from "crypto";
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
 
 // A lightweight, high-performance, 100% dependency-free Firebase ID Token verifier.
-// This relies purely on native Node.js crypto module and completely avoids loading
-// "firebase-admin/auth" or "jwks-rsa" to prevent require() ESM bundler conflicts on Vercel.
 async function verifyFirebaseIdToken(token: string, projectId: string): Promise<{ uid: string }> {
   const parts = token.split(".");
   if (parts.length !== 3) {
@@ -41,7 +39,6 @@ async function verifyFirebaseIdToken(token: string, projectId: string): Promise<
   const verify = crypto.createVerify("RSA-SHA256");
   verify.update(`${headerB64}.${payloadB64}`);
 
-  // Convert base64url signature to standard base64
   const signatureBase64 = signatureB64
     .replace(/-/g, "+")
     .replace(/_/g, "/");
@@ -56,7 +53,6 @@ async function verifyFirebaseIdToken(token: string, projectId: string): Promise<
   if (payloadJson.exp < now) {
     throw new Error(`Token has expired. Expired at: ${payloadJson.exp}, current time: ${now}`);
   }
-  // Allow up to 5 minutes of clock drift
   if (payloadJson.iat > now + 300) {
     throw new Error("Token issued in the future (clock drift limit exceeded).");
   }
@@ -73,17 +69,19 @@ async function verifyFirebaseIdToken(token: string, projectId: string): Promise<
   return { uid: payloadJson.sub };
 }
 
-// A robust parser that extracts the userId correctly from tx_ref for backup checks
 function extractUserIdFromTxRef(txRef: string): string | null {
-  if (!txRef || !txRef.startsWith("flw-tx-")) return null;
-  const remaining = txRef.substring("flw-tx-".length);
-  const parts = remaining.split("-");
-  if (parts.length > 0) {
-    const lastPart = parts[parts.length - 1];
-    if (/^\d+$/.test(lastPart)) {
-      parts.pop();
+  if (!txRef) return null;
+  if (txRef.startsWith("flw-tx-") || txRef.startsWith("pstk-tx-")) {
+    const prefixLength = txRef.startsWith("flw-tx-") ? "flw-tx-".length : "pstk-tx-".length;
+    const remaining = txRef.substring(prefixLength);
+    const parts = remaining.split("-");
+    if (parts.length > 0) {
+      const lastPart = parts[parts.length - 1];
+      if (/^\d+$/.test(lastPart)) {
+        parts.pop();
+      }
+      return parts.join("-");
     }
-    return parts.join("-");
   }
   return null;
 }
@@ -94,7 +92,7 @@ export async function POST(req: Request) {
 
   // Rate limiting protection
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
-  if (isRateLimited(ip, 30, 60 * 1000)) { // 30 requests per minute
+  if (isRateLimited(ip, 30, 60 * 1000)) {
     console.warn(`[Rate Limited] IP blocked: ${ip}`);
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
@@ -102,6 +100,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     transactionId = body.transactionId;
+    const txRef = body.txRef || body.tx_ref;
 
     if (!transactionId) {
       return NextResponse.json({ error: "Missing required parameter: 'transactionId'." }, { status: 400 });
@@ -125,7 +124,6 @@ export async function POST(req: Request) {
     let authUid = "";
     if (idToken === "mock-token") {
       console.log("[Firebase Admin Auth] Mock verification token detected.");
-      const txRef = body.txRef || body.tx_ref;
       authUid = (txRef ? extractUserIdFromTxRef(txRef) : null) || "mock-uid";
     } else {
       if (!idToken) {
@@ -154,18 +152,18 @@ export async function POST(req: Request) {
       }
     }
 
-    // Call the shared, secure, single transaction wallet-funding function
-    const result = await verifyAndCreditWallet(transactionId, authUid);
+    // Call dynamic verifyPayment through PaymentGatewayManager
+    const result = await PaymentGatewayManager.verifyPayment(transactionId, txRef);
 
     if (!result.success) {
       logPaymentEvent({
         category: "Verification Failed",
         transactionId,
         userId: authUid,
-        message: `Wallet funding verification failed: ${result.message}`,
+        message: `Wallet funding verification failed: ${result.error}`,
         processingTimeMs: Date.now() - startTime,
       });
-      return NextResponse.json({ error: result.message }, { status: 400 });
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
     return NextResponse.json(result);
@@ -180,12 +178,10 @@ export async function POST(req: Request) {
       processingTimeMs: Date.now() - startTime,
     });
 
-    // Protect stack trace exposure to user
     return NextResponse.json({ error: "Internal Server Verification Error" }, { status: 500 });
   }
 }
 
-// Keep GET for backwards compatibility / web redirect checks
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -195,14 +191,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing required parameter: Transaction ID 'id'." }, { status: 400 });
     }
 
-    // Forward the Authorization header if present
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     const authHeader = req.headers.get("Authorization");
     if (authHeader) {
       headers["Authorization"] = authHeader;
     }
 
-    // Call identical logic
     const response = await fetch(`${new URL(req.url).origin}/api/flutterwave/verify`, {
       method: "POST",
       headers,
@@ -212,7 +206,7 @@ export async function GET(req: Request) {
     return NextResponse.json(data, { status: response.status });
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[Flutterwave Verification Exception] Failed GET verify operation:", error.message, error.stack);
+    console.error("[Verification Exception] Failed GET verify operation:", error.message, error.stack);
     return NextResponse.json({ error: "Internal Server Verification Error" }, { status: 500 });
   }
 }
