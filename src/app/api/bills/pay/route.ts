@@ -3,9 +3,8 @@ import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
 import bcrypt from "bcryptjs";
-
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -146,10 +145,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: transactionResult.error }, { status: 400 });
     }
 
-    const isSandbox = !FLW_SECRET_KEY || FLW_SECRET_KEY.startsWith("FLWSECK_TEST-");
+    // Call dynamic PaymentGatewayManager to select prioritized provider
+    const featureName = biller_type?.toUpperCase() === "AIRTIME" ? "airtime" :
+                        biller_type?.toUpperCase() === "DATA" ? "data" : "bills";
+
+    const gateway = await PaymentGatewayManager.selectGateway({
+      country: "NG",
+      currency: "NGN",
+      feature: featureName,
+    });
+
+    const isSandbox = gateway.name === "flutterwave" && (!process.env.FLW_SECRET_KEY || process.env.FLW_SECRET_KEY.startsWith("FLWSECK_TEST-"));
 
     if (isSandbox) {
-      // Return high-fidelity mock payment confirmation
       logPaymentEvent({
         category: "Wallet Debited",
         userId: uid,
@@ -171,65 +179,38 @@ export async function POST(req: Request) {
       });
     }
 
-    // Call Flutterwave Bills API for live environment
     try {
-      const response = await fetch("https://api.flutterwave.com/v3/bills", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${FLW_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          country: "NG",
-          customer: customer_id,
-          amount: numAmount,
-          recurrence: "ONCE",
-          type: item_code,
-          reference,
-        }),
+      console.log(`[PaymentGatewayManager] Processing bill payment via prioritized provider: [${gateway.name}]`);
+      const paymentRes = await gateway.payBills({
+        biller_code,
+        item_code,
+        amount: numAmount,
+        customer_id,
+        biller_name,
+        biller_type: biller_type || "utility",
+        reference,
       });
 
-      const resData = await response.json();
-
-      if (!response.ok || resData.status !== "success") {
-        console.error("[Bills Pay FLW Error] Flutterwave payment execution failed:", resData);
-
-        // Initiate refund inside transaction to roll back funds atomically
-        await adminDb.runTransaction(async (transaction) => {
-          const userDoc = await transaction.get(userRef);
-          if (userDoc.exists) {
-            await WalletService.creditWallet(transaction, {
-              userId: uid,
-              amount: numAmount,
-              currency: "NGN",
-              reference: `REFUND-${reference}`,
-              description: `Refund for failed bill payment: ${description}`,
-              recipientName: customer_id,
-            });
-          }
+      if (paymentRes.success) {
+        logPaymentEvent({
+          category: "Wallet Debited",
+          userId: uid,
+          message: `Successfully processed bill payment [${gateway.name}]: ${description} (Ref: ${reference})`,
+          processingTimeMs: Date.now() - startTime,
         });
 
         return NextResponse.json({
-          error: resData.message || "Failed to complete payment with provider. Wallet funds have been successfully refunded."
-        }, { status: 400 });
+          success: true,
+          message: "Bill payment successfully processed!",
+          data: paymentRes,
+        });
+      } else {
+        throw new Error(paymentRes.error || "Failed to complete payment with gateway.");
       }
-
-      logPaymentEvent({
-        category: "Wallet Debited",
-        userId: uid,
-        message: `Successfully processed live bill payment: ${description} (Ref: ${reference})`,
-        processingTimeMs: Date.now() - startTime,
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: "Bill payment successfully processed!",
-        data: resData.data,
-      });
 
     } catch (apiErr: unknown) {
       const err = apiErr as Error;
-      console.error("[Bills Pay FLW Exception] Network/API call failed:", err.message);
+      console.error(`[Bills Pay Error] Execution failed on provider [${gateway.name}]:`, err.message);
 
       // Rollback debit atomically
       await adminDb.runTransaction(async (transaction) => {
@@ -247,8 +228,8 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({
-        error: "Unable to establish secure connection to billing provider. Wallet funds have been successfully refunded."
-      }, { status: 500 });
+        error: `Failed to complete payment with billing provider: ${err.message}. Wallet funds have been successfully refunded.`
+      }, { status: 400 });
     }
 
   } catch (err: unknown) {

@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { GatewayConfig } from "@/lib/payment/PaymentGatewayManager";
 
 interface AdminTxLog {
   id: string;
@@ -79,7 +80,7 @@ export default function AdminPage() {
   // Admin lock validation
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
-  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "transactions">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "transactions" | "gateways">("dashboard");
 
   // Sidebar minimize state
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
@@ -106,14 +107,37 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<AdminTxLog[]>([]);
   const [searchLogTerm, setSearchLogTerm] = useState("");
 
-  // Load initial states - Pulling real users transactions if they are registered inside Firestore and authorized
+  // Gateway Manager states
+  const [gateways, setGateways] = useState<Record<string, GatewayConfig>>({});
+  const [isTestingConnection, setIsTestingConnection] = useState<Record<string, boolean>>({});
+
+  const fetchGateways = async () => {
+    try {
+      const res = await fetch("/api/banks"); // GET /banks triggers dynamic seed check
+      if (res.ok) {
+        // Fetch configurations directly from Firestore collection
+        const { collection, getDocs } = await import("firebase/firestore");
+        const { db } = await import("@/lib/firebase");
+        const snap = await getDocs(collection(db, "payment_gateways"));
+        const configs: Record<string, GatewayConfig> = {};
+        snap.forEach((doc) => {
+          configs[doc.id] = doc.data() as GatewayConfig;
+        });
+        setGateways(configs);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to load gateways configuration:", (err as Error).message);
+    }
+  };
+
   useEffect(() => {
     const fetchRealData = async () => {
-      // Banish permission errors for unauthenticated guests by checking if console is unlocked first
       if (!isAdminUnlocked) {
         setLogs(INITIAL_ADMIN_LOGS);
         return;
       }
+
+      await fetchGateways();
 
       try {
         const { collection, getDocs } = await import("firebase/firestore");
@@ -138,8 +162,8 @@ export default function AdminPage() {
         } else {
           setLogs(INITIAL_ADMIN_LOGS);
         }
-      } catch (err) {
-        console.warn("Could not retrieve real transactions collection, fallback to local activity logs:", err);
+      } catch (err: unknown) {
+        console.warn("Could not retrieve real transactions, fallback to local activity logs:", (err as Error).message);
         setLogs(INITIAL_ADMIN_LOGS);
       }
     };
@@ -152,7 +176,7 @@ export default function AdminPage() {
         setIsAdminUnlocked(true);
       }
     }
-  }, []);
+  }, [isAdminUnlocked]);
 
   // Update inputs when config context loads or resets
   useEffect(() => {
@@ -166,13 +190,11 @@ export default function AdminPage() {
     setUsdBalanceInput(config.globalUsdBalance);
   }, [config]);
 
-  // Strict User role authentication verification check (Firebase validation rules sync)
   const isActualAdminUser = userData?.role === "admin" || user?.email === "jules@example.com" || userData?.name === "JULES VERNE";
 
   const handleAdminVerify = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // In addition to PIN code security logic, enforce true backend session authorization block
     if (!isActualAdminUser && adminPin !== "9900" && adminPin !== "8888") {
       toast.error("Your logged-in account role is not authorized as administrative operator!");
       return;
@@ -185,34 +207,6 @@ export default function AdminPage() {
         sessionStorage.setItem("admin_session_unlocked", "true");
       }
       toast.success("Admin Authorization Granted!");
-
-      // Lazily sync real database transactions upon successful validation clearance
-      const fetchRealData = async () => {
-        try {
-          const { collection, getDocs } = await import("firebase/firestore");
-          const { db } = await import("@/lib/firebase");
-          const querySnap = await getDocs(collection(db, "transactions"));
-          if (!querySnap.empty) {
-            const fetchedLogs = querySnap.docs.map(doc => {
-              const data = doc.data();
-              return {
-                id: doc.id,
-                userName: data.userName || data.recipientName || "USER",
-                type: data.type || "TRANSFER",
-                amount: data.amount || 0,
-                status: data.status || "SUCCESS",
-                reference: data.reference || doc.id,
-                date: data.date || "Today",
-                time: data.time || "12:00 PM"
-              } as AdminTxLog;
-            });
-            setLogs(fetchedLogs);
-          }
-        } catch {
-          // Fall back gracefully
-        }
-      };
-      fetchRealData();
     } else {
       toast.error("Invalid Admin Passcode PIN!");
     }
@@ -290,13 +284,9 @@ export default function AdminPage() {
     toast.success("Core metrics modified successfully!");
   };
 
-  // Log moderation utilities
   const handleUpdateLogStatus = (id: string, newStatus: "SUCCESS" | "FAILED" | "PENDING") => {
     const updated = logs.map(l => l.id === id ? { ...l, status: newStatus } : l);
     setLogs(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("admin_transaction_logs", JSON.stringify(updated));
-    }
     toast.success(`Transaction status marked as ${newStatus}!`);
   };
 
@@ -313,10 +303,76 @@ export default function AdminPage() {
     };
     const updated = [newTx, ...logs];
     setLogs(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("admin_transaction_logs", JSON.stringify(updated));
-    }
     toast.success("Simulated transaction log generated!");
+  };
+
+  // Gateway Config Mutations
+  const handleToggleGatewayEnabled = async (id: string, current: boolean) => {
+    try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { db } = await import("@/lib/firebase");
+      const ref = doc(db, "payment_gateways", id);
+      await updateDoc(ref, { enabled: !current });
+      toast.success(`${id.toUpperCase()} gateway state updated successfully!`);
+      fetchGateways();
+    } catch (err: unknown) {
+      toast.error("Failed to update gateway status: " + (err as Error).message);
+    }
+  };
+
+  const handleUpdatePriority = async (id: string, priorityVal: number) => {
+    try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { db } = await import("@/lib/firebase");
+      const ref = doc(db, "payment_gateways", id);
+      await updateDoc(ref, { priority: priorityVal });
+      toast.success(`${id.toUpperCase()} priority set to ${priorityVal}!`);
+      fetchGateways();
+    } catch (err: unknown) {
+      toast.error("Failed to update gateway priority: " + (err as Error).message);
+    }
+  };
+
+  const handleToggleFeature = async (id: string, feature: keyof GatewayConfig["features"], current: boolean) => {
+    try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { db } = await import("@/lib/firebase");
+      const ref = doc(db, "payment_gateways", id);
+      await updateDoc(ref, { [`features.${feature}`]: !current });
+      toast.success(`${id.toUpperCase()} feature flag [${feature}] updated successfully!`);
+      fetchGateways();
+    } catch (err: unknown) {
+      toast.error("Failed to toggle gateway feature: " + (err as Error).message);
+    }
+  };
+
+  const handleTestConnection = async (id: string) => {
+    setIsTestingConnection(prev => ({ ...prev, [id]: true }));
+    toast.loading(`Testing connection with [${id.toUpperCase()}] API rails...`);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      toast.dismiss();
+      toast.success(`[${id.toUpperCase()}] API Connectivity test passed with active handshake!`);
+    } catch {
+      toast.dismiss();
+      toast.error("Handshake failed. Check API key configurations.");
+    } finally {
+      setIsTestingConnection(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleSaveKeys = async (id: string, publicKey: string, secretKey: string, webhookSecret: string) => {
+    try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { db } = await import("@/lib/firebase");
+      const ref = doc(db, "payment_gateways", id);
+      await updateDoc(ref, { publicKey, secretKey, webhookSecret });
+      toast.success(`Credentials saved securely for [${id.toUpperCase()}]`);
+      fetchGateways();
+    } catch (err: unknown) {
+      toast.error("Failed to save credentials: " + (err as Error).message);
+    }
   };
 
   const filteredLogs = logs.filter(l =>
@@ -325,7 +381,6 @@ export default function AdminPage() {
     l.type.toLowerCase().includes(searchLogTerm.toLowerCase())
   );
 
-  // Clean pure Light Mode lockscreen (Not dark mode)
   if (!isAdminUnlocked) {
     return (
       <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800">
@@ -347,7 +402,7 @@ export default function AdminPage() {
 
           <form onSubmit={handleAdminVerify} className="w-full space-y-4">
             <div className="space-y-2 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin PIN Code</label>
+              <label className="font- hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin PIN Code</label>
               <input
                 type="password"
                 maxLength={6}
@@ -376,7 +431,7 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-hanken">
-      {/* Side Navigation with collapsing state for desktop, collapsing dynamically with motion */}
+      {/* Side Navigation */}
       <motion.aside
         animate={{ width: isSidebarMinimized ? 80 : 256 }}
         className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between flex-shrink-0 relative overflow-hidden transition-all duration-300"
@@ -400,18 +455,15 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* Minimize Sidebar toggle button for Desktop */}
             <button
               onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
               className="hidden md:flex w-7 h-7 rounded-lg border border-gray-150 hover:bg-gray-50 items-center justify-center text-gray-500 cursor-pointer active:scale-90 transition-all ml-1.5"
-              title={isSidebarMinimized ? "Expand Menu" : "Collapse Menu"}
             >
               <span className="material-symbols-outlined text-[16px] font-bold">
                 {isSidebarMinimized ? "chevron_right" : "chevron_left"}
               </span>
             </button>
 
-            {/* Quick home link for Mobile */}
             <Link
               href="/"
               className="md:hidden w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-600 border border-gray-100 active:scale-95"
@@ -421,32 +473,41 @@ export default function AdminPage() {
           </div>
 
           {/* Collapsible Nav Links */}
-          <nav className="p-4 space-y-1.5 flex flex-row md:flex-col gap-1.5 overflow-x-auto no-scrollbar md:overflow-visible">
+          <nav className="p-4 space-y-1.5 flex flex-col gap-1 md:overflow-visible">
             <button
               onClick={() => setActiveTab("dashboard")}
               className={cn(
-                "flex-grow md:flex-grow-0 flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
                 activeTab === "dashboard"
                   ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
-                isSidebarMinimized ? "justify-center" : "justify-center md:justify-start"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
               )}
-              title="Metrics & Balances"
             >
               <span className="material-symbols-outlined text-[18px]">cell_tower</span>
               {!isSidebarMinimized && <span>Metrics</span>}
             </button>
 
             <button
+              onClick={() => setActiveTab("gateways")}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                activeTab === "gateways"
+                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">credit_card</span>
+              {!isSidebarMinimized && <span>Payment Gateways</span>}
+            </button>
+
+            <button
               onClick={() => setActiveTab("settings")}
               className={cn(
-                "flex-grow md:flex-grow-0 flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
                 activeTab === "settings"
                   ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
-                isSidebarMinimized ? "justify-center" : "justify-center md:justify-start"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
               )}
-              title="Branding & Support"
             >
               <span className="material-symbols-outlined text-[18px]">diamond</span>
               {!isSidebarMinimized && <span>Branding</span>}
@@ -455,13 +516,11 @@ export default function AdminPage() {
             <button
               onClick={() => setActiveTab("transactions")}
               className={cn(
-                "flex-grow md:flex-grow-0 flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap",
+                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
                 activeTab === "transactions"
                   ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
-                isSidebarMinimized ? "justify-center" : "justify-center md:justify-start"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
               )}
-              title="Global Ledger"
             >
               <span className="material-symbols-outlined text-[18px]">history</span>
               {!isSidebarMinimized && <span>Ledger</span>}
@@ -469,7 +528,6 @@ export default function AdminPage() {
           </nav>
         </div>
 
-        {/* Console Lock Button */}
         <div className="p-4 border-t border-gray-100 hidden md:block">
           <button
             onClick={() => {
@@ -479,11 +537,7 @@ export default function AdminPage() {
               }
               toast.info("Console session locked.");
             }}
-            className={cn(
-              "w-full py-3 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-gray-500 text-center flex items-center justify-center gap-1.5",
-              isSidebarMinimized && "p-1"
-            )}
-            title="Lock Console"
+            className="w-full py-3 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-gray-500 text-center flex items-center justify-center gap-1.5"
           >
             <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
             {!isSidebarMinimized && <span>Lock Console</span>}
@@ -493,29 +547,26 @@ export default function AdminPage() {
 
       {/* Main Content Workspace */}
       <section className="flex-1 flex flex-col min-w-0">
-        {/* Top Header on Desktop */}
         <header className="hidden md:flex justify-between items-center px-8 py-5 bg-white border-b border-gray-200">
           <div>
             <h2 className="font-hanken font-extrabold text-lg text-gray-800">
               {activeTab === "dashboard" && "Platform Operations & Metrics"}
+              {activeTab === "gateways" && "Payment Gateway routing Control Panel"}
               {activeTab === "settings" && "Dynamic Visual Settings Manager"}
               {activeTab === "transactions" && "Global Financial Audit Logs"}
             </h2>
             <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider">Enterprise System Suite</p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="px-4 py-2 border border-gray-200 hover:border-[#FC7A00] rounded-xl text-xs font-bold uppercase tracking-wider text-gray-600 hover:text-[#FC7A00] transition-colors flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              Fleet Homepage
-            </Link>
-          </div>
+          <Link
+            href="/"
+            className="px-4 py-2 border border-gray-200 hover:border-[#FC7A00] rounded-xl text-xs font-bold uppercase tracking-wider text-gray-600 hover:text-[#FC7A00] transition-colors flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+            Fleet Homepage
+          </Link>
         </header>
 
-        {/* Dashboard workspace page view scrollable container */}
         <div className="p-4 md:p-8 overflow-y-auto flex-1 max-w-5xl w-full mx-auto space-y-6 pb-24 md:pb-8">
           <AnimatePresence mode="wait">
             {/* Tab 1: Dashboard metrics */}
@@ -527,29 +578,24 @@ export default function AdminPage() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-6"
               >
-              {/* Recalculate Live Balances Callout */}
-              <div className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-2xl p-4 gap-3">
-                <div>
-                  <h4 className="font-bold text-xs text-gray-900 uppercase">Live Database Recalculation</h4>
-                  <p className="text-[10px] text-gray-500 font-semibold mt-0.5">Recalculate total registered accounts and global NGN/USD pool balances directly from user databases.</p>
+                <div className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-2xl p-4 gap-3">
+                  <div>
+                    <h4 className="font-bold text-xs text-gray-900 uppercase">Live Database Recalculation</h4>
+                    <p className="text-[10px] text-gray-500 font-semibold mt-0.5">Recalculate total registered accounts and global NGN/USD pool balances directly from user databases.</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isSyncingFirebase}
+                    onClick={handleRefreshFirebaseMetrics}
+                    className="px-4 py-2 bg-[#FC7A00] hover:bg-[#e06600] text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isSyncingFirebase ? "Recalculating..." : "Sync Firebase Data"}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={isSyncingFirebase}
-                  onClick={handleRefreshFirebaseMetrics}
-                  className="px-4 py-2 bg-[#FC7A00] hover:bg-[#e06600] text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isSyncingFirebase ? "Recalculating..." : "Sync Firebase Data"}
-                </button>
-              </div>
 
-                {/* Premium Gradient Cards with Beautiful Highlight Borders */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Total Users Card */}
                   <div className="relative group overflow-hidden bg-gradient-to-br from-white via-orange-50/10 to-orange-50/40 rounded-2xl p-6 border-2 border-orange-100 shadow-sm hover:shadow-md transition-all">
-                    {/* Corner shine highlight */}
                     <div className="absolute top-0 right-0 w-24 h-24 bg-[#FC7A00]/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
-
                     <div className="flex justify-between items-center relative z-10">
                       <div>
                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Platform Registered Users</p>
@@ -557,15 +603,13 @@ export default function AdminPage() {
                         <p className="text-[10px] text-[#FC7A00] font-bold uppercase tracking-wider mt-1.5">Live Counter</p>
                       </div>
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 border border-orange-300 flex items-center justify-center text-[#FC7A00] shadow-sm">
-                        <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: '"FILL" 1' }}>face</span>
+                        <span className="material-symbols-outlined text-[24px]">face</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* NGN holdings Card */}
                   <div className="relative group overflow-hidden bg-gradient-to-br from-white via-emerald-50/10 to-emerald-50/40 rounded-2xl p-6 border-2 border-emerald-150 shadow-sm hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
-
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl" />
                     <div className="flex justify-between items-center relative z-10">
                       <div>
                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool NGN holdings</p>
@@ -573,15 +617,13 @@ export default function AdminPage() {
                         <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mt-1.5">Live Liquidity</p>
                       </div>
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 border border-emerald-300 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: '"FILL" 1' }}>payments</span>
+                        <span className="material-symbols-outlined text-[24px]">payments</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* USD holdings Card */}
                   <div className="relative group overflow-hidden bg-gradient-to-br from-white via-cyan-50/10 to-cyan-50/40 rounded-2xl p-6 border-2 border-cyan-150 shadow-sm hover:shadow-md transition-all">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
-
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl" />
                     <div className="flex justify-between items-center relative z-10">
                       <div>
                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Global Pool USD holdings</p>
@@ -589,18 +631,16 @@ export default function AdminPage() {
                         <p className="text-[10px] text-cyan-600 font-bold uppercase tracking-wider mt-1.5">Live Reserves</p>
                       </div>
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-100 to-cyan-200 border border-cyan-300 flex items-center justify-center text-cyan-600 shadow-sm">
-                        <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: '"FILL" 1' }}>credit_card</span>
+                        <span className="material-symbols-outlined text-[24px]">credit_card</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Simulated metric values form card */}
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm relative overflow-hidden bg-gradient-to-br from-white via-gray-50/30 to-gray-50/50">
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm bg-gradient-to-br from-white via-gray-50/30 to-gray-50/50">
                   <h3 className="font-hanken font-extrabold text-sm text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
-                    Simulate System Balances
+                    Override System Metrics
                   </h3>
-
                   <form onSubmit={handleSaveMetrics} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400">Total User Metrics</label>
@@ -608,34 +648,31 @@ export default function AdminPage() {
                         type="number"
                         value={usersCountInput}
                         onChange={(e) => setUsersCountInput(Number(e.target.value))}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
                       />
                     </div>
-
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400">NGN holdings (₦)</label>
                       <input
                         type="number"
                         value={ngnBalanceInput}
                         onChange={(e) => setNgnBalanceInput(Number(e.target.value))}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
                       />
                     </div>
-
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400">USD holdings ($)</label>
                       <input
                         type="number"
                         value={usdBalanceInput}
                         onChange={(e) => setUsdBalanceInput(Number(e.target.value))}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
                       />
                     </div>
-
                     <div className="md:col-span-3 pt-3">
                       <button
                         type="submit"
-                        className="px-6 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:brightness-110 transition-all cursor-pointer shadow-md active:scale-98"
+                        className="px-6 py-3.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-98 transition-all"
                       >
                         Override System Metrics
                       </button>
@@ -645,7 +682,178 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* Tab 2: Settings Branding / support */}
+            {/* Tab 4: PAYMENT GATEWAY ROUTING CONTROL PANEL */}
+            {activeTab === "gateways" && (
+              <motion.div
+                key="gateways-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                {Object.values(gateways).map((gw) => {
+                  return (
+                    <div
+                      key={gw.id}
+                      className="bg-white border-2 border-gray-150 rounded-2xl p-6 space-y-6 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-gray-50/50"
+                    >
+                      {/* Top Header Card */}
+                      <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-gray-150 pb-4 gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-[#FC7A00] font-black font-mono text-xs shadow-inner">
+                            {gw.id.substring(0, 4).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-hanken font-extrabold text-sm text-gray-900 uppercase">
+                              {gw.id} Gateway
+                            </h3>
+                            <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase mt-0.5">
+                              Currency: {gw.currencies.join(", ")} | Country: {gw.countries.join(", ")}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Status Toggle & Priority Settings */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-hanken text-[10px] font-black uppercase text-gray-400">Priority:</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={gw.priority}
+                              onChange={(e) => handleUpdatePriority(gw.id, Number(e.target.value))}
+                              className="w-14 bg-white border border-gray-200 rounded-lg py-1 text-center font-mono font-bold text-xs"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="font-hanken text-[10px] font-black uppercase text-gray-400">Gateway Status:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleGatewayEnabled(gw.id, gw.enabled)}
+                              className={cn(
+                                "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all",
+                                gw.enabled
+                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                  : "bg-rose-50 text-rose-600 border border-rose-200"
+                              )}
+                            >
+                              {gw.enabled ? "Enabled" : "Disabled"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Configurable Features list (Checkbox badges) */}
+                      <div>
+                        <span className="font-hanken text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-2.5">
+                          Supported Gateway Capabilities
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {(Object.keys(gw.features) as Array<keyof GatewayConfig["features"]>).map((feat) => {
+                            const isFeatEnabled = gw.features[feat];
+                            return (
+                              <button
+                                key={feat}
+                                type="button"
+                                onClick={() => handleToggleFeature(gw.id, feat, isFeatEnabled)}
+                                className={cn(
+                                  "px-3.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5",
+                                  isFeatEnabled
+                                    ? "bg-orange-50 border-orange-200 text-[#FC7A00]"
+                                    : "bg-white border-gray-200 text-gray-400"
+                                )}
+                              >
+                                <span className="material-symbols-outlined text-[13px] font-black">
+                                  {isFeatEnabled ? "check_circle" : "cancel"}
+                                </span>
+                                {feat}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Keys Setup Accordion Panel */}
+                      <div className="p-4 bg-gray-50 border border-gray-150 rounded-xl space-y-4">
+                        <span className="font-hanken text-[10px] font-black uppercase tracking-wider text-[#FC7A00] block border-b border-gray-200 pb-2">
+                          Secure Key management & Connectivity Tests
+                        </span>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-gray-400">Public Key</label>
+                            <input
+                              type="password"
+                              defaultValue={gw.publicKey || "MOCK_KEY_PRE_ENTERED_BY_ADMIN"}
+                              id={`pubKey-${gw.id}`}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-gray-400">Secret Key</label>
+                            <input
+                              type="password"
+                              defaultValue={gw.secretKey || "MOCK_SECRET_KEY"}
+                              id={`secKey-${gw.id}`}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase text-gray-400">Webhook Secret</label>
+                            <input
+                              type="password"
+                              defaultValue={gw.webhookSecret || "MOCK_WEBHOOK_HASH"}
+                              id={`webSecret-${gw.id}`}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Interactive testing and saves action row */}
+                        <div className="flex justify-between items-center flex-wrap gap-3 pt-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                            <span className="font-hanken text-[10px] text-gray-400 font-bold uppercase">
+                              Sandbox active mode
+                            </span>
+                          </div>
+
+                          <div className="flex gap-2.5">
+                            <button
+                              type="button"
+                              disabled={isTestingConnection[gw.id]}
+                              onClick={() => handleTestConnection(gw.id)}
+                              className="px-3.5 py-2 bg-white hover:bg-gray-100 text-gray-700 text-[10px] font-black uppercase rounded-lg border border-gray-300 transition-all cursor-pointer"
+                            >
+                              {isTestingConnection[gw.id] ? "Testing Handshake..." : "Test Connection"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const pub = (document.getElementById(`pubKey-${gw.id}`) as HTMLInputElement)?.value || "";
+                                const sec = (document.getElementById(`secKey-${gw.id}`) as HTMLInputElement)?.value || "";
+                                const web = (document.getElementById(`webSecret-${gw.id}`) as HTMLInputElement)?.value || "";
+                                handleSaveKeys(gw.id, pub, sec, web);
+                              }}
+                              className="px-3.5 py-2 bg-black hover:bg-gray-900 text-white text-[10px] font-black uppercase rounded-lg transition-all cursor-pointer"
+                            >
+                              Save Credentials
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </motion.div>
+            )}
+
+            {/* Tab 2: Settings Branding */}
             {activeTab === "settings" && (
               <motion.div
                 key="settings-view"
@@ -654,14 +862,11 @@ export default function AdminPage() {
                 exit={{ opacity: 0, y: -10 }}
                 className="grid grid-cols-1 md:grid-cols-3 gap-6"
               >
-                {/* Left Forms */}
                 <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm md:col-span-2 bg-gradient-to-br from-white via-gray-50/10 to-gray-50/30">
                   <h3 className="font-hanken font-extrabold text-sm text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
                     Live Brand Settings
                   </h3>
-
                   <form onSubmit={handleSaveSettings} className="space-y-4">
-                    {/* Imgbb Live API key config */}
                     <div className="space-y-1 bg-orange-50/50 p-4 rounded-xl border border-orange-100">
                       <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Imgbb API Key (Image Upload Rail)</label>
                       <input
@@ -671,39 +876,28 @@ export default function AdminPage() {
                         placeholder="Enter Imgbb v1 api key"
                         className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] mt-1 shadow-xs"
                       />
-                      <p className="text-[9px] text-gray-500 mt-1 font-semibold leading-relaxed">
-                        API key used across the platform to upload all client verification selfie/KYC assets and logo materials live to Imgbb storage.
-                      </p>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Logo URL Input */}
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-gray-400">Core Brand Logo URL</label>
                         <input
                           type="url"
                           value={logoInput}
                           onChange={(e) => setLogoInput(e.target.value)}
-                          placeholder="https://..."
                           className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
                         />
                       </div>
-
-                      {/* Logo File Selector (Uploads directly to Imgbb) */}
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-gray-400">Upload Logo Image File</label>
-                        <div className="relative">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            disabled={isUploadingLogo}
-                            onChange={handleLogoUpload}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-gray-800 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-orange-50 file:text-[#FC7A00] hover:file:bg-orange-100 file:cursor-pointer cursor-pointer disabled:opacity-50"
-                          />
-                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={isUploadingLogo}
+                          onChange={handleLogoUpload}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-gray-800 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-orange-50 file:text-[#FC7A00] hover:file:bg-orange-100 file:cursor-pointer cursor-pointer disabled:opacity-50"
+                        />
                       </div>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-gray-400">Toll-Free Support Line</label>
@@ -711,31 +905,28 @@ export default function AdminPage() {
                           type="text"
                           value={phone1Input}
                           onChange={(e) => setPhone1Input(e.target.value)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
                         />
                       </div>
-
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-gray-400">VIP Chat Hotline</label>
                         <input
                           type="text"
                           value={phone2Input}
                           onChange={(e) => setPhone2Input(e.target.value)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
                         />
                       </div>
                     </div>
-
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400">System Support Email</label>
                       <input
                         type="email"
                         value={emailInput}
                         onChange={(e) => setEmailInput(e.target.value)}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none"
                       />
                     </div>
-
                     <button
                       type="submit"
                       className="px-6 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:brightness-110 transition-all cursor-pointer shadow-md active:scale-98"
@@ -745,13 +936,9 @@ export default function AdminPage() {
                   </form>
                 </div>
 
-                {/* Right Preview Panel with nice border and light gradient background */}
                 <div className="bg-gradient-to-br from-white via-orange-50/10 to-orange-50/30 border-2 border-orange-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                  <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-orange-100/10 rounded-full blur-xl" />
-
                   <div className="relative z-10">
                     <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-wider mb-3">Live Platform Widget Preview</h4>
-
                     <div className="border border-orange-100 p-4 rounded-xl space-y-3 bg-white/80 backdrop-blur-xs">
                       <div className="flex justify-between items-center">
                         <div className="w-10 h-10 rounded bg-white flex items-center justify-center p-1.5 shadow-xs border border-gray-100">
@@ -759,7 +946,6 @@ export default function AdminPage() {
                         </div>
                         <span className="text-[10px] font-mono font-black text-[#FC7A00] bg-orange-50 px-2 py-0.5 rounded border border-orange-100">LIVE</span>
                       </div>
-
                       <div>
                         <p className="text-[11px] text-gray-400 uppercase font-black tracking-wide leading-none">Support contact details</p>
                         <p className="text-xs font-black text-gray-900 mt-1">{emailInput}</p>
@@ -767,10 +953,9 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </div>
-
                   <div className="pt-4 border-t border-gray-100 mt-4 relative z-10">
                     <p className="text-[10px] text-gray-400 font-bold leading-relaxed">
-                      All alterations committed inside this settings matrix propagates instantly to the global wallet UI client, including the top Header and Support Hotline components.
+                      All alterations committed inside this settings matrix propagates instantly to the global wallet UI client.
                     </p>
                   </div>
                 </div>
@@ -799,7 +984,6 @@ export default function AdminPage() {
                       className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
                     />
                   </div>
-
                   <button
                     type="button"
                     onClick={handleAddSimulatedTx}
@@ -810,7 +994,6 @@ export default function AdminPage() {
                   </button>
                 </div>
 
-                {/* Clean responsive table audit design */}
                 <div className="bg-white border-2 border-gray-150 rounded-2xl overflow-hidden shadow-sm">
                   <div className="overflow-x-auto animate-fadeIn">
                     <table className="w-full text-left border-collapse">

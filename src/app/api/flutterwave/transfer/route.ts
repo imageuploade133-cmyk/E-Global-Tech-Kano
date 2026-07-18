@@ -4,12 +4,9 @@ import { adminDb, hasAdminCredentials } from "@/lib/firebase-admin";
 import { WalletService } from "@/lib/wallet-service";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
-import { flutterwaveService } from "@/lib/flutterwave";
+import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
 import { BankService } from "@/services/bank-service";
 import bcrypt from "bcryptjs";
-
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-const FLW_BASE_URL = "https://api.flutterwave.com/v3";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -52,12 +49,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid transfer amount." }, { status: 400 });
     }
 
-    // Single Transfer Limit (Max NGN 500,000 per transfer)
     if (transferAmount > 500000) {
       return NextResponse.json({ error: "Single transfer amount cannot exceed ₦500,000.00" }, { status: 400 });
     }
 
-    // Resolve bank from Firestore using BankService
+    // Resolve bank from Firestore
     const bank = await BankService.getBankById(bankId);
     if (!bank) {
       return NextResponse.json({ error: "Invalid bank selected." }, { status: 400 });
@@ -70,7 +66,7 @@ export async function POST(req: Request) {
 
     console.log(`[Outward Transfer Initiated] User: ${uid}, Amount: ${transferAmount}, Bank: ${bank.name} (${bankCode})`);
 
-    // Fetch user's cumulative transfer total for today from Firestore (Daily Limit enforcement)
+    // Fetch user's cumulative transfer total for today from Firestore
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const startOfTodayStr = startOfToday.toISOString();
@@ -89,7 +85,7 @@ export async function POST(req: Request) {
 
     const userRef = adminDb.collection("users").doc(uid);
 
-    // 2. Secure Transaction PIN verification with Lockout checks & Daily Limit verification
+    // 2. PIN verification with Lockout checks
     const pinCheckResult = await adminDb.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
@@ -102,8 +98,7 @@ export async function POST(req: Request) {
       let pinAttempts = Number(userData.pinAttempts) || 0;
       const lockedUntil = userData.lockedUntil;
 
-      // Extract user's specific daily cumulative limit (configured via profile selection)
-      const userDailyLimit = Number(userData.dailyLimit) || 1000000; // default to NGN 1,000,000
+      const userDailyLimit = Number(userData.dailyLimit) || 1000000;
 
       // Enforce Daily Cumulative Limit
       if (todayTransferTotal + transferAmount > userDailyLimit) {
@@ -168,50 +163,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: pinCheckResult.error }, { status: 400 });
     }
 
-    // 3. Re-Verify recipient account server-side (never trust frontend input)
-    console.log(`[Outward Transfer] Re-verifying account number ${accountNumber} for bank ${bankCode} server-side...`);
-    const resolveRes = await flutterwaveService.verifyBankAccount({
-      account_number: accountNumber,
-      account_bank: bankCode,
+    // 3. Re-Verify recipient account server-side via dynamic GatewayManager
+    console.log(`[Outward Transfer] Re-verifying account number ${accountNumber} server-side...`);
+    const resolveRes = await PaymentGatewayManager.resolveAccount({
+      bankId,
+      accountNumber,
     });
 
-    if (resolveRes.status !== "success" || !resolveRes.data) {
+    if (!resolveRes.success || !resolveRes.accountName) {
       return NextResponse.json({ error: "Recipient account verification failed. Check bank and account number." }, { status: 400 });
     }
 
-    const verifiedAccountName = resolveRes.data.account_name;
+    const verifiedAccountName = resolveRes.accountName;
     console.log(`[Outward Transfer] Resolved Recipient Account Name: ${verifiedAccountName}`);
 
-    // 4. Fetch dynamic Flutterwave Transfer Fee server-side
-    let fee = 10.00; // standard fallback
-    if (FLW_SECRET_KEY) {
-      try {
-        const feeRes = await fetch(`${FLW_BASE_URL}/transfers/fee?amount=${transferAmount}&currency=NGN`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${FLW_SECRET_KEY}`,
-            "Content-Type": "application/json",
-          },
-        });
-        const feeData = await feeRes.json();
-        if (feeRes.ok && feeData.status === "success" && Array.isArray(feeData.data) && feeData.data[0]) {
-          fee = Number(feeData.data[0].fee) || 10.00;
-        }
-      } catch {
-        console.warn(`[Outward Transfer Warning] Error fetching dynamic fee. Defaulting to: ${fee}`);
-      }
-    }
-
+    // Standard fallback transfer fee
+    const fee = 10.00;
     const totalDebit = transferAmount + fee;
     console.log(`[Outward Transfer Calculation] Amount: ₦${transferAmount}, Fee: ₦${fee}, Total Debit: ₦${totalDebit}`);
 
-    const referenceId = `flw-trf-${uid}-${Date.now()}`;
+    const referenceId = `trf-${uid}-${Date.now()}`;
     const trfRef = adminDb.collection("wallet_transfers").doc(referenceId);
 
-    // 5. Begin Firestore Transaction to debit balance, write PROCESSING wallet transfer, and create ledger entry
+    // 4. Begin Firestore Transaction to debit balance and write PROCESSING transfer record
     const dbTransactionResult = await adminDb.runTransaction(async (transaction) => {
       try {
-        // Debit the totalDebit (amount + fee) from wallet balance using WalletService
         const debitRes = await WalletService.debitWallet(transaction, {
           userId: uid,
           amount: totalDebit,
@@ -222,24 +198,23 @@ export async function POST(req: Request) {
           description: narration || `Outward transfer to bank account ${accountNumber}`,
           recipientName: verifiedAccountName,
           fee: fee,
-          isPending: true, // starts as PENDING until settled or reversed
+          isPending: true,
         });
 
-        // Store PROCESSING transfer record inside 'wallet_transfers' collection
         transaction.set(trfRef, {
           id: referenceId,
           userId: uid,
           reference: referenceId,
-          flutterwaveTransferId: null, // set once accepted by FLW
+          transferId: null,
           amount: transferAmount,
           fee: fee,
           totalDebit: totalDebit,
           recipientName: verifiedAccountName,
-          bankName: "Nigerian Bank",
+          bankName: bank.name || "Nigerian Bank",
           bankCode: bankCode,
           accountNumber: accountNumber,
           currency: "NGN",
-          status: "PROCESSING", // State Machine Initial State
+          status: "PROCESSING",
           createdAt: new Date().toISOString(),
           completedAt: null,
           failureReason: null,
@@ -262,38 +237,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: dbTransactionResult.error || "Insufficient wallet funds." }, { status: 400 });
     }
 
-    // 6. Call Flutterwave Direct Transfer API
+    // 5. Call dynamic outward transfer through PaymentGatewayManager
     try {
-      console.log(`[Flutterwave API] Executing outward transfer of NGN ${transferAmount} to bank ${bankCode}...`);
-      const flwRes = await fetch(`${FLW_BASE_URL}/transfers`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${FLW_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          account_bank: bankCode,
-          account_number: accountNumber,
-          amount: transferAmount,
-          narration: narration || "E-Tech Outward Transfer",
-          currency: "NGN",
-          reference: referenceId,
-          callback_url: "https://e-global-tech-kano.vercel.app/api/flutterwave/transfer-webhook",
-        }),
+      console.log(`[PaymentGatewayManager] Executing outward transfer of NGN ${transferAmount}...`);
+      const res = await PaymentGatewayManager.transfer({
+        bankId,
+        accountNumber,
+        amount: transferAmount,
+        narration: narration || "E-Tech Outward Transfer",
+        reference: referenceId,
       });
 
-      const flwData = await flwRes.json();
-      console.log(`[Flutterwave API Response] Status: ${flwRes.status}, Payload: ${JSON.stringify(flwData)}`);
-
-      if (flwRes.ok && flwData.status === "success" && flwData.data) {
-        // Flutterwave accepted the transfer successfully (set FLW Transfer ID, keep PROCESSING)
-        const flwId = flwData.data.id;
-        const flwBankName = flwData.data.bank_name || "Nigerian Bank";
-
+      if (res.success) {
         await adminDb.runTransaction(async (transaction) => {
           transaction.update(trfRef, {
-            flutterwaveTransferId: flwId.toString(),
-            bankName: flwBankName,
+            transferId: res.reference,
           });
         });
 
@@ -301,10 +259,9 @@ export async function POST(req: Request) {
           category: "Transfer",
           userId: uid,
           tx_ref: referenceId,
-          transactionId: flwId.toString(),
           amount: transferAmount,
           currency: "NGN",
-          message: `Outward bank transfer successfully accepted and registered with Flutterwave. Ref: ${referenceId}`,
+          message: `Outward bank transfer successfully accepted and registered with payment gateway. Ref: ${referenceId}`,
           processingTimeMs: Date.now() - startTime,
         });
 
@@ -315,9 +272,8 @@ export async function POST(req: Request) {
           reference: referenceId,
         });
       } else {
-        // Flutterwave explicitly rejected the transfer! Rollback wallet balance atomically
-        const rejectReason = flwData.message || "Failed to register transfer with Flutterwave API.";
-        console.warn(`[Flutterwave Rejection] Outward transfer rejected: ${rejectReason}. Executing atomic refund rollback...`);
+        const rejectReason = res.error || "Failed to register transfer with payment gateway.";
+        console.warn(`[Gateway Rejection] Outward transfer rejected: ${rejectReason}. Executing refund rollback...`);
 
         await executeRefundRollback(uid, totalDebit, referenceId, rejectReason);
 
@@ -326,9 +282,8 @@ export async function POST(req: Request) {
         }, { status: 400 });
       }
     } catch (apiErr: unknown) {
-      // API Timeout / Network Failure: Do NOT refund immediately. Keep as PROCESSING and let recovery handle it!
       const error = apiErr as Error;
-      console.warn(`[Flutterwave API Timeout/Exception] Outward transfer timed out: ${error.message}. Retaining PROCESSING status for background recovery resolution.`);
+      console.warn(`[Gateway Timeout/Exception] Outward transfer timed out: ${error.message}. Retaining PROCESSING status.`);
 
       logPaymentEvent({
         category: "Errors",
@@ -336,7 +291,7 @@ export async function POST(req: Request) {
         tx_ref: referenceId,
         amount: transferAmount,
         currency: "NGN",
-        message: `Outward transfer API timeout. Transaction retained as PROCESSING for background recovery resolver. Error: ${error.message}`,
+        message: `Outward transfer API timeout. Transaction retained as PROCESSING for background recovery. Error: ${error.message}`,
         processingTimeMs: Date.now() - startTime,
       });
 
@@ -355,16 +310,12 @@ export async function POST(req: Request) {
   }
 }
 
-/**
- * Handles atomic balance refunds and updates ledger status to FAILED in case of Flutterwave registration rejections.
- */
 async function executeRefundRollback(userId: string, totalDebit: number, referenceId: string, reason: string) {
   try {
     const trfRef = adminDb.collection("wallet_transfers").doc(referenceId);
     const ledgerRef = adminDb.collection("transactions").doc(`tx-${referenceId}`);
 
     await adminDb.runTransaction(async (transaction) => {
-      // 1. Refund the totalDebit atomically back into user's wallet using WalletService
       await WalletService.creditWallet(transaction, {
         userId,
         amount: totalDebit,
@@ -375,14 +326,12 @@ async function executeRefundRollback(userId: string, totalDebit: number, referen
         recipientName: "System Refund",
       });
 
-      // 2. Mark outward transfer doc as REVERSED with failureReason
       transaction.update(trfRef, {
         status: "REVERSED",
         failureReason: reason,
         completedAt: new Date().toISOString(),
       });
 
-      // 3. Update the original ledger transaction record status to FAILED
       transaction.update(ledgerRef, {
         status: "FAILED",
         description: `FAILED: ${reason}`,
