@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 interface BalanceCardProps {
   balance: number;
@@ -16,6 +17,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [isVisible, setIsVisible] = useState(true);
   const { userData, user } = useAuth();
   const { config } = useAppConfig();
+  const router = useRouter();
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
 
   // Add Money Wizard States
@@ -960,18 +962,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       </div>
 
       {/* Action Buttons Below Card */}
-      <div className="mt-4 min-[360px]:mt-5 flex gap-2.5 min-[360px]:gap-4">
+      <div className="mt-4 min-[360px]:mt-5 flex gap-2 min-[360px]:gap-3">
         <motion.button
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           onClick={() => setIsAddMoneyOpen(true)}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 min-[360px]:gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-          <div className="w-5.5 h-5.5 min-[360px]:w-7 min-[360px]:h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[12px] min-[360px]:text-[16px] font-bold block">add_card</span>
+          <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">add_card</span>
           </div>
-          <span className="font-label-sm text-[10px] min-[360px]:text-[12px] text-white tracking-wide uppercase font-bold truncate">
+          <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Add Money
           </span>
         </motion.button>
@@ -980,14 +982,29 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           onClick={() => setIsTransferOpen(true)}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 min-[360px]:gap-2 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-          <div className="w-5.5 h-5.5 min-[360px]:w-7 min-[360px]:h-7 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[12px] min-[360px]:text-[16px] font-bold block">send</span>
+          <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">send</span>
           </div>
-          <span className="font-label-sm text-[10px] min-[360px]:text-[12px] text-white tracking-wide uppercase font-bold truncate">
+          <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Transfer
+          </span>
+        </motion.button>
+
+        <motion.button
+          whileTap={{ scale: 0.96 }}
+          whileHover={{ scale: 1.03, y: -1 }}
+          onClick={() => router.push("/investment")}
+          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#0F62FE] via-[#6C63FF] to-[#0B513D] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+          <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">savings</span>
+          </div>
+          <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
+            Save
           </span>
         </motion.button>
       </div>

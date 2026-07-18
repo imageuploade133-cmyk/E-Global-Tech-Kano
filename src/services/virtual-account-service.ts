@@ -8,11 +8,14 @@ export class VirtualAccountService {
   /**
    * Retrieves an existing permanent virtual account for a user or creates a new one idempotently.
    * Utilizes safe verified Firebase ID Token fallbacks if profile fields are missing in Firestore.
+   * Restricts permanent virtual accounts only to users with a valid BVN or NIN.
    */
   static async getOrCreateVirtualAccount(
     userId: string,
     emailFallback?: string,
-    nameFallback?: string
+    nameFallback?: string,
+    bvnInput?: string,
+    ninInput?: string
   ): Promise<UserWalletAccount> {
     if (!userId) {
       throw new Error("Missing authenticated user ID context.");
@@ -34,11 +37,21 @@ export class VirtualAccountService {
 
     const userData = userDoc.exists ? (userDoc.data() || {}) : {};
 
+    const bvn = (bvnInput || userData.bvn || "").toString().trim();
+    const nin = (ninInput || userData.nin || "").toString().trim();
+
+    const hasValidBvn = bvn && /^\d{11}$/.test(bvn);
+    const hasValidNin = nin && /^\d{11}$/.test(nin);
+
+    // Restrict permanent accounts to users with a valid BVN or NIN
+    if (!hasValidBvn && !hasValidNin) {
+      throw new Error("A valid 11-digit BVN or NIN is required to activate a permanent static virtual account.");
+    }
+
     // Defensively resolve email and name with high-security verified Token fallback contexts
     const email = userData.email || emailFallback || `user-${userId}@e-tech-hub.com`;
     const fullname = userData.name || userData.displayName || nameFallback || "Captain User";
     const phone = userData.phoneNumber || userData.phone || "08012345678";
-    const bvn = userData.bvn || ""; // optional, passed if configured
 
     if (!email) {
       throw new Error("Missing required customer email to generate a permanent virtual account.");
@@ -59,6 +72,8 @@ export class VirtualAccountService {
       throw new Error("Configuration Error: Missing Flutterwave Secret Key.");
     }
 
+    const bvnToPass = hasValidBvn ? bvn : nin;
+
     const response = await fetch(`${FLW_BASE_URL}/virtual-account-numbers`, {
       method: "POST",
       headers: {
@@ -74,7 +89,7 @@ export class VirtualAccountService {
         firstname,
         lastname,
         narration: "E-Tech Wallet Funding Link",
-        ...(bvn ? { bvn } : {}),
+        bvn: bvnToPass,
       }),
     });
 
