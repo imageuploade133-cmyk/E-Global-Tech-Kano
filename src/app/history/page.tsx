@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { useAuth } from "@/lib/AuthContext";
@@ -175,12 +174,13 @@ export default function HistoryPage() {
         >
           {/* Header Bar */}
           <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="w-9 h-9 rounded-full border border-gray-100 bg-white shadow-sm flex items-center justify-center text-gray-700 active:scale-95 transition-all cursor-pointer"
+            <button
+              onClick={() => window.history.back()}
+              className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
+              title="Go Back"
             >
               <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
-            </Link>
+            </button>
             <div>
               <h2 className="font-hanken font-extrabold text-lg text-black leading-tight">Activity Log</h2>
               <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider">Historical Transactions</p>
