@@ -57,6 +57,7 @@ export default function GenericBillPage() {
   // PIN Pad Modal States
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
   const [enteredPin, setEnteredPin] = useState<string>("");
+  const [keypadNumbers, setKeypadNumbers] = useState<string[]>([]);
 
   // Payment Success Screen States
   const [successReceipt, setSuccessReceipt] = useState<{ reference?: string; tx_ref?: string; amount?: number } | null>(null);
@@ -84,6 +85,20 @@ export default function GenericBillPage() {
       default: return "payments";
     }
   };
+
+  // Suffle Keypad logic matching Auth PIN Page
+  const shuffleKeypad = () => {
+    const numbers = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+    for (let i = numbers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+    }
+    setKeypadNumbers(numbers);
+  };
+
+  useEffect(() => {
+    shuffleKeypad();
+  }, [isPinModalOpen]);
 
   // Fetch billers when pageCategory changes
   useEffect(() => {
@@ -200,11 +215,12 @@ export default function GenericBillPage() {
     setIsPinModalOpen(true);
   };
 
-  // PIN entry handlers
+  // PIN entry handlers matching Login page
   const handlePinPress = (num: string) => {
     if (enteredPin.length < 4) {
       const nextPin = enteredPin + num;
       setEnteredPin(nextPin);
+      shuffleKeypad();
       if (nextPin.length === 4) {
         executePayment(nextPin);
       }
@@ -213,6 +229,7 @@ export default function GenericBillPage() {
 
   const handlePinDelete = () => {
     setEnteredPin((prev) => prev.slice(0, -1));
+    shuffleKeypad();
   };
 
   // Final Payment execution
@@ -293,13 +310,13 @@ export default function GenericBillPage() {
           <div className="flex items-center gap-4 mb-5">
             <button
               onClick={() => window.history.back()}
-              className="w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-300 active:scale-95 transition-all duration-300 cursor-pointer shadow-sm"
+              className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
               title="Go Back"
             >
               <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
             </button>
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center flex-shrink-0 shadow-none">
                 <span className="material-symbols-outlined text-primary text-[22px]">
                   {getPageIcon()}
                 </span>
@@ -323,14 +340,14 @@ export default function GenericBillPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="bg-gradient-to-b from-[#FAF8F5] to-white rounded-[24px] border border-gray-150 p-6 shadow-xl flex flex-col items-center text-center relative overflow-hidden"
+                className="bg-gradient-to-b from-[#FAF8F5] to-white rounded-[24px] border border-gray-150 p-6 shadow-none flex flex-col items-center text-center relative overflow-hidden"
               >
                 {/* Visual Stamp */}
                 <div className="absolute right-[-10px] top-[-10px] text-[120px] text-emerald-500/5 select-none font-bold rotate-12 pointer-events-none">
                   PAID
                 </div>
 
-                <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-4 shadow-inner animate-bounce-subtle">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-4 shadow-none animate-bounce-subtle">
                   <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>
                     check_circle
                   </span>
@@ -344,7 +361,7 @@ export default function GenericBillPage() {
                 </p>
 
                 {/* Receipt Grid */}
-                <div className="w-full bg-white border border-gray-150 rounded-2xl p-4 space-y-3 text-left font-hanken text-xs mb-6 shadow-sm">
+                <div className="w-full bg-white border border-gray-150 rounded-2xl p-4 space-y-3 text-left font-hanken text-xs mb-6 shadow-none">
                   <div className="flex justify-between border-b border-gray-100 pb-2.5 text-gray-500">
                     <span className="font-semibold">Provider</span>
                     <span className="text-black font-extrabold">{selectedBiller?.name}</span>
@@ -400,16 +417,16 @@ export default function GenericBillPage() {
                 </button>
               </motion.div>
             ) : (
-              // --- FORM AND INPUT CONTAINER ---
+              // --- FORM AND INPUT CONTAINER (Removing all Dev Shadow shadows) ---
               <motion.div
                 key="bill-form"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="bg-white rounded-[24px] border border-gray-150 p-6 shadow-xl space-y-6"
+                className="bg-white rounded-[24px] border border-gray-150 p-6 shadow-none space-y-6"
               >
                 {/* Step 1: Select Biller Provider (Nice UI Grid instead of select dropdown) */}
-                <div className="space-y-3 text-left">
+                <div className="space-y-3 text-left font-hanken">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
                     Choose Network / Provider
                   </label>
@@ -428,9 +445,9 @@ export default function GenericBillPage() {
                             key={b.id}
                             type="button"
                             onClick={() => setSelectedBiller(b)}
-                            className={`p-3 rounded-2xl border text-left transition-all duration-300 flex items-center gap-3 cursor-pointer ${
+                            className={`p-3 rounded-2xl border text-left transition-all duration-300 flex items-center gap-3 cursor-pointer shadow-none ${
                               isSelected
-                                ? "bg-orange-50/50 border-[#FC7A00] shadow-sm shadow-orange-500/5"
+                                ? "bg-orange-50/50 border-[#FC7A00]"
                                 : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
                             }`}
                           >
@@ -479,9 +496,9 @@ export default function GenericBillPage() {
                               key={i.id}
                               type="button"
                               onClick={() => setSelectedItem(i)}
-                              className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                              className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all duration-300 cursor-pointer shadow-none ${
                                 isSelected
-                                  ? "bg-orange-50/50 border-[#FC7A00] shadow-md shadow-orange-500/5"
+                                  ? "bg-orange-50/50 border-[#FC7A00]"
                                   : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
                               }`}
                             >
@@ -622,21 +639,21 @@ export default function GenericBillPage() {
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
               />
 
-              {/* Bottom Sheet Keypad */}
+              {/* Bottom Sheet Keypad matching LOGIN PIN PAGE styling (no shadow, clean grid, shuffle) */}
               <motion.div
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto"
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black h-[85dvh] flex flex-col justify-between"
               >
                 {/* Drag handle */}
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
+                <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-3 mx-auto cursor-grab" />
 
-                <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+                <div className="w-full flex items-center justify-between border-b border-gray-100 pb-3">
                   <div className="w-8" />
-                  <h3 className="font-hanken font-bold text-base text-black text-center">
-                    Enter Transaction PIN
+                  <h3 className="font-hanken font-bold text-base text-black text-center uppercase tracking-wide">
+                    Enter Access PIN
                   </h3>
                   <button
                     type="button"
@@ -647,52 +664,59 @@ export default function GenericBillPage() {
                   </button>
                 </div>
 
-                <div className="space-y-5 text-center flex flex-col items-center">
-                  <p className="font-hanken text-[11px] text-gray-400">
-                    Provide your highly secure 4-digit PIN to approve this debit transfer.
+                <div className="flex-grow flex flex-col items-center justify-center space-y-6">
+                  <p className="font-hanken text-[11px] text-gray-400 text-center max-w-[240px]">
+                    Provide your highly secure 4-digit Access PIN to approve this debit transaction.
                   </p>
 
-                  {/* Dot indicator indicators */}
-                  <div className="flex justify-center gap-3 py-1 mb-2">
+                  {/* Dot indicator indicators matching login page */}
+                  <div className="flex justify-center gap-4 py-1">
                     {[0, 1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 ${
+                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
                           enteredPin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
                         }`}
                       />
                     ))}
                   </div>
 
-                  {/* PIN Grid keypad */}
-                  <div className="grid grid-cols-3 gap-2.5 w-full max-w-[280px]">
-                    {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
-                      <button
+                  {/* PIN Grid keypad matching Login Page exactly (shuffled) */}
+                  <div className="grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-5 w-full max-w-[260px] min-[360px]:max-w-[290px] justify-items-center">
+                    {keypadNumbers.slice(0, 9).map((num) => (
+                      <motion.button
+                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
                         key={num}
                         type="button"
                         onClick={() => handlePinPress(num)}
-                        className="py-4 text-base font-black font-mono border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-black cursor-pointer"
+                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all"
                       >
                         {num}
-                      </button>
+                      </motion.button>
                     ))}
-                    <button
-                      type="button"
+                    <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18" />
+                    {keypadNumbers[9] !== undefined && (
+                      <motion.button
+                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+                        onClick={() => handlePinPress(keypadNumbers[9])}
+                        type="button"
+                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all"
+                      >
+                        {keypadNumbers[9]}
+                      </motion.button>
+                    )}
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
                       onClick={handlePinDelete}
-                      className="py-4 text-xs font-bold font-hanken border border-gray-150 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-rose-500 cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                    <button
                       type="button"
-                      onClick={() => handlePinPress("0")}
-                      className="py-4 text-base font-black font-mono border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-black cursor-pointer"
+                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-black cursor-pointer active:text-rose-500 transition-all"
                     >
-                      0
-                    </button>
-                    <div className="w-full h-full" />
+                      <span className="material-symbols-outlined text-[22px] min-[360px]:text-[24px]">backspace</span>
+                    </motion.button>
                   </div>
                 </div>
+
+                <div className="h-4" />
               </motion.div>
             </>
           )}
