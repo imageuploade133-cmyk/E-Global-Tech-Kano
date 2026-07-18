@@ -9,7 +9,7 @@ const navItems = [
   { icon: "account_balance_wallet", label: "Wealth", href: "/" },
   { icon: "credit_card", label: "Cards", href: "/cards" },
   { icon: "history", label: "History", href: "/history" },
-  { icon: "storefront", label: "Store", href: "/bills?type=data" },
+  { icon: "storefront", label: "Store", href: "/store" },
   { icon: "trending_up", label: "Investment", href: "/investment" },
   { icon: "person", label: "Profile", href: "/profile" },
 ];
@@ -20,7 +20,7 @@ export const BottomNav: React.FC = () => {
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-0.5 pb-3.5 min-[360px]:pb-5.5 pt-2 bg-surface-container-highest/90 backdrop-blur-2xl border-t border-white/10 shadow-[0_-4px_20px_rgba(252,122,0,0.08)] rounded-t-[20px] min-[360px]:rounded-t-[28px]">
       {navItems.map((item) => {
-        const isActive = pathname === item.href || (item.href.startsWith("/bills") && pathname === "/bills");
+        const isActive = pathname === item.href;
         return (
           <Link
             key={item.label}
