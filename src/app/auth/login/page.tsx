@@ -76,7 +76,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-black text-xs font-semibold"
+              className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-black text-xs font-semibold rounded-none"
               placeholder="doe@example.com"
               aria-label="Email Address"
             />
@@ -96,7 +96,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-50 border-b border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-black transition-colors text-black text-xs font-semibold"
+                className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-black text-xs font-semibold rounded-none"
                 placeholder="••••••••"
                 aria-label="Password"
               />

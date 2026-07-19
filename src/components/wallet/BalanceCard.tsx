@@ -1150,7 +1150,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         key={preset}
                         type="button"
                         onClick={() => handlePresetClick(preset)}
-                        className="py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-150 text-xs font-mono font-bold text-gray-800 rounded-xl transition-all cursor-pointer text-center"
+                        className="premium-gradient-border py-2.5 bg-white/80 hover:bg-white text-xs font-mono font-black text-black rounded-xl transition-all active:scale-95 cursor-pointer text-center hover:shadow-[0_4px_12px_rgba(252,122,0,0.08)]"
                       >
                         +₦{preset / 1000}K
                       </button>
