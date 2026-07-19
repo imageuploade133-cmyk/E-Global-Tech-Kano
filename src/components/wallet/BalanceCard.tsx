@@ -1004,7 +1004,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">savings</span>
           </div>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
-            Save = Investment
+            Investment
           </span>
         </motion.button>
       </div>

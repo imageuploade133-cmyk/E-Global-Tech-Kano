@@ -313,7 +313,7 @@ export default function GenericBillPage() {
 
   if (pagePreloading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-transparent backdrop-blur-xs p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white/20 backdrop-blur-[1px] p-6">
         <div className="relative flex flex-col items-center">
           <div className="flex flex-col items-center p-5 rounded-2xl bg-white/40 backdrop-blur-md border border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.03)]">
             <div className="relative w-10 h-10 flex items-center justify-center">
