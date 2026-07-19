@@ -513,29 +513,29 @@ export default function SignUpPage() {
         <form onSubmit={handleSignUp} className="space-y-5">
           {/* First & Last Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1 text-left">
-              <label htmlFor="firstName" className="text-xs font-bold uppercase tracking-widest text-black">First Name <span className="text-red-500">*</span></label>
+            <div className="space-y-1.5 text-left">
+              <label htmlFor="firstName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name <span className="text-red-500">*</span></label>
               <input
                 id="firstName"
                 type="text"
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
+                className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
                 placeholder="John"
                 aria-required="true"
               />
             </div>
 
-            <div className="space-y-1 text-left">
-              <label htmlFor="lastName" className="text-xs font-bold uppercase tracking-widest text-black">Last Name <span className="text-red-500">*</span></label>
+            <div className="space-y-1.5 text-left">
+              <label htmlFor="lastName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Last Name <span className="text-red-500">*</span></label>
               <input
                 id="lastName"
                 type="text"
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
+                className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
                 placeholder="Doe"
                 aria-required="true"
               />
@@ -547,15 +547,15 @@ export default function SignUpPage() {
           </p>
 
           {/* DoB */}
-          <div className="space-y-1 text-left">
-            <label htmlFor="dateOfBirth" className="text-xs font-bold uppercase tracking-widest text-black">Date of Birth <span className="text-red-500">*</span></label>
+          <div className="space-y-1.5 text-left">
+            <label htmlFor="dateOfBirth" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Date of Birth <span className="text-red-500">*</span></label>
             <input
               id="dateOfBirth"
               type="date"
               required
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
-              className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
+              className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
               aria-required="true"
             />
           </div>
@@ -574,7 +574,7 @@ export default function SignUpPage() {
                   value={houseNumber}
                   onChange={(e) => setHouseNumber(e.target.value)}
                   placeholder="24B"
-                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
+                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
                 />
               </div>
               <div className="md:col-span-3 space-y-1">
@@ -586,7 +586,7 @@ export default function SignUpPage() {
                   value={street}
                   onChange={(e) => setStreet(e.target.value)}
                   placeholder="Adetokunbo Ademola Street"
-                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
+                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
                 />
               </div>
             </div>
@@ -601,7 +601,7 @@ export default function SignUpPage() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="Victoria Island"
-                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
+                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
                 />
               </div>
               <div className="space-y-1">
@@ -613,7 +613,7 @@ export default function SignUpPage() {
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                   placeholder="Lagos"
-                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
+                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
                 />
               </div>
               <div className="space-y-1">
@@ -624,7 +624,7 @@ export default function SignUpPage() {
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
                   placeholder="101241"
-                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
+                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
                 />
               </div>
             </div>
@@ -636,7 +636,7 @@ export default function SignUpPage() {
                   id="country"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
+                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
                 >
                   <option value="Nigeria">Nigeria</option>
                   <option value="Niger">Niger</option>
@@ -646,14 +646,14 @@ export default function SignUpPage() {
           </div>
 
           {/* International Phone Input */}
-          <div className="space-y-1 text-left">
-            <label htmlFor="phoneNumber" className="text-xs font-bold uppercase tracking-widest text-black">Phone Number <span className="text-red-500">*</span></label>
+          <div className="space-y-1.5 text-left">
+            <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
             <div className="flex gap-2">
               <select
                 id="phonePrefix"
                 value={phonePrefix}
                 onChange={(e) => setPhonePrefix(e.target.value)}
-                className="bg-gray-50 border-b-2 border-gray-200 px-1 outline-none text-xs font-bold text-black focus:border-[#FC7A00] rounded-none appearance-none"
+                className="bg-gray-50 border border-gray-200 px-3.5 outline-none text-xs font-bold text-black focus:border-[#FC7A00] rounded-2xl appearance-none"
                 aria-label="Phone Prefix"
               >
                 <option value="+234">🇳🇬 +234</option>
@@ -665,7 +665,7 @@ export default function SignUpPage() {
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-                className="flex-grow appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black font-mono rounded-none"
+                className="flex-grow appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black font-mono rounded-2xl"
                 placeholder="08012345678"
                 aria-required="true"
               />
@@ -673,15 +673,15 @@ export default function SignUpPage() {
           </div>
 
           {/* Email Address */}
-          <div className="space-y-1 text-left">
-            <label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-black">Email Address <span className="text-red-500">*</span></label>
+          <div className="space-y-1.5 text-left">
+            <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address <span className="text-red-500">*</span></label>
             <input
               id="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
+              className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black rounded-2xl"
               placeholder="doe@example.com"
               aria-required="true"
             />
@@ -689,8 +689,8 @@ export default function SignUpPage() {
 
           {/* Passwords */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1 text-left">
-              <label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-black">Password <span className="text-red-500">*</span></label>
+            <div className="space-y-1.5 text-left">
+              <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input
                   id="password"
@@ -698,14 +698,14 @@ export default function SignUpPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
+                  className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
                   placeholder="••••••••"
                   aria-required="true"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
                 >
                   <span className="material-symbols-outlined text-[18px]">
                     {showPassword ? "visibility" : "visibility_off"}
@@ -714,8 +714,8 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            <div className="space-y-1 text-left">
-              <label htmlFor="confirmPassword" className="text-xs font-bold uppercase tracking-widest text-black">Confirm Password <span className="text-red-500">*</span></label>
+            <div className="space-y-1.5 text-left">
+              <label htmlFor="confirmPassword" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm Password <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input
                   id="confirmPassword"
@@ -723,7 +723,7 @@ export default function SignUpPage() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
+                  className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
                   placeholder="••••••••"
                   aria-required="true"
                 />
@@ -804,7 +804,7 @@ export default function SignUpPage() {
               type="submit"
               disabled={loading}
               onClick={handleButtonClick}
-              className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_20px_rgba(252,122,0,0.25)] hover:shadow-[0_4px_25px_rgba(252,122,0,0.4)] cursor-pointer flex items-center justify-center gap-2.5"
+              className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-3xl font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2.5 shadow-none"
             >
               {/* Ripple Elements */}
               {ripples.map((ripple) => (

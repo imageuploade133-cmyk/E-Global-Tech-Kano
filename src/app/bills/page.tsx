@@ -461,7 +461,7 @@ export default function GenericBillPage() {
                     setSelectedBiller(null);
                     setSelectedItem(null);
                   }}
-                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-3xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
                 >
                   Pay Another Bill
                 </button>
@@ -592,7 +592,7 @@ export default function GenericBillPage() {
                           placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
                           value={customerId}
                           onChange={(e) => setCustomerId(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                          className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
                         />
                         {/* Validation Action inside input if applicable */}
                         {customerId.length >= 6 && (
@@ -635,7 +635,7 @@ export default function GenericBillPage() {
                             placeholder="Amount (e.g. 2000)"
                             value={customAmount}
                             onChange={(e) => setCustomAmount(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                            className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
                           />
                         </div>
                       </div>
@@ -665,7 +665,7 @@ export default function GenericBillPage() {
                       type="button"
                       onClick={handlePayTrigger}
                       disabled={isPaying || !customerId || (!selectedItem.is_fixed_amount && !customAmount)}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-3xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                     >
                       {isPaying ? "Processing Debit..." : "Proceed to Pay"}
                     </button>
