@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { idNumber, type } = body; // type is "bvn" or "nin"
+    const { idNumber, type, idCardImage } = body; // type is "bvn" or "nin"
 
     if (!idNumber || !/^\d{11}$/.test(idNumber.trim())) {
       return NextResponse.json({ error: "Identity number must be exactly 11 digits." }, { status: 400 });
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
       kycStatus: "VERIFIED",
       bvn: bvnInput || null,
       nin: ninInput || null,
+      idCardImage: idCardImage || null,
       updatedAt: new Date().toISOString(),
     }, { merge: true });
 
