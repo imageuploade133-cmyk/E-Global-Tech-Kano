@@ -68,23 +68,23 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-1 text-left">
-            <label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-black">Email Address</label>
+          <div className="space-y-1.5 text-left">
+            <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address</label>
             <input
               id="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-black text-xs font-semibold rounded-none"
+              className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-4 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-black text-xs font-semibold"
               placeholder="doe@example.com"
               aria-label="Email Address"
             />
           </div>
 
-          <div className="space-y-1 text-left">
+          <div className="space-y-1.5 text-left">
             <div className="flex justify-between items-center">
-              <label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-black">Password</label>
+              <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password</label>
               <Link href="/auth/forgot-password" className="text-xs text-[#FC7A00] hover:underline font-bold">
                 Forgot Password?
               </Link>
@@ -96,7 +96,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-black text-xs font-semibold rounded-none"
+                className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-4 pl-4 pr-10 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-black text-xs font-semibold"
                 placeholder="••••••••"
                 aria-label="Password"
               />
@@ -119,7 +119,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               onClick={handleButtonClick}
-              className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_20px_rgba(252,122,0,0.25)] hover:shadow-[0_4px_25px_rgba(252,122,0,0.4)] cursor-pointer flex items-center justify-center gap-2.5"
+              className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-3xl font-bold uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2.5 shadow-none"
             >
               {/* Ripple Elements */}
               {ripples.map((ripple) => (

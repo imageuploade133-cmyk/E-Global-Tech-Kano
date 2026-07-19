@@ -967,7 +967,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           onClick={() => setIsAddMoneyOpen(true)}
-          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-3xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
           <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
@@ -982,7 +982,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           onClick={() => setIsTransferOpen(true)}
-          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-3xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
           <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
@@ -997,7 +997,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           onClick={() => router.push("/investment")}
-          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-3xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
           <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
@@ -1571,15 +1571,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   className="space-y-4 text-left"
                 >
                   {/* Single/Bulk Toggle Button Bar */}
-                  <div className="grid grid-cols-2 p-1 bg-gray-100 rounded-xl mb-2">
+                  <div className="grid grid-cols-2 p-1 bg-gray-100/80 rounded-full mb-3 border border-gray-200/50">
                     <button
                       type="button"
                       onClick={() => {
                         setIsBulkMode(false);
                         setTrfStep("input");
                       }}
-                      className={`py-2 text-xs font-black font-hanken rounded-lg transition-all cursor-pointer ${
-                        !isBulkMode ? "bg-white text-black shadow-sm" : "bg-transparent text-gray-400"
+                      className={`py-2.5 text-xs font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
+                        !isBulkMode ? "bg-[#FC7A00] text-white shadow-none" : "bg-transparent text-gray-400 hover:text-black"
                       }`}
                     >
                       Single Transfer
@@ -1590,8 +1590,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         setIsBulkMode(true);
                         setTrfStep("input");
                       }}
-                      className={`py-2 text-xs font-black font-hanken rounded-lg transition-all cursor-pointer ${
-                        isBulkMode ? "bg-white text-black shadow-sm" : "bg-transparent text-gray-400"
+                      className={`py-2.5 text-xs font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
+                        isBulkMode ? "bg-[#FC7A00] text-white shadow-none" : "bg-transparent text-gray-400 hover:text-black"
                       }`}
                     >
                       Bulk Transfer
