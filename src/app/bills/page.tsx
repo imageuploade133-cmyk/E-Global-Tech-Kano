@@ -340,7 +340,7 @@ export default function GenericBillPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="bg-gradient-to-b from-[#FAF8F5] to-white rounded-[24px] border border-gray-150 p-6 shadow-none flex flex-col items-center text-center relative overflow-hidden"
+                className="premium-gradient-card premium-gradient-border p-6 shadow-none flex flex-col items-center text-center relative overflow-hidden"
               >
                 {/* Visual Stamp */}
                 <div className="absolute right-[-10px] top-[-10px] text-[120px] text-emerald-500/5 select-none font-bold rotate-12 pointer-events-none">
@@ -423,7 +423,7 @@ export default function GenericBillPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="bg-white rounded-[24px] border border-gray-150 p-6 shadow-none space-y-6"
+                className="premium-gradient-card premium-gradient-border p-6 shadow-none space-y-6"
               >
                 {/* Step 1: Select Biller Provider (Nice UI Grid instead of select dropdown) */}
                 <div className="space-y-3 text-left font-hanken">

@@ -73,6 +73,10 @@ export default function ProfilePage() {
     accountName: string;
   } | null>(null);
   const [loadingAccount, setLoadingAccount] = useState(false);
+  const [idCardImage, setIdCardImage] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   // Modal / Drawer States
   const [showCameraDrawer, setShowCameraDrawer] = useState(false);
@@ -169,7 +173,12 @@ export default function ProfilePage() {
 
       if (isMock) {
         setTimeout(async () => {
-          await updateUserData({ kycStatus: "VERIFIED", bvn: kycType === "bvn" ? idNumber : null, nin: kycType === "nin" ? idNumber : null });
+          await updateUserData({
+            kycStatus: "VERIFIED",
+            bvn: kycType === "bvn" ? idNumber : null,
+            nin: kycType === "nin" ? idNumber : null,
+            idCardImage: idCardImage || null,
+          });
           toast.dismiss();
           toast.success("Identity verified successfully (MOCK)!");
           setStaticAccount({
@@ -192,6 +201,7 @@ export default function ProfilePage() {
         body: JSON.stringify({
           idNumber: idNumber.trim(),
           type: kycType,
+          idCardImage: idCardImage || null,
         }),
       });
 
@@ -214,6 +224,45 @@ export default function ProfilePage() {
       toast.error("Internal connection error while communicating with verification gateway.");
     } finally {
       setVerifyingKyc(false);
+    }
+  };
+
+  const handleDocImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image file size should be less than 5MB");
+      return;
+    }
+
+    setUploadingDoc(true);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const key = config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005";
+    toast.loading("Uploading ID card image directly to Imgbb storage...");
+
+    try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${key}`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      toast.dismiss();
+
+      if (json.success) {
+        const uploadedUrl = json.data.display_url;
+        setIdCardImage(uploadedUrl);
+        toast.success("ID Document successfully uploaded and linked!");
+      } else {
+        toast.error(json.error?.message || "Failed to upload ID document to Imgbb!");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Imgbb API communication failure. Please verify internet connectivity.");
+    } finally {
+      setUploadingDoc(false);
     }
   };
 
@@ -699,10 +748,62 @@ export default function ProfilePage() {
                     />
                   </div>
 
+                  {/* NIN / Passport Image Upload (Optional) */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Upload {kycType === "nin" ? "NIN Slip" : "Passport Picture"}</label>
+                      <span className="text-[8px] text-gray-400 font-bold uppercase">optional</span>
+                    </div>
+
+                    <div className="border border-dashed border-gray-200 rounded-2xl p-4 bg-gray-50/50 flex flex-col items-center justify-center text-center">
+                      <input
+                        type="file"
+                        ref={docInputRef}
+                        accept="image/*"
+                        onChange={handleDocImageUpload}
+                        className="hidden"
+                      />
+
+                      {idCardImage ? (
+                        <div className="space-y-3 w-full flex flex-col items-center">
+                          <div className="relative w-full h-32 rounded-xl overflow-hidden border border-gray-150">
+                            <Image
+                              src={idCardImage}
+                              alt="ID card preview"
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIdCardImage(null)}
+                            className="text-xs text-red-500 font-bold hover:underline flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-sm">delete</span>
+                            Remove Image
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <span className="material-symbols-outlined text-gray-300 text-3xl">upload_file</span>
+                          <p className="text-[10px] text-gray-400 font-bold">PDF, JPEG, or PNG (Max 5MB)</p>
+                          <button
+                            type="button"
+                            disabled={uploadingDoc}
+                            onClick={() => docInputRef.current?.click()}
+                            className="px-3 py-1.5 bg-[#FC7A00] text-white text-[9px] font-black uppercase rounded-lg hover:brightness-105 active:scale-95 transition-all shadow-sm"
+                          >
+                            {uploadingDoc ? "Uploading..." : `Select ${kycType === "nin" ? "NIN" : "Passport"}`}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <button
                     type="submit"
-                    disabled={verifyingKyc || idNumber.length !== 11}
-                    className="w-full bg-gradient-to-r from-[#0F62FE] to-[#6C63FF] hover:brightness-110 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_15px_rgba(15,98,254,0.15)] flex items-center justify-center gap-2"
+                    disabled={verifyingKyc || idNumber.length !== 11 || uploadingDoc}
+                    className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_15px_rgba(252,122,0,0.15)] flex items-center justify-center gap-2"
                   >
                     {verifyingKyc ? (
                       <>
