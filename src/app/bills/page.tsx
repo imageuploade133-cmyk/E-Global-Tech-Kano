@@ -461,7 +461,7 @@ export default function GenericBillPage() {
                     setSelectedBiller(null);
                     setSelectedItem(null);
                   }}
-                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-3xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 cursor-pointer hover:brightness-105 active:scale-98 transition-all"
                 >
                   Pay Another Bill
                 </button>
@@ -665,7 +665,7 @@ export default function GenericBillPage() {
                       type="button"
                       onClick={handlePayTrigger}
                       disabled={isPaying || !customerId || (!selectedItem.is_fixed_amount && !customAmount)}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-3xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                     >
                       {isPaying ? "Processing Debit..." : "Proceed to Pay"}
                     </button>
