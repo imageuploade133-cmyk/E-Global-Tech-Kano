@@ -997,14 +997,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.03, y: -1 }}
           onClick={() => router.push("/investment")}
-          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#0F62FE] via-[#6C63FF] to-[#0B513D] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2 min-[360px]:py-3 px-1.5 bg-gradient-to-r from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl min-[360px]:rounded-2xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
           <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">savings</span>
           </div>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
-            Save
+            Save = Investment
           </span>
         </motion.button>
       </div>

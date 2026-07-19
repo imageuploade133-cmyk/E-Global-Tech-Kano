@@ -25,11 +25,22 @@ interface BillItem {
   is_fixed_amount: boolean;
 }
 
+import Image from "next/image";
+
 export default function GenericBillPage() {
   const { userData, user } = useAuth();
   const searchParams = useSearchParams();
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
+
+  const [pagePreloading, setPagePreloading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPagePreloading(false);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Wallet Balance sync
   const balance = Number(userData?.balance) || 0;
@@ -299,6 +310,45 @@ export default function GenericBillPage() {
         return "Customer Identifier";
     }
   };
+
+  if (pagePreloading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-transparent backdrop-blur-xs p-6">
+        <div className="relative flex flex-col items-center">
+          <div className="flex flex-col items-center p-5 rounded-2xl bg-white/40 backdrop-blur-md border border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.03)]">
+            <div className="relative w-10 h-10 flex items-center justify-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1.0, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-[2px] border-gray-100/80 border-t-[#FC7A00] border-r-[#0b513d]"
+              />
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                className="relative w-6 h-6 bg-white rounded-full p-1 shadow-sm flex items-center justify-center"
+              >
+                <Image
+                  src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+                  alt="E-Tech Logo"
+                  width={16}
+                  height={16}
+                  className="object-contain"
+                  priority
+                />
+              </motion.div>
+            </div>
+            <motion.p
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+              className="mt-3 font-hanken font-bold text-[8px] tracking-[0.25em] uppercase text-gray-500 select-none"
+            >
+              E-TECH HUB
+            </motion.p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <RouteGuard>
