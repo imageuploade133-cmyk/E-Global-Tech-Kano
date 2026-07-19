@@ -521,7 +521,7 @@ export default function SignUpPage() {
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-xs font-semibold text-black"
+                className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
                 placeholder="John"
                 aria-required="true"
               />
@@ -535,7 +535,7 @@ export default function SignUpPage() {
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-xs font-semibold text-black"
+                className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
                 placeholder="Doe"
                 aria-required="true"
               />
@@ -555,7 +555,7 @@ export default function SignUpPage() {
               required
               value={dateOfBirth}
               onChange={(e) => setDateOfBirth(e.target.value)}
-              className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-xs font-semibold text-black"
+              className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
               aria-required="true"
             />
           </div>
@@ -574,7 +574,7 @@ export default function SignUpPage() {
                   value={houseNumber}
                   onChange={(e) => setHouseNumber(e.target.value)}
                   placeholder="24B"
-                  className="w-full bg-white border-b border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-black"
+                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
                 />
               </div>
               <div className="md:col-span-3 space-y-1">
@@ -586,7 +586,7 @@ export default function SignUpPage() {
                   value={street}
                   onChange={(e) => setStreet(e.target.value)}
                   placeholder="Adetokunbo Ademola Street"
-                  className="w-full bg-white border-b border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-black"
+                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
                 />
               </div>
             </div>
@@ -601,7 +601,7 @@ export default function SignUpPage() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="Victoria Island"
-                  className="w-full bg-white border-b border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-black"
+                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
                 />
               </div>
               <div className="space-y-1">
@@ -613,7 +613,7 @@ export default function SignUpPage() {
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                   placeholder="Lagos"
-                  className="w-full bg-white border-b border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-black"
+                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
                 />
               </div>
               <div className="space-y-1">
@@ -624,7 +624,7 @@ export default function SignUpPage() {
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
                   placeholder="101241"
-                  className="w-full bg-white border-b border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-black"
+                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
                 />
               </div>
             </div>
@@ -636,7 +636,7 @@ export default function SignUpPage() {
                   id="country"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  className="w-full bg-white border-b border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-black"
+                  className="w-full appearance-none bg-white border-b-2 border-gray-200 py-2 px-1 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 rounded-none"
                 >
                   <option value="Nigeria">Nigeria</option>
                   <option value="Niger">Niger</option>
@@ -653,7 +653,7 @@ export default function SignUpPage() {
                 id="phonePrefix"
                 value={phonePrefix}
                 onChange={(e) => setPhonePrefix(e.target.value)}
-                className="bg-gray-50 border-b border-gray-200 px-1 outline-none text-xs font-bold text-black focus:border-black"
+                className="bg-gray-50 border-b-2 border-gray-200 px-1 outline-none text-xs font-bold text-black focus:border-[#FC7A00] rounded-none appearance-none"
                 aria-label="Phone Prefix"
               >
                 <option value="+234">🇳🇬 +234</option>
@@ -665,7 +665,7 @@ export default function SignUpPage() {
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-                className="flex-grow bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-all text-xs font-semibold text-black font-mono"
+                className="flex-grow appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black font-mono rounded-none"
                 placeholder="08012345678"
                 aria-required="true"
               />
@@ -681,7 +681,7 @@ export default function SignUpPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 border-b border-gray-200 py-3 px-1 outline-none focus:border-black transition-colors text-xs font-semibold text-black"
+              className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 px-1 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
               placeholder="doe@example.com"
               aria-required="true"
             />
@@ -698,7 +698,7 @@ export default function SignUpPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-gray-50 border-b border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-black transition-colors text-xs font-semibold text-black"
+                  className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
                   placeholder="••••••••"
                   aria-required="true"
                 />
@@ -723,7 +723,7 @@ export default function SignUpPage() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-gray-50 border-b border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-black transition-colors text-xs font-semibold text-black"
+                  className="w-full appearance-none bg-gray-50 border-b-2 border-gray-200 py-3 pl-1 pr-10 outline-none focus:border-[#FC7A00] focus:bg-white focus:shadow-[0_2px_8px_rgba(252,122,0,0.05)] transition-all duration-300 text-xs font-semibold text-black rounded-none"
                   placeholder="••••••••"
                   aria-required="true"
                 />
