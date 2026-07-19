@@ -18,7 +18,7 @@ export const BottomNav: React.FC = () => {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-0.5 pb-3.5 min-[360px]:pb-5.5 pt-2 bg-white/95 backdrop-blur-2xl border-t border-gray-150 shadow-[0_-4px_20px_rgba(252,122,0,0.05)] rounded-t-[20px] min-[360px]:rounded-t-[28px]">
+    <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-0.5 pb-3.5 min-[360px]:pb-5.5 pt-2 bg-white/95 backdrop-blur-2xl border-none shadow-[0_-4px_20px_rgba(252,122,0,0.05)] rounded-t-[20px] min-[360px]:rounded-t-[28px]">
       {navItems.map((item) => {
         const isActive = pathname === item.href;
         return (
