@@ -4,13 +4,6 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { toast } from "sonner";
-
-const primaryActions = [
-  { icon: "account_balance_wallet", label: "To Opay" },
-  { icon: "account_balance", label: "To Bank" },
-  { icon: "outbox", label: "Withdraw" },
-];
 
 const services = [
   { icon: "cell_tower", label: "Airtime", color: "text-secondary", href: "/bills?type=airtime" },
@@ -42,10 +35,6 @@ export const ServiceGrid: React.FC = () => {
   // Modal states
   const [activeModal, setActiveModal] = useState<"loan" | "wealth" | "more" | null>(null);
 
-  const handlePrimaryClick = (label: string) => {
-    toast.info(`${label} action initiated. Secure payment rails are loading...`);
-  };
-
   const handleServiceClick = (service: typeof services[0]) => {
     if (service.action) {
       setActiveModal(service.action as "loan" | "wealth" | "more");
@@ -55,30 +44,6 @@ export const ServiceGrid: React.FC = () => {
   return (
     <>
       <section className="grid grid-cols-4 gap-3 min-[360px]:gap-4 mb-stack-lg text-black">
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="col-span-4 grid grid-cols-3 gap-2 min-[360px]:gap-3 mb-1 min-[360px]:mb-2"
-        >
-          {primaryActions.map((action) => (
-            <motion.div
-              key={action.label}
-              variants={item}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handlePrimaryClick(action.label)}
-              className="premium-gradient-border glass-card rounded-xl p-2.5 min-[360px]:p-3.5 min-[390px]:p-4 flex flex-col items-center justify-center gap-1.5 min-[360px]:gap-2 cursor-pointer group min-w-0"
-            >
-              <div className="w-9 h-9 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-12 min-[390px]:h-12 rounded-full bg-surface-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-dim transition-colors flex-shrink-0">
-                <span className="material-symbols-outlined text-[18px] min-[360px]:text-[22px] min-[390px]:text-[24px]">{action.icon}</span>
-              </div>
-              <span className="font-label-sm text-[10px] min-[360px]:text-[11px] min-[390px]:text-xs text-on-surface-variant font-bold truncate w-full text-center">
-                {action.label}
-              </span>
-            </motion.div>
-          ))}
-        </motion.div>
-
         <motion.div
           variants={container}
           initial="hidden"
