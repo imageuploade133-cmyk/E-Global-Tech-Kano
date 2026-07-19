@@ -1658,13 +1658,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999998]"
                             />
 
-                            {/* 95% Height Drawer */}
+                            {/* 90% Height Drawer */}
                             <motion.div
                               initial={{ y: "100%" }}
                               animate={{ y: 0 }}
                               exit={{ y: "100%" }}
                               transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-                              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[999999] p-6 pb-8 shadow-none text-black h-[95vh] max-h-[95vh] flex flex-col no-scrollbar"
+                              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[999999] p-6 pb-8 shadow-none text-black h-[90vh] max-h-[90vh] flex flex-col no-scrollbar"
                             >
                               {/* Grab handle */}
                               <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
@@ -1727,7 +1727,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                       </div>
                                       <div className="min-w-0 flex-1">
                                         <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
-                                        <p className="font-hanken text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Code: {bank.code}</p>
                                       </div>
                                       <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
                                     </button>

@@ -93,7 +93,7 @@ export const RecentTransactions: React.FC = () => {
               whileTap={{ scale: 0.98 }}
               onClick={() => setSelectedTx(tx)}
               className={cn(
-                "w-full text-left relative overflow-hidden rounded-[20px] p-4.5 flex items-center justify-between gap-3 border transition-all cursor-pointer shadow-xs",
+                "w-full text-left relative overflow-hidden rounded-[20px] p-4.5 flex items-center justify-between gap-3 premium-gradient-border transition-all cursor-pointer shadow-xs",
                 isDeposit
                   ? "bg-gradient-to-r from-emerald-500/[0.04] via-emerald-500/[0.01] to-white border-emerald-500/15 hover:border-emerald-500/35 hover:shadow-sm"
                   : "bg-gradient-to-r from-[#FC7A00]/[0.04] via-[#FC7A00]/[0.01] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35 hover:shadow-sm"
