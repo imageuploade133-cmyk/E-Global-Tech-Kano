@@ -63,7 +63,10 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
     });
 
-    // Request the USSD charging code from Flutterwave
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    // Request the USSD charging code from VM Payment Gateway
     const ussdDetails = await PaymentService.createUSSDPayment({
       tx_ref,
       amount: payAmount,
@@ -71,7 +74,7 @@ export async function POST(req: Request) {
       phone_number: phone || "08012345678",
       fullname: name,
       bank_code: bankCode,
-    });
+    }, idToken);
 
     logPaymentEvent({
       category: "Payment Initialized",

@@ -49,7 +49,10 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
     });
 
-    // Request the Virtual Account from Flutterwave (passes firstname, lastname, narration)
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    // Request the Virtual Account from VM Payment Gateway
     const transferDetails = await PaymentService.createBankTransferPayment({
       tx_ref,
       amount: payAmount,
@@ -59,7 +62,7 @@ export async function POST(req: Request) {
       firstname,
       lastname,
       narration,
-    });
+    }, idToken);
 
     logPaymentEvent({
       category: "Payment Initialized",

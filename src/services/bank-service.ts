@@ -1,7 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
 
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-const BANKS_API_URL = "https://api.flutterwave.com/v3/banks/NG";
+const BANKS_API_URL = "https://etechglobalhub.duckdns.org/api/flutterwave/banks";
 
 export interface BankDoc {
   id: string;
@@ -93,14 +92,10 @@ export class BankService {
    * Fetches latest bank codes from Flutterwave and syncs them to Firestore 'banks' collection.
    * Uses batched writes for performance and robustness.
    */
-  static async syncBanks(): Promise<{ success: boolean; count: number }> {
-    console.log("[BankService] Initiating banks sync with Flutterwave...");
-    if (!FLW_SECRET_KEY) {
-      console.error("[BankService Sync Error] Missing Flutterwave Secret Key (FLW_SECRET_KEY).");
-      throw new Error("Cannot sync banks. Flutterwave Secret Key is missing in server environment.");
-    }
+  static async syncBanks(idToken?: string): Promise<{ success: boolean; count: number }> {
+    console.log("[BankService] Initiating banks sync with VM Payment Gateway...");
 
-    // Call Flutterwave API with 15s timeout & retries
+    // Call VM Payment Gateway API with 15s timeout & retries
     let response;
     const retries = 2;
     for (let attempt = 1; attempt <= retries + 1; attempt++) {
@@ -110,7 +105,7 @@ export class BankService {
         response = await fetch(BANKS_API_URL, {
           method: "GET",
           headers: {
-            "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+            "Authorization": `Bearer ${idToken || ""}`,
             "Content-Type": "application/json",
           },
           signal: controller.signal,

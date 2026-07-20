@@ -34,6 +34,9 @@ export async function POST(req: Request) {
     const bvnInput = type === "bvn" ? idNumber.trim() : undefined;
     const ninInput = type === "nin" ? idNumber.trim() : undefined;
 
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
     // Contact Flutterwave gateway server-side to provision the static virtual account
     // This acts as our successful verification gateway check!
     const account = await VirtualAccountService.getOrCreateVirtualAccount(
@@ -41,7 +44,8 @@ export async function POST(req: Request) {
       emailFallback,
       nameFallback,
       bvnInput,
-      ninInput
+      ninInput,
+      idToken
     );
 
     // Save success status and the verified BVN/NIN securely in Firestore

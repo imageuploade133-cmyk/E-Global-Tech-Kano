@@ -1,7 +1,4 @@
-import { verifyAndCreditWallet } from "@/lib/wallet-funding";
-
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-const FLW_BASE_URL = "https://api.flutterwave.com/v3";
+const FLW_BASE_URL = "https://etechglobalhub.duckdns.org/api/flutterwave";
 
 export interface USSDPaymentPayload {
   tx_ref: string;
@@ -36,17 +33,13 @@ const TEST_USSD_TEMPLATES: Record<string, string> = {
 
 export class PaymentService {
   /**
-   * Requests a custom USSD charge code from Flutterwave charges API
+   * Requests a custom USSD charge code from the VM Payment Gateway
    */
-  static async createUSSDPayment(payload: USSDPaymentPayload) {
-    if (!FLW_SECRET_KEY) {
-      throw new Error("Configuration Error: Missing Flutterwave Secret Key.");
-    }
-
+  static async createUSSDPayment(payload: USSDPaymentPayload, idToken: string) {
     const response = await fetch(`${FLW_BASE_URL}/charges?type=ussd`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+        "Authorization": `Bearer ${idToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -64,14 +57,11 @@ export class PaymentService {
 
     const resData = await response.json();
 
-    // Log the complete HTTP status and raw JSON response from Flutterwave before parsing
-    console.log(`[Flutterwave USSD Charge API] HTTP Status: ${response.status}`);
-    console.log(`[Flutterwave USSD Charge API] Raw Response Payload: ${JSON.stringify(resData)}`);
+    console.log(`[VM Payment Gateway USSD Charge API] HTTP Status: ${response.status}`);
+    console.log(`[VM Payment Gateway USSD Charge API] Raw Response: ${JSON.stringify(resData)}`);
 
-    // Handle Flutterwave API error by surfacing the exact error message
     if (!response.ok || resData.status !== "success") {
       const apiErrorMessage = resData.message || `HTTP Error ${response.status}`;
-      console.error(`[Flutterwave USSD API Charge Error] ${apiErrorMessage}`);
       throw new Error(apiErrorMessage);
     }
 
@@ -81,7 +71,6 @@ export class PaymentService {
                  resData.data?.authorization ||
                  {};
 
-    // Support all documented response fields in order of priority
     let authNote = auth.note ||
                    auth.validate_instructions ||
                    auth.instruction ||
@@ -90,9 +79,7 @@ export class PaymentService {
                    resData.payment_code ||
                    resData.payment_instruction;
 
-    // Test Sandbox fallback to guarantee payment flows when dial code is omitted under test credentials
     if (!authNote) {
-      console.log(`[Flutterwave Sandbox Warning] No USSD instruction was returned in test credentials. Generating high-fidelity mock instruction fallback...`);
       const bankPrefix = TEST_USSD_TEMPLATES[payload.bank_code] || "*955*2*";
       authNote = `${bankPrefix}${payload.amount}#`;
     }
@@ -107,13 +94,9 @@ export class PaymentService {
   }
 
   /**
-   * Requests virtual account details from Flutterwave charges API for direct bank transfer checkout
+   * Requests virtual account details from the VM Payment Gateway for direct bank transfer checkout
    */
-  static async createBankTransferPayment(payload: BankTransferPayload) {
-    if (!FLW_SECRET_KEY) {
-      throw new Error("Configuration Error: Missing Flutterwave Secret Key.");
-    }
-
+  static async createBankTransferPayment(payload: BankTransferPayload, idToken: string) {
     const nameParts = (payload.fullname || "").trim().split(/\s+/);
     const calculatedFirstname = payload.firstname || nameParts[0] || "Customer";
     const calculatedLastname = payload.lastname || nameParts.slice(1).join(" ") || "Wallet";
@@ -121,7 +104,7 @@ export class PaymentService {
     const response = await fetch(`${FLW_BASE_URL}/charges?type=bank_transfer`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+        "Authorization": `Bearer ${idToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -141,17 +124,14 @@ export class PaymentService {
 
     const resData = await response.json();
 
-    // Log the complete HTTP status and raw JSON response from Flutterwave before parsing
-    console.log(`[Flutterwave Bank Transfer Charge API] HTTP Status: ${response.status}`);
-    console.log(`[Flutterwave Bank Transfer Charge API] Raw Response Payload: ${JSON.stringify(resData)}`);
+    console.log(`[VM Payment Gateway Bank Transfer Charge API] HTTP Status: ${response.status}`);
+    console.log(`[VM Payment Gateway Bank Transfer Charge API] Raw Response: ${JSON.stringify(resData)}`);
 
     if (!response.ok || resData.status !== "success") {
       const apiErrorMessage = resData.message || `HTTP Error ${response.status}`;
-      console.error(`[Flutterwave Bank Transfer API Charge Error] ${apiErrorMessage}`);
       throw new Error(apiErrorMessage);
     }
 
-    // Defensive root vs nested metadata resolution
     const flwData = resData.data || resData || {};
     const auth = resData.meta?.authorization ||
                  resData.data?.meta?.authorization ||
@@ -168,7 +148,6 @@ export class PaymentService {
       throw new Error("No dynamic virtual account was allocated by the payment gateway.");
     }
 
-    // Exact response schema required by the client/frontend
     return {
       status: "pending",
       flwId: flwData.id || "flw-test-id",
@@ -177,10 +156,9 @@ export class PaymentService {
       bankName: transferBank,
       accountName: "E-Tech Global Hub",
       amount: transferAmount,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 60 minutes expiry
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       reference: transferReference,
 
-      // Backward-compatible properties to prevent any frontend regressions
       transferAccount,
       transferBank,
       transferAmount,
@@ -190,20 +168,16 @@ export class PaymentService {
   }
 
   /**
-   * Queries Flutterwave transaction status by tx_ref using verify_by_reference.
-   * If successful, triggers the shared verifyAndCreditWallet() atomic transaction helper.
+   * Queries transaction status by tx_ref on the VM Payment Gateway
    */
-  static async checkPaymentStatus(txRef: string) {
-    if (!FLW_SECRET_KEY) {
-      throw new Error("Configuration Error: Missing Flutterwave Secret Key.");
-    }
-
-    const response = await fetch(`${FLW_BASE_URL}/transactions/verify_by_reference?tx_ref=${txRef}`, {
-      method: "GET",
+  static async checkPaymentStatus(txRef: string, idToken: string) {
+    const response = await fetch(`${FLW_BASE_URL}/verify`, {
+      method: "POST",
       headers: {
-        "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+        "Authorization": `Bearer ${idToken}`,
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ txRef }),
     });
 
     const resData = await response.json();
@@ -216,31 +190,26 @@ export class PaymentService {
                          errorMsg.toLowerCase().includes("not found");
 
       if (isNotFound) {
-        console.log(`[Polling Status Info] Transaction reference ${txRef} is not yet settled on Flutterwave rail (unpaid/not found). Status: PENDING`);
+        console.log(`[Polling Status Info] Transaction reference ${txRef} is not yet settled on VM gateway. Status: PENDING`);
         return { status: "PENDING" };
       }
 
-      throw new Error(resData.message || "Failed to contact Flutterwave verification api.");
+      throw new Error(resData.message || "Failed to contact VM verification api.");
     }
 
-    if (resData.status === "success" && resData.data) {
-      const flwTx = resData.data;
-
-      if (flwTx.status === "successful") {
-        // Trigger the secure, atomic verify and crediting flow
-        const creditResult = await verifyAndCreditWallet(flwTx.id.toString());
-        return {
-          status: "SUCCESS",
-          fundedAmount: flwTx.amount,
-          newBalance: creditResult.newBalance,
-          duplicate: creditResult.duplicate,
-          message: creditResult.message,
-        };
-      } else if (flwTx.status === "failed") {
+    if (resData.success) {
+      return {
+        status: "SUCCESS",
+        fundedAmount: resData.fundedAmount,
+        newBalance: resData.newBalance,
+        duplicate: resData.duplicate,
+        message: resData.message,
+      };
+    } else {
+      if (resData.error && resData.error.toLowerCase().includes("failed")) {
         return { status: "FAILED" };
       }
+      return { status: "PENDING" };
     }
-
-    return { status: "PENDING" };
   }
 }

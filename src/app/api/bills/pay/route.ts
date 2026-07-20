@@ -176,7 +176,10 @@ export async function POST(req: Request) {
       feature: featureName,
     });
 
-    const isSandbox = gateway.name === "flutterwave" && (!process.env.FLW_SECRET_KEY || process.env.FLW_SECRET_KEY.startsWith("FLWSECK_TEST-"));
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    const isSandbox = sessionStorage.getItem("mock") === "true";
 
     if (isSandbox) {
       logPaymentEvent({
@@ -210,7 +213,7 @@ export async function POST(req: Request) {
         biller_name,
         biller_type: biller_type || "utility",
         reference,
-      });
+      }, idToken);
 
       if (paymentRes.success) {
         logPaymentEvent({

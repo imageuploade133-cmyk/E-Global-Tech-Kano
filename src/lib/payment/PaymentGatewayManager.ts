@@ -1,7 +1,4 @@
 import { adminDb } from "../firebase-admin";
-import { PaymentGateway, InitializePaymentPayload, InitializePaymentResponse, VerifyPaymentResponse, ResolveAccountPayload, ResolveAccountResponse, TransferPayload, TransferResponse, VirtualAccountPayload, VirtualAccountResponse } from "./PaymentGateway";
-import { flutterwaveGateway } from "./providers/flutterwave/FlutterwaveGateway";
-import { paystackGateway } from "./providers/paystack/PaystackGateway";
 import { logPaymentEvent } from "../payment-logger";
 
 export interface GatewayConfig {
@@ -41,36 +38,33 @@ const DEFAULT_GATEWAYS: Record<string, GatewayConfig> = {
     },
     environment: "sandbox",
     publicKey: process.env.FLW_PUBLIC_KEY || "",
-    secretKey: process.env.FLW_SECRET_KEY || "",
-    webhookSecret: process.env.FLW_WEBHOOK_SECRET || "",
-  },
-  paystack: {
-    id: "paystack",
-    enabled: true,
-    priority: 1,
-    countries: ["NG", "GH"],
-    currencies: ["NGN", "GHS"],
-    features: {
-      funding: true,
-      transfer: true,
-      virtualAccount: true,
-      bills: true,
-      airtime: true,
-      data: true,
-    },
-    environment: "sandbox",
-    publicKey: process.env.PAYSTACK_PUBLIC_KEY || "",
-    secretKey: process.env.PAYSTACK_SECRET_KEY || "",
-    webhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET || "",
+    secretKey: "",
+    webhookSecret: "",
   },
 };
 
-export class PaymentGatewayManager {
-  private static providers: Record<string, PaymentGateway> = {
-    flutterwave: flutterwaveGateway,
-    paystack: paystackGateway,
-  };
+export interface BillPaymentPayload {
+  biller_code: string;
+  item_code: string;
+  amount: number;
+  customer_id: string;
+  biller_name?: string;
+  biller_type?: string;
+  reference: string;
+}
 
+export interface BillPaymentResponse {
+  success: boolean;
+  reference: string;
+  tx_ref: string;
+  flw_ref?: string;
+  amount: number;
+  customer: string;
+  biller_name?: string;
+  error?: string;
+}
+
+export class PaymentGatewayManager {
   static async getGatewayConfigs(): Promise<Record<string, GatewayConfig>> {
     try {
       const snap = await adminDb.collection("payment_gateways").get();
@@ -107,211 +101,51 @@ export class PaymentGatewayManager {
     country: string;
     currency: string;
     feature: keyof GatewayConfig["features"];
-  }): Promise<PaymentGateway> {
-    const configs = await this.getGatewayConfigs();
-    const candidates = Object.values(configs)
-      .filter((cfg) => {
-        return (
-          cfg.enabled &&
-          cfg.countries.includes(params.country.toUpperCase()) &&
-          cfg.currencies.includes(params.currency.toUpperCase()) &&
-          cfg.features[params.feature]
-        );
-      })
-      .sort((a, b) => b.priority - a.priority);
+  }): Promise<{ name: string; payBills: (payload: BillPaymentPayload, idToken?: string) => Promise<BillPaymentResponse> }> {
+    console.log(`[PaymentGatewayManager] Selecting gateway for feature: ${params.feature}`);
+    return {
+      name: "flutterwave",
+      payBills: async (payload: BillPaymentPayload, idToken?: string) => {
+        const response = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/bills", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${idToken || ""}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            country: "NG",
+            customer: payload.customer_id,
+            amount: payload.amount,
+            recurrence: "ONCE",
+            type: payload.item_code,
+            reference: payload.reference,
+          }),
+        });
 
-    if (candidates.length > 0) {
-      const bestId = candidates[0].id;
-      const provider = this.providers[bestId];
-      if (provider) {
-        console.log(`[PaymentGatewayManager] Selected prioritized gateway: [${bestId}] for feature [${params.feature}]`);
-        return provider;
-      }
-    }
+        const resData = await response.json();
+        if (response.ok && resData.status === "success") {
+          return {
+            success: true,
+            reference: payload.reference,
+            tx_ref: payload.reference,
+            flw_ref: resData.data?.tx_ref || resData.data?.reference,
+            amount: payload.amount,
+            customer: payload.customer_id,
+            biller_name: payload.biller_name,
+          };
+        }
 
-    console.warn(`[PaymentGatewayManager] No matching prioritized gateway found. Defaulting to Flutterwave.`);
-    return this.providers.flutterwave;
-  }
-
-  static getProviders(): PaymentGateway[] {
-    return Object.values(this.providers);
-  }
-
-  static getProvider(id: string): PaymentGateway {
-    return this.providers[id] || this.providers.flutterwave;
-  }
-
-  static async initializePayment(
-    payload: InitializePaymentPayload
-  ): Promise<InitializePaymentResponse> {
-    const startTime = Date.now();
-    const primary = await this.selectGateway({ country: "NG", currency: payload.currency, feature: "funding" });
-
-    try {
-      const res = await primary.initializePayment(payload);
-      this.logMetrics(primary.name, "initializePayment", startTime, true);
-      if (res.success) return res;
-      throw new Error(res.error || "Gateway initialization failed.");
-    } catch (err: unknown) {
-      const errorMsg = (err as Error).message;
-      console.warn(`[Failover Activated] Primary gateway ${primary.name} failed initialization: ${errorMsg}. Retrying fallback...`);
-      const alternativeId = primary.name === "paystack" ? "flutterwave" : "paystack";
-      const fallback = this.providers[alternativeId];
-
-      try {
-        const res = await fallback.initializePayment(payload);
-        this.logMetrics(fallback.name, "initializePayment_failover", startTime, true);
-        return res;
-      } catch (fallbackErr: unknown) {
-        const fallbackErrorMsg = (fallbackErr as Error).message;
-        this.logMetrics(primary.name, "initializePayment_failed_entirely", startTime, false, fallbackErrorMsg);
-        return {
-          success: false,
-          reference: "",
-          error: `Both primary and fallback gateways failed to initialize: ${fallbackErrorMsg}`,
-        };
-      }
-    }
-  }
-
-  static async verifyPayment(
-    transactionId: string,
-    txRef?: string
-  ): Promise<VerifyPaymentResponse> {
-    const startTime = Date.now();
-    let targetGateway = this.providers.flutterwave;
-    const reference = txRef || transactionId;
-    if (reference.startsWith("pstk-")) {
-      targetGateway = this.providers.paystack;
-    }
-
-    try {
-      const res = await targetGateway.verifyPayment(transactionId, txRef);
-      this.logMetrics(targetGateway.name, "verifyPayment", startTime, true);
-      return res;
-    } catch (err: unknown) {
-      const errorMsg = (err as Error).message;
-      this.logMetrics(targetGateway.name, "verifyPayment_failed", startTime, false, errorMsg);
-      return {
-        success: false,
-        error: errorMsg || "Failed to verify transaction.",
-      };
-    }
-  }
-
-  static async resolveAccount(
-    payload: ResolveAccountPayload,
-    country = "NG",
-    currency = "NGN"
-  ): Promise<ResolveAccountResponse> {
-    const startTime = Date.now();
-    const gateway = await this.selectGateway({ country, currency, feature: "transfer" });
-
-    try {
-      const res = await gateway.resolveAccount(payload);
-      this.logMetrics(gateway.name, "resolveAccount", startTime, true);
-      return res;
-    } catch (err: unknown) {
-      const errorMsg = (err as Error).message;
-      console.warn(`[Failover Account Resolution] Gateway ${gateway.name} failed account resolve: ${errorMsg}. Falling back...`);
-      const alternativeId = gateway.name === "paystack" ? "flutterwave" : "paystack";
-      const fallback = this.providers[alternativeId];
-      try {
-        const res = await fallback.resolveAccount(payload);
-        this.logMetrics(fallback.name, "resolveAccount_failover", startTime, true);
-        return res;
-      } catch (fallbackErr: unknown) {
-        const fallbackErrorMsg = (fallbackErr as Error).message;
-        this.logMetrics(gateway.name, "resolveAccount_failed_entirely", startTime, false, fallbackErrorMsg);
-        return {
-          success: false,
-          error: "Failed to resolve account details with all providers.",
-        };
-      }
-    }
-  }
-
-  static async transfer(
-    payload: TransferPayload,
-    country = "NG",
-    currency = "NGN"
-  ): Promise<TransferResponse> {
-    const startTime = Date.now();
-    const gateway = await this.selectGateway({ country, currency, feature: "transfer" });
-
-    try {
-      const res = await gateway.transfer(payload);
-      this.logMetrics(gateway.name, "transfer", startTime, true);
-      return res;
-    } catch (err: unknown) {
-      const errorMsg = (err as Error).message;
-      console.warn(`[Failover Transfer] Primary gateway ${gateway.name} failed transfer: ${errorMsg}. Initiating fallback...`);
-      const alternativeId = gateway.name === "paystack" ? "flutterwave" : "paystack";
-      const fallback = this.providers[alternativeId];
-      try {
-        const res = await fallback.transfer(payload);
-        this.logMetrics(fallback.name, "transfer_failover", startTime, true);
-        return res;
-      } catch (fallbackErr: unknown) {
-        const fallbackErrorMsg = (fallbackErr as Error).message;
-        this.logMetrics(gateway.name, "transfer_failed_entirely", startTime, false, fallbackErrorMsg);
         return {
           success: false,
           reference: payload.reference,
-          error: `Transfer failed on both providers. Last error: ${fallbackErrorMsg}`,
+          tx_ref: payload.reference,
+          amount: payload.amount,
+          customer: payload.customer_id,
+          biller_name: payload.biller_name,
+          error: resData.message || "Failed to process bill payment.",
         };
       }
-    }
-  }
-
-  static async createVirtualAccount(
-    payload: VirtualAccountPayload,
-    country = "NG",
-    currency = "NGN"
-  ): Promise<VirtualAccountResponse> {
-    const startTime = Date.now();
-    const gateway = await this.selectGateway({ country, currency, feature: "virtualAccount" });
-
-    try {
-      const res = await gateway.createVirtualAccount(payload);
-      this.logMetrics(gateway.name, "createVirtualAccount", startTime, true);
-      return res;
-    } catch (err: unknown) {
-      const errorMsg = (err as Error).message;
-      console.warn(`[Failover Virtual Account] ${gateway.name} failed creation: ${errorMsg}. Falling back...`);
-      const alternativeId = gateway.name === "paystack" ? "flutterwave" : "paystack";
-      const fallback = this.providers[alternativeId];
-      try {
-        const res = await fallback.createVirtualAccount(payload);
-        this.logMetrics(fallback.name, "createVirtualAccount_failover", startTime, true);
-        return res;
-      } catch (fallbackErr: unknown) {
-        const fallbackErrorMsg = (fallbackErr as Error).message;
-        this.logMetrics(gateway.name, "createVirtualAccount_failed_entirely", startTime, false, fallbackErrorMsg);
-        return {
-          success: false,
-          bankName: "",
-          accountNumber: "",
-          accountName: "",
-          error: "Failed to generate virtual account details.",
-        };
-      }
-    }
-  }
-
-  private static logMetrics(
-    gateway: string,
-    action: string,
-    startTime: number,
-    success: boolean,
-    errorMessage?: string
-  ) {
-    const latency = Date.now() - startTime;
-    logPaymentEvent({
-      category: success ? "Payment Initialized" : "Errors",
-      message: `Gateway metric [${gateway}] action [${action}] finished in ${latency}ms. Success: ${success}${errorMessage ? ` | Error: ${errorMessage}` : ""}`,
-      processingTimeMs: latency,
-    });
+    };
   }
 }
 export const gatewayManager = PaymentGatewayManager;

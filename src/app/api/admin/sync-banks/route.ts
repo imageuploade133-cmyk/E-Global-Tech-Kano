@@ -9,8 +9,11 @@ export async function POST(req: Request) {
 
     console.log("[Admin Sync Banks] Manual bank synchronization triggered by administrator...");
 
-    // 2. Perform sync from Flutterwave
-    const result = await BankService.syncBanks();
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    // 2. Perform sync from VM Payment Gateway
+    const result = await BankService.syncBanks(idToken);
 
     return NextResponse.json({
       success: true,
