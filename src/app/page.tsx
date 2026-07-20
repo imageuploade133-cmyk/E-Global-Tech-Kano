@@ -65,11 +65,14 @@ export default function Home() {
               }
             }
 
-            console.log(`[Verify API called] Requesting https://etechglobalhub.duckdns.org/api/flutterwave/verify?id=${transactionId}`);
-            const res = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/verify?id=${transactionId}`, {
+            console.log(`[Verify API called] Requesting POST https://etechglobalhub.duckdns.org/api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
+            const res = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/verify`, {
+              method: "POST",
               headers: {
+                "Content-Type": "application/json",
                 "Authorization": `Bearer ${idToken}`
-              }
+              },
+              body: JSON.stringify({ transactionId, txRef })
             });
             const data = await res.json();
             toast.dismiss();
