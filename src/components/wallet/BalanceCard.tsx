@@ -365,10 +365,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   useEffect(() => {
-    if (isAddMoneyOpen) {
-      fetchPermanentVirtualAccount();
-    }
-  }, [isAddMoneyOpen]);
+    fetchPermanentVirtualAccount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch banks dynamically from our Discovery API endpoint
   const fetchBanks = async () => {
@@ -1052,19 +1051,31 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
           {/* Bottom section: Card Number, User Name, Expiry/infinite badge */}
           <div className="space-y-1.5 w-full overflow-hidden flex-shrink-0">
-            <div className="font-mono text-[9px] min-[360px]:text-[11px] text-[#FFFFFF]/80 tracking-[0.15em] uppercase truncate max-w-full" title={resolvedName}>
-              {resolvedName}
+            {/* Prominent Account Number / Card Number styling */}
+            <div className="font-mono text-[13px] min-[360px]:text-[15px] text-white tracking-[0.2em] font-semibold flex items-center justify-between select-all leading-none mb-1">
+              <span>
+                {permanentAccount ? (
+                  permanentAccount.accountNumber.replace(/(\d{4})(\d{4})(\d{2})/, "$1 $2 $3")
+                ) : (
+                  "9921 4732 81" // fallback/mock permanent account number format
+                )}
+              </span>
+              {permanentAccount && (
+                <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 font-bold">
+                  {permanentAccount.bankName}
+                </span>
+              )}
             </div>
 
             <div className="flex justify-between items-end gap-2 w-full overflow-hidden">
               <div className="flex-1 min-w-0">
-                  <p className="font-label-sm text-[7px] min-[360px]:text-[8px] uppercase tracking-wider text-[#FFFFFF]/60 mb-0.5 font-medium truncate">Account Holder</p>
-                  <p className="font-label-sm text-[10px] min-[360px]:text-[12px] text-[#FFFFFF] uppercase tracking-widest font-bold truncate leading-none" title={resolvedName}>
+                  <p className="font-label-sm text-[6.5px] min-[360px]:text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 mb-0.5 font-medium truncate">Account Holder</p>
+                  <p className="font-label-sm text-[9px] min-[360px]:text-[11px] text-[#FFFFFF] uppercase tracking-widest font-bold truncate leading-none" title={resolvedName}>
                     {resolvedName}
                   </p>
               </div>
               <div className="flex flex-col items-end flex-shrink-0 bg-white/10 px-2 py-0.5 rounded border border-white/15 backdrop-blur-xs select-none">
-                   <span className="font-mono text-[9px] min-[360px]:text-[11px] text-[#FFFFFF] font-black tracking-wider leading-none">NGN</span>
+                   <span className="font-mono text-[8px] min-[360px]:text-[10px] text-[#FFFFFF] font-black tracking-wider leading-none">NGN</span>
               </div>
             </div>
           </div>
@@ -1072,16 +1083,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       </div>
 
       {/* Action Buttons Below Card */}
-      <div className="mt-4 min-[360px]:mt-5 flex gap-2 min-[360px]:gap-3">
+      <div className="mt-4 min-[360px]:mt-5 flex gap-2 min-[360px]:gap-3 select-none">
         <motion.button
           whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.03, y: -1 }}
+          whileHover={{ scale: 1.02 }}
           onClick={() => setIsAddMoneyOpen(true)}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-          <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">add_card</span>
+          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">add_card</span>
           </div>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Add Money
@@ -1090,13 +1100,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
         <motion.button
           whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.03, y: -1 }}
+          whileHover={{ scale: 1.02 }}
           onClick={() => setIsTransferOpen(true)}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-          <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">send</span>
+          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">send</span>
           </div>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Transfer
@@ -1105,19 +1114,43 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
         <motion.button
           whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.03, y: -1 }}
+          whileHover={{ scale: 1.02 }}
           onClick={() => router.push("/investment")}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-r from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-          <div className="w-5 h-5 min-[360px]:w-6 min-[360px]:h-6 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[10px] min-[360px]:text-[13px] font-bold block">savings</span>
+          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">savings</span>
           </div>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Investment
           </span>
         </motion.button>
       </div>
+
+      {/* Premium Verification / KYC Alert Banner */}
+      {userData?.kycStatus !== "VERIFIED" && (
+        <motion.div
+          whileTap={{ scale: 0.98 }}
+          onClick={() => router.push("/profile")}
+          className="mt-4 p-4.5 bg-gradient-to-r from-[#FFF5F0] to-[#FFF9F6] border border-[#FFECD8] rounded-xl flex items-center justify-between cursor-pointer active:brightness-95 transition-all select-none relative overflow-hidden shadow-none"
+        >
+          {/* Subtle background luxury badge icon */}
+          <div className="absolute right-0 bottom-0 opacity-5 text-[60px] pointer-events-none translate-x-2 translate-y-2 select-none">
+            <span className="material-symbols-outlined text-[#FC7A00] font-black">gpp_maybe</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-orange-50 border border-[#FFECD8] flex items-center justify-center text-[#FC7A00] flex-shrink-0">
+              <span className="material-symbols-outlined text-[20px] font-bold animate-pulse">gpp_maybe</span>
+            </div>
+            <div>
+              <h4 className="font-hanken font-extrabold text-xs text-black leading-tight">Verify Your Identity (KYC)</h4>
+              <p className="font-hanken text-[10.5px] text-gray-500 font-bold uppercase mt-1 tracking-wider leading-none">Link BVN or NIN to activate unlimited deposits & transfers</p>
+            </div>
+          </div>
+          <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
+        </motion.div>
+      )}
     </motion.section>
 
     {/* Add Money Bottom Sheet Overlay Modal */}
