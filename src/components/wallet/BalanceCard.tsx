@@ -280,12 +280,29 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         idToken = await user.getIdToken();
       }
 
+      const fullname = userData?.name || user?.displayName || "Captain User";
+      const nameParts = fullname.trim().split(/\s+/);
+      const firstname = nameParts[0] || "Customer";
+      const lastname = nameParts.slice(1).join(" ") || "Wallet";
+
+      const payload = {
+        email: user?.email || userData?.email || `user-${user?.uid}@e-tech-hub.com`,
+        phone: userData?.phoneNumber || userData?.phone || "08012345678",
+        firstname,
+        lastname,
+        userId: user?.uid,
+        isPermanent: true,
+        is_permanent: true,
+        bvn: userData?.bvn || userData?.nin || "22222222222"
+      };
+
       const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/create-virtual-account", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
         },
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
