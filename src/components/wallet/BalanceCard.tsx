@@ -145,11 +145,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             body: JSON.stringify(bodyPayload),
           });
           const data = await res.json();
-          if (res.ok && data.success) {
-            setBulkName(data.accountName);
+          console.log("Resolve Account API raw response (Bulk):", data);
+
+          const isSuccess = data.status === "success" || data.success === true;
+          const resolvedName = data.accountName ||
+                               data.account_name ||
+                               data.data?.account_name ||
+                               data.data?.accountName ||
+                               "";
+
+          if (res.ok && isSuccess && resolvedName) {
+            setBulkName(resolvedName);
             toast.success("Recipient account verified!");
           } else {
-            toast.error(data.error || "Could not resolve account details.");
+            toast.error(data.error || data.message || "Could not resolve account details.");
           }
         } catch {
           toast.error("Failed to connect to verification server.");
@@ -203,11 +212,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             body: JSON.stringify(bodyPayload),
           });
           const data = await res.json();
-          if (res.ok && data.success) {
-            setTrfAccountName(data.accountName);
+          console.log("Resolve Account API raw response (Single):", data);
+
+          const isSuccess = data.status === "success" || data.success === true;
+          const resolvedName = data.accountName ||
+                               data.account_name ||
+                               data.data?.account_name ||
+                               data.data?.accountName ||
+                               "";
+
+          if (res.ok && isSuccess && resolvedName) {
+            setTrfAccountName(resolvedName);
             toast.success("Recipient account verified!");
           } else {
-            toast.error(data.error || "Could not resolve account details.");
+            toast.error(data.error || data.message || "Could not resolve account details.");
           }
         } catch {
           toast.error("Failed to connect to verification server.");
@@ -1681,7 +1699,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </div>
 
                       {/* "Find Bank" Button */}
-                      {trfAccount.length === 10 && (
+                      {trfAccount.length === 10 && !trfAccountName && (
                         <div className="pt-1">
                           <button
                             type="button"
@@ -1813,18 +1831,88 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                       {!isResolvingAccount && trfAccountName && (
                         <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                          <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Account Name</p>
-                          <p className="font-hanken text-xs font-extrabold text-emerald-700 uppercase mt-0.5">{trfAccountName}</p>
+                          <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Recipient Name</p>
+                          <p className="font-hanken text-xs font-extrabold text-emerald-700 uppercase mt-0.5 flex items-center gap-1.5">
+                            <span className="text-emerald-500 font-bold">✅</span> {trfAccountName}
+                          </p>
                         </div>
                       )}
 
-                      <button
-                        type="submit"
-                        disabled={!trfAccountName || isResolvingAccount}
-                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                      >
-                        Enter Amount
-                      </button>
+                      {/* Amount Field (shown only after verification) */}
+                      {trfAccountName && (
+                        <div className="space-y-1.5 pt-2">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Transfer (NGN)</label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
+                            <input
+                              type="number"
+                              placeholder="Enter amount to send..."
+                              value={trfAmount}
+                              onChange={(e) => setTrfAmount(e.target.value)}
+                              className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                            />
+                          </div>
+
+                          {/* Pricing breakdown details if amount is entered */}
+                          {parseFloat(trfAmount) > 0 && (
+                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs mt-2">
+                              <div className="flex justify-between text-gray-500">
+                                <span className="font-semibold">Transfer Amount</span>
+                                <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
+                                <span className="font-semibold">Transfer Fee</span>
+                                {isFeeLoading ? (
+                                  <span className="w-8 h-3 bg-gray-200 animate-pulse rounded" />
+                                ) : (
+                                  <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                                )}
+                              </div>
+                              <div className="flex justify-between items-center text-sm font-black pt-1">
+                                <span>Total Debit Amount</span>
+                                {isFeeLoading ? (
+                                  <span className="w-16 h-4 bg-gray-200 animate-pulse rounded" />
+                                ) : (
+                                  <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Submit / Continue Button */}
+                      {!trfAccountName && (
+                        <button
+                          type="submit"
+                          disabled={!trfAccountName || isResolvingAccount}
+                          className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 mt-4"
+                        >
+                          Enter Amount
+                        </button>
+                      )}
+
+                      {trfAccountName && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const amt = parseFloat(trfAmount);
+                            if (isNaN(amt) || amt <= 0) {
+                              toast.error("Please enter a valid transfer amount.");
+                              return;
+                            }
+                            if (trfTotalDebit > balance) {
+                              toast.error("Insufficient wallet balance for this transfer including fee.");
+                              return;
+                            }
+                            setTrfStep("confirm");
+                          }}
+                          disabled={isFeeLoading || !trfAmount || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance}
+                          className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 mt-4"
+                        >
+                          Continue
+                        </button>
+                      )}
                     </form>
                   ) : (
                     // --- BULK BATCH RECIPIENT ADDER FORM ---
