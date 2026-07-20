@@ -121,7 +121,7 @@ export default function ProfilePage() {
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/flutterwave/create-virtual-account", {
+      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/create-virtual-account", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

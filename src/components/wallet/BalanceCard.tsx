@@ -126,7 +126,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             idToken = await user.getIdToken();
           }
 
-          const res = await fetch("/api/flutterwave/resolve-account", {
+          const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/resolve-account", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -177,7 +177,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             idToken = await user.getIdToken();
           }
 
-          const res = await fetch("/api/flutterwave/resolve-account", {
+          const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/resolve-account", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -219,7 +219,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             idToken = await user.getIdToken();
           }
 
-          const res = await fetch(`/api/flutterwave/transfer-fee?amount=${amt}`, {
+          const res = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/transfer-fee?amount=${amt}`, {
             headers: {
               "Authorization": `Bearer ${idToken}`,
             },
@@ -280,7 +280,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/flutterwave/create-virtual-account", {
+      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/create-virtual-account", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -315,7 +315,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const fetchBanks = async () => {
     setIsBanksLoading(true);
     try {
-      const res = await fetch("/api/banks");
+      let idToken = "mock-token";
+      if (user && sessionStorage.getItem("mock") !== "true") {
+        try {
+          idToken = await user.getIdToken();
+        } catch (tokenErr) {
+          console.error("Failed to retrieve ID token for bank fetch:", tokenErr);
+        }
+      }
+
+      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/banks", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         setBanksList(data);
@@ -599,6 +612,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     toast.loading("Contacting Flutterwave secure payment element...");
 
     try {
+      let idToken = "mock-token";
+      if (user && sessionStorage.getItem("mock") !== "true") {
+        try {
+          idToken = await user.getIdToken();
+        } catch (tokenErr) {
+          console.error("Failed to retrieve ID token for initialization:", tokenErr);
+        }
+      }
+
       const payload = {
         amount: parseFloat(addAmount),
         currency: "NGN",
@@ -608,9 +630,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         redirectUrl: `${window.location.origin}/?verify=flw`,
       };
 
-      const res = await fetch("/api/flutterwave/initialize-payment", {
+      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/initialize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -746,7 +771,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           idToken = await user.getIdToken();
         }
 
-        const res = await fetch("/api/flutterwave/bulk-transfer", {
+        const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/bulk-transfer", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -791,7 +816,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/flutterwave/transfer", {
+      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/transfer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

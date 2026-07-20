@@ -20,8 +20,11 @@ export async function GET(req: Request) {
 
     console.log(`[Polling Payment Status] txRef: ${txRef}`);
 
-    // Call service layer to verify reference status on Flutterwave rail
-    const statusResult = await PaymentService.checkPaymentStatus(txRef);
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    // Call service layer to verify reference status on VM Payment Gateway
+    const statusResult = await PaymentService.checkPaymentStatus(txRef, idToken);
 
     return NextResponse.json({
       success: true,

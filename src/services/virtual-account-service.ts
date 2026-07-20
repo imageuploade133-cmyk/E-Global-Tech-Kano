@@ -1,8 +1,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { UserWalletAccount, FLWVirtualAccountResponse } from "@/types/flutterwave";
 
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-const FLW_BASE_URL = "https://api.flutterwave.com/v3";
+const FLW_BASE_URL = "https://etechglobalhub.duckdns.org/api/flutterwave";
 
 export class VirtualAccountService {
   /**
@@ -15,7 +14,8 @@ export class VirtualAccountService {
     emailFallback?: string,
     nameFallback?: string,
     bvnInput?: string,
-    ninInput?: string
+    ninInput?: string,
+    idToken?: string
   ): Promise<UserWalletAccount> {
     if (!userId) {
       throw new Error("Missing authenticated user ID context.");
@@ -67,17 +67,13 @@ export class VirtualAccountService {
 
     console.log(`[Virtual Account Service] Registering permanent virtual account with Flutterwave for: ${userId}`);
 
-    // 3. Request a permanent virtual account from Flutterwave API
-    if (!FLW_SECRET_KEY) {
-      throw new Error("Configuration Error: Missing Flutterwave Secret Key.");
-    }
-
+    // 3. Request a permanent virtual account from VM Payment Gateway
     const bvnToPass = hasValidBvn ? bvn : nin;
 
-    const response = await fetch(`${FLW_BASE_URL}/virtual-account-numbers`, {
+    const response = await fetch(`${FLW_BASE_URL}/create-virtual-account`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+        "Authorization": `Bearer ${idToken || ""}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
