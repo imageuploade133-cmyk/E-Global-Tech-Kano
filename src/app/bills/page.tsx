@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 interface Biller {
   id: number;
@@ -25,7 +26,7 @@ interface BillItem {
   is_fixed_amount: boolean;
 }
 
-import Image from "next/image";
+const AIRTIME_PRESETS = [100, 200, 500, 1000, 2000, 5000];
 
 export default function GenericBillPage() {
   const { userData, user } = useAuth();
@@ -58,6 +59,7 @@ export default function GenericBillPage() {
 
   const [customerId, setCustomerId] = useState<string>("");
   const [customAmount, setCustomAmount] = useState<string>("");
+  const [useCustomDataPrice, setUseCustomDataPrice] = useState<boolean>(false);
   const [validatedName, setValidatedName] = useState<string>("");
 
   // Loading States
@@ -121,10 +123,13 @@ export default function GenericBillPage() {
       setItems([]);
       setCustomerId("");
       setCustomAmount("");
+      setUseCustomDataPrice(false);
       setValidatedName("");
 
       try {
-        const res = await fetch(`/api/bills/billers?category=${pageCategory}`);
+        // Map page category to API expected category code
+        const apiCategory = pageCategory === "DATA" ? "MOBILEDATA" : pageCategory;
+        const res = await fetch(`/api/bills/billers?category=${apiCategory}`);
         if (!res.ok) throw new Error("Failed to load billing providers.");
         const data = await res.json();
         setBillers(data.data || []);
@@ -148,6 +153,7 @@ export default function GenericBillPage() {
       setSelectedItem(null);
       setCustomerId("");
       setCustomAmount("");
+      setUseCustomDataPrice(false);
       setValidatedName("");
 
       try {
@@ -165,6 +171,39 @@ export default function GenericBillPage() {
     }
     fetchItems();
   }, [selectedBiller]);
+
+  // Parse details for data plan presentation
+  const parseDataPlan = (name: string) => {
+    const sizeMatch = name.match(/(\d+(?:\.\d+)?\s*(?:GB|MB))/i);
+    const durationMatch = name.match(/\(([^)]+)\)/);
+
+    const gbSize = sizeMatch ? sizeMatch[1] : "";
+    const duration = durationMatch ? durationMatch[1] : "30 Days";
+
+    let cleanedName = name;
+    if (sizeMatch && gbSize) {
+      cleanedName = name.replace(sizeMatch[0], "").replace(/\([^)]+\)/, "").trim();
+    }
+    // Clean up brand prefixes
+    cleanedName = cleanedName.replace(/^(MTN|GLO|Airtel|9mobile|Smile|Spectranet)\s+(Mobile\s+)?(Data\s+)?(Plan\s+)?/i, "");
+
+    return {
+      size: gbSize || "Data Plan",
+      duration,
+      displayName: cleanedName || "Standard Plan"
+    };
+  };
+
+  // Compute final transaction amount dynamically
+  const finalAmount = selectedItem
+    ? (pageCategory === "DATA" && useCustomDataPrice
+        ? Number(customAmount)
+        : (selectedItem.is_fixed_amount ? selectedItem.amount : Number(customAmount)))
+    : 0;
+
+  // Frontend input validation checks
+  const isAirtimeInvalid = pageCategory === "AIRTIME" && (Number(customAmount) < 100 || Number(customAmount) > 50000);
+  const isCustomPriceInvalid = pageCategory === "DATA" && useCustomDataPrice && Number(customAmount) < (selectedItem?.amount || 0);
 
   // Interactive Validation handler
   const handleValidateCustomer = async () => {
@@ -211,9 +250,18 @@ export default function GenericBillPage() {
       return;
     }
 
-    const finalAmount = selectedItem.is_fixed_amount ? selectedItem.amount : Number(customAmount);
     if (!finalAmount || finalAmount <= 0) {
       toast.error("Please specify a valid payment amount.");
+      return;
+    }
+
+    if (isAirtimeInvalid) {
+      toast.error("Airtime amount must be between ₦100 and ₦50,000.");
+      return;
+    }
+
+    if (isCustomPriceInvalid) {
+      toast.error(`Custom price cannot be less than the standard price of ₦${selectedItem?.amount.toLocaleString()}.`);
       return;
     }
 
@@ -249,8 +297,6 @@ export default function GenericBillPage() {
     setIsPaying(true);
     setIsPinModalOpen(false);
     toast.loading("Processing your utility debit transaction...");
-
-    const finalAmount = selectedItem?.is_fixed_amount ? selectedItem.amount : Number(customAmount);
 
     try {
       const idToken = await user?.getIdToken();
@@ -311,6 +357,9 @@ export default function GenericBillPage() {
         return "Customer Identifier";
     }
   };
+
+  // Sort and group packages by amount ascending for robust design
+  const sortedItems = [...items].sort((a, b) => a.amount - b.amount);
 
   if (pagePreloading) {
     return (
@@ -447,7 +496,7 @@ export default function GenericBillPage() {
                   <div className="flex justify-between items-center pt-1">
                     <span className="font-black text-black">Total Paid Amount</span>
                     <span className="font-mono text-emerald-600 font-black text-sm">
-                      ₦{Number(successReceipt.amount || selectedItem?.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₦{Number(successReceipt.amount || finalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
@@ -458,7 +507,7 @@ export default function GenericBillPage() {
                     setSuccessReceipt(null);
                     setCustomerId("");
                     setCustomAmount("");
-                    setValidatedName("");
+                    setUseCustomDataPrice(false);
                     setSelectedBiller(null);
                     setSelectedItem(null);
                   }}
@@ -468,7 +517,7 @@ export default function GenericBillPage() {
                 </button>
               </motion.div>
             ) : (
-              // --- FORM AND INPUT CONTAINER (Removing all Dev Shadow shadows) ---
+              // --- FORM AND INPUT CONTAINER ---
               <motion.div
                 key="bill-form"
                 initial={{ opacity: 0, y: 10 }}
@@ -476,7 +525,7 @@ export default function GenericBillPage() {
                 exit={{ opacity: 0, y: -10 }}
                 className="premium-gradient-card premium-gradient-border p-6 shadow-none space-y-6"
               >
-                {/* Step 1: Select Biller Provider (Nice UI Grid instead of select dropdown) */}
+                {/* Step 1: Select Biller Provider */}
                 <div className="space-y-3 text-left font-hanken">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
                     Choose Network / Provider
@@ -502,7 +551,7 @@ export default function GenericBillPage() {
                                 : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
                             }`}
                           >
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm tracking-tight ${
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm tracking-tight flex-shrink-0 ${
                               isSelected ? "bg-primary text-white" : "bg-gray-200 text-gray-600"
                             }`}>
                               {b.name.substring(0, 2).toUpperCase()}
@@ -522,7 +571,7 @@ export default function GenericBillPage() {
                   )}
                 </div>
 
-                {/* Step 2: Select Package / Plan (Elegant Grid/List of plan cards) */}
+                {/* Step 2: Select Package / Plan */}
                 {selectedBiller && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -533,20 +582,85 @@ export default function GenericBillPage() {
                       Choose Plan / Package
                     </label>
                     {isItemsLoading ? (
-                      <div className="space-y-2">
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="h-16 bg-gray-50 border border-gray-200 rounded-2xl animate-pulse" />
+                      /* --- HIGH FIDELITY SKELETON LOADER --- */
+                      <div className="grid grid-cols-2 gap-3.5">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className="h-28 bg-gray-50 border border-gray-150 rounded-2xl animate-pulse flex flex-col justify-between p-3.5">
+                            <div className="flex justify-between items-center">
+                              <div className="h-4 bg-gray-200 rounded w-12" />
+                              <div className="h-3 bg-gray-200 rounded w-10" />
+                            </div>
+                            <div className="h-3 bg-gray-200 rounded w-20 mt-2" />
+                            <div className="h-4 bg-gray-200 rounded w-1/2 mt-4" />
+                          </div>
                         ))}
                       </div>
+                    ) : sortedItems.length === 0 ? (
+                      /* --- EMPTY STATE --- */
+                      <div className="py-8 text-center text-gray-400 font-hanken text-xs font-semibold">
+                        No plans available from this provider.
+                      </div>
+                    ) : pageCategory === "DATA" ? (
+                      /* --- HIGH FIDELITY DATA PLANS GRID --- */
+                      <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                        {sortedItems.map((i) => {
+                          const isSelected = selectedItem?.id === i.id;
+                          const planInfo = parseDataPlan(i.name);
+
+                          return (
+                            <button
+                              key={i.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedItem(i);
+                                setCustomAmount(i.amount.toString());
+                                setUseCustomDataPrice(false);
+                              }}
+                              className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-[120px] transition-all duration-300 cursor-pointer shadow-none ${
+                                isSelected
+                                  ? "bg-orange-50/50 border-[#FC7A00]"
+                                  : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                              }`}
+                            >
+                              <div className="w-full">
+                                <div className="flex justify-between items-start gap-1 w-full">
+                                  <span className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black tracking-tight leading-none ${
+                                    isSelected ? "bg-[#FC7A00] text-white" : "bg-gray-200 text-gray-700"
+                                  }`}>
+                                    {planInfo.size}
+                                  </span>
+                                  <span className="text-[8px] text-gray-400 font-bold uppercase truncate">
+                                    {planInfo.duration}
+                                  </span>
+                                </div>
+                                <p className="font-hanken text-[10px] font-extrabold text-black mt-2 leading-tight line-clamp-2">
+                                  {planInfo.displayName}
+                                </p>
+                              </div>
+
+                              <div className="w-full text-right mt-2 pt-1 border-t border-gray-100/30 flex justify-between items-center">
+                                <span className="text-[7.5px] text-gray-400 font-bold uppercase">Price</span>
+                                <span className="font-mono text-[11.5px] font-black text-black">
+                                  ₦{i.amount.toLocaleString()}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     ) : (
+                      /* Standard package selector (e.g. Airtime, Cable, Utility) */
                       <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 no-scrollbar">
-                        {items.map((i) => {
+                        {sortedItems.map((i) => {
                           const isSelected = selectedItem?.id === i.id;
                           return (
                             <button
                               key={i.id}
                               type="button"
-                              onClick={() => setSelectedItem(i)}
+                              onClick={() => {
+                                setSelectedItem(i);
+                                setCustomAmount("");
+                              }}
                               className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all duration-300 cursor-pointer shadow-none ${
                                 isSelected
                                   ? "bg-orange-50/50 border-[#FC7A00]"
@@ -621,39 +735,175 @@ export default function GenericBillPage() {
                       </div>
                     )}
 
-                    {/* Step 4: Handle Amount (Fixed or Flexible) */}
-                    {!selectedItem.is_fixed_amount ? (
-                      <div className="space-y-1.5 text-left">
-                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                          Enter Payment Amount (NGN)
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
-                            ₦
-                          </span>
-                          <input
-                            type="number"
-                            placeholder="Amount (e.g. 2000)"
-                            value={customAmount}
-                            onChange={(e) => setCustomAmount(e.target.value)}
-                            className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
-                          />
+                    {/* Step 4: Handle Amount & Pricing selectors */}
+                    {pageCategory === "AIRTIME" ? (
+                      /* --- LUXURY AIRTIME SELECT PRESET & CUSTOM PRICES --- */
+                      <div className="space-y-3.5 text-left">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                            Select Pre-defined Price (NGN)
+                          </label>
+                          <div className="grid grid-cols-3 gap-2 mt-1.5">
+                            {AIRTIME_PRESETS.map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => setCustomAmount(preset.toString())}
+                                className={`py-2.5 rounded-xl border font-mono font-black text-[12px] text-center active:scale-95 transition-all cursor-pointer shadow-none ${
+                                  Number(customAmount) === preset
+                                    ? "bg-primary border-primary text-white"
+                                    : "bg-gray-50 border-gray-200 hover:bg-gray-100 text-black"
+                                }`}
+                              >
+                                ₦{preset.toLocaleString()}
+                              </button>
+                            ))}
+                          </div>
                         </div>
+
+                        <div className="space-y-1.5 pt-1">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                            Or Enter Custom Price (NGN)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
+                              ₦
+                            </span>
+                            <input
+                              type="number"
+                              pattern="[0-9]*"
+                              inputMode="numeric"
+                              placeholder="Specify flexible topup amount"
+                              value={customAmount}
+                              onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
+                              className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
+                            />
+                          </div>
+                          {isAirtimeInvalid && customAmount !== "" && (
+                            <p className="text-[10px] text-rose-500 font-bold text-left mt-1.5">
+                              Airtime amount must be between ₦100 and ₦50,000.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ) : pageCategory === "DATA" ? (
+                      /* --- LUXURY MOBILE DATA SELECT PRESET & CUSTOM PRICES --- */
+                      <div className="space-y-3.5 text-left">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                            Pricing Option / Mode
+                          </label>
+                          <div className="grid grid-cols-2 p-1 bg-gray-100/80 rounded-full mt-1.5 border border-gray-200/50">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUseCustomDataPrice(false);
+                                setCustomAmount(selectedItem.amount.toString());
+                              }}
+                              className={`py-2 text-[10.5px] font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
+                                !useCustomDataPrice
+                                  ? "bg-primary text-white shadow-none"
+                                  : "bg-transparent text-gray-400 hover:text-black"
+                              }`}
+                            >
+                              Standard Plan Price
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setUseCustomDataPrice(true)}
+                              className={`py-2 text-[10.5px] font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
+                                useCustomDataPrice
+                                  ? "bg-primary text-white shadow-none"
+                                  : "bg-transparent text-gray-400 hover:text-black"
+                              }`}
+                            >
+                              Enter Custom Price
+                            </button>
+                          </div>
+                        </div>
+
+                        {useCustomDataPrice ? (
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                              Enter Custom Price for this Data Plan (NGN)
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
+                                ₦
+                              </span>
+                              <input
+                                type="number"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
+                                placeholder="E.g. 500"
+                                value={customAmount}
+                                onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
+                                className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
+                              />
+                            </div>
+                            {isCustomPriceInvalid && (
+                              <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-hanken text-[10px] font-bold text-left flex items-center gap-2 mt-1.5">
+                                <span className="material-symbols-outlined text-[16px] text-rose-500">warning</span>
+                                <span>Custom price cannot be less than the standard plan price of ₦{selectedItem?.amount.toLocaleString()}.</span>
+                              </div>
+                            )}
+                            <p className="text-[8.5px] text-gray-400 font-bold uppercase tracking-wide mt-1">
+                              Standard plan value is ₦{selectedItem?.amount.toLocaleString()}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 flex items-center justify-between">
+                            <div>
+                              <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
+                                Standard Package Price
+                              </p>
+                              <p className="font-hanken text-xs font-semibold text-gray-500 mt-0.5">
+                                Set dynamically by network provider
+                              </p>
+                            </div>
+                            <p className="font-mono font-black text-lg text-black">
+                              ₦{selectedItem?.amount.toLocaleString()}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 text-left flex items-center justify-between">
-                        <div>
-                          <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
-                            Package Fixed Amount
-                          </p>
-                          <p className="font-hanken text-xs font-semibold text-gray-500 mt-0.5">
-                            Set by provider network
+                      /* Fallback generic categories */
+                      !selectedItem.is_fixed_amount ? (
+                        <div className="space-y-1.5 text-left">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                            Enter Payment Amount (NGN)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
+                              ₦
+                            </span>
+                            <input
+                              type="number"
+                              pattern="[0-9]*"
+                              inputMode="numeric"
+                              placeholder="Amount (e.g. 2000)"
+                              value={customAmount}
+                              onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
+                              className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 text-left flex items-center justify-between">
+                          <div>
+                            <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
+                              Package Fixed Amount
+                            </p>
+                            <p className="font-hanken text-xs font-semibold text-gray-500 mt-0.5">
+                              Set by provider network
+                            </p>
+                          </div>
+                          <p className="font-mono font-black text-lg text-black">
+                            ₦{selectedItem?.amount.toLocaleString()}
                           </p>
                         </div>
-                        <p className="font-mono font-black text-lg text-black">
-                          ₦{selectedItem.amount.toLocaleString()}
-                        </p>
-                      </div>
+                      )
                     )}
 
                     {/* Balance Preview Badge */}
@@ -665,10 +915,10 @@ export default function GenericBillPage() {
                     <button
                       type="button"
                       onClick={handlePayTrigger}
-                      disabled={isPaying || !customerId || (!selectedItem.is_fixed_amount && !customAmount)}
+                      disabled={isPaying || !customerId || (pageCategory === "AIRTIME" && isAirtimeInvalid) || (pageCategory === "DATA" && useCustomDataPrice && isCustomPriceInvalid) || !customAmount}
                       className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                     >
-                      {isPaying ? "Processing Debit..." : "Proceed to Pay"}
+                      {isPaying ? "Processing Debit..." : `Proceed to Pay (₦${finalAmount.toLocaleString()})`}
                     </button>
                   </motion.div>
                 )}

@@ -5,6 +5,7 @@ import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
 import bcrypt from "bcryptjs";
+import { MOCK_ITEMS } from "../items/config";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -42,6 +43,26 @@ export async function POST(req: Request) {
     const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       return NextResponse.json({ error: "Invalid bill amount. Must be greater than zero." }, { status: 400 });
+    }
+
+    // Backend Custom Data Amount floor validation
+    if (biller_type?.toUpperCase() === "DATA") {
+      let matchedPlan = null;
+      for (const billerCode in MOCK_ITEMS) {
+        const plans = MOCK_ITEMS[billerCode];
+        const plan = plans.find(p => p.item_code === item_code);
+        if (plan) {
+          matchedPlan = plan;
+          break;
+        }
+      }
+
+      if (matchedPlan && matchedPlan.amount > 0 && numAmount < matchedPlan.amount) {
+        return NextResponse.json(
+          { error: `Custom data payment amount (₦${numAmount}) cannot be less than the standard plan price of ₦${matchedPlan.amount}.` },
+          { status: 400 }
+        );
+      }
     }
 
     // Verify user transaction PIN and debit wallet inside single atomic Firestore transaction

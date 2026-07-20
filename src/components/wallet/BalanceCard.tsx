@@ -1527,7 +1527,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto h-[95vh] max-h-[95vh] no-scrollbar"
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto h-[90vh] max-h-[90vh] no-scrollbar"
           >
             {/* Drag handle */}
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
