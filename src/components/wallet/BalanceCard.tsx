@@ -44,6 +44,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   // Outward Transfer Wizard States
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [trfStep, setTrfStep] = useState<"input" | "amount" | "confirm" | "pin" | "completion">("input");
+  const [trfKeypadNumbers, setTrfKeypadNumbers] = useState<string[]>([]);
+
+  const shuffleTrfKeypad = () => {
+    const numbers = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+    for (let i = numbers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+    }
+    setTrfKeypadNumbers(numbers);
+  };
 
   // Single Transfer states
   const [trfBank, setTrfBank] = useState<{ id: string; name: string; code?: string } | null>(null);
@@ -406,6 +416,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     if ((isAddMoneyOpen || isTransferOpen) && banksList.length === 0) {
       fetchBanks();
     }
+    if (isTransferOpen) {
+      shuffleTrfKeypad();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAddMoneyOpen, isTransferOpen, banksList.length]);
 
   // Safely calculate active locked savings from sessionStorage
@@ -1860,7 +1874,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               type="number"
                               placeholder="Enter amount to send..."
                               value={trfAmount}
-                              onChange={(e) => setTrfAmount(e.target.value)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTrfAmount(val);
+                                const parsedAmt = parseFloat(val);
+                                if (!isNaN(parsedAmt) && parsedAmt > 0) {
+                                  const flatFee = 10.00;
+                                  const totalDeduction = parsedAmt + flatFee;
+                                  if (totalDeduction > balance) {
+                                    toast.error("Insufficient Funds", {
+                                      description: `The total debit (₦${totalDeduction.toLocaleString()} including transfer fee) exceeds your available balance of ₦${balance.toLocaleString()}.`
+                                    });
+                                  }
+                                }
+                              }}
                               className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
                             />
                           </div>
@@ -2260,47 +2287,55 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   {/* Dot indicator indicators */}
-                  <div className="flex justify-center gap-3 py-1 mb-2">
+                  <div className="flex justify-center gap-3.5 py-2 mb-4">
                     {[0, 1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 ${
+                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
                           trfPin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
                         }`}
                       />
                     ))}
                   </div>
 
-                  {/* PIN Grid keypad */}
-                  <div className="grid grid-cols-3 gap-2 w-full max-w-[280px]">
-                    {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
-                      <button
+                  {/* Premium circular shuffled PIN Grid keypad */}
+                  <div className="w-full max-w-[260px] min-[360px]:max-w-[290px] min-[410px]:max-w-xs grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-6 mb-6">
+                    {trfKeypadNumbers.slice(0, 9).map((num) => (
+                      <motion.button
+                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+                        whileHover={{ scale: 1.05 }}
                         key={num}
                         type="button"
                         onClick={() => handleTrfPinPress(num)}
                         disabled={isTransferring}
-                        className="py-4 text-base font-black font-mono border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-black cursor-pointer"
+                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
                       >
                         {num}
-                      </button>
+                      </motion.button>
                     ))}
-                    <button
+                    <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20" />
+                    {trfKeypadNumbers[9] !== undefined && (
+                      <motion.button
+                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+                        whileHover={{ scale: 1.05 }}
+                        type="button"
+                        onClick={() => handleTrfPinPress(trfKeypadNumbers[9])}
+                        disabled={isTransferring}
+                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+                      >
+                        {trfKeypadNumbers[9]}
+                      </motion.button>
+                    )}
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
                       type="button"
-                      disabled={isTransferring}
                       onClick={handleTrfPinDelete}
-                      className="py-4 text-xs font-bold font-hanken border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-rose-500 cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleTrfPinPress("0")}
                       disabled={isTransferring}
-                      className="py-4 text-base font-black font-mono border border-gray-100 bg-gray-50 hover:bg-gray-100 rounded-xl active:scale-95 transition-all text-black cursor-pointer"
+                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer"
                     >
-                      0
-                    </button>
-                    <div className="w-full h-full" />
+                      <span className="material-symbols-outlined text-[24px] min-[360px]:text-[28px] min-[410px]:text-3xl">backspace</span>
+                    </motion.button>
                   </div>
                 </motion.div>
               )}
