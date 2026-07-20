@@ -331,7 +331,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       });
       if (res.ok) {
         const data = await res.json();
-        setBanksList(data);
+        console.log("Banks API response:", data);
+        const banksArray = Array.isArray(data)
+          ? data
+          : Array.isArray(data.data)
+            ? data.data
+            : Array.isArray(data.banks)
+              ? data.banks
+              : Array.isArray(data.data?.banks)
+                ? data.data.banks
+                : [];
+        setBanksList(banksArray);
       } else {
         console.warn("Failed to retrieve dynamic bank codes. Using local cache.");
       }
@@ -875,14 +885,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // Filter bank query
-  const filteredBanks = banksList.filter(b =>
-    b.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredBanks = Array.isArray(banksList) ? banksList.filter(b =>
+    b.name && b.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) : [];
 
   // Filter bank query (Outward transfer)
-  const filteredTrfBanks = banksList.filter(b =>
-    b.name.toLowerCase().includes(bankSearchQuery.toLowerCase())
-  );
+  const filteredTrfBanks = Array.isArray(banksList) ? banksList.filter(b =>
+    b.name && b.name.toLowerCase().includes(bankSearchQuery.toLowerCase())
+  ) : [];
 
   return (
     <>
