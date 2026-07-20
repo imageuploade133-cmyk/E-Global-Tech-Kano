@@ -875,19 +875,31 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         idToken = await user.getIdToken();
       }
 
+      const transferReference = `trf-${Date.now()}-${user?.uid?.slice(-6)}`;
+      const payload = {
+        amount: parseFloat(trfAmount),
+        accountNumber: trfAccount,
+        account_number: trfAccount,
+        bankId: trfBank?.id,
+        bankCode: trfBank?.code || trfBank?.id,
+        accountBank: trfBank?.code || trfBank?.id,
+        account_bank: trfBank?.code || trfBank?.id,
+        narration: `Direct outward transfer to ${trfAccountName}`,
+        currency: "NGN",
+        reference: transferReference,
+        beneficiary_name: trfAccountName,
+        beneficiaryName: trfAccountName,
+        pin: completedPin,
+      };
+      console.log("Outward Transfer Payload to VM Payment Gateway:", payload);
+
       const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/transfer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          bankId: trfBank?.id,
-          accountNumber: trfAccount,
-          amount: parseFloat(trfAmount),
-          narration: `Direct outward transfer to ${trfAccountName}`,
-          pin: completedPin,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
