@@ -65,8 +65,8 @@ export default function Home() {
               }
             }
 
-            console.log(`[Verify API called] Requesting POST https://etechglobalhub.duckdns.org/api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
-            const res = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/verify`, {
+            console.log(`[Verify API called] Requesting POST /api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
+            const res = await fetch(`/api/flutterwave/verify`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -134,7 +134,7 @@ export default function Home() {
             }
 
             console.log(`[Cancel Cleanup Started] Cleaning up pending payment: ${txRef}`);
-            const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/cancel", {
+            const res = await fetch("/api/flutterwave/cancel", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

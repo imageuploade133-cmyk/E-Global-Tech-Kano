@@ -2,10 +2,9 @@
 > e-global-wallet@0.1.0 dev
 > next dev
 
- ⚠ Port 3000 is in use, trying 3001 instead.
    ▲ Next.js 15.1.12
-   - Local:        http://localhost:3001
-   - Network:      http://192.168.0.2:3001
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.2:3000
 
  ✓ Starting...
- ✓ Ready in 2.1s
+ ✓ Ready in 1951ms
