@@ -910,6 +910,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           body: JSON.stringify({
             title: "Staff December Settlement",
             recipients: bulkRecipients,
+            pin: completedPin,
           }),
         });
 
