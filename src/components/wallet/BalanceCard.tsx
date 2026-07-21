@@ -87,6 +87,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [accountNumber, setAccountNumber] = useState("");
   const [isResolving, setIsResolving] = useState(false);
   const [isAutoDetected, setIsAutoDetected] = useState(false);
+  const [isManualFallback, setIsManualFallback] = useState(false);
 
   // Refs for request cancellation and session caching
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -358,6 +359,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       }
       setIsResolving(false);
       setIsAutoDetected(false);
+      setIsManualFallback(false);
       return;
     }
 
@@ -379,6 +381,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       const triggerAutoDetection = async () => {
         setIsResolving(true);
         setIsAutoDetected(false);
+        setIsManualFallback(false);
 
         // Cancel previous request if any
         if (abortControllerRef.current) {
@@ -513,6 +516,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
           if (successBank && successAccountName) {
             setIsAutoDetected(true);
+            setIsManualFallback(false);
 
             // Sync with existing transfer flow states so they are 100% backward compatible
             setTrfBank(successBank);
@@ -527,6 +531,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             toast.success("Recipient account auto-detected and verified!");
           } else {
             setIsAutoDetected(false);
+            setIsManualFallback(true);
+            toast.info("We couldn't automatically detect your bank. Please select your bank manually.");
           }
         } catch (err: unknown) {
           const error = err as Error;
@@ -2031,25 +2037,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   {!isBulkMode ? (
-                    // --- SINGLE TRANSFER INPUT FORM (TASK 1) ---
+                    // --- SINGLE TRANSFER INPUT FORM (TASK 1 & BANK DISCOVERY) ---
                     <div className="space-y-4 flex-1">
-                      {/* Recipient Bank Selector Field */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Destination Bank</label>
-                        <button
-                          type="button"
-                          onClick={() => setShowTrfBankSelector(true)}
-                          className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-extrabold text-black flex items-center justify-between cursor-pointer transition-all hover:bg-gray-100/50"
-                        >
-                          <span className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
-                            {trfBank ? trfBank.name : "Choose bank..."}
-                          </span>
-                          <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
-                        </button>
-                      </div>
-
-                      {/* Account Number Input */}
+                      {/* Account Number Input - Rendered first for Automatic Bank Discovery */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Account Number (10 Digits)</label>
                         <input
@@ -2064,11 +2054,52 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             if (val.length !== 10) {
                               setTrfAccountName("");
                               setIsAutoDetected(false);
+                              setIsManualFallback(false);
                             }
                           }}
                           className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
                         />
                       </div>
+
+                      {/* Graceful Fallback: Recipient Bank Selector (Shown only if automatic discovery fails or is overridden) */}
+                      {isManualFallback && (
+                        <div className="space-y-1.5 animate-fade-in">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Destination Bank (Manual Fallback)</label>
+                          <button
+                            type="button"
+                            onClick={() => setShowTrfBankSelector(true)}
+                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-extrabold text-black flex items-center justify-between cursor-pointer transition-all hover:bg-gray-100/50"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
+                              {trfBank ? trfBank.name : "Choose bank..."}
+                            </span>
+                            <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Display Detected Bank after successful automatic discovery or manual selection */}
+                      {trfBank && trfAccountName && (
+                        <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between text-left animate-fade-in">
+                          <div>
+                            <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Detected Bank</span>
+                            <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfBank.name}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAutoDetected(false);
+                              setIsManualFallback(true);
+                              setTrfAccountName(""); // Clear verified name to force re-verification with manually chosen bank
+                              setShowTrfBankSelector(true);
+                            }}
+                            className="text-[10px] font-black text-[#FC7A00] uppercase hover:underline"
+                          >
+                            Change Bank
+                          </button>
+                        </div>
+                      )}
 
                       {/* BANK SELECTION OVERLAY DRAWER */}
                       <AnimatePresence>
