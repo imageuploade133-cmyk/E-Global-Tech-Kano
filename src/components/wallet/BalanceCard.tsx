@@ -1043,15 +1043,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         setWizardStep("ussd-pay");
         startPolling(data.txRef);
       } else {
-        const errMsg = data.error || "Selected bank is temporarily offline.";
+        const errMsg = data.error || data.message || "Selected bank is temporarily offline.";
         console.warn("USSD initiation error:", errMsg);
-        setUssdErrorMessage("USSD payments are currently unavailable for this bank. Please choose another bank or use Bank Transfer.");
-        toast.error("USSD is not supported for this bank.");
+        setUssdErrorMessage(errMsg);
+        toast.error(errMsg);
       }
-    } catch {
+    } catch (err: unknown) {
       toast.dismiss();
-      setUssdErrorMessage("USSD payments are currently unavailable for this bank. Please choose another bank or use Bank Transfer.");
-      toast.error("Internal connection error.");
+      const error = err as Error;
+      const errMsg = error?.message || "Internal connection error.";
+      setUssdErrorMessage(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsInitializing(false);
     }
