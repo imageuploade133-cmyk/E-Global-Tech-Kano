@@ -15,12 +15,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
+  // 5. If userId comes from Firebase ID Token, verify that the Authorization header is being decoded correctly.
+  const authHeader = req.headers.get("Authorization") || "";
+  console.log("[USSD Payment API] Authentication header received:", authHeader ? `${authHeader.substring(0, 30)}...` : "None");
+
   let uid = "";
   try {
     const authResult = await authenticateUserRequest(req);
-    uid = authResult.uid;
-  } catch {
+    uid = authResult?.uid || "";
+    console.log("[USSD Payment API] Successfully decoded Authorization header. Extracted UID:", uid);
+  } catch (authErr: any) {
+    console.error("[USSD Auth Error] Decoding Authorization header failed:", authErr.message || authErr);
     return NextResponse.json({ error: "Unauthorized: Invalid or missing authorization token." }, { status: 401 });
+  }
+
+  // 3. Verify that Firebase Authentication is correctly extracting the user id.
+  // The API must reject requests if uid is undefined instead of calling Firestore.
+  if (!uid || typeof uid !== "string" || uid.trim() === "") {
+    console.error("[USSD Auth Error] Authenticated user id is missing, undefined, or empty.");
+    return NextResponse.json({
+      success: false,
+      message: "Authenticated user id missing."
+    }, { status: 401 });
   }
 
   try {
@@ -37,6 +53,17 @@ export async function POST(req: Request) {
 
     let bankCode = rawBankCode;
     if (bankId) {
+      // 4. Ensure every Firestore document path uses a valid id/uid. Never call doc(undefined) or doc("")
+      if (!bankId || typeof bankId !== "string" || bankId.trim() === "") {
+        console.error("[USSD Payment API Error] Selected bankId is empty or invalid:", bankId);
+        return NextResponse.json({ error: "Invalid bank selected." }, { status: 400 });
+      }
+
+      // 6. Add verbose logging before Firestore access
+      console.log("UID:", uid);
+      console.log("Document path:", `banks/${bankId}`);
+      console.log("Request Body:", JSON.stringify(body));
+
       const bank = await BankService.getBankById(bankId);
       if (!bank) {
         return NextResponse.json({ error: "Invalid bank selected." }, { status: 400 });
@@ -53,6 +80,17 @@ export async function POST(req: Request) {
 
     const tx_ref = `flw-tx-${uid}-${Date.now()}`;
 
+    // 4. Ensure every Firestore document path uses a valid uid. Never call doc(undefined) or doc("")
+    if (!tx_ref || typeof tx_ref !== "string" || tx_ref.trim() === "") {
+      console.error("[USSD Payment API Error] Generated tx_ref is empty or invalid:", tx_ref);
+      return NextResponse.json({ error: "Invalid transaction reference." }, { status: 400 });
+    }
+
+    // 6. Add verbose logging before Firestore access
+    console.log("UID:", uid);
+    console.log("Document path:", `pending_payments/${tx_ref}`);
+    console.log("Request Body:", JSON.stringify(body));
+
     // Create a server-managed pending payment record in Firestore first
     console.log(`[USSD Payment Init] Creating pending payment record: pending_payments/${tx_ref}`);
     await adminDb.collection("pending_payments").doc(tx_ref).set({
@@ -63,8 +101,8 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
     });
 
-    const authHeader = req.headers.get("Authorization") || "";
-    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    const gatewayAuthHeader = req.headers.get("Authorization") || "";
+    const idToken = gatewayAuthHeader.startsWith("Bearer ") ? gatewayAuthHeader.split("Bearer ")[1] : "";
 
     // Request the USSD charging code from VM Payment Gateway
     const ussdDetails = await PaymentService.createUSSDPayment({
