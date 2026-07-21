@@ -40,3 +40,6 @@ https://nextjs.org/telemetry
  ✓ Compiled in 909ms (1709 modules)
  GET /?mock=true 200 in 781ms
  ✓ Compiled in 7.5s (1709 modules)
+ ✓ Compiled in 4.8s (756 modules)
+ ✓ Compiled in 682ms (756 modules)
+ ✓ Compiled in 430ms (756 modules)

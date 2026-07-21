@@ -13,26 +13,50 @@ export async function POST(req: Request) {
     uid = authResult.uid;
     emailFallback = authResult.email || "";
     nameFallback = authResult.name || "";
-  } catch {
-    return NextResponse.json({ error: "Unauthorized: Invalid or missing authentication token." }, { status: 401 });
+
+    if (!uid) {
+      console.error("[KYC Verification Auth Error] Decoded token is missing uid.");
+      return NextResponse.json({ error: "Unauthorized: Firebase user UID is missing in the decoded token." }, { status: 401 });
+    }
+    console.log(`[KYC Verification] Authenticated Firebase User: ${uid}, Email: ${emailFallback || "none"}, Name: ${nameFallback || "none"}`);
+  } catch (authErr: unknown) {
+    const error = authErr as Error;
+    console.error("[KYC Verification Auth Error] Authentication failed:", error.message);
+    return NextResponse.json({ error: `Unauthorized: ${error.message || "Invalid or missing authentication token."}` }, { status: 401 });
   }
 
   try {
     const body = await req.json();
+    console.log("[KYC Verification] Complete incoming request body:", JSON.stringify(body));
+
     const { idNumber, type, idCardImage } = body; // type is "bvn" or "nin"
 
-    if (!idNumber || !/^\d{11}$/.test(idNumber.trim())) {
-      return NextResponse.json({ error: "Identity number must be exactly 11 digits." }, { status: 400 });
+    const errors: string[] = [];
+    if (!idNumber) {
+      errors.push("Identity number (idNumber) is missing.");
+    } else if (typeof idNumber !== "string") {
+      errors.push("Identity number must be a string.");
+    } else if (!/^\d{11}$/.test(idNumber.trim())) {
+      errors.push(`Identity number '${idNumber}' is invalid. It must be exactly 11 digits.`);
     }
 
-    if (type !== "bvn" && type !== "nin") {
-      return NextResponse.json({ error: "Identity type must be either 'bvn' or 'nin'." }, { status: 400 });
+    if (!type) {
+      errors.push("Identity type (type) is missing.");
+    } else if (type !== "bvn" && type !== "nin") {
+      errors.push(`Identity type '${type}' is invalid. It must be either 'bvn' or 'nin'.`);
     }
 
-    console.log(`[KYC Verification] Starting for user: ${uid}, Type: ${type}, ID: ${idNumber.slice(0, 4)}*******`);
+    if (errors.length > 0) {
+      const errorMsg = errors.join(" ");
+      console.error("[KYC Verification Validation Errors]:", errorMsg);
+      return NextResponse.json({ error: errorMsg }, { status: 400 });
+    }
 
-    const bvnInput = type === "bvn" ? idNumber.trim() : undefined;
-    const ninInput = type === "nin" ? idNumber.trim() : undefined;
+    const cleanIdNumber = idNumber.trim();
+    console.log(`[KYC Verification] Starting for user: ${uid}, Type: ${type}, ID: ${cleanIdNumber.slice(0, 4)}*******`);
+
+    const bvnInput = type === "bvn" ? cleanIdNumber : undefined;
+    const ninInput = type === "nin" ? cleanIdNumber : undefined;
 
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";

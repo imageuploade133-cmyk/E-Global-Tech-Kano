@@ -79,13 +79,16 @@ export class VirtualAccountService {
       body: JSON.stringify({
         email,
         tx_ref,
+        phone,
         phonenumber: phone,
+        isPermanent: true,
         is_permanent: true,
         currency: "NGN",
         firstname,
         lastname,
         narration: "E-Tech Wallet Funding Link",
         bvn: bvnToPass,
+        userId,
       }),
     });
 
