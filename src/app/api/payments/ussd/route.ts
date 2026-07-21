@@ -24,8 +24,9 @@ export async function POST(req: Request) {
     const authResult = await authenticateUserRequest(req);
     uid = authResult?.uid || "";
     console.log("[USSD Payment API] Successfully decoded Authorization header. Extracted UID:", uid);
-  } catch (authErr: any) {
-    console.error("[USSD Auth Error] Decoding Authorization header failed:", authErr.message || authErr);
+  } catch (authErr: unknown) {
+    const err = authErr as Error;
+    console.error("[USSD Auth Error] Decoding Authorization header failed:", err.message || err);
     return NextResponse.json({ error: "Unauthorized: Invalid or missing authorization token." }, { status: 401 });
   }
 
