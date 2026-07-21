@@ -3,32 +3,27 @@
 > next dev
 
    ▲ Next.js 15.1.12
-   - Local:        http://localhost:3012
-   - Network:      http://192.168.0.2:3012
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.2:3000
 
  ✓ Starting...
- ✓ Ready in 1934ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+ ✓ Ready in 2s
  ○ Compiling / ...
- ✓ Compiled / in 12.1s (1727 modules)
- HEAD / 200 in 13778ms
- GET /?mock=true 200 in 99ms
- GET /?mock=true 200 in 105ms
- ○ Compiling /api/payments/banks ...
- ✓ Compiled /api/payments/banks in 1818ms (1727 modules)
-[Banks Discovery] Cache expired or missing. Fetching Nigerian banks from Flutterwave...
-[Banks Discovery] Missing Flutterwave Secret Key. Serving fallback bank list.
- GET /api/payments/banks 200 in 2010ms
- GET /?mock=true 200 in 128ms
- ○ Compiling /api/flutterwave/resolve-account ...
- ✓ Compiled /api/flutterwave/resolve-account in 528ms (1718 modules)
-[Resolve Account Request] Authenticated User: mock-uid
-[Resolve Account Flutterwave Query] Bank Code: 044, Acc: 1234567890
-[Flutterwave API Error] Call to /accounts/resolve failed after 3 attempts: HTTP Error 401: {"status":"error","message":"Invalid authorization key","data":null}
-[Resolve Account Exception] Process crashed: HTTP Error 401: {"status":"error","message":"Invalid authorization key","data":null}
- POST /api/flutterwave/resolve-account 500 in 4079ms
- ✓ Compiled in 1246ms (1710 modules)
- GET /?mock=true 200 in 694ms
- ✓ Compiled /api/payments/banks in 324ms (970 modules)
-[Banks Discovery] Cache expired or missing. Fetching Nigerian banks from Flutterwave...
-[Banks Discovery] Missing Flutterwave Secret Key. Serving fallback bank list.
- GET /api/payments/banks 200 in 539ms
+ ✓ Compiled / in 18.7s (1727 modules)
+ HEAD / 200 in 21153ms
+ ✓ Compiled in 702ms (756 modules)
+ GET /?mock=true 200 in 60ms
+ ✓ Compiled in 414ms (756 modules)
+ GET /?mock=true 200 in 95ms
+ ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.2:3000
+
+ ✓ Starting...
+ ✓ Ready in 1946ms

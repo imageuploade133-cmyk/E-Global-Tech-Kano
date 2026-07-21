@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ["firebase-admin", "jwks-rsa"],
+  async rewrites() {
+    return [
+      {
+        source: "/api/flutterwave/:path*",
+        destination: "https://etechglobalhub.duckdns.org/api/flutterwave/:path*",
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

@@ -13,6 +13,21 @@ interface BalanceCardProps {
   userName?: string;
 }
 
+// Helper to calculate Nigerian Uniform Bank Account Number (NUBAN) check digit
+const calculateNubanCheckDigit = (serialNumber9: string, bankCode3: string): number => {
+  const b = bankCode3.padStart(3, "0");
+  const s = serialNumber9.padStart(9, "0");
+
+  const bankSum = (parseInt(b[0]) * 3) + (parseInt(b[1]) * 7) + (parseInt(b[2]) * 3);
+  const serialSum = (parseInt(s[0]) * 3) + (parseInt(s[1]) * 7) + (parseInt(s[2]) * 3) +
+                    (parseInt(s[3]) * 3) + (parseInt(s[4]) * 7) + (parseInt(s[5]) * 3) +
+                    (parseInt(s[6]) * 3) + (parseInt(s[7]) * 7) + (parseInt(s[8]) * 3);
+
+  const totalSum = bankSum + serialSum;
+  const modulo = totalSum % 10;
+  return (10 - modulo) % 10;
+};
+
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
   const [isVisible, setIsVisible] = useState(true);
   const { userData, user } = useAuth();
@@ -64,6 +79,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [trfFee, setTrfFee] = useState(0);
   const [trfTotalDebit, setTrfTotalDebit] = useState(0);
   const [isFeeLoading, setIsFeeLoading] = useState(false);
+
+  // Smart Auto-Detection states (without breaking existing transfer flow)
+  const [accountNumber, setAccountNumber] = useState("");
+  const [detectedBank, setDetectedBank] = useState<{ id: string; name: string; code?: string } | null>(null);
+  const [detectedBankCode, setDetectedBankCode] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
+  const [isAutoDetected, setIsAutoDetected] = useState(false);
+
+  // Refs for request cancellation and session caching
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const lookupCache = useRef<Record<string, { accountName: string; bank: { id: string; name: string; code?: string } }>>({});
 
   // Bulk Transfer States
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -146,7 +174,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           };
           console.log("Resolve Account payload (Bulk):", bodyPayload);
 
-          const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/resolve-account", {
+          const res = await fetch("/api/flutterwave/resolve-account", {
+          const res = await fetch("/api/flutterwave/resolve-account", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -183,6 +212,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   // Automatically resolve bank account details when 10 digits are inputted
   useEffect(() => {
+    if (isAutoDetected) return; // Skip manual resolution if already auto-detected!
     if (trfAccount.length === 10 && trfBank) {
       const resolveAccount = async () => {
         setIsResolvingAccount(true);
@@ -246,7 +276,226 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
       resolveAccount();
     }
-  }, [trfAccount, trfBank, user]);
+  }, [trfAccount, trfBank, user, isAutoDetected]);
+
+  // Smart Auto-Detection Effect
+  useEffect(() => {
+    // Reset smart states if account number is not exactly 10 digits
+    if (accountNumber.length !== 10) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setDetectedBank(null);
+      setDetectedBankCode("");
+      setAccountName("");
+      setIsResolving(false);
+      setResolveError("");
+      setIsAutoDetected(false);
+      return;
+    }
+
+    // Debounce the requests by 500ms
+    const debounceTimer = setTimeout(() => {
+      // 1. Check Session Cache first to prevent duplicate API calls
+      const cacheKey = accountNumber;
+      if (lookupCache.current[cacheKey]) {
+        const cached = lookupCache.current[cacheKey];
+        setDetectedBank(cached.bank);
+        setDetectedBankCode(cached.bank.code || cached.bank.id);
+        setAccountName(cached.accountName);
+        setIsAutoDetected(true);
+        setResolveError("");
+        setIsResolving(false);
+
+        // Sync with existing transfer flow states so they are 100% backward compatible
+        setTrfBank(cached.bank);
+        setTrfAccountName(cached.accountName);
+        return;
+      }
+
+      const triggerAutoDetection = async () => {
+        setIsResolving(true);
+        setResolveError("");
+        setDetectedBank(null);
+        setDetectedBankCode("");
+        setAccountName("");
+        setIsAutoDetected(false);
+
+        // Cancel previous request if any
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+
+        // Mock mode handling
+        if (sessionStorage.getItem("mock") === "true") {
+          try {
+            await new Promise((resolve, reject) => {
+              const timeout = setTimeout(resolve, 600);
+              abortController.signal.addEventListener("abort", () => {
+                clearTimeout(timeout);
+                reject(new Error("aborted"));
+              });
+            });
+
+            // Fallback mock bank setup
+            const targetBank = banksList.find(b => b.code === "044") || banksList[0] || { id: "044", name: "Access Bank", code: "044" };
+            const resolvedName = "MOCK AUTO RECIPIENT";
+
+            setDetectedBank(targetBank);
+            setDetectedBankCode(targetBank.code || targetBank.id);
+            setAccountName(resolvedName);
+            setIsAutoDetected(true);
+
+            // Sync with existing states
+            setTrfBank(targetBank);
+            setTrfAccountName(resolvedName);
+
+            // Cache lookup
+            lookupCache.current[cacheKey] = {
+              accountName: resolvedName,
+              bank: targetBank
+            };
+          } catch (err: any) {
+            if (err.message !== "aborted") {
+              setResolveError("Unable to verify account.");
+            }
+          } finally {
+            setIsResolving(false);
+          }
+          return;
+        }
+
+        try {
+          // Calculate candidate banks using NUBAN check digit mathematical validation
+          const serialNumber9 = accountNumber.slice(0, 9);
+          const lastDigit = parseInt(accountNumber[9]);
+
+          let candidates = banksList.filter(bank => {
+            if (!bank.code) return false;
+            if (bank.code.length === 3 && /^\d+$/.test(bank.code)) {
+              const computed = calculateNubanCheckDigit(serialNumber9, bank.code);
+              return computed === lastDigit;
+            }
+            return false;
+          });
+
+          // Sort candidates using popular bank weights
+          const POPULAR_BANK_CODES = ["044", "058", "057", "033", "011", "50515", "50211", "999992", "999991"];
+          candidates.sort((a, b) => {
+            const indexA = POPULAR_BANK_CODES.indexOf(a.code || "");
+            const indexB = POPULAR_BANK_CODES.indexOf(b.code || "");
+            const priorityA = indexA !== -1 ? indexA : 999;
+            const priorityB = indexB !== -1 ? indexB : 999;
+            return priorityA - priorityB;
+          });
+
+          // Fallback to top banks if no candidate matches mathematically (for robust error tolerance)
+          if (candidates.length === 0) {
+            candidates = banksList.filter(b => POPULAR_BANK_CODES.includes(b.code || "")).slice(0, 5);
+          }
+
+          if (candidates.length === 0) {
+            throw new Error("No candidate banks available for verification.");
+          }
+
+          let idToken = "mock-token";
+          if (user) {
+            idToken = await user.getIdToken();
+          }
+
+          let successBank = null;
+          let successAccountName = "";
+
+          // Try resolving account against up to 3 candidate banks in sequence
+          for (let i = 0; i < Math.min(candidates.length, 3); i++) {
+            const candidate = candidates[i];
+            const bodyPayload = {
+              bankId: candidate.id,
+              bankCode: candidate.code || candidate.id,
+              account_bank: candidate.code || candidate.id,
+              accountBank: candidate.code || candidate.id,
+              accountNumber: accountNumber,
+              account_number: accountNumber,
+            };
+
+            try {
+              const res = await fetch("/api/flutterwave/resolve-account", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${idToken}`,
+                },
+                body: JSON.stringify(bodyPayload),
+                signal: abortController.signal
+              });
+
+              if (!res.ok) continue;
+
+              const data = await res.json();
+              const isSuccess = data.status === "success" || data.success === true;
+              const rName = data.accountName ||
+                            data.account_name ||
+                            data.data?.account_name ||
+                            data.data?.accountName ||
+                            "";
+
+              if (isSuccess && rName) {
+                successBank = candidate;
+                successAccountName = rName;
+                break; // Stop querying once correct bank resolves successfully
+              }
+            } catch (err: any) {
+              if (err.name === "AbortError" || err.message === "aborted") {
+                throw err;
+              }
+            }
+          }
+
+          if (successBank && successAccountName) {
+            setDetectedBank(successBank);
+            setDetectedBankCode(successBank.code || successBank.id);
+            setAccountName(successAccountName);
+            setIsAutoDetected(true);
+            setResolveError("");
+
+            // Sync with existing transfer flow states so they are 100% backward compatible
+            setTrfBank(successBank);
+            setTrfAccountName(successAccountName);
+
+            // Cache successful lookup
+            lookupCache.current[cacheKey] = {
+              accountName: successAccountName,
+              bank: successBank
+            };
+
+            toast.success("Recipient account auto-detected and verified!");
+          } else {
+            setResolveError("Unable to verify account.");
+            // Do NOT block. Clear any stale smart state so manual flow can be used as fallback
+            setDetectedBank(null);
+            setDetectedBankCode("");
+            setAccountName("");
+            setIsAutoDetected(false);
+          }
+        } catch (err: any) {
+          if (err.name !== "AbortError" && err.message !== "aborted") {
+            setResolveError("Unable to verify account.");
+          }
+        } finally {
+          setIsResolving(false);
+        }
+      };
+
+      triggerAutoDetection();
+    }, 500);
+
+    return () => {
+      clearTimeout(debounceTimer);
+    };
+  }, [accountNumber, banksList, user]);
 
   // Automatically calculate transfer fee when transferAmount changes (Single Mode)
   useEffect(() => {
@@ -557,6 +806,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setBulkName("");
       setBulkAmountVal("");
       setShowBulkBankSelector(false);
+
+      // Clean up smart auto-detection states on drawer close
+      setAccountNumber("");
+      setDetectedBank(null);
+      setDetectedBankCode("");
+      setAccountName("");
+      setIsResolving(false);
+      setResolveError("");
+      setIsAutoDetected(false);
     }, 300);
   };
 
@@ -1752,13 +2010,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           type="number"
                           placeholder="e.g. 0123456789"
                           value={trfAccount}
-                          onChange={(e) => setTrfAccount(e.target.value.slice(0, 10))}
+                          onChange={(e) => {
+                            const val = e.target.value.slice(0, 10);
+                            setTrfAccount(val);
+                            setAccountNumber(val);
+                          }}
                           className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
                         />
                       </div>
 
-                      {/* "Find Bank" Button */}
-                      {trfAccount.length === 10 && !trfAccountName && (
+                      {/* "Find Bank" Button (Only if not auto-detected or auto-resolving) */}
+                      {trfAccount.length === 10 && !trfAccountName && !isResolving && !isAutoDetected && (
                         <div className="pt-1">
                           <button
                             type="button"
@@ -1771,8 +2033,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </div>
                       )}
 
-                      {/* Selected Bank Summary Badge */}
-                      {trfBank && (
+                      {/* Selected Bank Summary Badge (Only if not auto-detected) */}
+                      {trfBank && !isAutoDetected && (
                         <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between text-left">
                           <div>
                             <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Recipient Bank</p>
@@ -1859,6 +2121,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                       key={bank.id}
                                       type="button"
                                       onClick={() => {
+                                        setIsAutoDetected(false);
+                                        setResolveError("");
                                         setTrfBank(bank);
                                         setShowTrfBankSelector(false);
                                       }}
@@ -1881,14 +2145,62 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         )}
                       </AnimatePresence>
 
-                      {isResolvingAccount && (
+                      {/* Smart Auto-Detection Indicators */}
+                      {isResolving && (
+                        <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-100 rounded-2xl animate-pulse">
+                          <span className="material-symbols-outlined text-blue-500 text-[18px] animate-spin">progress_activity</span>
+                          <span className="font-hanken text-xs font-bold text-blue-600">Verifying account...</span>
+                        </div>
+                      )}
+
+                      {!isResolving && isAutoDetected && detectedBank && accountName && (
+                        <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex flex-col text-left space-y-2 animate-fade-in">
+                          <div className="flex items-center gap-2.5">
+                            {/* Initials-based circular logo */}
+                            <div className="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-800 text-xs font-black">
+                              {(detectedBank.name || "BK").substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-hanken text-xs font-extrabold text-gray-800">{detectedBank.name}</p>
+                              <p className="font-hanken text-sm font-black text-emerald-700 uppercase">{accountName}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between border-t border-emerald-100 pt-2 mt-1">
+                            <span className="font-hanken text-[11px] text-emerald-600 font-extrabold flex items-center gap-1">
+                              <span className="material-symbols-outlined text-sm font-black">check_circle</span>
+                              Account Verified ✅
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAutoDetected(false);
+                                setResolveError("");
+                                setShowTrfBankSelector(true);
+                              }}
+                              className="text-[10px] font-black text-[#FC7A00] uppercase hover:underline"
+                            >
+                              Change Bank
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!isResolving && resolveError && (
+                        <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-2 text-left font-hanken text-xs font-bold">
+                          <span className="material-symbols-outlined text-rose-500 text-[18px]">error</span>
+                          <span>{resolveError}</span>
+                        </div>
+                      )}
+
+                      {/* Manual/Fallback Resolution Indicators */}
+                      {isResolvingAccount && !isAutoDetected && (
                         <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl animate-pulse">
                           <span className="material-symbols-outlined text-blue-500 text-[16px] animate-spin">progress_activity</span>
                           <span className="font-hanken text-[11px] font-bold text-blue-600">Verifying bank account details...</span>
                         </div>
                       )}
 
-                      {!isResolvingAccount && trfAccountName && (
+                      {!isResolvingAccount && trfAccountName && !isAutoDetected && (
                         <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex flex-col text-left">
                           <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Recipient Name</p>
                           <div className="flex items-center gap-2 mt-1.5">
