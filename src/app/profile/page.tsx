@@ -118,18 +118,45 @@ export default function ProfilePage() {
 
     setLoadingAccount(true);
     try {
-      const docRef = doc(db, "wallet_accounts", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setStaticAccount({
-          bankName: data.bankName,
-          accountNumber: data.accountNumber,
-          accountName: data.accountName,
-        });
-      } else {
-        console.warn(`[loadStaticAccount] No wallet_account found in Firestore for user: ${user.uid}`);
-        setStaticAccount(null);
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const fullname = userData?.name || user?.displayName || "Captain User";
+      const nameParts = fullname.trim().split(/\s+/);
+      const firstname = nameParts[0] || "Customer";
+      const lastname = nameParts.slice(1).join(" ") || "Wallet";
+
+      const payload = {
+        email: user?.email || userData?.email || `user-${user?.uid}@e-tech-hub.com`,
+        phone: userData?.phoneNumber || userData?.phone || "08012345678",
+        firstname,
+        lastname,
+        userId: user?.uid,
+        isPermanent: true,
+        is_permanent: true,
+        bvn: userData?.bvn || userData?.nin || "22222222222"
+      };
+
+      const res = await fetch("/api/flutterwave/create-virtual-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.account) {
+          setStaticAccount({
+            bankName: data.account.bankName,
+            accountNumber: data.account.accountNumber,
+            accountName: data.account.accountName,
+          });
+        }
       }
     } catch (err) {
       console.error("Error loading permanent account from Firestore:", err);

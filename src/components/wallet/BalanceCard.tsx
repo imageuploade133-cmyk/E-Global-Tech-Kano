@@ -78,17 +78,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [trfAccountName, setTrfAccountName] = useState("");
   const [isResolvingAccount, setIsResolvingAccount] = useState(false);
   const [trfAmount, setTrfAmount] = useState("");
+  const [trfNarration, setTrfNarration] = useState("");
   const [trfFee, setTrfFee] = useState(0);
   const [trfTotalDebit, setTrfTotalDebit] = useState(0);
   const [isFeeLoading, setIsFeeLoading] = useState(false);
 
   // Smart Auto-Detection states (without breaking existing transfer flow)
   const [accountNumber, setAccountNumber] = useState("");
-  const [detectedBank, setDetectedBank] = useState<{ id: string; name: string; code?: string } | null>(null);
-  const [detectedBankCode, setDetectedBankCode] = useState("");
-  const [accountName, setAccountName] = useState("");
   const [isResolving, setIsResolving] = useState(false);
-  const [resolveError, setResolveError] = useState("");
   const [isAutoDetected, setIsAutoDetected] = useState(false);
 
   // Refs for request cancellation and session caching
@@ -176,7 +173,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           };
           console.log("Resolve Account payload (Bulk):", bodyPayload);
 
-          const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/resolve-account", {
+          const res = await fetch("/api/flutterwave/resolve-account", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -279,6 +276,78 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
   }, [trfAccount, trfBank, user, isAutoDetected]);
 
+  // Manual Recipient Account Resolution Handler (TASK 1)
+  const resolveAccountManually = async () => {
+    if (!trfBank) {
+      toast.error("Please select a recipient bank.");
+      return;
+    }
+    if (trfAccount.length !== 10) {
+      toast.error("Account number must be exactly 10 digits.");
+      return;
+    }
+
+    setIsResolvingAccount(true);
+    setTrfAccountName("");
+
+    if (sessionStorage.getItem("mock") === "true") {
+      setTimeout(() => {
+        setTrfAccountName("MOCK RECIPIENT USER");
+        setIsResolvingAccount(false);
+        toast.success("Recipient account verified (MOCK)!");
+      }, 300);
+      return;
+    }
+
+    try {
+      let idToken = "mock-token";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const bodyPayload = {
+        bankId: trfBank.id,
+        bankCode: trfBank.code || trfBank.id,
+        account_bank: trfBank.code || trfBank.id,
+        accountBank: trfBank.code || trfBank.id,
+        accountNumber: trfAccount,
+        account_number: trfAccount,
+      };
+      console.log("Resolve Account Payload (Manual):", bodyPayload);
+
+      const res = await fetch("/api/flutterwave/resolve-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      const data = await res.json();
+      console.log("Resolve Account Response (Manual):", data);
+
+      const isSuccess = data.status === "success" || data.success === true;
+      const resolvedName = data.accountName ||
+                           data.account_name ||
+                           data.data?.account_name ||
+                           data.data?.accountName ||
+                           "";
+
+      if (res.ok && isSuccess && resolvedName) {
+        setTrfAccountName(resolvedName);
+        toast.success("Recipient account verified!");
+      } else {
+        const errorMsg = data.error || data.message || data.data?.message || "Could not resolve account details. Please verify your details.";
+        toast.error(errorMsg);
+      }
+    } catch {
+      toast.error("Failed to connect to verification server.");
+    } finally {
+      setIsResolvingAccount(false);
+    }
+  };
+
   // Smart Auto-Detection Effect
   useEffect(() => {
     // Reset smart states if account number is not exactly 10 digits
@@ -287,11 +356,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      setDetectedBank(null);
-      setDetectedBankCode("");
-      setAccountName("");
       setIsResolving(false);
-      setResolveError("");
       setIsAutoDetected(false);
       return;
     }
@@ -302,11 +367,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       const cacheKey = accountNumber;
       if (lookupCache.current[cacheKey]) {
         const cached = lookupCache.current[cacheKey];
-        setDetectedBank(cached.bank);
-        setDetectedBankCode(cached.bank.code || cached.bank.id);
-        setAccountName(cached.accountName);
         setIsAutoDetected(true);
-        setResolveError("");
         setIsResolving(false);
 
         // Sync with existing transfer flow states so they are 100% backward compatible
@@ -317,10 +378,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
       const triggerAutoDetection = async () => {
         setIsResolving(true);
-        setResolveError("");
-        setDetectedBank(null);
-        setDetectedBankCode("");
-        setAccountName("");
         setIsAutoDetected(false);
 
         // Cancel previous request if any
@@ -345,9 +402,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             const targetBank = banksList.find(b => b.code === "044") || banksList[0] || { id: "044", name: "Access Bank", code: "044" };
             const resolvedName = "MOCK AUTO RECIPIENT";
 
-            setDetectedBank(targetBank);
-            setDetectedBankCode(targetBank.code || targetBank.id);
-            setAccountName(resolvedName);
             setIsAutoDetected(true);
 
             // Sync with existing states
@@ -362,7 +416,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           } catch (err: unknown) {
             const error = err as Error;
             if (error.message !== "aborted") {
-              setResolveError("Unable to verify account.");
+              console.warn("Smart auto-detect abort exception:", error);
             }
           } finally {
             setIsResolving(false);
@@ -458,11 +512,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           }
 
           if (successBank && successAccountName) {
-            setDetectedBank(successBank);
-            setDetectedBankCode(successBank.code || successBank.id);
-            setAccountName(successAccountName);
             setIsAutoDetected(true);
-            setResolveError("");
 
             // Sync with existing transfer flow states so they are 100% backward compatible
             setTrfBank(successBank);
@@ -476,17 +526,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
             toast.success("Recipient account auto-detected and verified!");
           } else {
-            setResolveError("Unable to verify account.");
-            // Do NOT block. Clear any stale smart state so manual flow can be used as fallback
-            setDetectedBank(null);
-            setDetectedBankCode("");
-            setAccountName("");
             setIsAutoDetected(false);
           }
         } catch (err: unknown) {
           const error = err as Error;
           if (error.name !== "AbortError" && error.message !== "aborted") {
-            setResolveError("Unable to verify account.");
+            console.warn("Auto detection exception:", error);
           }
         } finally {
           setIsResolving(false);
@@ -514,7 +559,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             idToken = await user.getIdToken();
           }
 
-          const res = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/transfer-fee?amount=${amt}`, {
+          const res = await fetch(`/api/flutterwave/transfer-fee?amount=${amt}`, {
             headers: {
               "Authorization": `Bearer ${idToken}`,
             },
@@ -523,6 +568,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           if (res.ok && data.success) {
             setTrfFee(data.fee);
             setTrfTotalDebit(data.totalDebit);
+          } else {
+            // Backend error message or fallback
+            const fallbackFee = 10.00;
+            setTrfFee(fallbackFee);
+            setTrfTotalDebit(amt + fallbackFee);
           }
         } catch {
           const fallbackFee = 10.00;
@@ -571,18 +621,45 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     setIsPermAccountLoading(true);
     try {
-      const docRef = doc(db, "wallet_accounts", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setPermanentAccount({
-          bankName: data.bankName,
-          accountNumber: data.accountNumber,
-          accountName: data.accountName,
-        });
-      } else {
-        console.warn(`[fetchPermanentVirtualAccount] No wallet_account found in Firestore for user: ${user.uid}`);
-        setPermanentAccount(null);
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const fullname = userData?.name || user?.displayName || "Captain User";
+      const nameParts = fullname.trim().split(/\s+/);
+      const firstname = nameParts[0] || "Customer";
+      const lastname = nameParts.slice(1).join(" ") || "Wallet";
+
+      const payload = {
+        email: user?.email || userData?.email || `user-${user?.uid}@e-tech-hub.com`,
+        phone: userData?.phoneNumber || userData?.phone || "08012345678",
+        firstname,
+        lastname,
+        userId: user?.uid,
+        isPermanent: true,
+        is_permanent: true,
+        bvn: userData?.bvn || userData?.nin || "22222222222"
+      };
+
+      const res = await fetch("/api/flutterwave/create-virtual-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.account) {
+          setPermanentAccount({
+            bankName: data.account.bankName,
+            accountNumber: data.account.accountNumber,
+            accountName: data.account.accountName,
+          });
+        }
       }
     } catch (err) {
       console.error("Error loading permanent account from Firestore:", err);
@@ -613,7 +690,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         }
       }
 
-      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/banks", {
+      const res = await fetch("/api/flutterwave/banks", {
         headers: {
           "Authorization": `Bearer ${idToken}`,
         },
@@ -791,11 +868,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
       // Clean up smart auto-detection states on drawer close
       setAccountNumber("");
-      setDetectedBank(null);
-      setDetectedBankCode("");
-      setAccountName("");
       setIsResolving(false);
-      setResolveError("");
       setIsAutoDetected(false);
     }, 300);
   };
@@ -842,46 +915,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setWizardStep("methods");
   };
 
-  const handleTransferInputSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (isBulkMode) {
-      if (bulkRecipients.length === 0) {
-        toast.error("Please add at least one bulk recipient.");
-        return;
-      }
-      setTrfStep("amount");
-      return;
-    }
-
-    if (!trfBank) {
-      toast.error("Please select a recipient bank.");
-      return;
-    }
-    if (trfAccount.length !== 10 || isNaN(Number(trfAccount))) {
-      toast.error("Account number must be exactly 10 digits.");
-      return;
-    }
-    if (!trfAccountName) {
-      toast.error("Recipient account could not be verified.");
-      return;
-    }
-    setTrfStep("amount");
-  };
-
-  const handleTransferAmountSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amt = parseFloat(trfAmount);
-    if (isNaN(amt) || amt <= 0) {
-      toast.error("Please enter a valid transfer amount.");
-      return;
-    }
-    if (trfTotalDebit > balance) {
-      toast.error("Insufficient wallet balance for this transfer including fee.");
-      return;
-    }
-    setTrfStep("confirm");
-  };
 
   const handleAddBulkRecipient = () => {
     const amt = parseFloat(bulkAmountVal);
@@ -942,7 +975,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         redirectUrl: `${window.location.origin}/?verify=flw`,
       };
 
-      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/initialize", {
+      const res = await fetch("/api/flutterwave/initialize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1083,7 +1116,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           idToken = await user.getIdToken();
         }
 
-        const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/bulk-transfer", {
+        const res = await fetch("/api/flutterwave/bulk-transfer", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1102,18 +1135,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           setTransferResult({
             success: true,
             message: `Your bulk transfer of ${bulkRecipients.length} recipients has been successfully queued in the background!`,
-            reference: data.bulkTransferId,
+            reference: data.bulkTransferId || data.reference,
           });
           setTrfStep("completion");
           toast.success("Bulk batch queued successfully!");
         } else {
           setTrfPin("");
-          toast.error(data.error || "Bulk transfer queuing failed.");
+          const backendErr = data.error || data.message || data.data?.message || "Bulk transfer queuing failed.";
+          toast.error(backendErr);
         }
       } catch {
         toast.dismiss();
         setTrfPin("");
-        toast.error("Internal connection error.");
+        toast.error("Internal connection error during bulk transfer.");
       } finally {
         setIsTransferring(false);
       }
@@ -1129,16 +1163,21 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       }
 
       const transferReference = `trf-${Date.now()}-${user?.uid?.slice(-6)}`;
+
+      // Strict payload adhering to TASK 2 with both camelCase and snake_case properties
       const payload = {
         amount: parseFloat(trfAmount),
-        accountNumber: trfAccount,
         account_number: trfAccount,
-        bankId: trfBank?.id,
-        bankCode: trfBank?.code || trfBank?.id,
-        accountBank: trfBank?.code || trfBank?.id,
+        accountNumber: trfAccount,
         account_bank: trfBank?.code || trfBank?.id,
-        narration: `Direct outward transfer to ${trfAccountName}`,
+        accountBank: trfBank?.code || trfBank?.id,
+        bankCode: trfBank?.code || trfBank?.id,
+        account_name: trfAccountName,
+        accountName: trfAccountName,
         currency: "NGN",
+        narration: trfNarration || `Direct outward transfer to ${trfAccountName}`,
+        recipientName: trfAccountName,
+        recipientAccount: trfAccount,
         reference: transferReference,
         beneficiary_name: trfAccountName,
         beneficiaryName: trfAccountName,
@@ -1146,7 +1185,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       };
       console.log("Outward Transfer Payload to VM Payment Gateway:", payload);
 
-      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/transfer", {
+      const res = await fetch("/api/flutterwave/transfer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1168,12 +1207,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         toast.success("Transfer initiated successfully!");
       } else {
         setTrfPin("");
-        toast.error(data.error || "Transfer failed. Check details or PIN.");
+        // Specific improved error reporting from backend (TASK 4)
+        const backendErr = data.error || data.message || data.data?.message || "Transfer failed. Please check details or PIN.";
+        toast.error(backendErr);
       }
-    } catch {
+    } catch (err: unknown) {
       toast.dismiss();
       setTrfPin("");
-      toast.error("Internal connection error during transfer.");
+      const error = err as Error;
+      toast.error(error.message || "Internal connection error during transfer.");
     } finally {
       setIsTransferring(false);
     }
@@ -1904,6 +1946,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
           />
 
+          {/* Fullscreen Overlay Loading indicator when sending transfer (TASK 5) */}
+          {isTransferring && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[999999] flex flex-col items-center justify-center text-white animate-fade-in select-none">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center p-3.5 mb-4 shadow-2xl">
+                <span className="material-symbols-outlined text-white text-[36px] animate-spin">progress_activity</span>
+              </div>
+              <h4 className="font-hanken font-bold text-base text-white">Sending Transfer...</h4>
+              <p className="font-hanken text-xs text-white/75 mt-1.5 font-bold uppercase tracking-widest">Verifying transaction ledger blocks</p>
+            </div>
+          )}
+
           {/* Transfer drawer */}
           <motion.div
             initial={{ y: "100%" }}
@@ -1913,14 +1966,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto no-scrollbar flex flex-col"
           >
             {/* Header row */}
-            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5 flex-shrink-0">
               {trfStep !== "input" && trfStep !== "completion" ? (
                 <button
                   type="button"
                   onClick={() => {
-                    if (trfStep === "amount") setTrfStep("input");
-                    else if (trfStep === "confirm") setTrfStep("amount");
-                    else if (trfStep === "pin") setTrfStep("confirm");
+                    if (trfStep === "confirm") {
+                      setTrfStep("input");
+                    }
                   }}
                   className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
                 >
@@ -1949,15 +2002,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
-                  className="space-y-4 text-left"
+                  className="space-y-4 text-left flex-1 flex flex-col"
                 >
                   {/* Single/Bulk Toggle Button Bar */}
-                  <div className="grid grid-cols-2 p-1 bg-gray-100/80 rounded-full mb-3 border border-gray-200/50">
+                  <div className="grid grid-cols-2 p-1 bg-gray-100/80 rounded-full mb-3 border border-gray-200/50 flex-shrink-0">
                     <button
                       type="button"
                       onClick={() => {
                         setIsBulkMode(false);
-                        setTrfStep("input");
                       }}
                       className={`py-2.5 text-xs font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
                         !isBulkMode ? "bg-[#FC7A00] text-white shadow-none" : "bg-transparent text-gray-400 hover:text-black"
@@ -1969,7 +2021,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       type="button"
                       onClick={() => {
                         setIsBulkMode(true);
-                        setTrfStep("input");
                       }}
                       className={`py-2.5 text-xs font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
                         isBulkMode ? "bg-[#FC7A00] text-white shadow-none" : "bg-transparent text-gray-400 hover:text-black"
@@ -1980,9 +2031,25 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   {!isBulkMode ? (
-                    // --- SINGLE TRANSFER INPUT FORM ---
-                    <form onSubmit={handleTransferInputSubmit} className="space-y-4">
-                      {/* Account Number Input first */}
+                    // --- SINGLE TRANSFER INPUT FORM (TASK 1) ---
+                    <div className="space-y-4 flex-1">
+                      {/* Recipient Bank Selector Field */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Destination Bank</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowTrfBankSelector(true)}
+                          className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-extrabold text-black flex items-center justify-between cursor-pointer transition-all hover:bg-gray-100/50"
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
+                            {trfBank ? trfBank.name : "Choose bank..."}
+                          </span>
+                          <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
+                        </button>
+                      </div>
+
+                      {/* Account Number Input */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Account Number (10 Digits)</label>
                         <input
@@ -1993,47 +2060,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             const val = e.target.value.slice(0, 10);
                             setTrfAccount(val);
                             setAccountNumber(val);
+                            // Clear verified recipient name immediately if account number edits (TASK 1)
+                            if (val.length !== 10) {
+                              setTrfAccountName("");
+                              setIsAutoDetected(false);
+                            }
                           }}
                           className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
                         />
                       </div>
 
-                      {/* "Find Bank" Button (Only if not auto-detected or auto-resolving) */}
-                      {trfAccount.length === 10 && !trfAccountName && !isResolving && !isAutoDetected && (
-                        <div className="pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowTrfBankSelector(true)}
-                            className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-xs font-black uppercase tracking-wider rounded-xl border border-white/10 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-none"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">search</span>
-                            Find Bank
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Selected Bank Summary Badge (Only if not auto-detected) */}
-                      {trfBank && !isAutoDetected && (
-                        <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between text-left">
-                          <div>
-                            <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Recipient Bank</p>
-                            <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfBank.name}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowTrfBankSelector(true)}
-                            className="text-[10px] font-black text-[#FC7A00] uppercase hover:underline"
-                          >
-                            Change
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Bank Selection 95% Slide Up Overlay Modal Drawer */}
+                      {/* BANK SELECTION OVERLAY DRAWER */}
                       <AnimatePresence>
                         {showTrfBankSelector && (
                           <>
-                            {/* Backdrop */}
                             <motion.div
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
@@ -2042,7 +2082,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999998]"
                             />
 
-                            {/* 90% Height Drawer */}
                             <motion.div
                               initial={{ y: "100%" }}
                               animate={{ y: 0 }}
@@ -2050,7 +2089,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
                               className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[999999] p-6 pb-8 shadow-none text-black h-[90vh] max-h-[90vh] flex flex-col no-scrollbar"
                             >
-                              {/* Grab handle */}
                               <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
 
                               <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
@@ -2064,7 +2102,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                 </button>
                               </div>
 
-                              {/* Nice Search Bar */}
                               <div className="relative mb-4">
                                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">search</span>
                                 <input
@@ -2076,168 +2113,146 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                 />
                               </div>
 
-                              {/* Bank list scroll area */}
-                              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 no-scrollbar pb-6">
-                                {filteredTrfBanks.map((bank) => {
-                                  // Initials color generator
-                                  const initials = bank.name.substring(0, 2).toUpperCase();
-                                  const colors = [
-                                    "bg-orange-100 text-orange-700 border-orange-200",
-                                    "bg-emerald-100 text-emerald-700 border-emerald-200",
-                                    "bg-blue-100 text-blue-700 border-blue-200",
-                                    "bg-purple-100 text-purple-700 border-purple-200",
-                                    "bg-rose-100 text-rose-700 border-rose-200",
-                                    "bg-amber-100 text-amber-700 border-amber-200",
-                                  ];
-                                  let sum = 0;
-                                  for (let i = 0; i < bank.name.length; i++) {
-                                    sum += bank.name.charCodeAt(i);
-                                  }
-                                  const logoColorClass = colors[sum % colors.length];
+                              {/* Loading Banks State (TASK 5) */}
+                              {isBanksLoading ? (
+                                <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                                  <span className="material-symbols-outlined text-[32px] animate-spin mb-2 text-[#FC7A00]">progress_activity</span>
+                                  <p className="font-hanken text-xs font-semibold">Loading banks directory...</p>
+                                </div>
+                              ) : (
+                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 no-scrollbar pb-6">
+                                  {filteredTrfBanks.map((bank) => {
+                                    const initials = bank.name.substring(0, 2).toUpperCase();
+                                    const colors = [
+                                      "bg-orange-100 text-orange-700 border-orange-200",
+                                      "bg-emerald-100 text-emerald-700 border-emerald-200",
+                                      "bg-blue-100 text-blue-700 border-blue-200",
+                                      "bg-purple-100 text-purple-700 border-purple-200",
+                                      "bg-rose-100 text-rose-700 border-rose-200",
+                                      "bg-amber-100 text-amber-700 border-amber-200",
+                                    ];
+                                    let sum = 0;
+                                    for (let i = 0; i < bank.name.length; i++) {
+                                      sum += bank.name.charCodeAt(i);
+                                    }
+                                    const logoColorClass = colors[sum % colors.length];
 
-                                  return (
-                                    <button
-                                      key={bank.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setIsAutoDetected(false);
-                                        setResolveError("");
-                                        setTrfBank(bank);
-                                        setShowTrfBankSelector(false);
-                                      }}
-                                      className="w-full p-3 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50/50 flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none"
-                                    >
-                                      {/* Nice initials-based circular bank logo */}
-                                      <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
-                                        {initials}
-                                      </div>
-                                      <div className="min-w-0 flex-1">
-                                        <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
-                                      </div>
-                                      <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                                    return (
+                                      <button
+                                        key={bank.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setIsAutoDetected(false);
+                                          setTrfBank(bank);
+                                          setTrfAccountName(""); // Reset name to force re-verification
+                                          setShowTrfBankSelector(false);
+                                        }}
+                                        className="w-full p-3 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50/50 flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none"
+                                      >
+                                        <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
+                                          {initials}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                          <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
+                                        </div>
+                                        <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </motion.div>
                           </>
                         )}
                       </AnimatePresence>
 
-                      {/* Smart Auto-Detection Indicators */}
-                      {isResolving && (
-                        <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-100 rounded-2xl animate-pulse">
-                          <span className="material-symbols-outlined text-blue-500 text-[18px] animate-spin">progress_activity</span>
-                          <span className="font-hanken text-xs font-bold text-blue-600">Verifying account...</span>
+                      {/* Resolving Account Loading State Indicator (TASK 5) */}
+                      {(isResolving || isResolvingAccount) && (
+                        <div className="flex items-center gap-2.5 p-4 bg-orange-50 border border-orange-100 rounded-2xl animate-pulse">
+                          <span className="material-symbols-outlined text-primary text-[18px] animate-spin">progress_activity</span>
+                          <span className="font-hanken text-xs font-black text-primary-dark">Verifying account holder identity...</span>
                         </div>
                       )}
 
-                      {!isResolving && isAutoDetected && detectedBank && accountName && (
-                        <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex flex-col text-left space-y-2 animate-fade-in">
-                          <div className="flex items-center gap-2.5">
-                            {/* Initials-based circular logo */}
-                            <div className="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-800 text-xs font-black">
-                              {(detectedBank.name || "BK").substring(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-hanken text-xs font-extrabold text-gray-800">{detectedBank.name}</p>
-                              <p className="font-hanken text-sm font-black text-emerald-700 uppercase">{accountName}</p>
-                              <span className="hidden" data-bank-code={detectedBankCode} />
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between border-t border-emerald-100 pt-2 mt-1">
-                            <span className="font-hanken text-[11px] text-emerald-600 font-extrabold flex items-center gap-1">
-                              <span className="material-symbols-outlined text-sm font-black">check_circle</span>
-                              Account Verified ✅
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsAutoDetected(false);
-                                setResolveError("");
-                                setShowTrfBankSelector(true);
-                              }}
-                              className="text-[10px] font-black text-[#FC7A00] uppercase hover:underline"
-                            >
-                              Change Bank
-                            </button>
-                          </div>
-                        </div>
+                      {/* Manual Verify Recipient Button (Visible only when details entered but not verified yet - TASK 1) */}
+                      {trfBank && trfAccount.length === 10 && !trfAccountName && !isResolving && !isResolvingAccount && (
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          type="button"
+                          onClick={resolveAccountManually}
+                          className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                        >
+                          <span className="material-symbols-outlined text-[16px] font-black">check_circle</span>
+                          Verify Recipient
+                        </motion.button>
                       )}
 
-                      {!isResolving && resolveError && (
-                        <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center gap-2 text-left font-hanken text-xs font-bold">
-                          <span className="material-symbols-outlined text-rose-500 text-[18px]">error</span>
-                          <span>{resolveError}</span>
-                        </div>
-                      )}
-
-                      {/* Manual/Fallback Resolution Indicators */}
-                      {isResolvingAccount && !isAutoDetected && (
-                        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl animate-pulse">
-                          <span className="material-symbols-outlined text-blue-500 text-[16px] animate-spin">progress_activity</span>
-                          <span className="font-hanken text-[11px] font-bold text-blue-600">Verifying bank account details...</span>
-                        </div>
-                      )}
-
-                      {!isResolvingAccount && trfAccountName && !isAutoDetected && (
-                        <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex flex-col text-left">
-                          <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Recipient Name</p>
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 animate-pulse">
-                              <span className="material-symbols-outlined text-[12px] font-black">check_circle</span>
-                            </div>
-                            <span className="font-hanken text-xs font-extrabold text-emerald-700 uppercase truncate leading-none">
+                      {/* Verified Account Name & Green Verified Indicator (TASK 1) */}
+                      {trfAccountName && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-left space-y-1 animate-fade-in"
+                        >
+                          <span className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Verified Account Holder</span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-hanken text-sm font-black text-emerald-800 uppercase select-all truncate max-w-[250px]">
                               {trfAccountName}
                             </span>
+                            <span className="font-hanken text-[11px] text-emerald-600 font-extrabold flex items-center gap-0.5 flex-shrink-0 select-none">
+                              Verified ✅
+                            </span>
                           </div>
-                          {/* Red Warning text below verified name */}
-                          <p className="text-[10px] font-bold text-[#E11D48] mt-2 flex items-center gap-1 font-hanken leading-none">
-                            <span className="material-symbols-outlined text-[13px] text-[#E11D48] font-bold">warning</span>
-                            You are sending funds to him/her
-                          </p>
-                        </div>
+                        </motion.div>
                       )}
 
-                      {/* Amount Field (shown only after verification) */}
+                      {/* Amount and Narration Fields (Only enabled/visible after account is successfully verified - TASK 1) */}
                       {trfAccountName && (
-                        <div className="space-y-1.5 pt-2">
-                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Transfer (NGN)</label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-4 pt-1"
+                        >
+                          {/* Transfer Amount Field */}
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Send (NGN)</label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
+                              <input
+                                type="number"
+                                placeholder="0.00"
+                                value={trfAmount}
+                                onChange={(e) => {
+                                  setTrfAmount(e.target.value);
+                                }}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Narration Field (Optional) */}
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Narration / Description (Optional)</label>
                             <input
-                              type="number"
-                              placeholder="Enter amount to send..."
-                              value={trfAmount}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setTrfAmount(val);
-                                const parsedAmt = parseFloat(val);
-                                if (!isNaN(parsedAmt) && parsedAmt > 0) {
-                                  const flatFee = 10.00;
-                                  const totalDeduction = parsedAmt + flatFee;
-                                  if (totalDeduction > balance) {
-                                    toast.error("Insufficient Funds", {
-                                      description: `The total debit (₦${totalDeduction.toLocaleString()} including transfer fee) exceeds your available balance of ₦${balance.toLocaleString()}.`
-                                    });
-                                  }
-                                }
-                              }}
-                              className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                              type="text"
+                              placeholder="e.g. Rent, Payment for items, Food"
+                              value={trfNarration}
+                              onChange={(e) => setTrfNarration(e.target.value)}
+                              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
                             />
                           </div>
 
-                          {/* Pricing breakdown details if amount is entered */}
+                          {/* Live Transfer Fee and Cumulative Total Breakdown */}
                           {parseFloat(trfAmount) > 0 && (
-                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs mt-2">
+                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 font-hanken text-xs">
                               <div className="flex justify-between text-gray-500">
-                                <span className="font-semibold">Transfer Amount</span>
+                                <span className="font-semibold">Transfer Principal</span>
                                 <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
                               </div>
-                              <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
-                                <span className="font-semibold">Transfer Fee</span>
+                              <div className="flex justify-between text-gray-500 border-b border-gray-200/50 pb-2">
+                                <span className="font-semibold">Settlement Fee</span>
                                 {isFeeLoading ? (
-                                  <span className="w-8 h-3 bg-gray-200 animate-pulse rounded" />
+                                  <span className="material-symbols-outlined text-[14px] animate-spin text-[#FC7A00]">progress_activity</span>
                                 ) : (
                                   <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
                                 )}
@@ -2245,52 +2260,38 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               <div className="flex justify-between items-center text-sm font-black pt-1">
                                 <span>Total Debit Amount</span>
                                 {isFeeLoading ? (
-                                  <span className="w-16 h-4 bg-gray-200 animate-pulse rounded" />
+                                  <span className="material-symbols-outlined text-[14px] animate-spin text-[#FC7A00]">progress_activity</span>
                                 ) : (
                                   <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
                                 )}
                               </div>
+                              {trfTotalDebit > balance && (
+                                <p className="text-[9px] text-red-500 font-bold uppercase leading-none pt-1">
+                                  ⚠️ Total debit exceeds your wallet balance of ₦{balance.toLocaleString()}
+                                </p>
+                              )}
                             </div>
                           )}
+                        </motion.div>
+                      )}
+
+                      {/* Continue Button (TASK 1) */}
+                      {trfAccountName && (
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            disabled={!trfAmount || isNaN(parseFloat(trfAmount)) || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance || isFeeLoading}
+                            onClick={() => setTrfStep("confirm")}
+                            className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                          >
+                            Continue
+                          </button>
                         </div>
                       )}
-
-                      {/* Submit / Continue Button */}
-                      {!trfAccountName && (
-                        <button
-                          type="submit"
-                          disabled={!trfAccountName || isResolvingAccount}
-                          className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 mt-4"
-                        >
-                          Enter Amount
-                        </button>
-                      )}
-
-                      {trfAccountName && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const amt = parseFloat(trfAmount);
-                            if (isNaN(amt) || amt <= 0) {
-                              toast.error("Please enter a valid transfer amount.");
-                              return;
-                            }
-                            if (trfTotalDebit > balance) {
-                              toast.error("Insufficient wallet balance for this transfer including fee.");
-                              return;
-                            }
-                            setTrfStep("confirm");
-                          }}
-                          disabled={isFeeLoading || !trfAmount || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance}
-                          className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 mt-4"
-                        >
-                          Continue
-                        </button>
-                      )}
-                    </form>
+                    </div>
                   ) : (
                     // --- BULK BATCH RECIPIENT ADDER FORM ---
-                    <div className="space-y-4">
+                    <div className="space-y-4 flex-1">
                       <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
                         <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Add Recipient to Batch</p>
 
@@ -2446,235 +2447,117 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                       <button
                         type="button"
-                        onClick={handleTransferInputSubmit}
+                        onClick={() => setTrfStep("confirm")}
                         disabled={bulkRecipients.length === 0}
                         className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                       >
-                        Verify & Calculate Fees
+                        Confirm Batch Details
                       </button>
                     </div>
                   )}
                 </motion.div>
               )}
 
-              {/* STAGE 2: Enter Amount & Live Fee Lookup (Single / Cumulative summary display) */}
-              {trfStep === "amount" && (
-                <motion.form
-                  key="trf-amount"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  onSubmit={handleTransferAmountSubmit}
-                  className="space-y-4 text-left"
-                >
-                  {isBulkMode ? (
-                    // --- BULK MODE TOTALS SUMMARY SCREEN ---
-                    <div className="space-y-4">
-                      <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
-                        <div>
-                          <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Batch Type</p>
-                          <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">Bulk Salary Payment</p>
-                          <p className="font-mono text-[10px] text-gray-500 font-bold uppercase mt-0.5">{bulkRecipients.length} verified recipients added</p>
-                        </div>
-                        <span className="material-symbols-outlined text-gray-400">group_work</span>
-                      </div>
-
-                      {/* Display calculations for bulk */}
-                      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs">
-                        <div className="flex justify-between text-gray-500">
-                          <span className="font-semibold">Batch Principal Amount</span>
-                          <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
-                          <span className="font-semibold">Cumulative Batch Fees (₦10 per rec)</span>
-                          <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm font-black pt-1">
-                          <span>Total Batch Debit Amount</span>
-                          <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={trfTotalDebit > balance}
-                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                      >
-                        Confirm Bulk Transfer
-                      </button>
-                    </div>
-                  ) : (
-                    // --- SINGLE MODE TOTALS SUMMARY SCREEN ---
-                    <div className="space-y-4">
-                      {/* Recipient summary badge */}
-                      <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between">
-                        <div>
-                          <p className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Sending To</p>
-                          <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfAccountName}</p>
-                          <p className="font-mono text-[10px] text-gray-500 font-bold uppercase mt-0.5">{trfBank?.name} - {trfAccount}</p>
-                        </div>
-                        <span className="material-symbols-outlined text-gray-400">account_circle</span>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Transfer Amount (NGN)</label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
-                          <input
-                            type="number"
-                            placeholder="Enter amount to send..."
-                            value={trfAmount}
-                            onChange={(e) => setTrfAmount(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Pricing break downs */}
-                      {parseFloat(trfAmount) > 0 && (
-                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 font-hanken text-xs">
-                          <div className="flex justify-between text-gray-500">
-                            <span className="font-semibold">Transfer Amount</span>
-                            <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                          </div>
-                          <div className="flex justify-between text-gray-500 border-b border-gray-200/60 pb-2">
-                            <span className="font-semibold">Transfer Fee</span>
-                            {isFeeLoading ? (
-                              <span className="w-8 h-3 bg-gray-200 animate-pulse rounded" />
-                            ) : (
-                              <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                            )}
-                          </div>
-                          <div className="flex justify-between items-center text-sm font-black pt-1">
-                            <span>Total Debit Amount</span>
-                            {isFeeLoading ? (
-                              <span className="w-16 h-4 bg-gray-200 animate-pulse rounded" />
-                            ) : (
-                              <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={isFeeLoading || !trfAmount || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance}
-                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                      >
-                        Confirm Transfer
-                      </button>
-                    </div>
-                  )}
-                </motion.form>
-              )}
-
-              {/* STAGE: Secure Payment Confirmation Modal before PIN Pad */}
+              {/* STAGE 2: Secure Payment Confirmation & PIN Input Screen (TASK 6) */}
               {trfStep === "confirm" && (
                 <motion.div
                   key="trf-confirm"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="space-y-6 text-left"
+                  className="space-y-4 text-left flex-1 flex flex-col justify-between"
                 >
-                  <div className="text-center space-y-1">
-                    <div className="w-12 h-12 bg-amber-50 border border-amber-100 rounded-full flex items-center justify-center text-amber-600 mx-auto animate-pulse">
-                      <span className="material-symbols-outlined text-[24px]">verified_user</span>
-                    </div>
-                    <h4 className="font-hanken font-bold text-base text-black mt-2">Confirm Payment Details</h4>
-                    <p className="font-hanken text-[11px] text-gray-400">Please verify the recipient details below before authorizing.</p>
-                  </div>
-
-                  {/* Summary Card with Bold Details */}
-                  <div className="bg-gray-50 border border-gray-150 rounded-2xl p-5 space-y-4">
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Account Name</span>
-                      <p className="font-hanken text-base font-black text-black uppercase mt-0.5 leading-tight select-all">
-                        {isBulkMode ? "Bulk Transfer Batch" : trfAccountName}
-                      </p>
+                  <div className="space-y-4 overflow-y-auto pr-1 no-scrollbar pb-2">
+                    <div className="text-center space-y-1">
+                      <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-primary mx-auto">
+                        <span className="material-symbols-outlined text-[24px] font-black">gpp_maybe</span>
+                      </div>
+                      <h4 className="font-hanken font-extrabold text-base text-black mt-2">Confirm Outward Transfer</h4>
+                      <p className="font-hanken text-[11px] text-gray-400">Please review all settlement parameters before final signing.</p>
                     </div>
 
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Destination Bank</span>
-                      <p className="font-hanken text-sm font-bold text-gray-800 uppercase mt-0.5">
-                        {isBulkMode ? `${bulkRecipients.length} Recipient Banks` : trfBank?.name}
-                      </p>
-                    </div>
+                    {/* Bold structured Summary details (TASK 6) */}
+                    <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-5 space-y-3 font-hanken">
+                      <div className="grid grid-cols-2 gap-2 border-b border-gray-200/50 pb-2">
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Recipient Name</span>
+                          <p className="font-hanken text-xs font-black text-black uppercase mt-0.5 select-all truncate leading-tight">
+                            {isBulkMode ? `${bulkRecipients.length} Batch Recipients` : trfAccountName}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Destination Bank</span>
+                          <p className="font-hanken text-xs font-extrabold text-gray-800 uppercase mt-0.5 truncate leading-tight">
+                            {isBulkMode ? "Multiple Banks" : trfBank?.name}
+                          </p>
+                        </div>
+                      </div>
 
-                    {!isBulkMode && (
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Account Number</span>
-                        <p className="font-mono text-sm font-bold text-gray-800 mt-0.5 select-all">
-                          {trfAccount}
+                      {!isBulkMode && (
+                        <div className="border-b border-gray-200/50 pb-2">
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Recipient Account Number</span>
+                          <p className="font-mono text-xs font-black text-black mt-0.5 select-all tracking-widest leading-none">
+                            {trfAccount}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 border-b border-gray-200/50 pb-2">
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Principal Amount</span>
+                          <p className="font-mono text-sm font-black text-emerald-600 mt-0.5 leading-none">
+                            ₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Transfer Fee</span>
+                          <p className="font-mono text-sm font-black text-gray-700 mt-0.5 leading-none">
+                            ₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="border-b border-gray-200/50 pb-2">
+                        <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Narration Note</span>
+                        <p className="font-hanken text-xs font-semibold text-gray-800 mt-0.5 leading-tight italic truncate">
+                          &quot;{trfNarration || `Direct outward transfer to ${trfAccountName}`}&quot;
                         </p>
                       </div>
-                    )}
 
-                    <div className="border-t border-gray-200/60 pt-3 flex justify-between items-center">
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Transfer Amount</span>
-                        <p className="font-mono text-2xl font-black text-emerald-600 mt-0.5 leading-none">
-                          ₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </p>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">My Wallet Balance</span>
+                          <p className="font-mono text-xs font-bold text-gray-600 mt-0.5 leading-none">
+                            ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Total Debit Deduction</span>
+                          <p className="font-mono text-base font-black text-[#E11D48] mt-0.5 leading-none">
+                            ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Fee Included</span>
-                        <p className="font-mono text-xs font-semibold text-gray-500 mt-0.5">
-                          +₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </p>
+                    </div>
+
+                    {/* PIN input placeholder indicators (TASK 6) */}
+                    <div className="text-center space-y-2">
+                      <p className="font-hanken text-xs font-extrabold text-gray-800">Enter Your secure Transaction PIN</p>
+                      <div className="flex justify-center gap-3">
+                        {[0, 1, 2, 3].map((i) => (
+                          <div
+                            key={i}
+                            className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
+                              trfPin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
+                            }`}
+                          />
+                        ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setTrfStep("amount")}
-                      className="flex-grow py-4 bg-gray-100 hover:bg-gray-200 text-black text-xs font-black uppercase tracking-widest rounded-xl text-center active:scale-95 transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTrfStep("pin")}
-                      className="flex-grow py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 text-center hover:brightness-105 active:scale-95 transition-all shadow-none"
-                    >
-                      Yes, Approve
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* STAGE 3: Hashed Transaction PIN Pad Overlay */}
-              {trfStep === "pin" && (
-                <motion.div
-                  key="trf-pin"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  className="space-y-5 text-center flex flex-col items-center"
-                >
-                  <div>
-                    <h4 className="font-hanken font-extrabold text-base text-black">Enter Transaction PIN</h4>
-                    <p className="font-hanken text-[11px] text-gray-400 mt-1">
-                      Provide your highly secure 4-digit PIN to approve this debit transfer.
-                    </p>
-                  </div>
-
-                  {/* Dot indicator indicators */}
-                  <div className="flex justify-center gap-3.5 py-2 mb-4">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
-                          trfPin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Premium circular shuffled PIN Grid keypad */}
-                  <div className="w-full max-w-[260px] min-[360px]:max-w-[290px] min-[410px]:max-w-xs grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-6 mb-6">
+                  {/* Shuffled PIN Pad Grid Keypad */}
+                  <div className="w-full max-w-[280px] mx-auto grid grid-cols-3 gap-3.5 flex-shrink-0 mb-2">
                     {trfKeypadNumbers.slice(0, 9).map((num) => (
                       <motion.button
                         whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
@@ -2682,21 +2565,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         key={num}
                         type="button"
                         onClick={() => handleTrfPinPress(num)}
-                        disabled={isTransferring}
-                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+                        className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors mx-auto"
                       >
                         {num}
                       </motion.button>
                     ))}
-                    <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20" />
+                    <div className="w-16 h-16" />
                     {trfKeypadNumbers[9] !== undefined && (
                       <motion.button
                         whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
                         whileHover={{ scale: 1.05 }}
                         type="button"
                         onClick={() => handleTrfPinPress(trfKeypadNumbers[9])}
-                        disabled={isTransferring}
-                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+                        className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors mx-auto"
                       >
                         {trfKeypadNumbers[9]}
                       </motion.button>
@@ -2706,60 +2587,102 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       whileHover={{ scale: 1.05 }}
                       type="button"
                       onClick={handleTrfPinDelete}
-                      disabled={isTransferring}
-                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer"
+                      className="w-16 h-16 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer mx-auto"
                     >
-                      <span className="material-symbols-outlined text-[24px] min-[360px]:text-[28px] min-[410px]:text-3xl">backspace</span>
+                      <span className="material-symbols-outlined text-[24px]">backspace</span>
                     </motion.button>
                   </div>
                 </motion.div>
               )}
 
-              {/* STAGE 4: Outward Transfer Completion Receipt Screen */}
+              {/* STAGE 3: Gorgeous Success Animation & Receipt details Screen (TASK 7) */}
               {trfStep === "completion" && transferResult && (
                 <motion.div
                   key="trf-completion"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="space-y-5 text-center flex flex-col items-center py-4"
+                  className="space-y-5 text-center flex flex-col items-center py-4 flex-1 justify-between"
                 >
-                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner animate-bounce">
-                    <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
-                  </div>
+                  <div className="space-y-5 w-full overflow-y-auto no-scrollbar pr-1 pb-4">
+                    {/* Pulsing visual animated check indicator badge */}
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: [0, 1.2, 1] }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner"
+                    >
+                      <span className="material-symbols-outlined text-[32px] font-black" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
+                    </motion.div>
 
-                  <div>
-                    <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">
-                      {isBulkMode ? "Batch Queued!" : "Transfer Initiated!"}
-                    </h4>
-                    <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed max-w-[280px]">
-                      {transferResult.message}
-                    </p>
-                  </div>
-
-                  <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 text-left font-hanken text-xs">
-                    <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
-                      <span>{isBulkMode ? "Batch ID" : "Ref Code"}</span>
-                      <span className="font-mono font-bold text-black select-all">{transferResult.reference}</span>
+                    <div>
+                      <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">Transfer Successful!</h4>
+                      <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed max-w-[280px] mx-auto">
+                        Your outward bank transfer has been successfully initiated.
+                      </p>
                     </div>
-                    <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
-                      <span>Status</span>
-                      <span className="bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded uppercase font-bold text-[8px] tracking-wide">
-                        {isBulkMode ? "Queued" : "Pending"}
-                      </span>
+
+                    {/* Detailed structured Receipt parameters */}
+                    <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2.5 text-left font-hanken text-xs">
+                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+                        <span>Recipient</span>
+                        <span className="font-bold text-black uppercase truncate max-w-[180px]">{isBulkMode ? "Batch Recipients" : trfAccountName}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+                        <span>Amount Debited</span>
+                        <span className="font-mono font-black text-emerald-600">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+                        <span>Reference Code</span>
+                        <span className="font-mono font-bold text-black select-all">{transferResult.reference || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-200/50 pb-2 text-gray-500">
+                        <span>Settlement Date</span>
+                        <span className="font-bold text-black">{new Date().toLocaleString()}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 leading-relaxed font-medium pt-1 text-center">
+                        Funds are usually settled instantly. You can check your transaction history ledger any time.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed font-medium pt-1 text-center">
-                      Settlements usually take under 2 minutes. Check your transaction history for real-time status ledger updates.
-                    </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleCloseTransferModal}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
-                  >
-                    Close
-                  </button>
+                  {/* Actions Bar */}
+                  <div className="w-full space-y-2.5 flex-shrink-0">
+                    {/* Share Receipt functional trigger (TASK 7) */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const receiptText = `Transaction Receipt\nRecipient: ${isBulkMode ? "Batch Recipients" : trfAccountName}\nBank: ${isBulkMode ? "Multiple" : trfBank?.name}\nAmount: ₦${parseFloat(trfAmount).toLocaleString()}\nRef: ${transferResult.reference || ""}\nDate: ${new Date().toLocaleString()}\nPowered by E-Tech Global Hub`;
+                        if (navigator.share) {
+                          try {
+                            await navigator.share({
+                              title: "Transaction Receipt",
+                              text: receiptText,
+                            });
+                          } catch {
+                            navigator.clipboard.writeText(receiptText);
+                            toast.success("Receipt copied to clipboard!");
+                          }
+                        } else {
+                          navigator.clipboard.writeText(receiptText);
+                          toast.success("Receipt copied to clipboard!");
+                        }
+                      }}
+                      className="w-full py-3.5 border-2 border-gray-200 hover:border-black bg-white text-black text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">share</span>
+                      Share Receipt
+                    </button>
+
+                    {/* Done Action Button (TASK 7) */}
+                    <button
+                      type="button"
+                      onClick={handleCloseTransferModal}
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
+                    >
+                      Done
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
