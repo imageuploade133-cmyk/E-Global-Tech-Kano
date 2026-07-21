@@ -8,8 +8,9 @@ import { toast } from "sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
+import { doc, getDoc } from "firebase/firestore";
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { useRouter } from "next/navigation";
 import { useAppConfig } from "@/lib/ConfigContext";
@@ -104,6 +105,7 @@ export default function ProfilePage() {
 
   // Resolve or retrieve the permanent static account details if verified
   const loadStaticAccount = async () => {
+    if (!user) return;
     const isMock = sessionStorage.getItem("mock") === "true";
     if (isMock) {
       setStaticAccount({
@@ -116,58 +118,34 @@ export default function ProfilePage() {
 
     setLoadingAccount(true);
     try {
-      let idToken = "";
-      if (user) {
-        idToken = await user.getIdToken();
-      }
-
-      const fullname = userData?.name || user?.displayName || "Captain User";
-      const nameParts = fullname.trim().split(/\s+/);
-      const firstname = nameParts[0] || "Customer";
-      const lastname = nameParts.slice(1).join(" ") || "Wallet";
-
-      const payload = {
-        email: user?.email || userData?.email || `user-${user?.uid}@e-tech-hub.com`,
-        phone: userData?.phoneNumber || userData?.phone || "08012345678",
-        firstname,
-        lastname,
-        userId: user?.uid,
-        isPermanent: true,
-        is_permanent: true,
-        bvn: userData?.bvn || userData?.nin || "22222222222"
-      };
-
-      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/create-virtual-account", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.account) {
-          setStaticAccount({
-            bankName: data.account.bankName,
-            accountNumber: data.account.accountNumber,
-            accountName: data.account.accountName,
-          });
-        }
+      const docRef = doc(db, "wallet_accounts", user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setStaticAccount({
+          bankName: data.bankName,
+          accountNumber: data.accountNumber,
+          accountName: data.accountName,
+        });
+      } else {
+        console.warn(`[loadStaticAccount] No wallet_account found in Firestore for user: ${user.uid}`);
+        setStaticAccount(null);
       }
     } catch (err) {
-      console.error("Error loading permanent account:", err);
+      console.error("Error loading permanent account from Firestore:", err);
     } finally {
       setLoadingAccount(false);
     }
   };
 
   useEffect(() => {
-    if (userData?.kycStatus === "VERIFIED") {
+    if (user && userData?.kycStatus === "VERIFIED") {
       loadStaticAccount();
+    } else {
+      setStaticAccount(null);
     }
-  }, [userData?.kycStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, userData?.kycStatus]);
 
   // Execute verification call
   const handleVerifyKyc = async (e: React.FormEvent) => {
@@ -610,6 +588,30 @@ export default function ProfilePage() {
                     <p className="text-[10px] text-emerald-600 font-semibold">Your permanent static account is active and verified.</p>
                   </div>
                 </div>
+
+                {/* Masked BVN or NIN */}
+                {!!(userData?.bvn || userData?.nin) && (
+                  <div className="flex justify-between items-center p-3 bg-gray-50 border border-gray-150 rounded-2xl">
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                        Verified {userData?.bvn ? "BVN" : "NIN"} Document
+                      </p>
+                      <p className="font-mono text-sm font-extrabold text-gray-800 tracking-widest mt-0.5">
+                        {(() => {
+                          const bvnVal = (userData?.bvn as string | undefined) || "";
+                          const ninVal = (userData?.nin as string | undefined) || "";
+                          const val = bvnVal || ninVal || "";
+                          const cleaned = val.trim();
+                          if (cleaned.length < 4) return cleaned;
+                          return cleaned.slice(0, 2) + "*".repeat(cleaned.length - 4) + cleaned.slice(-2);
+                        })()}
+                      </p>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide">
+                      Verified
+                    </span>
+                  </div>
+                )}
 
                 {loadingAccount ? (
                   <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">

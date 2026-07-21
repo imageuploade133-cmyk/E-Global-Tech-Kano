@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface BalanceCardProps {
   balance: number;
@@ -554,8 +556,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setTrfTotalDebit(totalAmt + totalFees);
   }, [bulkRecipients, isBulkMode]);
 
-  // Load or create the permanent virtual account dynamically from server-side API (idempotent check)
+  // Load the permanent virtual account dynamically from Firestore (Idempotent check/load)
   const fetchPermanentVirtualAccount = async () => {
+    if (!user) return;
     const isMock = sessionStorage.getItem("mock") === "true";
     if (isMock) {
       setPermanentAccount({
@@ -568,57 +571,34 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     setIsPermAccountLoading(true);
     try {
-      let idToken = "";
-      if (user) {
-        idToken = await user.getIdToken();
-      }
-
-      const fullname = userData?.name || user?.displayName || "Captain User";
-      const nameParts = fullname.trim().split(/\s+/);
-      const firstname = nameParts[0] || "Customer";
-      const lastname = nameParts.slice(1).join(" ") || "Wallet";
-
-      const payload = {
-        email: user?.email || userData?.email || `user-${user?.uid}@e-tech-hub.com`,
-        phone: userData?.phoneNumber || userData?.phone || "08012345678",
-        firstname,
-        lastname,
-        userId: user?.uid,
-        isPermanent: true,
-        is_permanent: true,
-        bvn: userData?.bvn || userData?.nin || "22222222222"
-      };
-
-      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/create-virtual-account", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.account) {
-          setPermanentAccount({
-            bankName: data.account.bankName,
-            accountNumber: data.account.accountNumber,
-            accountName: data.account.accountName,
-          });
-        }
+      const docRef = doc(db, "wallet_accounts", user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setPermanentAccount({
+          bankName: data.bankName,
+          accountNumber: data.accountNumber,
+          accountName: data.accountName,
+        });
+      } else {
+        console.warn(`[fetchPermanentVirtualAccount] No wallet_account found in Firestore for user: ${user.uid}`);
+        setPermanentAccount(null);
       }
     } catch (err) {
-      console.error("Error loading permanent account:", err);
+      console.error("Error loading permanent account from Firestore:", err);
     } finally {
       setIsPermAccountLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPermanentVirtualAccount();
+    if (user && userData?.kycStatus === "VERIFIED") {
+      fetchPermanentVirtualAccount();
+    } else {
+      setPermanentAccount(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user, userData?.kycStatus]);
 
   // Fetch banks dynamically from our Discovery API endpoint
   const fetchBanks = async () => {
