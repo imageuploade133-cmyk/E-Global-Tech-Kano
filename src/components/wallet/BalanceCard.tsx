@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface BalanceCardProps {
   balance: number;
@@ -604,8 +606,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setTrfTotalDebit(totalAmt + totalFees);
   }, [bulkRecipients, isBulkMode]);
 
-  // Load or create the permanent virtual account dynamically from server-side API (idempotent check)
+  // Load the permanent virtual account dynamically from Firestore (Idempotent check/load)
   const fetchPermanentVirtualAccount = async () => {
+    if (!user) return;
     const isMock = sessionStorage.getItem("mock") === "true";
     if (isMock) {
       setPermanentAccount({
@@ -659,16 +662,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         }
       }
     } catch (err) {
-      console.error("Error loading permanent account:", err);
+      console.error("Error loading permanent account from Firestore:", err);
     } finally {
       setIsPermAccountLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPermanentVirtualAccount();
+    if (user && userData?.kycStatus === "VERIFIED") {
+      fetchPermanentVirtualAccount();
+    } else {
+      setPermanentAccount(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user, userData?.kycStatus]);
 
   // Fetch banks dynamically from our Discovery API endpoint
   const fetchBanks = async () => {
