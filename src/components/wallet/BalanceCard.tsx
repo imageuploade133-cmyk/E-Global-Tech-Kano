@@ -13,20 +13,6 @@ interface BalanceCardProps {
   userName?: string;
 }
 
-// Helper to calculate Nigerian Uniform Bank Account Number (NUBAN) check digit
-const calculateNubanCheckDigit = (serialNumber9: string, bankCode3: string): number => {
-  const b = bankCode3.padStart(3, "0");
-  const s = serialNumber9.padStart(9, "0");
-
-  const bankSum = (parseInt(b[0]) * 3) + (parseInt(b[1]) * 7) + (parseInt(b[2]) * 3);
-  const serialSum = (parseInt(s[0]) * 3) + (parseInt(s[1]) * 7) + (parseInt(s[2]) * 3) +
-                    (parseInt(s[3]) * 3) + (parseInt(s[4]) * 7) + (parseInt(s[5]) * 3) +
-                    (parseInt(s[6]) * 3) + (parseInt(s[7]) * 7) + (parseInt(s[8]) * 3);
-
-  const totalSum = bankSum + serialSum;
-  const modulo = totalSum % 10;
-  return (10 - modulo) % 10;
-};
 
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
   const [isVisible, setIsVisible] = useState(true);
@@ -82,14 +68,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [isFeeLoading, setIsFeeLoading] = useState(false);
 
   // Smart Auto-Detection states (without breaking existing transfer flow)
-  const [accountNumber, setAccountNumber] = useState("");
-  const [isResolving, setIsResolving] = useState(false);
-  const [isAutoDetected, setIsAutoDetected] = useState(false);
-  const [isManualFallback, setIsManualFallback] = useState(false);
-
-  // Refs for request cancellation and session caching
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const lookupCache = useRef<Record<string, { accountName: string; bank: { id: string; name: string; code?: string } }>>({});
+  const [isManualFallback, setIsManualFallback] = useState(true);
 
   // Bulk Transfer States
   const [isBulkMode, setIsBulkMode] = useState(false);
@@ -209,11 +188,27 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   // Automatically resolve bank account details when 10 digits are inputted
   useEffect(() => {
-    if (isAutoDetected) return; // Skip manual resolution if already auto-detected!
     if (trfAccount.length === 10 && trfBank) {
       const resolveAccount = async () => {
         setIsResolvingAccount(true);
         setTrfAccountName("");
+
+        // Add logs showing the selected bank name, its Flutterwave code, the account number, and the payload sent to the Payment Gateway.
+        const bodyPayload = {
+          bankId: trfBank.id,
+          bankCode: trfBank.code || trfBank.id,
+          account_bank: trfBank.code || trfBank.id,
+          accountBank: trfBank.code || trfBank.id,
+          accountNumber: trfAccount,
+          account_number: trfAccount,
+        };
+        console.log("-----------------------------------------");
+        console.log("AUTO-RESOLUTION INITIATED:");
+        console.log("Selected Bank Name:", trfBank.name);
+        console.log("Selected Bank Flutterwave Code:", trfBank.code || trfBank.id);
+        console.log("Account Number:", trfAccount);
+        console.log("Payload sent to Payment Gateway:", JSON.stringify(bodyPayload, null, 2));
+        console.log("-----------------------------------------");
 
         if (sessionStorage.getItem("mock") === "true") {
           setTimeout(() => {
@@ -229,16 +224,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           if (user && sessionStorage.getItem("mock") !== "true") {
             idToken = await user.getIdToken();
           }
-
-          const bodyPayload = {
-            bankId: trfBank.id,
-            bankCode: trfBank.code || trfBank.id,
-            account_bank: trfBank.code || trfBank.id,
-            accountBank: trfBank.code || trfBank.id,
-            accountNumber: trfAccount,
-            account_number: trfAccount,
-          };
-          console.log("Resolve Account payload (Single):", bodyPayload);
 
           const res = await fetch("/api/flutterwave/resolve-account", {
             method: "POST",
@@ -273,7 +258,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
       resolveAccount();
     }
-  }, [trfAccount, trfBank, user, isAutoDetected]);
+  }, [trfAccount, trfBank, user]);
 
   // Manual Recipient Account Resolution Handler (TASK 1)
   const resolveAccountManually = async () => {
@@ -347,208 +332,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
   };
 
-  // Smart Auto-Detection Effect
-  useEffect(() => {
-    // Reset smart states if account number is not exactly 10 digits
-    if (accountNumber.length !== 10) {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      setIsResolving(false);
-      setIsAutoDetected(false);
-      setIsManualFallback(false);
-      return;
-    }
-
-    // Debounce the requests by 500ms
-    const debounceTimer = setTimeout(() => {
-      // 1. Check Session Cache first to prevent duplicate API calls
-      const cacheKey = accountNumber;
-      if (lookupCache.current[cacheKey]) {
-        const cached = lookupCache.current[cacheKey];
-        setIsAutoDetected(true);
-        setIsResolving(false);
-
-        // Sync with existing transfer flow states so they are 100% backward compatible
-        setTrfBank(cached.bank);
-        setTrfAccountName(cached.accountName);
-        return;
-      }
-
-      const triggerAutoDetection = async () => {
-        setIsResolving(true);
-        setIsAutoDetected(false);
-        setIsManualFallback(false);
-
-        // Cancel previous request if any
-        if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-        }
-        const abortController = new AbortController();
-        abortControllerRef.current = abortController;
-
-        // Mock mode handling
-        if (sessionStorage.getItem("mock") === "true") {
-          try {
-            await new Promise((resolve, reject) => {
-              const timeout = setTimeout(resolve, 600);
-              abortController.signal.addEventListener("abort", () => {
-                clearTimeout(timeout);
-                reject(new Error("aborted"));
-              });
-            });
-
-            // Fallback mock bank setup
-            const targetBank = banksList.find(b => b.code === "044") || banksList[0] || { id: "044", name: "Access Bank", code: "044" };
-            const resolvedName = "MOCK AUTO RECIPIENT";
-
-            setIsAutoDetected(true);
-
-            // Sync with existing states
-            setTrfBank(targetBank);
-            setTrfAccountName(resolvedName);
-
-            // Cache lookup
-            lookupCache.current[cacheKey] = {
-              accountName: resolvedName,
-              bank: targetBank
-            };
-          } catch (err: unknown) {
-            const error = err as Error;
-            if (error.message !== "aborted") {
-              console.warn("Smart auto-detect abort exception:", error);
-            }
-          } finally {
-            setIsResolving(false);
-          }
-          return;
-        }
-
-        try {
-          // Calculate candidate banks using NUBAN check digit mathematical validation
-          const serialNumber9 = accountNumber.slice(0, 9);
-          const lastDigit = parseInt(accountNumber[9]);
-
-          let candidates = banksList.filter(bank => {
-            if (!bank.code) return false;
-            if (bank.code.length === 3 && /^\d+$/.test(bank.code)) {
-              const computed = calculateNubanCheckDigit(serialNumber9, bank.code);
-              return computed === lastDigit;
-            }
-            return false;
-          });
-
-          // Sort candidates using popular bank weights
-          const POPULAR_BANK_CODES = ["044", "058", "057", "033", "011", "50515", "50211", "999992", "999991"];
-          candidates.sort((a, b) => {
-            const indexA = POPULAR_BANK_CODES.indexOf(a.code || "");
-            const indexB = POPULAR_BANK_CODES.indexOf(b.code || "");
-            const priorityA = indexA !== -1 ? indexA : 999;
-            const priorityB = indexB !== -1 ? indexB : 999;
-            return priorityA - priorityB;
-          });
-
-          // Fallback to top banks if no candidate matches mathematically (for robust error tolerance)
-          if (candidates.length === 0) {
-            candidates = banksList.filter(b => POPULAR_BANK_CODES.includes(b.code || "")).slice(0, 5);
-          }
-
-          if (candidates.length === 0) {
-            throw new Error("No candidate banks available for verification.");
-          }
-
-          let idToken = "mock-token";
-          if (user) {
-            idToken = await user.getIdToken();
-          }
-
-          let successBank = null;
-          let successAccountName = "";
-
-          // Try resolving account against up to 3 candidate banks in sequence
-          for (let i = 0; i < Math.min(candidates.length, 3); i++) {
-            const candidate = candidates[i];
-            const bodyPayload = {
-              bankId: candidate.id,
-              bankCode: candidate.code || candidate.id,
-              account_bank: candidate.code || candidate.id,
-              accountBank: candidate.code || candidate.id,
-              accountNumber: accountNumber,
-              account_number: accountNumber,
-            };
-
-            try {
-              const res = await fetch("/api/flutterwave/resolve-account", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${idToken}`,
-                },
-                body: JSON.stringify(bodyPayload),
-                signal: abortController.signal
-              });
-
-              if (!res.ok) continue;
-
-              const data = await res.json();
-              const isSuccess = data.status === "success" || data.success === true;
-              const rName = data.accountName ||
-                            data.account_name ||
-                            data.data?.account_name ||
-                            data.data?.accountName ||
-                            "";
-
-              if (isSuccess && rName) {
-                successBank = candidate;
-                successAccountName = rName;
-                break; // Stop querying once correct bank resolves successfully
-              }
-            } catch (err: unknown) {
-              const error = err as Error;
-              if (error.name === "AbortError" || error.message === "aborted") {
-                throw error;
-              }
-            }
-          }
-
-          if (successBank && successAccountName) {
-            setIsAutoDetected(true);
-            setIsManualFallback(false);
-
-            // Sync with existing transfer flow states so they are 100% backward compatible
-            setTrfBank(successBank);
-            setTrfAccountName(successAccountName);
-
-            // Cache successful lookup
-            lookupCache.current[cacheKey] = {
-              accountName: successAccountName,
-              bank: successBank
-            };
-
-            toast.success("Recipient account auto-detected and verified!");
-          } else {
-            setIsAutoDetected(false);
-            setIsManualFallback(true);
-            toast.info("We couldn't automatically detect your bank. Please select your bank manually.");
-          }
-        } catch (err: unknown) {
-          const error = err as Error;
-          if (error.name !== "AbortError" && error.message !== "aborted") {
-            console.warn("Auto detection exception:", error);
-          }
-        } finally {
-          setIsResolving(false);
-        }
-      };
-
-      triggerAutoDetection();
-    }, 500);
-
-    return () => {
-      clearTimeout(debounceTimer);
-    };
-  }, [accountNumber, banksList, user]);
 
   // Automatically calculate transfer fee when transferAmount changes (Single Mode)
   useEffect(() => {
@@ -870,10 +653,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setBulkAmountVal("");
       setShowBulkBankSelector(false);
 
-      // Clean up smart auto-detection states on drawer close
-      setAccountNumber("");
-      setIsResolving(false);
-      setIsAutoDetected(false);
     }, 300);
   };
 
@@ -2049,12 +1828,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           onChange={(e) => {
                             const val = e.target.value.slice(0, 10);
                             setTrfAccount(val);
-                            setAccountNumber(val);
                             // Clear verified recipient name immediately if account number edits (TASK 1)
                             if (val.length !== 10) {
                               setTrfAccountName("");
-                              setIsAutoDetected(false);
-                              setIsManualFallback(false);
+                              setIsManualFallback(true);
                             }
                           }}
                           className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
@@ -2089,7 +1866,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           <button
                             type="button"
                             onClick={() => {
-                              setIsAutoDetected(false);
                               setIsManualFallback(true);
                               setTrfAccountName(""); // Clear verified name to force re-verification with manually chosen bank
                               setShowTrfBankSelector(true);
@@ -2173,7 +1949,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                         key={bank.id}
                                         type="button"
                                         onClick={() => {
-                                          setIsAutoDetected(false);
                                           setTrfBank(bank);
                                           setTrfAccountName(""); // Reset name to force re-verification
                                           setShowTrfBankSelector(false);
@@ -2198,7 +1973,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </AnimatePresence>
 
                       {/* Resolving Account Loading State Indicator (TASK 5) */}
-                      {(isResolving || isResolvingAccount) && (
+                      {isResolvingAccount && (
                         <div className="flex items-center gap-2.5 p-4 bg-orange-50 border border-orange-100 rounded-2xl animate-pulse">
                           <span className="material-symbols-outlined text-primary text-[18px] animate-spin">progress_activity</span>
                           <span className="font-hanken text-xs font-black text-primary-dark">Verifying account holder identity...</span>
@@ -2206,7 +1981,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       )}
 
                       {/* Manual Verify Recipient Button (Visible only when details entered but not verified yet - TASK 1) */}
-                      {trfBank && trfAccount.length === 10 && !trfAccountName && !isResolving && !isResolvingAccount && (
+                      {trfBank && trfAccount.length === 10 && !trfAccountName && !isResolvingAccount && (
                         <motion.button
                           whileTap={{ scale: 0.98 }}
                           type="button"
