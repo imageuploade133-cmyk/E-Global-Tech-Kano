@@ -174,8 +174,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           };
           console.log("Resolve Account payload (Bulk):", bodyPayload);
 
-          const res = await fetch("/api/flutterwave/resolve-account", {
-          const res = await fetch("/api/flutterwave/resolve-account", {
+          const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/resolve-account", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -243,7 +242,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           };
           console.log("Resolve Account payload (Single):", bodyPayload);
 
-          const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/resolve-account", {
+          const res = await fetch("/api/flutterwave/resolve-account", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -358,8 +357,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               accountName: resolvedName,
               bank: targetBank
             };
-          } catch (err: any) {
-            if (err.message !== "aborted") {
+          } catch (err: unknown) {
+            const error = err as Error;
+            if (error.message !== "aborted") {
               setResolveError("Unable to verify account.");
             }
           } finally {
@@ -447,9 +447,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 successAccountName = rName;
                 break; // Stop querying once correct bank resolves successfully
               }
-            } catch (err: any) {
-              if (err.name === "AbortError" || err.message === "aborted") {
-                throw err;
+            } catch (err: unknown) {
+              const error = err as Error;
+              if (error.name === "AbortError" || error.message === "aborted") {
+                throw error;
               }
             }
           }
@@ -480,8 +481,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             setAccountName("");
             setIsAutoDetected(false);
           }
-        } catch (err: any) {
-          if (err.name !== "AbortError" && err.message !== "aborted") {
+        } catch (err: unknown) {
+          const error = err as Error;
+          if (error.name !== "AbortError" && error.message !== "aborted") {
             setResolveError("Unable to verify account.");
           }
         } finally {
@@ -1928,11 +1930,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto h-[90vh] max-h-[90vh] no-scrollbar"
+            className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto no-scrollbar flex flex-col"
           >
-            {/* Drag handle */}
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
-
             {/* Header row */}
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
               {trfStep !== "input" && trfStep !== "completion" ? (
@@ -2163,6 +2162,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             <div>
                               <p className="font-hanken text-xs font-extrabold text-gray-800">{detectedBank.name}</p>
                               <p className="font-hanken text-sm font-black text-emerald-700 uppercase">{accountName}</p>
+                              <span className="hidden" data-bank-code={detectedBankCode} />
                             </div>
                           </div>
                           <div className="flex items-center justify-between border-t border-emerald-100 pt-2 mt-1">
