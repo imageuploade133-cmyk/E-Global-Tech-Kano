@@ -103,10 +103,11 @@ export class PaymentGatewayManager {
     feature: keyof GatewayConfig["features"];
   }): Promise<{ name: string; payBills: (payload: BillPaymentPayload, idToken?: string) => Promise<BillPaymentResponse> }> {
     console.log(`[PaymentGatewayManager] Selecting gateway for feature: ${params.feature}`);
+    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
     return {
       name: "flutterwave",
       payBills: async (payload: BillPaymentPayload, idToken?: string) => {
-        const response = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/bills", {
+        const response = await fetch(`${gatewayUrl}/api/flutterwave/bills`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${idToken || ""}`,
