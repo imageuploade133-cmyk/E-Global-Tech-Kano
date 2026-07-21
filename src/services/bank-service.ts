@@ -64,24 +64,23 @@ export class BankService {
 
   /**
    * Retrieves a single bank from memory cache or Firestore by its ID.
+   * If the cache is empty, uses getBanks() to automatically trigger a self-healing sync.
+   * Supports robust fallback searches by both ID and Code.
    */
   static async getBankById(bankId: string): Promise<BankDoc | null> {
     if (!bankId) return null;
 
-    // Try finding in cache first
-    if (cachedBanksList && cachedBanksList.length > 0) {
-      const cached = cachedBanksList.find((b) => b.id === bankId);
-      if (cached) return cached;
-    }
+    // Ensure banks cache is fully initialized/synced before looking up
+    const banks = await this.getBanks();
 
-    // Fallback to Firestore
+    // Look up by exact ID or by Code
+    const match = banks.find((b) => b.id === bankId || b.code === bankId);
+    if (match) return match;
+
+    // Fallback to direct Firestore lookup as last resort
     const bankDoc = await adminDb.collection("banks").doc(bankId).get();
     if (bankDoc.exists) {
       const data = bankDoc.data() as BankDoc;
-      // If cached list is active, we can push it in
-      if (cachedBanksList) {
-        cachedBanksList.push(data);
-      }
       return data;
     }
 
