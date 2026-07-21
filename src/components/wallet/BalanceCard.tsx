@@ -1132,7 +1132,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         <motion.div
           whileTap={{ scale: 0.98 }}
           onClick={() => router.push("/profile")}
-          className="mt-4 p-4.5 bg-gradient-to-r from-[#FFF5F0] to-[#FFF9F6] border border-[#FFECD8] rounded-xl flex items-center justify-between cursor-pointer active:brightness-95 transition-all select-none relative overflow-hidden shadow-none"
+          className="mt-4 p-4.5 bg-gradient-to-br from-[#FFFDF9] via-[#FFF3E6] to-[#FFEADA] border-[1.5px] border-[#FC7A00]/40 rounded-xl flex items-center justify-between cursor-pointer active:brightness-95 hover:brightness-102 transition-all select-none relative overflow-hidden shadow-none"
         >
           {/* Subtle background luxury badge icon */}
           <div className="absolute right-0 bottom-0 opacity-5 text-[60px] pointer-events-none translate-x-2 translate-y-2 select-none">
@@ -1889,10 +1889,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       )}
 
                       {!isResolvingAccount && trfAccountName && (
-                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                        <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex flex-col text-left">
                           <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">Recipient Name</p>
-                          <p className="font-hanken text-xs font-extrabold text-emerald-700 uppercase mt-0.5 flex items-center gap-1.5">
-                            <span className="text-emerald-500 font-bold">✅</span> {trfAccountName}
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 animate-pulse">
+                              <span className="material-symbols-outlined text-[12px] font-black">check_circle</span>
+                            </div>
+                            <span className="font-hanken text-xs font-extrabold text-emerald-700 uppercase truncate leading-none">
+                              {trfAccountName}
+                            </span>
+                          </div>
+                          {/* Red Warning text below verified name */}
+                          <p className="text-[10px] font-bold text-[#E11D48] mt-2 flex items-center gap-1 font-hanken leading-none">
+                            <span className="material-symbols-outlined text-[13px] text-[#E11D48] font-bold">warning</span>
+                            You are sending funds to him/her
                           </p>
                         </div>
                       )}
@@ -2032,43 +2042,83 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         {/* Account number */}
                         <input
                           type="number"
-                          placeholder="Recipient Account Number"
+                          placeholder="Recipient Account Number (10 Digits)"
                           value={bulkAccount}
-                          onChange={(e) => setBulkAccount(e.target.value.slice(0, 10))}
+                          onChange={(e) => {
+                            setBulkAccount(e.target.value.slice(0, 10));
+                            if (e.target.value.length !== 10) {
+                              setBulkName(""); // reset on edit
+                            }
+                          }}
                           className="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00]"
                         />
 
-                        {isBulkResolving && (
-                          <span className="block text-[10px] text-blue-500 font-bold animate-pulse">Resolving details...</span>
+                        {/* Find Bank button for Bulk */}
+                        {bulkAccount.length === 10 && !bulkName && (
+                          <button
+                            type="button"
+                            onClick={() => setShowBulkBankSelector(true)}
+                            className="w-full py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-xs font-bold uppercase tracking-wider rounded-xl active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">search</span>
+                            Find Bank
+                          </button>
                         )}
 
-                        {!isBulkResolving && bulkName && (
-                          <div className="p-2 bg-emerald-50 rounded-lg text-emerald-800 font-hanken text-[11px] font-bold uppercase truncate max-w-full">
-                            Resolved: {bulkName}
+                        {isBulkResolving && (
+                          <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-100 rounded-xl animate-pulse text-left">
+                            <span className="material-symbols-outlined text-blue-500 text-[14px] animate-spin">progress_activity</span>
+                            <span className="font-hanken text-[10px] font-bold text-blue-600">Verifying bank account details...</span>
                           </div>
                         )}
 
-                        {/* Amount */}
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-gray-500">₦</span>
-                          <input
-                            type="number"
-                            placeholder="Recipient Amount"
-                            value={bulkAmountVal}
-                            onChange={(e) => setBulkAmountVal(e.target.value)}
-                            className="w-full bg-white border border-gray-200 rounded-xl pl-6 pr-3 py-3 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00]"
-                          />
-                        </div>
+                        {!isBulkResolving && bulkName && (
+                          <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl flex flex-col text-left">
+                            <p className="text-[7px] font-black uppercase text-emerald-600 tracking-wider">Recipient Name</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="w-4.5 h-4.5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 animate-pulse">
+                                <span className="material-symbols-outlined text-[10px] font-black">check_circle</span>
+                              </div>
+                              <span className="font-hanken text-[11px] font-extrabold text-emerald-700 uppercase truncate leading-none">
+                                {bulkName}
+                              </span>
+                            </div>
+                            {/* Red Warning text below verified name */}
+                            <p className="text-[9px] font-bold text-[#E11D48] mt-1.5 flex items-center gap-1 font-hanken leading-none">
+                              <span className="material-symbols-outlined text-[12px] text-[#E11D48] font-bold">warning</span>
+                              You are sending funds to him/her
+                            </p>
+                          </div>
+                        )}
 
-                        <button
-                          type="button"
-                          onClick={handleAddBulkRecipient}
-                          disabled={isBulkResolving || !bulkName || !bulkAmountVal}
-                          className="w-full py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-hanken text-xs font-bold transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">add_circle</span>
-                          Add to Batch
-                        </button>
+                        {/* Amount - shown only after verified */}
+                        {bulkName && (
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Recipient Amount (NGN)</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-gray-500">₦</span>
+                              <input
+                                type="number"
+                                placeholder="Recipient Amount"
+                                value={bulkAmountVal}
+                                onChange={(e) => setBulkAmountVal(e.target.value)}
+                                className="w-full bg-white border border-gray-200 rounded-xl pl-6 pr-3 py-3 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00]"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {bulkName && (
+                          <button
+                            type="button"
+                            onClick={handleAddBulkRecipient}
+                            disabled={isBulkResolving || !bulkName || !bulkAmountVal}
+                            className="w-full py-3 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">add_circle</span>
+                            Add to Batch
+                          </button>
+                        )}
                       </div>
 
                       {/* Recipients array scroll list */}
