@@ -137,7 +137,7 @@ export default function ProfilePage() {
         bvn: userData?.bvn || userData?.nin || "22222222222"
       };
 
-      const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/create-virtual-account", {
+      const res = await fetch("/api/flutterwave/create-virtual-account", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

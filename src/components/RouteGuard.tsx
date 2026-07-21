@@ -51,7 +51,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               }
 
               console.log(`[Cancel Cleanup Started] Cleaning up pending payment: ${txRef}`);
-              const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/cancel", {
+              const res = await fetch("/api/flutterwave/cancel", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
@@ -103,7 +103,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             }
           }
 
-          const res = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/verify", {
+          const res = await fetch("/api/flutterwave/verify", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
