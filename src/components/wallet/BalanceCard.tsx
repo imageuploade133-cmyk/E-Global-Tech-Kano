@@ -357,8 +357,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               accountName: resolvedName,
               bank: targetBank
             };
-          } catch (err: any) {
-            if (err.message !== "aborted") {
+          } catch (err: unknown) {
+            const error = err as Error;
+            if (error.message !== "aborted") {
               setResolveError("Unable to verify account.");
             }
           } finally {
@@ -446,9 +447,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 successAccountName = rName;
                 break; // Stop querying once correct bank resolves successfully
               }
-            } catch (err: any) {
-              if (err.name === "AbortError" || err.message === "aborted") {
-                throw err;
+            } catch (err: unknown) {
+              const error = err as Error;
+              if (error.name === "AbortError" || error.message === "aborted") {
+                throw error;
               }
             }
           }
@@ -479,8 +481,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             setAccountName("");
             setIsAutoDetected(false);
           }
-        } catch (err: any) {
-          if (err.name !== "AbortError" && err.message !== "aborted") {
+        } catch (err: unknown) {
+          const error = err as Error;
+          if (error.name !== "AbortError" && error.message !== "aborted") {
             setResolveError("Unable to verify account.");
           }
         } finally {
@@ -2159,6 +2162,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             <div>
                               <p className="font-hanken text-xs font-extrabold text-gray-800">{detectedBank.name}</p>
                               <p className="font-hanken text-sm font-black text-emerald-700 uppercase">{accountName}</p>
+                              <span className="hidden" data-bank-code={detectedBankCode} />
                             </div>
                           </div>
                           <div className="flex items-center justify-between border-t border-emerald-100 pt-2 mt-1">
