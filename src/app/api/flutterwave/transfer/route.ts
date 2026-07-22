@@ -202,7 +202,7 @@ export async function POST(req: Request) {
         amount: trfAmount,
         account_number: trfAccount,
         account_bank: trfBank,
-        account_name: trfName,
+        beneficiary_name: trfName,
         currency: trfCurrency,
         narration: description,
         reference: trfReference,
