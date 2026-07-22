@@ -146,28 +146,73 @@ export async function POST(req: Request) {
                  resData.data?.authorization ||
                  {};
 
-    let authNote = auth.note ||
-                   auth.validate_instructions ||
-                   auth.instruction ||
-                   flwData.payment_code ||
-                   flwData.payment_instruction ||
-                   resData.payment_code ||
-                   resData.payment_instruction;
+    const rawAuthNote = auth.note ||
+                        auth.validate_instructions ||
+                        auth.instruction ||
+                        flwData.payment_code ||
+                        flwData.payment_instruction ||
+                        resData.payment_code ||
+                        resData.payment_instruction ||
+                        "";
 
-    if (!authNote) {
-      // In-app high-fidelity fallback template
-      const TEST_USSD_TEMPLATES: Record<string, string> = {
-        "058": "*737*1*2*",
-        "044": "*901*1*2*",
-        "033": "*919*3*2*",
-        "057": "*966*2*",
-        "011": "*894*1*1*",
-        "999992": "*955*2*",
-        "50515": "*5573*1*",
-      };
-      const bankPrefix = TEST_USSD_TEMPLATES[finalBankCode] || "*955*2*";
-      authNote = `${bankPrefix}${payAmount}#`;
+    // USSD bank mapping prefixes (without trailing asterisks for perfect `${prefix}*${amount}*${reference}#` construction)
+    const USSD_PREFIXES: Record<string, string> = {
+      "058": "*737",      // GTBank
+      "011": "*894",      // First Bank
+      "057": "*966",      // Zenith Bank
+      "033": "*919",      // UBA
+      "044": "*901",      // Access Bank
+      "035": "*329",      // Wema Bank
+      "070": "*7111",     // Fidelity Bank
+      "030": "*909",      // Heritage Bank
+      "032": "*826",      // Union Bank
+      "050": "*822",      // FCMB
+      "082": "*711",      // Keystone Bank
+      "214": "*565*0",    // FCMB/other
+      "076": "*770",      // Polaris Bank
+      "232": "*945",      // Sterling Bank
+      "035a": "*322",     // ALAT (Wema)
+      "101": "*901",      // Providus Bank
+      "215": "*737",      // Unity Bank
+      "301": "*565",      // Jaiz Bank
+      "999992": "*955",   // OPay
+      "50515": "*5573",   // PalmPay
+
+      // Dynamic bank ID mappings (as database IDs)
+      "8": "*737",        // GTBank ID
+      "1": "*901",        // Access Bank ID
+      "6": "*894",        // First Bank ID
+    };
+
+    const prefix = USSD_PREFIXES[finalBankCode] || USSD_PREFIXES[bankId] || "*955";
+
+    // Extract dynamic reference code
+    let reference = "";
+    if (rawAuthNote) {
+      // E.g., "*bank_ussd_code*000*7548#" or "*955*000*7548#"
+      let cleaned = rawAuthNote.replace(/^[*\s]+/, "").replace(/[#\s]+$/, "");
+      cleaned = cleaned.replace(/^(bank_ussd_code|955|737|901|894|919|966|5573|329|7111|909|826|822|711|565\*0|565|770|945|322|301)/i, "");
+      cleaned = cleaned.replace(/^[*\s]+/, ""); // E.g., "000*7548" or "7548"
+
+      // If there are multiple parts (e.g. 000*7548), take the last numeric/code segment
+      if (cleaned.includes("*")) {
+        const parts = cleaned.split("*");
+        const lastPart = parts.filter(Boolean).pop();
+        if (lastPart) {
+          cleaned = lastPart;
+        }
+      }
+      reference = cleaned;
     }
+
+    if (!reference) {
+      reference = flwData.payment_code ||
+                  flwData.payment_instruction ||
+                  (finalTxRef ? finalTxRef.split("-").pop() || "7548" : "7548");
+    }
+
+    // Generate the final clean USSD code matching format: *PREFIX*AMOUNT*REFERENCE#
+    const finalUssdCode = `${prefix}*${payAmount}*${reference}#`;
 
     logPaymentEvent({
       category: "Payment Initialized",
@@ -175,7 +220,7 @@ export async function POST(req: Request) {
       tx_ref: finalTxRef,
       amount: payAmount,
       currency: payCurrency,
-      message: `USSD Charge initiated successfully for bank ${flwData.account_bank || "Selected Bank"}. Code: ${authNote}`,
+      message: `USSD Charge initiated successfully for bank ${flwData.account_bank || "Selected Bank"}. Code: ${finalUssdCode}`,
       processingTimeMs: Date.now() - startTime,
     });
 
@@ -184,7 +229,7 @@ export async function POST(req: Request) {
       status: "pending",
       flwId: flwData.id || "flw-test-id",
       txRef: finalTxRef,
-      ussdCode: authNote,
+      ussdCode: finalUssdCode,
       bankName: flwData.account_bank || "Selected Bank",
       ...resData
     });

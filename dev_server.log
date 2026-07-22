@@ -63,3 +63,4 @@
  ✓ Compiled /api/flutterwave/transfer in 439ms (1256 modules)
 [STRUCTURED_PAYMENT_LOG] {"timestamp":"2026-07-22T02:50:57.616Z","category":"Transfer","userId":"mock-uid","tx_ref":"trf-1784688656999-ck-uid","amount":15000,"currency":"NGN","message":"Processed successful mock transfer: Project settlement for E-Tech","processingTimeMs":2}
  POST /api/flutterwave/transfer 200 in 616ms
+ ✓ Compiled in 9.1s (968 modules)
