@@ -10,7 +10,7 @@ def run_cuj(page):
 
     # Click the transfer button to open the outward transfer bottom drawer
     print("[Playwright] Opening Outward Transfer drawer...")
-    page.get_by_role("button", name="send Transfer").click()
+    page.get_by_role("button", name="Transfer").click()
     page.wait_for_timeout(1000)
 
     # Open bank selector
@@ -28,7 +28,12 @@ def run_cuj(page):
     # Input account number
     print("[Playwright] Inputting account number...")
     page.get_by_placeholder("e.g. 0123456789").fill("8073281034")
-    page.wait_for_timeout(3000)
+    page.wait_for_timeout(2000)
+
+    # Click Verify Recipient
+    print("[Playwright] Clicking Verify Recipient button...")
+    page.get_by_role("button", name="Verify Recipient").click()
+    page.wait_for_timeout(2000)
 
     # Input amount
     print("[Playwright] Inputting transfer amount...")
@@ -41,33 +46,28 @@ def run_cuj(page):
     page.wait_for_timeout(1000)
 
     # Click Continue
-    print("[Playwright] Clicking Continue to open Confirmation Modal...")
+    print("[Playwright] Clicking Continue to confirmation screen...")
     page.get_by_role("button", name="Continue").click()
-    page.wait_for_timeout(2000)
-
-    # Click Confirm & Proceed in modal
-    print("[Playwright] Clicking Confirm & Proceed in modal...")
-    page.get_by_role("button", name="Confirm & Proceed").click()
-    page.wait_for_timeout(2000)
+    page.wait_for_timeout(1500)
 
     # Now enter PIN "1234" by clicking keypad numbers
     print("[Playwright] Inputting Secure PIN: 1234...")
     for digit in ["1", "2", "3", "4"]:
-        page.get_by_role("button", name=digit, exact=True).click()
+        page.get_by_role("button", name=digit).click()
         page.wait_for_timeout(600)
 
     print("[Playwright] Transfer request sent. Waiting for success...")
     page.wait_for_timeout(4000)
 
-    # Take screenshot of the Receipt screen
+    # Take screenshot of the Success screen
     screenshot_path = "/home/jules/verification/screenshots/verification.png"
     print(f"[Playwright] Taking screenshot at: {screenshot_path}")
     page.screenshot(path=screenshot_path)
     page.wait_for_timeout(1000)
 
-    # Click Close & Finish to close the success screen
-    print("[Playwright] Clicking Close & Finish to close...")
-    page.get_by_role("button", name="Close & Finish").click()
+    # Click Done to close the success screen
+    print("[Playwright] Clicking Done to close...")
+    page.get_by_role("button", name="Done").click()
     page.wait_for_timeout(1000)
     print("[Playwright] CUJ complete!")
 
