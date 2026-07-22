@@ -188,6 +188,11 @@ export async function POST(req: Request) {
         description,
         recipientName: trfName,
         fee,
+        preLoadedUser: {
+          ref: userRef,
+          data: userData,
+          balance: currentBalance,
+        },
       });
       console.log("STEP 9 - Wallet debited");
 
@@ -283,6 +288,7 @@ export async function POST(req: Request) {
       await adminDb.runTransaction(async (rollbackTx) => {
         const userDoc = await rollbackTx.get(userRef);
         if (userDoc.exists) {
+          const uData = userDoc.data() || {};
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
             amount: totalDeduction,
@@ -290,6 +296,11 @@ export async function POST(req: Request) {
             reference: `REFUND-${trfReference}`,
             description: `Refund for failed transfer: ${description}`,
             recipientName: trfName,
+            preLoadedUser: {
+              ref: userRef,
+              data: uData,
+              balance: Number(uData.balance) || 0,
+            },
           });
         }
       });
