@@ -180,9 +180,96 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: transactionResult.error }, { status: 400 });
     }
 
+    const BANK_CODE_MAPPING: Record<string, string> = {
+      // Major Banks
+      '1': '044',    // Access Bank
+      '2': '023',    // Citi Bank
+      '4': '050',    // EcoBank
+      '5': '011',    // First Bank
+      '6': '214',    // FCMB
+      '7': '070',    // Fidelity Bank
+      '8': '058',    // GTBank
+      '9': '076',    // Polaris Bank
+      '10': '221',   // Stanbic IBTC
+      '11': '068',   // Standard Chartered
+      '12': '232',   // Sterling Bank
+      '13': '033',   // UBA
+      '14': '032',   // Union Bank
+      '15': '035',   // Wema Bank
+      '16': '057',   // Zenith Bank
+      '17': '215',   // Unity Bank
+      '18': '101',   // Providus Bank
+      '183': '082',  // Keystone Bank
+      '184': '301',  // Jaiz Bank
+      '231': '100',  // Suntrust Bank
+      '259': '400001', // FSDH Merchant Bank
+      '260': '502',  // Rand Merchant Bank
+
+      // Payment Service Providers
+      '1435': '100004', // Opay
+      '990': '100033',  // Palmpay
+      '254': '090267',  // Kuda Bank
+      '1864': '090405', // Moniepoint
+      '639': '090328',  // Eyowo
+      '1434': '100034', // Zenith Eazy Wallet
+      '1431': '100052', // Beta-Access Yello
+      '1430': '110003', // Interswitch
+      '1429': '110005', // 3Line
+      '1428': '110006', // Paystack
+      '1427': '110008', // Kadick
+      '1426': '110010', // Interswitch Financial Inclusion
+      '1425': '110011', // Arca Payments
+      '1424': '110012', // Cellulant
+      '1423': '110013', // QR Payments
+      '1422': '110015', // Vas2Nets
+      '1421': '110017', // Crowdforce
+      '1420': '110018', // Microsystems
+      '1419': '110019', // Nibssussd
+      '1418': '110021', // Bud Infrastructure
+      '1417': '110022', // Koraypay
+      '1416': '110023', // Capricorn Digital
+      '1415': '110024', // Resident Fintech
+      '1414': '110025', // Netapps
+      '1413': '110026', // Spay Business
+      '1412': '110027', // Yello Digital
+      '1411': '110028', // Nomba
+      '1410': '110029', // Woven Finance
+      '1409': '120002', // HopePSB
+      '1408': '120003', // Momo PSB
+      '1407': '120004', // Smartcash PSB
+      '1406': '120005', // Money Master PSB
+
+      // Microfinance Banks
+      '997': '120001', // 9 Payment Service Bank
+      '996': '090286', // Safe Haven
+      '995': '100035', // M36
+      '994': '090420', // Letshego
+      '992': '090383', // Manny
+      '989': '090366', // Firmus
+      '988': '000030', // Parallex Bank
+      '987': '060004', // Greenwich Merchant Bank
+      '986': '090423', // MAUTECH
+      '965': '303',    // ChamsMobile
+      '964': '000025', // Titan Trust Bank
+      '949': '100007', // Stanbic IBTC @ease
+      '948': '100006', // eTranzact
+      '947': '100005', // Cellulant
+      '946': '100003', // Parkway-ReadyCash
+      '945': '100001', // FET
+
+      // Virtual Banks
+      '1353': '090435', // Links Microfinance
+      '1317': '090470', // Dot Microfinance
+      '1154': '090482', // Clearpay
+    };
+
     // 4. Map the client recipients into the bulk_data schema expected by the gateway
     const normalizedBulkData = trfRecipients.map((rec: BulkRecipient, index: number) => {
-      const bankCode = rec.bankId || rec.bank_code || rec.bankCode || rec.accountBank || rec.account_bank;
+      const rawBankCode = rec.bankId || rec.bank_code || rec.bankCode || rec.accountBank || rec.account_bank;
+      let bankCode = rawBankCode;
+      if (rawBankCode && BANK_CODE_MAPPING[String(rawBankCode).trim()]) {
+        bankCode = BANK_CODE_MAPPING[String(rawBankCode).trim()];
+      }
       const accountNumber = rec.accountNumber || rec.account_number || rec.recipientAccount;
       const amount = Number(rec.amount);
       const narration = rec.narration || `Bulk Transfer Item ${index + 1}`;
