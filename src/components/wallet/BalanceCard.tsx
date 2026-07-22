@@ -6,7 +6,6 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { TransferConfirmationModal } from "./TransferConfirmationModal";
 
 interface BalanceCardProps {
   balance: number;
@@ -30,15 +29,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [searchQuery, setSearchQuery] = useState("");
 
   // Dynamic Bank Discovery States
-  const [banksList, setBanksList] = useState<Array<{ id: string; name: string; code?: string }>>([
-    { id: "1", name: "Access Bank", code: "044" },
-    { id: "2", name: "Guaranty Trust Bank", code: "058" },
-    { id: "3", name: "Zenith Bank", code: "057" },
-    { id: "4", name: "United Bank for Africa", code: "033" },
-    { id: "5", name: "First Bank of Nigeria", code: "011" },
-    { id: "6", name: "Opay", code: "999992" },
-    { id: "7", name: "Palmpay", code: "999991" }
-  ]);
+  const [banksList, setBanksList] = useState<Array<{ id: string; name: string; code?: string }>>([]);
   const [isBanksLoading, setIsBanksLoading] = useState(false);
   const [selectedBank, setSelectedBank] = useState<{ id: string; name: string; code?: string } | null>(null);
   const [ussdErrorMessage, setUssdErrorMessage] = useState("");
@@ -53,7 +44,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   // Outward Transfer Wizard States
   const [isTransferOpen, setIsTransferOpen] = useState(false);
-  const [isConfirmTrfModalOpen, setIsConfirmTrfModalOpen] = useState(false);
   const [trfStep, setTrfStep] = useState<"input" | "amount" | "confirm" | "pin" | "completion">("input");
   const [trfKeypadNumbers, setTrfKeypadNumbers] = useState<string[]>([]);
 
@@ -920,7 +910,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           body: JSON.stringify({
             title: "Staff December Settlement",
             recipients: bulkRecipients,
-            pin: completedPin,
           }),
         });
 
@@ -2098,7 +2087,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           <button
                             type="button"
                             disabled={!trfAmount || isNaN(parseFloat(trfAmount)) || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance || isFeeLoading}
-                            onClick={() => setIsConfirmTrfModalOpen(true)}
+                            onClick={() => setTrfStep("confirm")}
                             className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                           >
                             Continue
@@ -2264,7 +2253,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                       <button
                         type="button"
-                        onClick={() => setIsConfirmTrfModalOpen(true)}
+                        onClick={() => setTrfStep("confirm")}
                         disabled={bulkRecipients.length === 0}
                         className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                       >
@@ -2507,30 +2496,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </>
       )}
     </AnimatePresence>
-    <TransferConfirmationModal
-      isOpen={isConfirmTrfModalOpen}
-      onClose={() => setIsConfirmTrfModalOpen(false)}
-      transferData={{
-        amount: parseFloat(trfAmount) || 0,
-        recipientName: trfAccountName || "Batch Recipients",
-        bankName: trfBank?.name || "Multiple Banks",
-        bankCode: trfBank?.code || trfBank?.id || "",
-        accountNumber: trfAccount,
-        narration: trfNarration,
-        isBulk: isBulkMode,
-        recipients: bulkRecipients,
-      }}
-      balance={balance}
-      onSuccess={() => {
-        setTrfAmount("");
-        setTrfAccount("");
-        setTrfAccountName("");
-        setTrfNarration("");
-        setTrfPin("");
-        setIsConfirmTrfModalOpen(false);
-        setIsTransferOpen(false);
-      }}
-    />
     </>
   );
 };
