@@ -84,16 +84,21 @@ export class WalletService {
       description: string;
       recipientName: string;
       fee?: number;
+      preLoadedUser?: {
+        ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+        data: FirebaseFirestore.DocumentData;
+        balance: number;
+      };
     }
   ): Promise<{ previousBalance: number; newBalance: number }> {
-    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0 } = params;
+    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0, preLoadedUser } = params;
 
     // Strict validation
     this.validateAmount(amount);
     this.validateCurrency(currency);
 
     // Retrieve user and current balance
-    const user = await this.getUserProfile(transaction, userId);
+    const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
     const currentBalance = user.balance;
     const creditAmount = amount;
     const newBalance = currentBalance + creditAmount;
@@ -146,16 +151,21 @@ export class WalletService {
       recipientName: string;
       fee?: number;
       isPending?: boolean; // If true, sets status to PENDING instead of SUCCESS
+      preLoadedUser?: {
+        ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+        data: FirebaseFirestore.DocumentData;
+        balance: number;
+      };
     }
   ): Promise<{ previousBalance: number; newBalance: number }> {
-    const { userId, amount, currency, reference, docId, type, description, recipientName, fee = 0, isPending = false } = params;
+    const { userId, amount, currency, reference, docId, type, description, recipientName, fee = 0, isPending = false, preLoadedUser } = params;
 
     // Strict validation
     this.validateAmount(amount);
     this.validateCurrency(currency);
 
     // Retrieve user and current balance
-    const user = await this.getUserProfile(transaction, userId);
+    const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
     const currentBalance = user.balance;
 
     const totalDeduction = amount; // Fee is handled separately or included in amount
