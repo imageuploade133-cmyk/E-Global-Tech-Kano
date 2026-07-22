@@ -1,292 +1,272 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
-import { isRateLimited } from "@/lib/rate-limiter";
+import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import bcrypt from "bcryptjs";
-import { FieldValue } from "firebase-admin/firestore";
 
-const PAYMENT_GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+interface BulkRecipient {
+  amount: number;
+  bankId?: string;
+  bank_code?: string;
+  bankCode?: string;
+  accountBank?: string;
+  account_bank?: string;
+  accountNumber?: string;
+  account_number?: string;
+  recipientAccount?: string;
+  narration?: string;
+  reference?: string;
+}
 
 export async function POST(req: Request) {
   const startTime = Date.now();
-  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
-
-  // Rate Limiting: 10 bulk-transfer requests per minute per IP
-  if (isRateLimited(ip, 10, 60 * 1000)) {
-    return NextResponse.json({ error: "Too many bulk transfer requests. Please try again in a minute." }, { status: 429 });
-  }
-
   let uid = "";
-  let idToken = "";
+
+  // 1. Authenticate user
   try {
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
-
-    // Extract the bearer token to pass downstream
-    const authHeader = req.headers.get("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      idToken = authHeader.split("Bearer ")[1];
-    } else {
-      idToken = "mock-token";
-    }
   } catch (authErr: unknown) {
     const error = authErr as Error;
-    console.error("[Bulk Transfer API Auth Error] Auth verification failed:", error.message);
-    return NextResponse.json({ error: "Unauthorized: Invalid or missing authentication token." }, { status: 401 });
+    console.error("[Bulk Transfer Auth Error] Verification failed:", error.message);
+    return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
   }
-
-  let totalDeduction = 0;
-  let ledgerDocId = "";
-  let reference = "";
 
   try {
     const body = await req.json();
-    console.log("[Bulk Transfer API] Processing bulk transfer for user:", uid);
+    const { title, recipients, bulk_data, pin } = body;
 
-    const title = body.title || "Bulk Settlement";
-    const recipients = body.recipients; // Array of { accountNumber, bankId, bankName, recipientName, amount }
-    const pin = body.pin;
+    const trfRecipients = (recipients || bulk_data) as BulkRecipient[] | undefined;
 
-    // Basic Validation
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-      return NextResponse.json({ error: "Invalid recipients batch. Must be a non-empty array." }, { status: 400 });
+    // Validations
+    if (!trfRecipients || !Array.isArray(trfRecipients) || trfRecipients.length === 0) {
+      return NextResponse.json({ error: "A list of transfer recipients is required." }, { status: 400 });
     }
-    if (!pin || typeof pin !== "string" || pin.length !== 4) {
-      return NextResponse.json({ error: "Please provide your 4-digit transaction PIN." }, { status: 400 });
+    if (!pin) {
+      return NextResponse.json({ error: "Transaction PIN is required to authorize bulk transfers." }, { status: 400 });
     }
 
-    // Validate each recipient and sum up totals
-    let totalAmt = 0;
-    for (const r of recipients) {
-      const amt = Number(r.amount);
-      if (isNaN(amt) || amt <= 0) {
-        return NextResponse.json({ error: `Invalid amount for recipient ${r.recipientName || "unknown"}.` }, { status: 400 });
-      }
-      if (!r.accountNumber || !r.bankId) {
-        return NextResponse.json({ error: `Missing bank code or account number for recipient ${r.recipientName || "unknown"}.` }, { status: 400 });
-      }
-      totalAmt += amt;
-    }
-
+    // Calculate total amounts and fees
+    const totalAmt = trfRecipients.reduce((sum: number, rec: BulkRecipient) => sum + (Number(rec.amount) || 0), 0);
     const flatFee = 10.00;
-    const totalFees = recipients.length * flatFee;
-    totalDeduction = totalAmt + totalFees;
-    reference = `bulk-${Date.now()}-${uid.slice(-6)}`;
-    ledgerDocId = `tx-${reference}`;
+    const totalFees = trfRecipients.length * flatFee;
+    const totalDeduction = totalAmt + totalFees;
 
+    if (isNaN(totalDeduction) || totalDeduction <= 0) {
+      return NextResponse.json({ error: "Invalid total bulk transfer amount." }, { status: 400 });
+    }
+
+    const trfReference = `bulk-${Date.now()}-${uid.slice(-6)}`;
+    const description = title || `Bulk outward transfer of ${trfRecipients.length} recipients`;
+
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    const isMock = uid === "mock-uid";
+
+    // 2. Atomically verify PIN and debit user balance inside Firestore transaction
     const userRef = adminDb.collection("users").doc(uid);
 
-    // 1. PIN Verification and Wallet Debit inside a Firestore Transaction
-    try {
-      await adminDb.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) {
-          throw new Error("USER_NOT_FOUND");
+    const transactionResult = await adminDb.runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      const userData = userDoc.data() || {};
+      const pinHash = userData.pinHash;
+      const currentPlainPin = userData.pin;
+      const lockedUntil = userData.lockedUntil;
+      let pinAttempts = Number(userData.pinAttempts) || 0;
+
+      // Lockout check
+      if (lockedUntil) {
+        const lockTime = new Date(lockedUntil).getTime();
+        if (Date.now() < lockTime) {
+          const minutesLeft = Math.ceil((lockTime - Date.now()) / (60 * 1000));
+          return {
+            success: false,
+            error: `Too many incorrect PIN attempts. Locked. Please try again in ${minutesLeft} minutes.`,
+          };
         }
+      }
 
-        const userData = userDoc.data() || {};
-        const pinHash = userData.pinHash;
-        const currentPlainPin = userData.pin;
-        let pinAttempts = Number(userData.pinAttempts) || 0;
-        const lockedUntil = userData.lockedUntil;
+      let isPinMatch = false;
+      if (isMock) {
+        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
+      } else if (pinHash) {
+        isPinMatch = bcrypt.compareSync(pin, pinHash);
+      } else if (currentPlainPin) {
+        isPinMatch = (pin === currentPlainPin);
+      } else {
+        return {
+          success: false,
+          error: "No transaction PIN has been set up on this account.",
+        };
+      }
 
-        // Lockout verification
-        if (lockedUntil) {
-          const lockTime = new Date(lockedUntil).getTime();
-          if (Date.now() < lockTime) {
-            const minutesLeft = Math.ceil((lockTime - Date.now()) / (60 * 1000));
-            throw new Error(`LOCKED_OUT|${minutesLeft}`);
-          }
+      if (!isPinMatch) {
+        pinAttempts += 1;
+        let lockTimestamp = null;
+        if (pinAttempts >= 5) {
+          lockTimestamp = new Date(Date.now() + 15 * 60 * 1000).toISOString();
         }
-
-        let isMatch = false;
-        if (uid === "mock-uid") {
-          isMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-        } else if (pinHash) {
-          isMatch = bcrypt.compareSync(pin, pinHash);
-        } else if (currentPlainPin) {
-          isMatch = (pin === currentPlainPin);
-          if (isMatch) {
-            const salt = bcrypt.genSaltSync(10);
-            const newHash = bcrypt.hashSync(pin, salt);
-            transaction.update(userRef, { pinHash: newHash, pin: null });
-          }
-        } else {
-          throw new Error("NO_PIN_SETUP");
-        }
-
-        if (!isMatch) {
-          pinAttempts += 1;
-          let lockTimestamp = null;
-          let isLocked = false;
-
-          if (pinAttempts >= 5) {
-            lockTimestamp = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-            isLocked = true;
-          }
-
-          transaction.update(userRef, {
-            pinAttempts,
-            lockedUntil: lockTimestamp,
-          });
-
-          if (isLocked) {
-            throw new Error("LOCKED_OUT_NOW");
-          } else {
-            throw new Error(`INCORRECT_PIN|${5 - pinAttempts}`);
-          }
-        }
-
-        // Reset pin attempts
-        transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
-
-        // Verify balance and debit atomically
-        const currentBalance = Number(userData.balance) || 0;
-        if (currentBalance < totalDeduction) {
-          throw new Error(`INSUFFICIENT_FUNDS|${currentBalance}`);
-        }
-
-        // Apply debit
         transaction.update(userRef, {
-          balance: FieldValue.increment(-totalDeduction),
+          pinAttempts,
+          lockedUntil: lockTimestamp,
         });
 
-        // Record transaction in general ledger
-        const ledgerRef = adminDb.collection("transactions").doc(ledgerDocId);
-        const ledgerRecord = {
-          userId: uid,
-          amount: totalAmt,
-          currency: "NGN",
-          reference,
-          type: "TRANSFER",
-          description: `Bulk transfer batch: ${title} (${recipients.length} recipients)`,
-          recipientName: `${recipients.length} Batch Recipients`,
-          status: "SUCCESS",
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          fee: totalFees,
-          createdAt: new Date().toISOString(),
+        const remaining = Math.max(0, 5 - pinAttempts);
+        return {
+          success: false,
+          error: pinAttempts >= 5
+            ? "Too many incorrect PIN attempts. Account locked for 15 minutes."
+            : `Incorrect PIN. ${remaining} attempts remaining.`,
         };
+      }
 
-        transaction.set(ledgerRef, ledgerRecord);
+      // PIN matches, reset attempts
+      transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
+
+      // Check balance
+      const currentBalance = Number(userData.balance) || 0;
+      if (currentBalance < totalDeduction) {
+        return {
+          success: false,
+          error: `Insufficient wallet balance to complete this bulk transfer. Required: ₦${totalDeduction.toLocaleString()}, Available: ₦${currentBalance.toLocaleString()}`,
+        };
+      }
+
+      // Perform local debit atomically
+      await WalletService.debitWallet(transaction, {
+        userId: uid,
+        amount: totalDeduction,
+        currency: "NGN",
+        reference: trfReference,
+        type: "TRANSFER",
+        description,
+        recipientName: "Bulk Recipients",
+        fee: totalFees,
       });
-    } catch (txErr: unknown) {
-      const error = txErr as Error;
-      const errMsg = error.message || "";
-      if (errMsg === "USER_NOT_FOUND") {
-        return NextResponse.json({ error: "User profile not found in database." }, { status: 404 });
-      }
-      if (errMsg === "NO_PIN_SETUP") {
-        return NextResponse.json({ error: "No transaction PIN setup found on this account." }, { status: 400 });
-      }
-      if (errMsg.startsWith("LOCKED_OUT|")) {
-        const mins = errMsg.split("|")[1];
-        return NextResponse.json({ error: `Too many incorrect PIN attempts. Locked out. Please try again in ${mins} minutes.` }, { status: 423 });
-      }
-      if (errMsg === "LOCKED_OUT_NOW") {
-        return NextResponse.json({ error: "Too many incorrect attempts. Account locked out for 15 minutes." }, { status: 423 });
-      }
-      if (errMsg.startsWith("INCORRECT_PIN|")) {
-        const remaining = errMsg.split("|")[1];
-        return NextResponse.json({ error: `Incorrect PIN. ${remaining} attempts remaining.` }, { status: 401 });
-      }
-      if (errMsg.startsWith("INSUFFICIENT_FUNDS|")) {
-        const bal = Number(errMsg.split("|")[1]);
-        return NextResponse.json({ error: `Insufficient wallet funds. Required: ₦${totalDeduction.toFixed(2)}, Available: ₦${bal.toFixed(2)}` }, { status: 400 });
-      }
-      throw txErr;
+
+      return {
+        success: true,
+      };
+    });
+
+    if (!transactionResult.success) {
+      return NextResponse.json({ error: transactionResult.error }, { status: 400 });
     }
 
-    console.log("[Bulk Transfer API] Wallet debited atomically. Map & dispatch to Payment Gateway...");
+    // 3. Mock simulation bypass
+    if (isMock) {
+      logPaymentEvent({
+        category: "Transfer",
+        userId: uid,
+        tx_ref: trfReference,
+        amount: totalAmt,
+        currency: "NGN",
+        message: `Processed successful mock bulk transfer: ${description}`,
+        processingTimeMs: Date.now() - startTime,
+      });
 
-    // 2. Translate front-end Recipients list to the raw bulk_data format expected by Flutterwave via payment-gateway
-    const bulk_data = recipients.map((r, index) => ({
-      bank_code: r.bankId,
-      account_number: r.accountNumber,
-      amount: Number(r.amount),
-      currency: "NGN",
-      narration: `Bulk transfer: ${title}`,
-      reference: `trf-${Date.now()}-${index}-${uid.slice(-4)}`,
-    }));
+      return NextResponse.json({
+        success: true,
+        reference: trfReference,
+        message: `Your bulk transfer of ${trfRecipients.length} recipients has been successfully processed!`,
+      });
+    }
 
-    // 3. Dispatch the bulk transfer to the remote Payment Gateway
-    let gatewaySuccess = false;
-    let gatewayResponse: { success?: boolean; bulkTransferId?: string; reference?: string; data?: { id?: string }; message?: string; error?: string } | null = null;
+    // 4. Map the client recipients into the bulk_data schema expected by the gateway
+    const normalizedBulkData = trfRecipients.map((rec: BulkRecipient, index: number) => {
+      const bankCodeRaw = rec.bankId || rec.bank_code || rec.bankCode || rec.accountBank || rec.account_bank;
+      const accountNumberRaw = rec.accountNumber || rec.account_number || rec.recipientAccount;
 
+      const bankCode = (bankCodeRaw !== undefined && bankCodeRaw !== null) ? String(bankCodeRaw).trim() : "";
+      const accountNumber = (accountNumberRaw !== undefined && accountNumberRaw !== null) ? String(accountNumberRaw).trim() : "";
+      const amount = Number(rec.amount);
+      const narration = rec.narration ? String(rec.narration).trim() : `Bulk Transfer Item ${index + 1}`;
+      const reference = rec.reference ? String(rec.reference).trim() : `blk-${Date.now()}-${index}-${uid.slice(-4)}`;
+
+      return {
+        bank_code: bankCode,
+        account_number: accountNumber,
+        amount,
+        currency: "NGN",
+        narration,
+        reference,
+      };
+    });
+
+    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+
+    // 5. Call Google Cloud Payment Gateway S2S Bulk Transfer API
     try {
-      const gwRes = await fetch(`${PAYMENT_GATEWAY_URL}/api/flutterwave/bulk-transfer`, {
+      console.log(`[Bulk Transfer API] Executing real bulk transfer via Payment Gateway: ${description}`);
+
+      const gatewayRes = await fetch(`${gatewayUrl}/api/flutterwave/bulk-transfer`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${idToken}`,
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          title,
-          bulk_data,
+          title: title || "Bulk Settlement",
+          bulk_data: normalizedBulkData,
         }),
       });
 
-      gatewayResponse = await gwRes.json();
-      if (gwRes.ok && gatewayResponse && gatewayResponse.success) {
-        gatewaySuccess = true;
-      } else {
-        console.error("[Bulk Transfer API] Payment Gateway returned error response:", gatewayResponse);
-      }
-    } catch (gwErr) {
-      console.error("[Bulk Transfer API] Exception contacting payment gateway VM:", gwErr);
-    }
+      const gatewayData = await gatewayRes.json();
 
-    // 4. Handle Rollback Refund if the Payment Gateway bulk-transfer call fails
-    if (!gatewaySuccess) {
-      console.warn(`[Bulk Transfer API Rollback] Refund for bulk batch ${reference}. Refunding: ₦${totalDeduction}`);
-
-      try {
-        await adminDb.runTransaction(async (transaction) => {
-          const userRef = adminDb.collection("users").doc(uid);
-          transaction.update(userRef, {
-            balance: FieldValue.increment(totalDeduction),
-          });
-
-          // Mark ledger record as FAILED instead of deleting, to maintain transparent audit logs
-          const ledgerRef = adminDb.collection("transactions").doc(ledgerDocId);
-          transaction.update(ledgerRef, {
-            status: "FAILED",
-            description: `[Refunded] Bulk transfer batch: ${title} (Gateway connection failed)`,
-            updatedAt: new Date().toISOString(),
-          });
+      if (gatewayRes.ok && gatewayData.success) {
+        logPaymentEvent({
+          category: "Transfer",
+          userId: uid,
+          tx_ref: trfReference,
+          amount: totalAmt,
+          currency: "NGN",
+          message: `Successfully processed real bulk transfer via Gateway: ${description}`,
+          processingTimeMs: Date.now() - startTime,
         });
 
-        console.log(`[Bulk Transfer API Rollback] Rollback completed. Wallet refunded ₦${totalDeduction}`);
-      } catch (refundErr) {
-        console.error(`[CRITICAL] Rollback refund failed for user ${uid}, reference ${reference}:`, refundErr);
+        return NextResponse.json({
+          success: true,
+          reference: trfReference,
+          bulkTransferId: gatewayData.data?.id || gatewayData.bulkTransferId,
+          message: `Your bulk transfer of ${trfRecipients.length} recipients has been successfully queued in the background!`,
+        });
+      } else {
+        throw new Error(gatewayData.error || gatewayData.message || "Payment Gateway rejected the bulk transfer.");
       }
 
-      const gatewayErrMsg = gatewayResponse ? (gatewayResponse.message || gatewayResponse.error) : "Payment Gateway failed to dispatch bulk transfers.";
+    } catch (apiErr: unknown) {
+      const err = apiErr as Error;
+      console.error("[Bulk Transfer API] Gateway bulk transfer failed. Rolling back local wallet debit:", err.message);
+
+      // Rollback debit atomically inside transaction
+      await adminDb.runTransaction(async (rollbackTx) => {
+        const userDoc = await rollbackTx.get(userRef);
+        if (userDoc.exists) {
+          await WalletService.creditWallet(rollbackTx, {
+            userId: uid,
+            amount: totalDeduction,
+            currency: "NGN",
+            reference: `REFUND-${trfReference}`,
+            description: `Refund for failed bulk transfer: ${description}`,
+            recipientName: "Bulk Recipients",
+          });
+        }
+      });
+
       return NextResponse.json({
-        success: false,
-        error: `Bulk transfer could not be processed by provider: ${gatewayErrMsg}. Your wallet has been refunded.`
+        error: `Failed to complete outward bulk transfer: ${err.message}. Local wallet balance has been successfully refunded.`
       }, { status: 400 });
     }
 
-    // 5. Successful Completion
-    logPaymentEvent({
-      category: "Transfer",
-      userId: uid,
-      message: `Bulk transfer batch ${reference} successfully dispatched. Recipients: ${recipients.length}`,
-      processingTimeMs: Date.now() - startTime,
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Bulk transfer batch queued successfully.",
-      reference,
-      bulkTransferId: gatewayResponse ? (gatewayResponse.data?.id || gatewayResponse.bulkTransferId || reference) : reference,
-    });
-
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[Bulk Transfer API Exception] Fatal error:", error.message, error.stack);
-    return NextResponse.json({ error: "Internal server error during bulk transfer processing." }, { status: 500 });
+    console.error("[Bulk Transfer API Exception]:", error.message, error.stack);
+    return NextResponse.json({ error: "Internal processing error occurred while executing bulk transfer." }, { status: 500 });
   }
 }
