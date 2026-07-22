@@ -630,308 +630,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }, 300);
   };
 
-  // Download Receipt as high-resolution PNG image
-  const downloadReceiptImage = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 600;
-    canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // 1. Clear background
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 2. Add border
-    ctx.strokeStyle = "#F97316"; // Orange border
-    ctx.lineWidth = 10;
-    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-
-    // 3. Header Banner
-    ctx.fillStyle = "#1E293B"; // Dark Slate
-    ctx.fillRect(10, 10, canvas.width - 20, 80);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 24px sans-serif";
-    ctx.fillText("E-GLOBAL TECH WALLET", 40, 50);
-
-    ctx.fillStyle = "#F97316"; // Accent Orange
-    ctx.font = "italic 14px sans-serif";
-    ctx.fillText("Secure Electronic Payment Receipt", 40, 72);
-
-    // 4. Success Circle Badge
-    ctx.fillStyle = "#10B981"; // Success Green
-    ctx.beginPath();
-    ctx.arc(300, 170, 32, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // Draw check mark
-    ctx.strokeStyle = "#FFFFFF";
-    ctx.lineWidth = 5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    ctx.moveTo(288, 170);
-    ctx.lineTo(296, 178);
-    ctx.lineTo(312, 162);
-    ctx.stroke();
-
-    ctx.fillStyle = "#111827";
-    ctx.font = "bold 18px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("TRANSACTION SUCCESSFUL", 300, 230);
-
-    ctx.fillStyle = "#10B981";
-    ctx.font = "bold 32px monospace";
-    ctx.fillText(`₦${parseFloat(trfAmount || "0").toLocaleString("en-NG", { minimumFractionDigits: 2 })}`, 300, 275);
-
-    // 5. Divider
-    ctx.strokeStyle = "#E5E7EB";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(40, 300);
-    ctx.lineTo(560, 300);
-    ctx.stroke();
-
-    // 6. Draw Details
-    const details = [
-      { key: "TRANSACTION TYPE", val: isBulkMode ? "BULK OUTWARD TRANSFER" : "SINGLE OUTWARD TRANSFER" },
-      { key: "SENDER", val: (userData?.name || user?.displayName || "E-GLOBAL TECH CLIENT").toUpperCase() },
-      { key: "BENEFICIARY", val: (isBulkMode ? `${bulkRecipients.length} BATCH RECIPIENTS` : trfAccountName).toUpperCase() },
-      { key: "BENEFICIARY BANK", val: (isBulkMode ? "MULTIPLE BANKS" : trfBank?.name || "N/A").toUpperCase() },
-      { key: "BENEFICIARY ACCOUNT", val: isBulkMode ? "MULTIPLE ACCOUNTS" : trfAccount },
-      { key: "TRANSACTION FEE", val: `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
-      { key: "TOTAL DEBIT", val: `₦${trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
-      { key: "REFERENCE CODE", val: transferResult?.reference || "N/A" },
-      { key: "DATE & TIME", val: new Date().toLocaleString().toUpperCase() },
-      { key: "NARRATION", val: (trfNarration || `Direct outward transfer to ${trfAccountName}`).toUpperCase() },
-    ];
-
-    ctx.textAlign = "left";
-    let currentY = 330;
-    const keyX = 50;
-    const valX = 260;
-
-    details.forEach((item) => {
-      ctx.fillStyle = "#6B7280";
-      ctx.font = "bold 12px sans-serif";
-      ctx.fillText(item.key, keyX, currentY);
-
-      ctx.fillStyle = "#1F2937";
-      ctx.font = "bold 13px sans-serif";
-
-      let valText = item.val;
-      if (valText.length > 35) {
-        valText = valText.substring(0, 32) + "...";
-      }
-      ctx.fillText(valText, valX, currentY);
-
-      ctx.strokeStyle = "#F3F4F6";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(40, currentY + 12);
-      ctx.lineTo(560, currentY + 12);
-      ctx.stroke();
-
-      currentY += 34;
-    });
-
-    // 7. Footer
-    ctx.fillStyle = "#9CA3AF";
-    ctx.font = "italic 11px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("This is an official transaction receipt generated automatically by E-Global Tech.", 300, 740);
-    ctx.fillText("For customer support, please contact support@e-global-tech-kano.com.", 300, 755);
-
-    // 8. Download trigger
-    const dataUrl = canvas.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.download = `receipt-${transferResult?.reference || Date.now()}.png`;
-    link.href = dataUrl;
-    link.click();
-    toast.success("Receipt downloaded as PNG image!");
-  };
-
-  // Download Receipt as high-fidelity PDF (Print layout)
-  const downloadReceiptPDF = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      toast.error("Popup blocked! Please allow popups to download PDF receipt.");
-      return;
-    }
-
-    const receiptHtml = `
-      <html>
-        <head>
-          <title>E-Global Tech - Receipt ${transferResult?.reference || ""}</title>
-          <style>
-            body {
-              font-family: 'Arial', sans-serif;
-              color: #111827;
-              background-color: #FFFFFF;
-              padding: 40px;
-              max-width: 650px;
-              margin: 0 auto;
-            }
-            .border-wrap {
-              border: 3px solid #F97316;
-              padding: 30px;
-              border-radius: 16px;
-            }
-            .header {
-              background-color: #1E293B;
-              color: #FFFFFF;
-              padding: 24px;
-              border-radius: 8px;
-              margin-bottom: 30px;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 24px;
-              font-weight: bold;
-            }
-            .header p {
-              margin: 4px 0 0 0;
-              font-size: 14px;
-              color: #F97316;
-              font-style: italic;
-            }
-            .status-badge {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .circle {
-              width: 60px;
-              height: 60px;
-              background-color: #D1FAE5;
-              border-radius: 50%;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              color: #059669;
-              font-size: 32px;
-              font-weight: bold;
-              margin-bottom: 12px;
-            }
-            .status-title {
-              font-size: 18px;
-              font-weight: bold;
-              color: #111827;
-              margin: 0;
-            }
-            .amount {
-              font-size: 32px;
-              font-weight: bold;
-              color: #10B981;
-              margin: 8px 0 0 0;
-            }
-            .details-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 40px;
-            }
-            .details-table tr {
-              border-bottom: 1px solid #E5E7EB;
-            }
-            .details-table td {
-              padding: 12px 6px;
-              font-size: 13px;
-            }
-            .details-table td.label {
-              color: #6B7280;
-              font-weight: bold;
-              width: 40%;
-            }
-            .details-table td.value {
-              color: #111827;
-              font-weight: bold;
-              text-align: right;
-            }
-            .footer {
-              text-align: center;
-              font-size: 11px;
-              color: #9CA3AF;
-              line-height: 1.6;
-              margin-top: 30px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="border-wrap">
-            <div class="header">
-              <h1>E-GLOBAL TECH WALLET</h1>
-              <p>Secure Electronic Payment Receipt</p>
-            </div>
-
-            <div class="status-badge">
-              <div class="circle">&#10003;</div>
-              <p class="status-title">TRANSACTION SUCCESSFUL</p>
-              <p class="amount">₦${parseFloat(trfAmount || "0").toLocaleString("en-NG", { minimumFractionDigits: 2 })}</p>
-            </div>
-
-            <table class="details-table">
-              <tr>
-                <td class="label">TRANSACTION TYPE</td>
-                <td class="value">${isBulkMode ? "BULK OUTWARD TRANSFER" : "SINGLE OUTWARD TRANSFER"}</td>
-              </tr>
-              <tr>
-                <td class="label">SENDER</td>
-                <td class="value">${(userData?.name || user?.displayName || "E-GLOBAL TECH CLIENT").toUpperCase()}</td>
-              </tr>
-              <tr>
-                <td class="label">BENEFICIARY</td>
-                <td class="value">${(isBulkMode ? `${bulkRecipients.length} BATCH RECIPIENTS` : trfAccountName).toUpperCase()}</td>
-              </tr>
-              <tr>
-                <td class="label">BENEFICIARY BANK</td>
-                <td class="value">${(isBulkMode ? "MULTIPLE BANKS" : trfBank?.name || "N/A").toUpperCase()}</td>
-              </tr>
-              <tr>
-                <td class="label">BENEFICIARY ACCOUNT</td>
-                <td class="value">${isBulkMode ? "MULTIPLE ACCOUNTS" : trfAccount}</td>
-              </tr>
-              <tr>
-                <td class="label">TRANSACTION FEE</td>
-                <td class="value">₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</td>
-              </tr>
-              <tr>
-                <td class="label">TOTAL DEBIT</td>
-                <td class="value">₦${trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</td>
-              </tr>
-              <tr>
-                <td class="label">REFERENCE CODE</td>
-                <td class="value">${transferResult?.reference || "N/A"}</td>
-              </tr>
-              <tr>
-                <td class="label">DATE & TIME</td>
-                <td class="value">${new Date().toLocaleString().toUpperCase()}</td>
-              </tr>
-              <tr>
-                <td class="label">NARRATION</td>
-                <td class="value">${(trfNarration || `Direct outward transfer to ${trfAccountName}`).toUpperCase()}</td>
-              </tr>
-            </table>
-
-            <div class="footer">
-              <p>This is an official transaction receipt generated automatically by E-Global Tech.</p>
-              <p>For customer support, please contact support@e-global-tech-kano.com.</p>
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(receiptHtml);
-    printWindow.document.close();
-    toast.success("Opening PDF print manager...");
-  };
-
   // Close Outward Transfer Drawer
   const handleCloseTransferModal = () => {
     setIsTransferOpen(false);
@@ -1313,6 +1011,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     if (trfPin.length < 4) {
       const nextPin = trfPin + num;
       setTrfPin(nextPin);
+      if (nextPin.length === 4) {
+        executeOutwardTransfer(nextPin);
+      }
     }
   };
 
@@ -2647,9 +2348,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
 
                     {/* PIN input placeholder indicators (TASK 6) */}
-                    <div className="text-center space-y-2 bg-orange-50/40 p-4 border border-orange-100/40 rounded-2xl">
+                    <div className="text-center space-y-2">
                       <p className="font-hanken text-xs font-extrabold text-gray-800">Enter Your secure Transaction PIN</p>
-                      <div className="flex justify-center gap-3 py-1">
+                      <div className="flex justify-center gap-3">
                         {[0, 1, 2, 3].map((i) => (
                           <div
                             key={i}
@@ -2659,26 +2360,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           />
                         ))}
                       </div>
-
-                      {/* Stand-alone explicit Confirm Button next to/below PIN (TASK 6) */}
-                      <button
-                        type="button"
-                        disabled={trfPin.length !== 4 || isTransferring}
-                        onClick={() => executeOutwardTransfer(trfPin)}
-                        className="w-full mt-3 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-200 disabled:to-gray-300 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
-                      >
-                        {isTransferring ? (
-                          <>
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Processing Transfer...
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-[16px]">lock_open</span>
-                            Authorize Transfer
-                          </>
-                        )}
-                      </button>
                     </div>
                   </div>
 
@@ -2773,29 +2454,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="w-full space-y-2 flex-shrink-0 mt-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Download Image Action */}
-                      <button
-                        type="button"
-                        onClick={downloadReceiptImage}
-                        className="py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
-                      >
-                        <span className="material-symbols-outlined text-[15px] text-orange-500">image</span>
-                        Download Image
-                      </button>
-
-                      {/* Download PDF Action */}
-                      <button
-                        type="button"
-                        onClick={downloadReceiptPDF}
-                        className="py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
-                      >
-                        <span className="material-symbols-outlined text-[15px] text-red-500">picture_as_pdf</span>
-                        Download PDF
-                      </button>
-                    </div>
-
+                  <div className="w-full space-y-2.5 flex-shrink-0">
                     {/* Share Receipt functional trigger (TASK 7) */}
                     <button
                       type="button"
@@ -2816,9 +2475,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           toast.success("Receipt copied to clipboard!");
                         }
                       }}
-                      className="w-full py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
+                      className="w-full py-3.5 border-2 border-gray-200 hover:border-black bg-white text-black text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5"
                     >
-                      <span className="material-symbols-outlined text-[15px] text-blue-500">share</span>
+                      <span className="material-symbols-outlined text-[16px]">share</span>
                       Share Receipt
                     </button>
 
@@ -2826,7 +2485,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     <button
                       type="button"
                       onClick={handleCloseTransferModal}
-                      className="w-full py-3 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-md"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
                     >
                       Done
                     </button>
