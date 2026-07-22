@@ -1,340 +1,272 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
-import { isRateLimited } from "@/lib/rate-limiter";
+import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import bcrypt from "bcryptjs";
-import { FieldValue } from "firebase-admin/firestore";
-
-const PAYMENT_GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
-  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
-
-  // Rate Limiting: 10 transfer requests per minute per IP to prevent spamming
-  if (isRateLimited(ip, 10, 60 * 1000)) {
-    return NextResponse.json({ error: "Too many transfer requests. Please try again in a minute." }, { status: 429 });
-  }
-
   let uid = "";
-  let idToken = "";
+
+  // 1. Authenticate user
   try {
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
-
-    // Extract the bearer token to pass downstream
-    const authHeader = req.headers.get("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      idToken = authHeader.split("Bearer ")[1];
-    } else {
-      idToken = "mock-token";
-    }
   } catch (authErr: unknown) {
     const error = authErr as Error;
-    console.error("[Transfer API Auth Error] Auth verification failed:", error.message);
-    return NextResponse.json({ error: "Unauthorized: Invalid or missing authentication token." }, { status: 401 });
+    console.error("[Transfer Auth Error] Verification failed:", error.message);
+    return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
   }
-
-  let totalDeduction = 0;
-  let ledgerDocId = "";
-  let reference = "";
 
   try {
     const body = await req.json();
-    console.log("[Transfer API] Parsed Request Body:", {
-      amount: body.amount,
-      account_number: body.account_number,
-      accountNumber: body.accountNumber,
-      account_bank: body.account_bank,
-      accountBank: body.accountBank,
-      bankCode: body.bankCode,
-      reference: body.reference,
-      pin: body.pin ? "***" : "missing",
-    });
-
-    const amount = Number(body.amount);
-
-    let accountNumber = "";
-    if (body.account_number !== undefined && body.account_number !== null) accountNumber = String(body.account_number).trim();
-    else if (body.accountNumber !== undefined && body.accountNumber !== null) accountNumber = String(body.accountNumber).trim();
-
-    let bankCode = "";
-    if (body.account_bank !== undefined && body.account_bank !== null) bankCode = String(body.account_bank).trim();
-    else if (body.accountBank !== undefined && body.accountBank !== null) bankCode = String(body.accountBank).trim();
-    else if (body.bankCode !== undefined && body.bankCode !== null) bankCode = String(body.bankCode).trim();
-
-    let accountName = "Beneficiary";
-    if (body.account_name) accountName = String(body.account_name).trim();
-    else if (body.accountName) accountName = String(body.accountName).trim();
-    else if (body.beneficiaryName) accountName = String(body.beneficiaryName).trim();
-    else if (body.beneficiary_name) accountName = String(body.beneficiary_name).trim();
-    else if (body.recipientName) accountName = String(body.recipientName).trim();
-
-    const currency = body.currency ? String(body.currency).trim() : "NGN";
-    const narration = body.narration ? String(body.narration).trim() : `Transfer of ₦${amount} to ${accountName}`;
-    reference = body.reference ? String(body.reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
-    const pin = body.pin;
-
-    // Basic Validation
-    if (isNaN(amount) || amount <= 0) {
-      return NextResponse.json({ error: "Invalid amount. Must be greater than zero." }, { status: 400 });
-    }
-    if (!accountNumber) {
-      return NextResponse.json({ error: "Missing or invalid recipient account number." }, { status: 400 });
-    }
-    if (!bankCode) {
-      return NextResponse.json({ error: "Missing or invalid destination bank code." }, { status: 400 });
-    }
-    if (!pin || typeof pin !== "string" || pin.length !== 4) {
-      return NextResponse.json({ error: "Please provide your 4-digit transaction PIN." }, { status: 400 });
-    }
-
-    // 1. Fetch Transfer Fee from payment gateway or fallback
-    let fee = 10.00; // default fallback fee
-    try {
-      const feeRes = await fetch(`${PAYMENT_GATEWAY_URL}/api/flutterwave/transfer-fee?amount=${amount}&currency=${currency}`, {
-        headers: {
-          "Authorization": `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (feeRes.ok) {
-        const feeData = await feeRes.json();
-        if (feeData.success && typeof feeData.fee === "number") {
-          fee = feeData.fee;
-        }
-      }
-    } catch (feeErr) {
-      console.warn("[Transfer API] Could not fetch real-time fee. Using fallback fee NGN 10:", feeErr);
-    }
-
-    totalDeduction = amount + fee;
-    ledgerDocId = `tx-${reference}`;
-
-    const userRef = adminDb.collection("users").doc(uid);
-
-    // 2. Perform PIN Verification and Wallet Debit atomically in a Firestore Transaction
-    try {
-      await adminDb.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) {
-          throw new Error("USER_NOT_FOUND");
-        }
-
-        const userData = userDoc.data() || {};
-        const pinHash = userData.pinHash;
-        const currentPlainPin = userData.pin;
-        let pinAttempts = Number(userData.pinAttempts) || 0;
-        const lockedUntil = userData.lockedUntil;
-
-        // Lockout verification
-        if (lockedUntil) {
-          const lockTime = new Date(lockedUntil).getTime();
-          if (Date.now() < lockTime) {
-            const minutesLeft = Math.ceil((lockTime - Date.now()) / (60 * 1000));
-            throw new Error(`LOCKED_OUT|${minutesLeft}`);
-          }
-        }
-
-        let isMatch = false;
-        if (uid === "mock-uid") {
-          isMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-        } else if (pinHash) {
-          isMatch = bcrypt.compareSync(pin, pinHash);
-        } else if (currentPlainPin) {
-          isMatch = (pin === currentPlainPin);
-          if (isMatch) {
-            // Self-healing migration
-            const salt = bcrypt.genSaltSync(10);
-            const newHash = bcrypt.hashSync(pin, salt);
-            transaction.update(userRef, { pinHash: newHash, pin: null });
-          }
-        } else {
-          throw new Error("NO_PIN_SETUP");
-        }
-
-        if (!isMatch) {
-          pinAttempts += 1;
-          let lockTimestamp = null;
-          let isLocked = false;
-
-          if (pinAttempts >= 5) {
-            lockTimestamp = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-            isLocked = true;
-          }
-
-          transaction.update(userRef, {
-            pinAttempts,
-            lockedUntil: lockTimestamp,
-          });
-
-          if (isLocked) {
-            throw new Error("LOCKED_OUT_NOW");
-          } else {
-            throw new Error(`INCORRECT_PIN|${5 - pinAttempts}`);
-          }
-        }
-
-        // Reset pin attempts on correct match
-        transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
-
-        // Verify balance and debit wallet atomically inside the same transaction
-        const currentBalance = Number(userData.balance) || 0;
-        if (currentBalance < totalDeduction) {
-          throw new Error(`INSUFFICIENT_FUNDS|${currentBalance}`);
-        }
-
-        // Apply debit
-        transaction.update(userRef, {
-          balance: FieldValue.increment(-totalDeduction),
-        });
-
-        // Record transaction in general ledger
-        const ledgerRef = adminDb.collection("transactions").doc(ledgerDocId);
-        const ledgerRecord = {
-          userId: uid,
-          amount,
-          currency,
-          reference,
-          type: "TRANSFER",
-          description: narration,
-          recipientName: accountName,
-          status: "SUCCESS",
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          fee,
-          createdAt: new Date().toISOString(),
-        };
-
-        transaction.set(ledgerRef, ledgerRecord);
-      });
-    } catch (txErr: unknown) {
-      const error = txErr as Error;
-      const errMsg = error.message || "";
-      if (errMsg === "USER_NOT_FOUND") {
-        return NextResponse.json({ error: "User profile not found in database." }, { status: 404 });
-      }
-      if (errMsg === "NO_PIN_SETUP") {
-        return NextResponse.json({ error: "No transaction PIN setup found on this account." }, { status: 400 });
-      }
-      if (errMsg.startsWith("LOCKED_OUT|")) {
-        const mins = errMsg.split("|")[1];
-        return NextResponse.json({ error: `Too many incorrect PIN attempts. Locked out. Please try again in ${mins} minutes.` }, { status: 423 });
-      }
-      if (errMsg === "LOCKED_OUT_NOW") {
-        return NextResponse.json({ error: "Too many incorrect attempts. Account locked out for 15 minutes." }, { status: 423 });
-      }
-      if (errMsg.startsWith("INCORRECT_PIN|")) {
-        const remaining = errMsg.split("|")[1];
-        return NextResponse.json({ error: `Incorrect PIN. ${remaining} attempts remaining.` }, { status: 401 });
-      }
-      if (errMsg.startsWith("INSUFFICIENT_FUNDS|")) {
-        const bal = Number(errMsg.split("|")[1]);
-        return NextResponse.json({ error: `Insufficient wallet funds. Required: ₦${totalDeduction.toFixed(2)}, Available: ₦${bal.toFixed(2)}` }, { status: 400 });
-      }
-      throw txErr; // Bubble up unexpected database exceptions
-    }
-
-    console.log("[Transfer API] Wallet debited atomically. Forwarding to Payment Gateway...");
-
-    const payload = {
+    const {
       amount,
-      account_number: accountNumber,
-      account_bank: bankCode,
-      beneficiary_name: accountName,
+      account_number,
+      accountNumber,
+      account_bank,
+      accountBank,
+      bankCode,
+      account_name,
+      accountName,
       currency,
       narration,
       reference,
-      userId: uid,
-    };
+      pin,
+    } = body;
 
-    console.log("[Transfer API] Constructed Payload to Gateway:", {
-      amount: payload.amount,
-      account_number: payload.account_number,
-      account_bank: payload.account_bank,
-      beneficiary_name: payload.beneficiary_name,
-      currency: payload.currency,
-      narration: payload.narration,
-      reference: payload.reference,
-    });
+    const trfAmount = Number(amount);
+    const trfAccount = (account_number !== undefined && account_number !== null) ? String(account_number).trim() : ((accountNumber !== undefined && accountNumber !== null) ? String(accountNumber).trim() : "");
+    const trfBank = (bankCode !== undefined && bankCode !== null) ? String(bankCode).trim() : ((accountBank !== undefined && accountBank !== null) ? String(accountBank).trim() : ((account_bank !== undefined && account_bank !== null) ? String(account_bank).trim() : ""));
+    const trfName = (account_name !== undefined && account_name !== null) ? String(account_name).trim() : ((accountName !== undefined && accountName !== null) ? String(accountName).trim() : "Beneficiary");
+    const trfCurrency = currency ? String(currency).trim() : "NGN";
+    const trfReference = reference ? String(reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
 
-    // 3. Dispatch the outward transfer to the remote Payment Gateway
-    let gatewaySuccess = false;
-    let gatewayResponse: { success?: boolean; provider_reference?: string; data?: { id?: string }; message?: string; error?: string; status?: string } | null = null;
-
-    try {
-
-      const gwRes = await fetch(`${PAYMENT_GATEWAY_URL}/api/flutterwave/transfer`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      gatewayResponse = await gwRes.json();
-      if (gwRes.ok && gatewayResponse && gatewayResponse.success) {
-        gatewaySuccess = true;
-      } else {
-        console.error("[Transfer API] Payment Gateway returned error response:", gatewayResponse);
-      }
-    } catch (gwErr) {
-      console.error("[Transfer API] Exception contacting payment gateway VM:", gwErr);
+    // Validations
+    if (!trfAmount || isNaN(trfAmount) || trfAmount <= 0) {
+      return NextResponse.json({ error: "Invalid transfer amount. Must be greater than zero." }, { status: 400 });
+    }
+    if (!trfAccount || !trfBank || !pin) {
+      return NextResponse.json({ error: "Account number, bank, and transaction PIN are required." }, { status: 400 });
     }
 
-    // 4. Handle Rollback Refund if the Payment Gateway call fails
-    if (!gatewaySuccess) {
-      console.warn(`[Transfer API Rollback] Initiating refund for reference ${reference}. Refunding: ₦${totalDeduction}`);
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
 
+    const isMock = uid === "mock-uid";
+
+    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+
+    // 2. Fetch transfer fee dynamically from gateway or fallback to 10.00 NGN
+    let fee = 10.00;
+    if (!isMock) {
       try {
-        await adminDb.runTransaction(async (transaction) => {
-          const userRef = adminDb.collection("users").doc(uid);
-          transaction.update(userRef, {
-            balance: FieldValue.increment(totalDeduction),
-          });
-
-          // Mark ledger record as FAILED instead of deleting, to maintain transparent audit logs
-          const ledgerRef = adminDb.collection("transactions").doc(ledgerDocId);
-          transaction.update(ledgerRef, {
-            status: "FAILED",
-            description: `[Refunded] ${narration} (Gateway connection failed)`,
-            updatedAt: new Date().toISOString(),
-          });
+        const feeRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer-fee?amount=${trfAmount}&currency=${trfCurrency}`, {
+          headers: {
+            "Authorization": `Bearer ${idToken}`,
+            "Content-Type": "application/json",
+          },
         });
+        const feeData = await feeRes.json();
+        if (feeRes.ok && feeData.success) {
+          fee = Number(feeData.fee) || 10.00;
+        }
+      } catch (err: unknown) {
+        const error = err as Error;
+        console.warn("[Transfer API] Failed to fetch dynamic fee. Using fallback 10 NGN:", error.message);
+      }
+    }
 
-        console.log(`[Transfer API Rollback] Rollback completed. Wallet refunded ₦${totalDeduction}`);
-      } catch (refundErr) {
-        console.error(`[CRITICAL] Rollback refund failed for user ${uid}, reference ${reference}:`, refundErr);
+    const totalDeduction = trfAmount + fee;
+    const description = narration || `Direct transfer to ${trfName} (${trfAccount})`;
+
+    // 3. Atomically verify PIN and debit user balance inside Firestore transaction
+    const userRef = adminDb.collection("users").doc(uid);
+
+    const transactionResult = await adminDb.runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error("USER_NOT_FOUND");
       }
 
-      const gatewayErrMsg = gatewayResponse ? (gatewayResponse.message || gatewayResponse.error) : "Payment Gateway failed to process transfer request.";
+      const userData = userDoc.data() || {};
+      const pinHash = userData.pinHash;
+      const currentPlainPin = userData.pin;
+      const lockedUntil = userData.lockedUntil;
+      let pinAttempts = Number(userData.pinAttempts) || 0;
+
+      // Lockout check
+      if (lockedUntil) {
+        const lockTime = new Date(lockedUntil).getTime();
+        if (Date.now() < lockTime) {
+          const minutesLeft = Math.ceil((lockTime - Date.now()) / (60 * 1000));
+          return {
+            success: false,
+            error: `Too many incorrect PIN attempts. Locked. Please try again in ${minutesLeft} minutes.`,
+          };
+        }
+      }
+
+      let isPinMatch = false;
+      if (isMock) {
+        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
+      } else if (pinHash) {
+        isPinMatch = bcrypt.compareSync(pin, pinHash);
+      } else if (currentPlainPin) {
+        isPinMatch = (pin === currentPlainPin);
+      } else {
+        return {
+          success: false,
+          error: "No transaction PIN has been set up on this account.",
+        };
+      }
+
+      if (!isPinMatch) {
+        pinAttempts += 1;
+        let lockTimestamp = null;
+        if (pinAttempts >= 5) {
+          lockTimestamp = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        }
+        transaction.update(userRef, {
+          pinAttempts,
+          lockedUntil: lockTimestamp,
+        });
+
+        const remaining = Math.max(0, 5 - pinAttempts);
+        return {
+          success: false,
+          error: pinAttempts >= 5
+            ? "Too many incorrect PIN attempts. Account locked for 15 minutes."
+            : `Incorrect PIN. ${remaining} attempts remaining.`,
+        };
+      }
+
+      // PIN matches, reset attempts
+      transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
+
+      // Check balance
+      const currentBalance = Number(userData.balance) || 0;
+      if (currentBalance < totalDeduction) {
+        return {
+          success: false,
+          error: `Insufficient wallet balance to complete this transfer. Required: ₦${totalDeduction.toLocaleString()}, Available: ₦${currentBalance.toLocaleString()}`,
+        };
+      }
+
+      // Perform local debit atomically
+      await WalletService.debitWallet(transaction, {
+        userId: uid,
+        amount: totalDeduction,
+        currency: trfCurrency,
+        reference: trfReference,
+        type: "TRANSFER",
+        description,
+        recipientName: trfName,
+        fee,
+      });
+
+      return {
+        success: true,
+      };
+    });
+
+    if (!transactionResult.success) {
+      return NextResponse.json({ error: transactionResult.error }, { status: 400 });
+    }
+
+    // 4. Mock simulation bypass
+    if (isMock) {
+      logPaymentEvent({
+        category: "Transfer",
+        userId: uid,
+        tx_ref: trfReference,
+        amount: trfAmount,
+        currency: trfCurrency,
+        message: `Processed successful mock transfer: ${description}`,
+        processingTimeMs: Date.now() - startTime,
+      });
+
       return NextResponse.json({
-        success: false,
-        error: `Transfer could not be processed by provider: ${gatewayErrMsg}. Your wallet has been refunded.`
+        success: true,
+        reference: trfReference,
+        message: `Your mock bank transfer has been initiated successfully! ₦${trfAmount.toLocaleString()} is being settled to ${trfName}.`,
+      });
+    }
+
+    // 5. Call Google Cloud Payment Gateway S2S Transfer API
+    try {
+      console.log(`[Transfer API] Executing real transfer via Payment Gateway: amount=${trfAmount} to ${trfName}`);
+
+      const gatewayPayload = {
+        amount: trfAmount,
+        account_number: trfAccount,
+        account_bank: trfBank,
+        account_name: trfName,
+        currency: trfCurrency,
+        narration: description,
+        reference: trfReference,
+      };
+
+      const gatewayRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify(gatewayPayload),
+      });
+
+      const gatewayData = await gatewayRes.json();
+
+      if (gatewayRes.ok && gatewayData.success) {
+        logPaymentEvent({
+          category: "Transfer",
+          userId: uid,
+          tx_ref: trfReference,
+          amount: trfAmount,
+          currency: trfCurrency,
+          message: `Successfully processed real transfer via Gateway: ${description}`,
+          processingTimeMs: Date.now() - startTime,
+        });
+
+        return NextResponse.json({
+          success: true,
+          reference: trfReference,
+          provider_reference: gatewayData.provider_reference || gatewayData.data?.id,
+          message: gatewayData.message || `Transfer initiated successfully!`,
+        });
+      } else {
+        throw new Error(gatewayData.error || gatewayData.message || "Payment Gateway rejected the transfer.");
+      }
+
+    } catch (apiErr: unknown) {
+      const err = apiErr as Error;
+      console.error("[Transfer API] Gateway transfer failed. Rolling back local wallet debit:", err.message);
+
+      // Rollback debit atomically inside transaction
+      await adminDb.runTransaction(async (rollbackTx) => {
+        const userDoc = await rollbackTx.get(userRef);
+        if (userDoc.exists) {
+          await WalletService.creditWallet(rollbackTx, {
+            userId: uid,
+            amount: totalDeduction,
+            currency: trfCurrency,
+            reference: `REFUND-${trfReference}`,
+            description: `Refund for failed transfer: ${description}`,
+            recipientName: trfName,
+          });
+        }
+      });
+
+      return NextResponse.json({
+        error: `Failed to complete outward bank transfer: ${err.message}. Local wallet balance has been successfully refunded.`
       }, { status: 400 });
     }
 
-    // 5. Successful Completion
-    logPaymentEvent({
-      category: "Transfer",
-      userId: uid,
-      message: `Outward bank transfer initiated successfully. Ref: ${reference}`,
-      processingTimeMs: Date.now() - startTime,
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Transfer initiated successfully.",
-      reference,
-      provider_reference: gatewayResponse ? (gatewayResponse.provider_reference || gatewayResponse.data?.id) : undefined,
-      status: gatewayResponse ? (gatewayResponse.status || "success") : "success",
-    });
-
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[Transfer API Exception] Fatal error:", error.message, error.stack);
-    return NextResponse.json({ error: "Internal server error during transfer processing." }, { status: 500 });
+    console.error("[Transfer API Exception]:", error.message, error.stack);
+    return NextResponse.json({ error: "Internal processing error occurred while executing transfer." }, { status: 500 });
   }
 }
