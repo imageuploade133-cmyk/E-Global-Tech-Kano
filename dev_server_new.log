@@ -7,4 +7,8 @@
    - Network:      http://192.168.0.2:3000
 
  ✓ Starting...
- ✓ Ready in 1951ms
+ ✓ Ready in 1825ms
+ ○ Compiling / ...
+ ✓ Compiled / in 10.1s (1727 modules)
+ HEAD / 200 in 12449ms
+ GET /?mock=true 200 in 90ms
