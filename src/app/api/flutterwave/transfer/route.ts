@@ -8,33 +8,53 @@ import bcrypt from "bcryptjs";
 export async function POST(req: Request) {
   const startTime = Date.now();
   let uid = "";
+  let requestBody: Record<string, unknown> | null = null;
+  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+
+  console.log("STEP 1 - Request received");
 
   // 1. Authenticate user
   try {
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
+    console.log(`STEP 1.5 - User authenticated successfully. UID: ${uid}`);
   } catch (authErr: unknown) {
     const error = authErr as Error;
-    console.error("[Transfer Auth Error] Verification failed:", error.message);
-    return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
+    console.error("[Transfer Auth Error] Verification failed:", error.message, error.stack);
+    return NextResponse.json({
+      error: "Unauthorized: Invalid or missing token.",
+      details: error.message,
+      stack: error.stack
+    }, { status: 401 });
   }
 
   try {
-    const body = await req.json();
-    const {
-      amount,
-      account_number,
-      accountNumber,
-      account_bank,
-      accountBank,
-      bankCode,
-      account_name,
-      accountName,
-      currency,
-      narration,
-      reference,
-      pin,
-    } = body;
+    try {
+      requestBody = await req.json();
+      console.log("STEP 2 - Request body parsed", JSON.stringify(requestBody));
+    } catch (parseErr: unknown) {
+      const error = parseErr as Error;
+      console.error("[Transfer Parse Error] Failed to parse request body:", error.message);
+      return NextResponse.json({
+        error: "Invalid request payload. Must be valid JSON.",
+        details: error.message,
+        stack: error.stack
+      }, { status: 400 });
+    }
+
+    const body = requestBody || {};
+    const amount = body.amount;
+    const account_number = body.account_number;
+    const accountNumber = body.accountNumber;
+    const account_bank = body.account_bank;
+    const accountBank = body.accountBank;
+    const bankCode = body.bankCode;
+    const account_name = body.account_name;
+    const accountName = body.accountName;
+    const currency = body.currency as string | undefined;
+    const narration = body.narration as string | undefined;
+    const reference = body.reference as string | undefined;
+    const pin = body.pin as string | undefined;
 
     const trfAmount = Number(amount);
     const trfAccount = (account_number !== undefined && account_number !== null) ? String(account_number).trim() : ((accountNumber !== undefined && accountNumber !== null) ? String(accountNumber).trim() : "");
@@ -56,8 +76,6 @@ export async function POST(req: Request) {
 
     const isMock = uid === "mock-uid";
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
-
     // 2. Fetch transfer fee dynamically from gateway or fallback to 10.00 NGN
     let fee = 10.00;
     if (!isMock) {
@@ -77,14 +95,17 @@ export async function POST(req: Request) {
         console.warn("[Transfer API] Failed to fetch dynamic fee. Using fallback 10 NGN:", error.message);
       }
     }
+    console.log(`STEP 3 - Transfer fee fetched: ${fee}`);
 
     const totalDeduction = trfAmount + fee;
     const description = narration || `Direct transfer to ${trfName} (${trfAccount})`;
 
     // 3. Atomically verify PIN and debit user balance inside Firestore transaction
+    console.log("STEP 4 - Starting Firestore transaction");
     const userRef = adminDb.collection("users").doc(uid);
 
     const transactionResult = await adminDb.runTransaction(async (transaction) => {
+      console.log("STEP 5 - User document loaded (fetching inside transaction)");
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
         throw new Error("USER_NOT_FOUND");
@@ -122,6 +143,7 @@ export async function POST(req: Request) {
         };
       }
 
+      console.log(`STEP 6 - PIN verified: ${isPinMatch}`);
       if (!isPinMatch) {
         pinAttempts += 1;
         let lockTimestamp = null;
@@ -147,6 +169,7 @@ export async function POST(req: Request) {
 
       // Check balance
       const currentBalance = Number(userData.balance) || 0;
+      console.log(`STEP 7 - Balance checked. Available: ${currentBalance}, Required: ${totalDeduction}`);
       if (currentBalance < totalDeduction) {
         return {
           success: false,
@@ -155,6 +178,7 @@ export async function POST(req: Request) {
       }
 
       // Perform local debit atomically
+      console.log("STEP 8 - Calling WalletService.debitWallet()");
       await WalletService.debitWallet(transaction, {
         userId: uid,
         amount: totalDeduction,
@@ -165,11 +189,14 @@ export async function POST(req: Request) {
         recipientName: trfName,
         fee,
       });
+      console.log("STEP 9 - Wallet debited");
 
       return {
         success: true,
       };
     });
+
+    console.log("STEP 10 - Transaction completed");
 
     if (!transactionResult.success) {
       return NextResponse.json({ error: transactionResult.error }, { status: 400 });
@@ -196,6 +223,7 @@ export async function POST(req: Request) {
 
     // 5. Call Google Cloud Payment Gateway S2S Transfer API
     try {
+      console.log("STEP 11 - Calling Payment Gateway");
       console.log(`[Transfer API] Executing real transfer via Payment Gateway: amount=${trfAmount} to ${trfName}`);
 
       const gatewayPayload = {
@@ -217,6 +245,7 @@ export async function POST(req: Request) {
         body: JSON.stringify(gatewayPayload),
       });
 
+      console.log("STEP 12 - Payment Gateway responded");
       const gatewayData = await gatewayRes.json();
 
       if (gatewayRes.ok && gatewayData.success) {
@@ -242,7 +271,13 @@ export async function POST(req: Request) {
 
     } catch (apiErr: unknown) {
       const err = apiErr as Error;
-      console.error("[Transfer API] Gateway transfer failed. Rolling back local wallet debit:", err.message);
+      console.error("[Transfer API] Gateway transfer failed. Rolling back local wallet debit. Detail:", {
+        message: err.message,
+        stack: err.stack,
+        requestBody,
+        uid,
+        gatewayUrl,
+      });
 
       // Rollback debit atomically inside transaction
       await adminDb.runTransaction(async (rollbackTx) => {
@@ -260,13 +295,31 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({
-        error: `Failed to complete outward bank transfer: ${err.message}. Local wallet balance has been successfully refunded.`
+        error: `Failed to complete outward bank transfer: ${err.message}. Local wallet balance has been successfully refunded.`,
+        details: err.message,
+        stack: err.stack,
+        requestBody,
+        uid,
+        gatewayUrl,
       }, { status: 400 });
     }
 
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[Transfer API Exception]:", error.message, error.stack);
-    return NextResponse.json({ error: "Internal processing error occurred while executing transfer." }, { status: 500 });
+    console.error("[Transfer API Exception] CRITICAL FAILURE:", {
+      message: error.message,
+      stack: error.stack,
+      requestBody,
+      uid,
+      gatewayUrl,
+    });
+    return NextResponse.json({
+      error: "Internal processing error occurred while executing transfer.",
+      details: error.message,
+      stack: error.stack,
+      requestBody,
+      uid,
+      gatewayUrl,
+    }, { status: 500 });
   }
 }
