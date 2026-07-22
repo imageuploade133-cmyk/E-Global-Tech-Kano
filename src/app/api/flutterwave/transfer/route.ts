@@ -239,6 +239,8 @@ export async function POST(req: Request) {
         currency: trfCurrency,
         narration: description,
         reference: trfReference,
+        userId: uid,
+        fee: fee,
       };
 
       const gatewayRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer`, {

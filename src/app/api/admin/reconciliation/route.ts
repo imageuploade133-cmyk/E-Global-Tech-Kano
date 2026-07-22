@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyAdminAuth } from "@/lib/admin-auth";
+import { FieldValue } from "firebase-admin/firestore";
 
 interface FlwTxRecord {
   id: string;
@@ -48,8 +49,7 @@ export async function POST(req: Request) {
       details: string;
     }> = [];
 
-    // Map general ledger records by transactionId (ledger documents have document IDs in format `tx-${transactionId}` or a random key,
-    // but they store the flwId or reference).
+    // Map general ledger records by transactionId
     const flwTxMap = new Map<string, FlwTxRecord>();
     flwDocs.forEach((doc) => {
       flwTxMap.set(doc.id, doc);
@@ -95,7 +95,6 @@ export async function POST(req: Request) {
     });
 
     // C. Check user-level balance consistency
-    // We sum up successful ledger entries (DEPOSIT as positive, TRANSFER/withdrawals as negative) and check if it tallies with users.balance
     users.forEach((user) => {
       const userId = user.id;
       const currentBalance = Number(user.balance) || 0;
@@ -112,7 +111,7 @@ export async function POST(req: Request) {
         }
       });
 
-      // Report high variance discrepancies (e.g. if the discrepancy doesn't resolve to 0, which could be due to manual credits or admin mutations)
+      // Report high variance discrepancies
       if (Math.abs(calculatedBalance - currentBalance) > 10.0) {
         inconsistencies.push({
           type: "USER_BALANCE_ANOMALY",
@@ -122,7 +121,110 @@ export async function POST(req: Request) {
       }
     });
 
-    console.log(`[Reconciliation Scan Complete] Detected ${inconsistencies.length} discrepancies.`);
+    // 3. Pending Transfers Reconciliation Job (Requirement 10)
+    console.log("[Reconciliation Tool] Querying pending transfers for reconciliation...");
+    const pendingTransfersSnap = await adminDb.collection("transfers").where("status", "==", "PENDING").get();
+
+    let reconciledCount = 0;
+    let refundCount = 0;
+    const authHeader = req.headers.get("Authorization") || "";
+    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+
+    for (const doc of pendingTransfersSnap.docs) {
+      const transferData = doc.data();
+      const reference = doc.id;
+      const createdAt = transferData.createdAt;
+
+      if (!createdAt) continue;
+
+      const createdTime = new Date(createdAt).getTime();
+      const ageMinutes = (Date.now() - createdTime) / (60 * 1000);
+
+      // Check if older than 10 minutes
+      if (ageMinutes >= 10) {
+        console.log(`[Reconciliation Tool] Transfer ${reference} is pending for ${ageMinutes.toFixed(1)} minutes. Fetching latest status from Gateway...`);
+        try {
+          const statusRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer/status/${reference}`, {
+            headers: {
+              "Authorization": authHeader,
+              "Content-Type": "application/json"
+            }
+          });
+
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            const latestStatus = statusData.status; // "SUCCESS", "FAILED", "PENDING"
+
+            console.log(`[Reconciliation Tool] Gateway status response for ${reference}: ${latestStatus}`);
+
+            if (latestStatus === "SUCCESS") {
+              await adminDb.collection("transfers").doc(reference).update({
+                status: "SUCCESS",
+                updatedAt: new Date().toISOString()
+              });
+              reconciledCount++;
+            } else if (latestStatus === "FAILED" || latestStatus === "REVERSED") {
+              // Run atomic refund transaction
+              const userRef = adminDb.collection("users").doc(transferData.userId);
+              const transferRef = adminDb.collection("transfers").doc(reference);
+
+              await adminDb.runTransaction(async (transaction) => {
+                const trDoc = await transaction.get(transferRef);
+                const trData = trDoc.data() || {};
+
+                if (trData.status !== "PENDING" || trData.refunded) {
+                  return; // Already refunded or terminal status
+                }
+
+                const totalRefund = (Number(trData.amount) || 0) + (Number(trData.fee) || 0);
+                const userId = trData.userId;
+
+                if (userId && userId !== "N/A") {
+                  const uDoc = await transaction.get(userRef);
+                  if (uDoc.exists) {
+                    transaction.update(userRef, {
+                      balance: FieldValue.increment(totalRefund)
+                    });
+
+                    // Ledger transaction record
+                    const ledgerRef = adminDb.collection("transactions").doc(`tx-REFUND-${reference}`);
+                    transaction.set(ledgerRef, {
+                      userId,
+                      amount: totalRefund,
+                      currency: "NGN",
+                      reference: `REFUND-${reference}`,
+                      type: "DEPOSIT",
+                      description: `Reconciliation Refund for failed transfer: ${trData.description || `Transfer to ${trData.recipientName}`}`,
+                      recipientName: trData.recipientName || "Self",
+                      status: "SUCCESS",
+                      date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+                      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+                      fee: 0,
+                      createdAt: new Date().toISOString(),
+                    });
+
+                    transaction.update(transferRef, {
+                      status: "FAILED",
+                      refunded: true,
+                      refundedAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString()
+                    });
+
+                    refundCount++;
+                  }
+                }
+              });
+              reconciledCount++;
+            }
+          }
+        } catch (fetchErr: unknown) {
+          const err = fetchErr as Error;
+          console.error(`[Reconciliation Tool] Failed to reconcile transfer ${reference}:`, err.message);
+        }
+      }
+    }
+
+    console.log(`[Reconciliation Scan Complete] Detected ${inconsistencies.length} general ledger discrepancies. Reconciled ${reconciledCount} pending transfers, executed ${refundCount} refunds.`);
 
     return NextResponse.json({
       success: true,
@@ -133,6 +235,8 @@ export async function POST(req: Request) {
         totalGeneralLedgerLogs: ledgerDocs.length,
         totalUsersChecked: users.length,
         inconsistenciesFound: inconsistencies.length,
+        pendingTransfersReconciled: reconciledCount,
+        refundsExecuted: refundCount,
       },
       inconsistencies,
     });
