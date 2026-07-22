@@ -7,46 +7,59 @@
    - Network:      http://192.168.0.2:3000
 
  ✓ Starting...
-Attention: Next.js now collects completely anonymous telemetry regarding usage.
-This information is used to shape Next.js' roadmap and prioritize features.
-You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
-https://nextjs.org/telemetry
-
- ✓ Ready in 2s
+ ✓ Ready in 2.5s
  ○ Compiling / ...
- ✓ Compiled / in 18.7s (1727 modules)
- HEAD / 200 in 21153ms
- ✓ Compiled in 702ms (756 modules)
- GET /?mock=true 200 in 60ms
- ✓ Compiled in 414ms (756 modules)
- GET /?mock=true 200 in 95ms
- ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
-   ▲ Next.js 15.1.12
-   - Local:        http://localhost:3000
-   - Network:      http://192.168.0.2:3000
-
- ✓ Starting...
- ✓ Ready in 1946ms
- ○ Compiling / ...
- ✓ Compiled / in 14.3s (1727 modules)
- HEAD / 200 in 15813ms
- GET /?mock=true 200 in 63ms
- ✓ Compiled in 1424ms (1709 modules)
- ✓ Compiled in 944ms (1709 modules)
- ✓ Compiled in 1205ms (1709 modules)
- ✓ Compiled in 658ms (1709 modules)
- ✓ Compiled in 715ms (1709 modules)
- ✓ Compiled in 663ms (1709 modules)
- ✓ Compiled in 909ms (1709 modules)
- GET /?mock=true 200 in 781ms
- ✓ Compiled in 7.5s (1709 modules)
- ✓ Compiled in 4.8s (756 modules)
- ✓ Compiled in 682ms (756 modules)
- ✓ Compiled in 430ms (756 modules)
- ✓ Compiled in 8.2s (1709 modules)
- ✓ Compiled in 5.5s (1709 modules)
- ✓ Compiled in 374ms (756 modules)
- ✓ Compiled in 736ms (756 modules)
- ✓ Compiled in 567ms (756 modules)
- ✓ Compiled in 580ms (756 modules)
- ✓ Compiled in 525ms (756 modules)
+ ✓ Compiled / in 16.6s (2216 modules)
+ GET /?mock=true 200 in 20193ms
+ ✓ Compiled in 639ms (967 modules)
+ GET /?mock=true 200 in 67ms
+(node:387802) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ Compiled in 1433ms (2198 modules)
+ GET /?mock=true 200 in 785ms
+ ✓ Compiled in 747ms (967 modules)
+ GET /?mock=true 200 in 94ms
+ ✓ Compiled in 1352ms (2198 modules)
+ GET /?mock=true 200 in 760ms
+ ✓ Compiled in 334ms (967 modules)
+ GET /?mock=true 200 in 39ms
+ ○ Compiling /api/flutterwave/transfer ...
+ ✓ Compiled /api/flutterwave/transfer in 1205ms (2210 modules)
+[Firebase Admin] Initialized with explicit fallback projectId: e-tech-global-hub
+(node:387802) MetadataLookupWarning: received unexpected error = All promises were rejected code = UNKNOWN
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Transfer API Exception]: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information. Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at GoogleAuth.getApplicationDefaultAsync (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:284:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async #determineClient (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:764:36)
+    at async GoogleAuth.getClient (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:741:20)
+    at async GrpcClient._getCredentials (/app/node_modules/google-gax/build/src/grpc.js:192:24)
+    at async GrpcClient.createStub (/app/node_modules/google-gax/build/src/grpc.js:373:23)
+ POST /api/flutterwave/transfer 500 in 8946ms
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ✓ Compiled in 1205ms (2199 modules)
+ ✓ Compiled in 832ms (968 modules)
+ GET /?mock=true 200 in 881ms
+ ○ Compiling /api/flutterwave/transfer ...
+ ✓ Compiled /api/flutterwave/transfer in 1272ms (1256 modules)
+[STRUCTURED_PAYMENT_LOG] {"timestamp":"2026-07-22T02:48:15.805Z","category":"Transfer","userId":"mock-uid","tx_ref":"trf-1784688494286-ck-uid","amount":15000,"currency":"NGN","message":"Processed successful mock transfer: Project settlement for E-Tech","processingTimeMs":3}
+ POST /api/flutterwave/transfer 200 in 1835ms
+ GET /?mock=true 200 in 651ms
+ ✓ Compiled in 1784ms (2199 modules)
+ GET /?mock=true 200 in 885ms
+ ✓ Compiled /api/flutterwave/transfer in 439ms (1256 modules)
+[STRUCTURED_PAYMENT_LOG] {"timestamp":"2026-07-22T02:50:57.616Z","category":"Transfer","userId":"mock-uid","tx_ref":"trf-1784688656999-ck-uid","amount":15000,"currency":"NGN","message":"Processed successful mock transfer: Project settlement for E-Tech","processingTimeMs":2}
+ POST /api/flutterwave/transfer 200 in 616ms

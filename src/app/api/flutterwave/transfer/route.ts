@@ -81,6 +81,29 @@ export async function POST(req: Request) {
     const totalDeduction = trfAmount + fee;
     const description = narration || `Direct transfer to ${trfName} (${trfAccount})`;
 
+    // 4. Mock simulation bypass early exit before accessing adminDb
+    if (isMock) {
+      if (pin !== "1234") {
+        return NextResponse.json({ error: "Incorrect PIN. 4 attempts remaining." }, { status: 400 });
+      }
+
+      logPaymentEvent({
+        category: "Transfer",
+        userId: uid,
+        tx_ref: trfReference,
+        amount: trfAmount,
+        currency: trfCurrency,
+        message: `Processed successful mock transfer: ${description}`,
+        processingTimeMs: Date.now() - startTime,
+      });
+
+      return NextResponse.json({
+        success: true,
+        reference: trfReference,
+        message: `Your mock bank transfer has been initiated successfully! ₦${trfAmount.toLocaleString()} is being settled to ${trfName}.`,
+      });
+    }
+
     // 3. Atomically verify PIN and debit user balance inside Firestore transaction
     const userRef = adminDb.collection("users").doc(uid);
 
@@ -109,9 +132,7 @@ export async function POST(req: Request) {
       }
 
       let isPinMatch = false;
-      if (isMock) {
-        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-      } else if (pinHash) {
+      if (pinHash) {
         isPinMatch = bcrypt.compareSync(pin, pinHash);
       } else if (currentPlainPin) {
         isPinMatch = (pin === currentPlainPin);
@@ -173,25 +194,6 @@ export async function POST(req: Request) {
 
     if (!transactionResult.success) {
       return NextResponse.json({ error: transactionResult.error }, { status: 400 });
-    }
-
-    // 4. Mock simulation bypass
-    if (isMock) {
-      logPaymentEvent({
-        category: "Transfer",
-        userId: uid,
-        tx_ref: trfReference,
-        amount: trfAmount,
-        currency: trfCurrency,
-        message: `Processed successful mock transfer: ${description}`,
-        processingTimeMs: Date.now() - startTime,
-      });
-
-      return NextResponse.json({
-        success: true,
-        reference: trfReference,
-        message: `Your mock bank transfer has been initiated successfully! ₦${trfAmount.toLocaleString()} is being settled to ${trfName}.`,
-      });
     }
 
     // 5. Call Google Cloud Payment Gateway S2S Transfer API

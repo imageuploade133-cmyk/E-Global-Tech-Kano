@@ -65,6 +65,29 @@ export async function POST(req: Request) {
 
     const isMock = uid === "mock-uid";
 
+    // 3. Mock simulation bypass early exit before accessing adminDb
+    if (isMock) {
+      if (pin !== "1234") {
+        return NextResponse.json({ error: "Incorrect PIN. 4 attempts remaining." }, { status: 400 });
+      }
+
+      logPaymentEvent({
+        category: "Transfer",
+        userId: uid,
+        tx_ref: trfReference,
+        amount: totalAmt,
+        currency: "NGN",
+        message: `Processed successful mock bulk transfer: ${description}`,
+        processingTimeMs: Date.now() - startTime,
+      });
+
+      return NextResponse.json({
+        success: true,
+        reference: trfReference,
+        message: `Your bulk transfer of ${trfRecipients.length} recipients has been successfully processed!`,
+      });
+    }
+
     // 2. Atomically verify PIN and debit user balance inside Firestore transaction
     const userRef = adminDb.collection("users").doc(uid);
 
@@ -93,9 +116,7 @@ export async function POST(req: Request) {
       }
 
       let isPinMatch = false;
-      if (isMock) {
-        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-      } else if (pinHash) {
+      if (pinHash) {
         isPinMatch = bcrypt.compareSync(pin, pinHash);
       } else if (currentPlainPin) {
         isPinMatch = (pin === currentPlainPin);
@@ -157,25 +178,6 @@ export async function POST(req: Request) {
 
     if (!transactionResult.success) {
       return NextResponse.json({ error: transactionResult.error }, { status: 400 });
-    }
-
-    // 3. Mock simulation bypass
-    if (isMock) {
-      logPaymentEvent({
-        category: "Transfer",
-        userId: uid,
-        tx_ref: trfReference,
-        amount: totalAmt,
-        currency: "NGN",
-        message: `Processed successful mock bulk transfer: ${description}`,
-        processingTimeMs: Date.now() - startTime,
-      });
-
-      return NextResponse.json({
-        success: true,
-        reference: trfReference,
-        message: `Your bulk transfer of ${trfRecipients.length} recipients has been successfully processed!`,
-      });
     }
 
     // 4. Map the client recipients into the bulk_data schema expected by the gateway
