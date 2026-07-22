@@ -63,7 +63,9 @@ export async function POST(req: Request) {
 
       // Payment Service Providers
       '1435': '100004', // Opay
+      '999992': '100004', // Opay fallback
       '990': '100033',  // Palmpay
+      '50515': '100033', // Palmpay fallback
       '254': '090267',  // Kuda Bank
       '1864': '090405', // Moniepoint
       '639': '090328',  // Eyowo
