@@ -42,23 +42,49 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    console.log("[Transfer API] Processing transfer for user:", uid, "Payload:", body);
+    console.log("[Transfer API] Parsed Request Body:", {
+      amount: body.amount,
+      account_number: body.account_number,
+      accountNumber: body.accountNumber,
+      account_bank: body.account_bank,
+      accountBank: body.accountBank,
+      bankCode: body.bankCode,
+      reference: body.reference,
+      pin: body.pin ? "***" : "missing",
+    });
 
     const amount = Number(body.amount);
-    const accountNumber = body.account_number || body.accountNumber;
-    const bankCode = body.account_bank || body.accountBank || body.bankCode;
-    const accountName = body.account_name || body.accountName || body.beneficiaryName || body.beneficiary_name || body.recipientName || "Beneficiary";
-    const currency = body.currency || "NGN";
-    const narration = body.narration || `Transfer of ₦${amount} to ${accountName}`;
-    reference = body.reference || `trf-${Date.now()}-${uid.slice(-6)}`;
+
+    let accountNumber = "";
+    if (body.account_number !== undefined && body.account_number !== null) accountNumber = String(body.account_number).trim();
+    else if (body.accountNumber !== undefined && body.accountNumber !== null) accountNumber = String(body.accountNumber).trim();
+
+    let bankCode = "";
+    if (body.account_bank !== undefined && body.account_bank !== null) bankCode = String(body.account_bank).trim();
+    else if (body.accountBank !== undefined && body.accountBank !== null) bankCode = String(body.accountBank).trim();
+    else if (body.bankCode !== undefined && body.bankCode !== null) bankCode = String(body.bankCode).trim();
+
+    let accountName = "Beneficiary";
+    if (body.account_name) accountName = String(body.account_name).trim();
+    else if (body.accountName) accountName = String(body.accountName).trim();
+    else if (body.beneficiaryName) accountName = String(body.beneficiaryName).trim();
+    else if (body.beneficiary_name) accountName = String(body.beneficiary_name).trim();
+    else if (body.recipientName) accountName = String(body.recipientName).trim();
+
+    const currency = body.currency ? String(body.currency).trim() : "NGN";
+    const narration = body.narration ? String(body.narration).trim() : `Transfer of ₦${amount} to ${accountName}`;
+    reference = body.reference ? String(body.reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
     const pin = body.pin;
 
     // Basic Validation
     if (isNaN(amount) || amount <= 0) {
       return NextResponse.json({ error: "Invalid amount. Must be greater than zero." }, { status: 400 });
     }
-    if (!accountNumber || !bankCode) {
-      return NextResponse.json({ error: "Missing recipient account number or destination bank code." }, { status: 400 });
+    if (!accountNumber) {
+      return NextResponse.json({ error: "Missing or invalid recipient account number." }, { status: 400 });
+    }
+    if (!bankCode) {
+      return NextResponse.json({ error: "Missing or invalid destination bank code." }, { status: 400 });
     }
     if (!pin || typeof pin !== "string" || pin.length !== 4) {
       return NextResponse.json({ error: "Please provide your 4-digit transaction PIN." }, { status: 400 });
@@ -212,21 +238,32 @@ export async function POST(req: Request) {
 
     console.log("[Transfer API] Wallet debited atomically. Forwarding to Payment Gateway...");
 
+    const payload = {
+      amount,
+      account_number: accountNumber,
+      account_bank: bankCode,
+      beneficiary_name: accountName,
+      currency,
+      narration,
+      reference,
+      userId: uid,
+    };
+
+    console.log("[Transfer API] Constructed Payload to Gateway:", {
+      amount: payload.amount,
+      account_number: payload.account_number,
+      account_bank: payload.account_bank,
+      beneficiary_name: payload.beneficiary_name,
+      currency: payload.currency,
+      narration: payload.narration,
+      reference: payload.reference,
+    });
+
     // 3. Dispatch the outward transfer to the remote Payment Gateway
     let gatewaySuccess = false;
     let gatewayResponse: { success?: boolean; provider_reference?: string; data?: { id?: string }; message?: string; error?: string; status?: string } | null = null;
 
     try {
-      const payload = {
-        amount,
-        account_number: accountNumber,
-        account_bank: bankCode,
-        beneficiary_name: accountName,
-        currency,
-        narration,
-        reference,
-        userId: uid,
-      };
 
       const gwRes = await fetch(`${PAYMENT_GATEWAY_URL}/api/flutterwave/transfer`, {
         method: "POST",
