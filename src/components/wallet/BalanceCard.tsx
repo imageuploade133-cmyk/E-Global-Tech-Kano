@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
@@ -11,12 +12,26 @@ interface BalanceCardProps {
   balance: number;
   currency: string;
   userName?: string;
+  isLoading?: boolean;
 }
 
 
-export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName }) => {
-  const [isVisible, setIsVisible] = useState(true);
+export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName, isLoading }) => {
+  const [isVisible, setIsVisible] = useState(false);
   const { userData, user } = useAuth();
+
+  useEffect(() => {
+    const saved = localStorage.getItem("balance_visible");
+    if (saved !== null) {
+      setIsVisible(saved === "true");
+    }
+  }, []);
+
+  const toggleVisibility = () => {
+    const nextState = !isVisible;
+    setIsVisible(nextState);
+    localStorage.setItem("balance_visible", String(nextState));
+  };
   const { config } = useAppConfig();
   const router = useRouter();
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
@@ -26,6 +41,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [wizardStep, setWizardStep] = useState<"amount" | "methods" | "ussd-bank" | "ussd-pay" | "transfer-pay" | "success">("amount");
   const [addAmount, setAddAmount] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
+  const [isMethodsLoading, setIsMethodsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Dynamic Bank Discovery States
@@ -723,6 +739,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
 
     setWizardStep("methods");
+    setIsMethodsLoading(true);
+    setTimeout(() => {
+      setIsMethodsLoading(false);
+    }, 800);
   };
 
 
@@ -1399,11 +1419,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           <div className="flex justify-between items-start gap-2 w-full overflow-hidden flex-shrink-0">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 overflow-hidden">
-                <div className="relative w-4.5 h-4.5 min-[360px]:w-5 min-[360px]:h-5 flex-shrink-0 bg-white/10 rounded-sm p-0.5">
-                  <img
+                <div className="relative w-4.5 h-4.5 min-[360px]:w-5 min-[360px]:h-5 flex-shrink-0 bg-white/10 rounded-sm p-0.5 overflow-hidden animate-fade-in" style={{ width: "20px", height: "20px" }}>
+                  <Image
                     src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
                     alt="E-Tech Logo"
-                    className="w-full h-full object-contain"
+                    fill
+                    sizes="20px"
+                    className="object-contain"
+                    priority
                   />
                 </div>
                 <span className="font-label-sm text-[8px] min-[360px]:text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF] font-bold truncate">
@@ -1422,67 +1445,104 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           <div className="flex flex-col justify-center gap-0.5 w-full overflow-hidden my-auto py-1 flex-grow">
             <div className="flex justify-between items-center w-full">
               <p className="font-label-sm text-[8px] min-[360px]:text-[10px] text-[#FFFFFF]/70 font-medium">Available Balance</p>
-              <div className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-xs">
-                <span className="material-symbols-outlined text-[9px] text-[#FC7A00] font-bold">lock_clock</span>
-                <span className="font-label-sm text-[7.5px] min-[360px]:text-[8.5px] text-[#FFFFFF]/95 font-bold uppercase tracking-wider">
-                  Savings: ₦{isVisible ? totalInvestment.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "•••,•••"}
-                </span>
-              </div>
-            </div>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={isVisible ? "visible" : "hidden"}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                className="flex items-center justify-between gap-1.5 w-full overflow-hidden"
-              >
-                <div className="flex-1 min-w-0">
-                  <h2 className={`${fontSizeClass} font-display-lg text-[#FFFFFF] font-bold tracking-tight truncate leading-none`} title={formattedBalance}>
-                    {balanceStr}
-                  </h2>
+              {isLoading ? (
+                <div className="h-4 w-24 bg-white/10 rounded skeleton-shimmer" />
+              ) : (
+                <div className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-xs">
+                  <span className="material-symbols-outlined text-[9px] text-[#FC7A00] font-bold">lock_clock</span>
+                  <span className="font-label-sm text-[7.5px] min-[360px]:text-[8.5px] text-[#FFFFFF]/95 font-bold uppercase tracking-wider">
+                    Savings: ₦{isVisible ? totalInvestment.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "•••,•••"}
+                  </span>
                 </div>
+              )}
+            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-between gap-1.5 w-full overflow-hidden mt-1">
+                <div className="h-8 min-[360px]:h-10 w-44 rounded-lg bg-white/20 skeleton-shimmer" />
                 <button
-                  onClick={() => setIsVisible(!isVisible)}
-                  className="text-[#FFFFFF]/80 hover:text-[#FFFFFF] transition-colors p-1 flex-shrink-0 cursor-pointer"
+                  disabled
+                  className="text-[#FFFFFF]/40 p-1 flex-shrink-0 cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined text-[15px] min-[360px]:text-[18px] text-[#FFFFFF] block leading-none">
-                    {isVisible ? "visibility" : "visibility_off"}
+                  <span className="material-symbols-outlined text-[15px] min-[360px]:text-[18px] block leading-none">
+                    visibility_off
                   </span>
                 </button>
-              </motion.div>
-            </AnimatePresence>
+              </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={isVisible ? "visible" : "hidden"}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="flex items-center justify-between gap-1.5 w-full overflow-hidden"
+                >
+                  <div className="flex-1 min-w-0">
+                    <h2 className={`${fontSizeClass} font-display-lg text-[#FFFFFF] font-bold tracking-tight truncate leading-none`} title={formattedBalance}>
+                      {balanceStr}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={toggleVisibility}
+                    className="text-[#FFFFFF]/80 hover:text-[#FFFFFF] transition-colors p-1 flex-shrink-0 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px] min-[360px]:text-[18px] text-[#FFFFFF] block leading-none">
+                      {isVisible ? "visibility" : "visibility_off"}
+                    </span>
+                  </button>
+                </motion.div>
+              </AnimatePresence>
+            )}
           </div>
 
           {/* Bottom section: Card Number, User Name, Expiry/infinite badge */}
           <div className="space-y-1.5 w-full overflow-hidden flex-shrink-0">
-            {/* Prominent Account Number / Card Number styling */}
-            <div className="font-mono text-[13px] min-[360px]:text-[15px] text-white tracking-[0.2em] font-semibold flex items-center justify-between select-all leading-none mb-1">
-              <span>
-                {permanentAccount ? (
-                  permanentAccount.accountNumber.replace(/(\d{4})(\d{4})(\d{2})/, "$1 $2 $3")
-                ) : (
-                  "9921 4732 81" // fallback/mock permanent account number format
-                )}
-              </span>
-              {permanentAccount && (
-                <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 font-bold">
-                  {permanentAccount.bankName}
-                </span>
-              )}
-            </div>
+            {isLoading || isPermAccountLoading ? (
+              <div className="space-y-2">
+                {/* Skeleton placeholders with precise height and size to prevent layout shift */}
+                <div className="flex justify-between items-center">
+                  <div className="h-4.5 w-36 bg-white/20 skeleton-shimmer rounded" />
+                  <div className="h-3 w-16 bg-white/15 skeleton-shimmer rounded" />
+                </div>
+                <div className="flex justify-between items-end gap-2 w-full">
+                  <div className="flex-1">
+                    <div className="h-2 w-16 bg-white/10 skeleton-shimmer rounded mb-1" />
+                    <div className="h-3.5 w-24 bg-white/20 skeleton-shimmer rounded" />
+                  </div>
+                  <div className="h-4.5 w-8 bg-white/10 skeleton-shimmer rounded" />
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Prominent Account Number / Card Number styling */}
+                <div className="font-mono text-[13px] min-[360px]:text-[15px] text-white tracking-[0.2em] font-semibold flex items-center justify-between select-all leading-none mb-1">
+                  <span>
+                    {permanentAccount ? (
+                      permanentAccount.accountNumber.replace(/(\d{4})(\d{4})(\d{2})/, "$1 $2 $3")
+                    ) : (
+                      "9921 4732 81" // fallback/mock permanent account number format
+                    )}
+                  </span>
+                  {permanentAccount && (
+                    <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 font-bold">
+                      {permanentAccount.bankName}
+                    </span>
+                  )}
+                </div>
 
-            <div className="flex justify-between items-end gap-2 w-full overflow-hidden">
-              <div className="flex-1 min-w-0">
-                  <p className="font-label-sm text-[6.5px] min-[360px]:text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 mb-0.5 font-medium truncate">Account Holder</p>
-                  <p className="font-label-sm text-[9px] min-[360px]:text-[11px] text-[#FFFFFF] uppercase tracking-widest font-bold truncate leading-none" title={resolvedName}>
-                    {resolvedName}
-                  </p>
-              </div>
-              <div className="flex flex-col items-end flex-shrink-0 bg-white/10 px-2 py-0.5 rounded border border-white/15 backdrop-blur-xs select-none">
-                   <span className="font-mono text-[8px] min-[360px]:text-[10px] text-[#FFFFFF] font-black tracking-wider leading-none">NGN</span>
-              </div>
-            </div>
+                <div className="flex justify-between items-end gap-2 w-full overflow-hidden">
+                  <div className="flex-1 min-w-0">
+                      <p className="font-label-sm text-[6.5px] min-[360px]:text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 mb-0.5 font-medium truncate">Account Holder</p>
+                      <p className="font-label-sm text-[9px] min-[360px]:text-[11px] text-[#FFFFFF] uppercase tracking-widest font-bold truncate leading-none" title={resolvedName}>
+                        {resolvedName}
+                      </p>
+                  </div>
+                  <div className="flex flex-col items-end flex-shrink-0 bg-white/10 px-2 py-0.5 rounded border border-white/15 backdrop-blur-xs select-none">
+                       <span className="font-mono text-[8px] min-[360px]:text-[10px] text-[#FFFFFF] font-black tracking-wider leading-none">NGN</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1490,10 +1550,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       {/* Action Buttons Below Card */}
       <div className="mt-4 min-[360px]:mt-5 flex gap-2 min-[360px]:gap-3 select-none">
         <motion.button
-          whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.02 }}
+          disabled={isLoading}
+          whileTap={isLoading ? {} : { scale: 0.96 }}
+          whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => setIsAddMoneyOpen(true)}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">add_card</span>
@@ -1504,10 +1565,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </motion.button>
 
         <motion.button
-          whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.02 }}
+          disabled={isLoading}
+          whileTap={isLoading ? {} : { scale: 0.96 }}
+          whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => setIsTransferOpen(true)}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">send</span>
@@ -1518,10 +1580,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </motion.button>
 
         <motion.button
-          whileTap={{ scale: 0.96 }}
-          whileHover={{ scale: 1.02 }}
+          disabled={isLoading}
+          whileTap={isLoading ? {} : { scale: 0.96 }}
+          whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => router.push("/investment")}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0"
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">savings</span>
@@ -1629,9 +1692,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 >
                   {/* Personal Permanent Virtual Account display widget */}
                   {isPermAccountLoading ? (
-                    <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
-                      <div className="h-3 bg-gray-200 rounded w-1/4" />
-                      <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200/50 rounded-2xl p-4 space-y-3 relative overflow-hidden">
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-1/3" />
+                        <div className="h-4.5 bg-gray-200 rounded skeleton-shimmer w-16" />
+                      </div>
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-2 flex-1">
+                          <div className="h-3.5 bg-gray-200 rounded skeleton-shimmer w-1/2" />
+                          <div className="h-5 bg-gray-200 rounded skeleton-shimmer w-3/4" />
+                          <div className="h-3 bg-gray-100 rounded skeleton-shimmer w-1/4" />
+                        </div>
+                        <div className="h-8 bg-gray-200 rounded-lg skeleton-shimmer w-14" />
+                      </div>
                     </div>
                   ) : permanentAccount ? (
                     <div className="bg-gradient-to-r from-[#1E293B] to-[#0F172A] border border-white/5 rounded-2xl p-4 text-white relative overflow-hidden select-none">
@@ -1730,62 +1803,83 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </p>
 
                   <div className="flex flex-col gap-3">
-                    {/* Method: Card */}
-                    <button
-                      type="button"
-                      disabled={isInitializing}
-                      onClick={handleCardPaymentSubmit}
-                      className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-[20px]">credit_card</span>
+                    {isMethodsLoading ? (
+                      // High-fidelity payment method shimmering skeletons to guarantee absolutely zero content layout shift
+                      [1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="w-full p-4 rounded-2xl border border-gray-150 bg-gray-50 flex items-center justify-between h-[74px]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 skeleton-shimmer flex-shrink-0" />
+                            <div className="text-left space-y-1.5">
+                              <div className="h-3.5 bg-gray-200 skeleton-shimmer w-24 rounded" />
+                              <div className="h-3 bg-gray-100 skeleton-shimmer w-36 rounded" />
+                            </div>
+                          </div>
+                          <div className="w-4.5 h-4.5 bg-gray-200 skeleton-shimmer rounded" />
                         </div>
-                        <div className="text-left">
-                          <p className="font-hanken font-extrabold text-xs text-black">Pay with Card</p>
-                          <p className="font-hanken text-[10px] text-gray-400">Secure Direct Checkout Element</p>
-                        </div>
-                      </div>
-                      <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
-                    </button>
+                      ))
+                    ) : (
+                      <>
+                        {/* Method: Card */}
+                        <button
+                          type="button"
+                          disabled={isInitializing}
+                          onClick={handleCardPaymentSubmit}
+                          className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98 h-[74px]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                              <span className="material-symbols-outlined text-[20px]">credit_card</span>
+                            </div>
+                            <div className="text-left">
+                              <p className="font-hanken font-extrabold text-xs text-black">Pay with Card</p>
+                              <p className="font-hanken text-[10px] text-gray-400">Secure Direct Checkout Element</p>
+                            </div>
+                          </div>
+                          <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
+                        </button>
 
-                    {/* Method: USSD */}
-                    <button
-                      type="button"
-                      disabled={isInitializing}
-                      onClick={() => setWizardStep("ussd-bank")}
-                      className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-[20px]">cell_tower</span>
-                        </div>
-                        <div className="text-left">
-                          <p className="font-hanken font-extrabold text-xs text-black">Pay with USSD Dial Code</p>
-                          <p className="font-hanken text-[10px] text-gray-400">Instant code generation for all bank dials</p>
-                        </div>
-                      </div>
-                      <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
-                    </button>
+                        {/* Method: USSD */}
+                        <button
+                          type="button"
+                          disabled={isInitializing}
+                          onClick={() => setWizardStep("ussd-bank")}
+                          className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98 h-[74px]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
+                              <span className="material-symbols-outlined text-[20px]">cell_tower</span>
+                            </div>
+                            <div className="text-left">
+                              <p className="font-hanken font-extrabold text-xs text-black">Pay with USSD Dial Code</p>
+                              <p className="font-hanken text-[10px] text-gray-400">Instant code generation for all bank dials</p>
+                            </div>
+                          </div>
+                          <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
+                        </button>
 
-                    {/* Method: Bank Transfer */}
-                    <button
-                      type="button"
-                      disabled={isInitializing}
-                      onClick={handleBankTransferInit}
-                      className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-[20px]">account_balance</span>
-                        </div>
-                        <div className="text-left">
-                          <p className="font-hanken font-extrabold text-xs text-black">Pay with Direct Bank Transfer</p>
-                          <p className="font-hanken text-[10px] text-gray-400">Generate temporary Wema Virtual Account</p>
-                        </div>
-                      </div>
-                      <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
-                    </button>
+                        {/* Method: Bank Transfer */}
+                        <button
+                          type="button"
+                          disabled={isInitializing}
+                          onClick={handleBankTransferInit}
+                          className="w-full p-4 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50 flex items-center justify-between cursor-pointer transition-all active:scale-98 h-[74px]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0">
+                              <span className="material-symbols-outlined text-[20px]">account_balance</span>
+                            </div>
+                            <div className="text-left">
+                              <p className="font-hanken font-extrabold text-xs text-black">Pay with Direct Bank Transfer</p>
+                              <p className="font-hanken text-[10px] text-gray-400">Generate temporary Wema Virtual Account</p>
+                            </div>
+                          </div>
+                          <span className="material-symbols-outlined text-gray-400 text-[18px]">chevron_right</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               )}

@@ -54,9 +54,20 @@ const LIMIT_CATEGORIES = [
 ];
 
 export default function ProfilePage() {
-  const { userData, user, updateUserData } = useAuth();
+  const { userData, user, loading, updateUserData } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
+
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => {
+        setIsProfileLoading(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
 
   // Basic User Information
   const userName = (userData?.name || user?.displayName || "Captain") as string;
@@ -605,15 +616,20 @@ export default function ProfilePage() {
           className="max-w-md mx-auto space-y-6"
         >
           {/* Section: Profile Header & Photo Editor */}
-          <section className="premium-gradient-card premium-gradient-border p-6 flex flex-col items-center text-center">
-            <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-[#FC7A00] flex items-center justify-center bg-gray-50 shadow-lg">
-              <Image
-                src={currentPhoto}
-                alt="Profile Avatar"
-                fill
-                className="object-cover"
-              />
-            </div>
+          <section className="premium-gradient-card premium-gradient-border p-6 flex flex-col items-center text-center h-[230px]">
+            {isProfileLoading ? (
+              <div className="w-24 h-24 rounded-full skeleton-shimmer shadow-lg" />
+            ) : (
+              <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-[#FC7A00] flex items-center justify-center bg-gray-50 shadow-lg">
+                <Image
+                  src={currentPhoto}
+                  alt="Profile Avatar"
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              </div>
+            )}
 
             <div className="mt-4 flex gap-2.5">
               <input
@@ -624,26 +640,37 @@ export default function ProfilePage() {
                 className="hidden"
               />
               <button
+                disabled={isProfileLoading}
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all"
+                className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[14px]">upload_file</span>
                 Upload File
               </button>
               <button
+                disabled={isProfileLoading}
                 type="button"
                 onClick={startSimulatedScan}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all"
+                className="px-3.5 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[14px]">photo_camera</span>
                 Take Selfie
               </button>
             </div>
 
-            <div className="mt-5">
-              <h2 className="font-hanken font-bold text-xl text-black tracking-tight">{userName}</h2>
-              <p className="font-hanken text-xs text-gray-400 font-semibold">{userEmail}</p>
+            <div className="mt-5 w-full flex flex-col items-center">
+              {isProfileLoading ? (
+                <div className="space-y-2 w-full flex flex-col items-center">
+                  <div className="h-5 bg-gray-200 rounded skeleton-shimmer w-32" />
+                  <div className="h-3.5 bg-gray-100 rounded skeleton-shimmer w-44" />
+                </div>
+              ) : (
+                <>
+                  <h2 className="font-hanken font-bold text-xl text-black tracking-tight leading-none">{userName}</h2>
+                  <p className="font-hanken text-xs text-gray-400 font-semibold mt-1 leading-none">{userEmail}</p>
+                </>
+              )}
             </div>
           </section>
 
@@ -691,13 +718,26 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {loadingAccount ? (
-                  <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
-                    <div className="h-3.5 bg-gray-200 rounded w-1/4" />
-                    <div className="h-4.5 bg-gray-200 rounded w-1/2" />
+                {loadingAccount || isProfileLoading ? (
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-250 rounded-2xl p-4 space-y-3.5 relative overflow-hidden h-[126px]">
+                    <div className="flex justify-between items-center pb-2 border-b border-gray-200/50">
+                      <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-1/3" />
+                      <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-1/4" />
+                    </div>
+                    <div className="flex justify-between items-center pb-2 border-b border-gray-200/50">
+                      <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-1/4" />
+                      <div className="h-3.5 bg-gray-200 rounded skeleton-shimmer w-1/3" />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-2.5 bg-gray-150 rounded skeleton-shimmer w-1/4" />
+                        <div className="h-4.5 bg-gray-200 rounded skeleton-shimmer w-1/3" />
+                      </div>
+                      <div className="h-7 bg-gray-200 rounded-lg skeleton-shimmer w-12" />
+                    </div>
                   </div>
                 ) : staticAccount ? (
-                  <div className="bg-[#0f172a] rounded-2xl p-4 text-white border border-white/5 space-y-3 relative overflow-hidden">
+                  <div className="bg-[#0f172a] rounded-2xl p-4 text-white border border-white/5 space-y-3 relative overflow-hidden h-[126px]">
                     <div className="absolute right-0 bottom-0 text-[100px] text-white/5 pointer-events-none select-none translate-x-1/4 translate-y-1/4">
                       <span className="material-symbols-outlined">account_balance</span>
                     </div>

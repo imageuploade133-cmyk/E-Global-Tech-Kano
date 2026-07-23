@@ -13,11 +13,21 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 export default function Home() {
-  const { userData, user } = useAuth();
+  const { userData, user, loading } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
+
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => {
+        setIsPageLoading(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
   const [verifiedAmount, setVerifiedAmount] = useState(0);
   const [verifyMessage, setVerifyMessage] = useState("");
   const [isDuplicate, setIsDuplicate] = useState(false);
@@ -165,7 +175,11 @@ export default function Home() {
 
   return (
     <>
-      <Header userName={currentUser.userName} profileImage={currentUser.profileImage} />
+      <Header
+        userName={currentUser.userName}
+        profileImage={currentUser.profileImage}
+        isLoading={isPageLoading}
+      />
 
       {/* Dynamic transaction verification overlays */}
       <AnimatePresence>
@@ -279,8 +293,12 @@ export default function Home() {
       </AnimatePresence>
 
       <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-24 min-[375px]:pb-32">
-        <BalanceCard balance={currentUser.balance} currency={currentUser.currency} />
-        <RecentTransactions />
+        <BalanceCard
+          balance={currentUser.balance}
+          currency={currentUser.currency}
+          isLoading={isPageLoading}
+        />
+        <RecentTransactions isLoading={isPageLoading} />
         <ServiceGrid />
         <Promotions />
       </main>
