@@ -114,7 +114,7 @@ export class VirtualAccountService {
     const newAccountRecord: UserWalletAccount = {
       userId,
       accountNumber: flwAccount.account_number,
-      bankName: flwAccount.bank_name || "Wema Bank",
+      bankName: flwAccount.bank_name || "",
       accountName: `${firstname} ${lastname} - E-Tech`,
       currency: flwAccount.currency || "NGN",
       flwRef: flwAccount.order_ref,

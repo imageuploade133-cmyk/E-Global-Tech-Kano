@@ -177,16 +177,17 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (loading && !isMock) return;
 
     // Allow public/exempt routes (/auth/login, /auth/signup, /cpanel)
     const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
 
-    if (!user) {
+    if (!user && !isMock) {
       if (!isPublicRoute) {
         router.push("/auth/login");
       }
-    } else {
+    } else if (user) {
       // User is logged in
       const hasPin = Boolean(userData?.pin || userData?.pinHash);
       const isPinRequired = userData?.isPinRequired !== false;
@@ -233,7 +234,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (loading) {
+  const isMockRoute = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+  if (loading && !isMockRoute) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
         <div className="relative flex flex-col items-center">

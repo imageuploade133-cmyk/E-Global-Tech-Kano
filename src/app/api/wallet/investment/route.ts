@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
-import { WalletService } from "@/lib/wallet-service";
-import { adminDb } from "@/lib/firebase-admin";
+import { InvestmentService } from "@/services/investment-service";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
 
@@ -24,7 +23,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { amount, currency, optionId, optionName, apr, maturityDate, userId } = body;
+    const { amount, currency, optionId, optionName, userId } = body;
 
     const targetUserId = userId || uid;
     if (uid !== targetUserId) {
@@ -38,90 +37,38 @@ export async function POST(req: Request) {
     if (!amount || isNaN(investAmount) || investAmount <= 0) {
       return NextResponse.json({ error: "Invalid investment amount." }, { status: 400 });
     }
-    if (!optionId || !optionName || typeof apr !== "number") {
-      return NextResponse.json({ error: "Missing required savings plan details." }, { status: 400 });
-    }
-    if (!maturityDate) {
-      return NextResponse.json({ error: "Maturity date is required." }, { status: 400 });
+    if (!optionId) {
+      return NextResponse.json({ error: "Missing required savings plan option ID." }, { status: 400 });
     }
 
-    // Maturity Date Validation: at least 7 days from now
-    const minMaturity = new Date();
-    minMaturity.setDate(minMaturity.getDate() + 7);
-    const chosenDate = new Date(maturityDate);
-    if (chosenDate < minMaturity) {
-      return NextResponse.json({ error: "Maturity date must be at least 7 days in the future." }, { status: 400 });
-    }
-
-    const ref_id = `inv-${uid}-${Date.now()}`;
-
-    // Perform atomic transaction to deduct wallet balance and write ledger and active investment record
-    const result = await adminDb.runTransaction(async (transaction) => {
-      try {
-        const debitRes = await WalletService.debitWallet(transaction, {
-          userId: targetUserId,
-          amount: investAmount,
-          currency: investCurrency,
-          reference: ref_id,
-          type: "INVESTMENT",
-          description: `Locked Savings: ${optionName} (Maturity: ${maturityDate})`,
-          recipientName: `${optionName}`,
-          fee: 0,
-        });
-
-        // Create the active investment document securely in backend database
-        const investRef = adminDb.collection("investments").doc(ref_id);
-        transaction.set(investRef, {
-          id: ref_id,
-          userId: targetUserId,
-          optionId,
-          optionName,
-          amount: investAmount,
-          currency: investCurrency,
-          apr,
-          startDate: new Date().toISOString(),
-          endDate: chosenDate.toISOString(),
-          status: "ACTIVE",
-          createdAt: new Date().toISOString(),
-        });
-
-        return {
-          success: true,
-          newBalance: debitRes.newBalance,
-        };
-      } catch (err: unknown) {
-        const error = err as Error;
-        return {
-          success: false,
-          error: error.message,
-        };
-      }
+    // Call the unified production InvestmentService
+    const record = await InvestmentService.createInvestment(targetUserId, {
+      amount: investAmount,
+      currency: investCurrency,
+      productId: optionId,
+      type: "SAVINGS",
     });
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
-    }
 
     // Log structured Investment Created event
     logPaymentEvent({
       category: "Investment Created",
       userId: targetUserId,
-      tx_ref: ref_id,
+      tx_ref: record.id,
       amount: investAmount,
       currency: investCurrency,
-      message: `Successfully created premium locked savings lock for plan ${optionName}. New Wallet Balance: ₦${result.newBalance}`,
+      message: `Successfully created locked savings via legacy endpoint for plan ${optionName}. Ref: ${record.id}`,
       processingTimeMs: Date.now() - startTime,
     });
 
     return NextResponse.json({
       success: true,
       message: "Locked savings plan successfully active!",
-      newBalance: result.newBalance,
-      reference: ref_id,
+      investment: record,
+      reference: record.id,
     });
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[Investment API Exception] Process crashed:", error.message, error.stack);
-    return NextResponse.json({ error: "Internal Investment Processing Error" }, { status: 500 });
+    console.error("[Investment Legacy API Exception] Process crashed:", error.message);
+    return NextResponse.json({ error: error.message || "Internal Investment Processing Error" }, { status: 400 });
   }
 }

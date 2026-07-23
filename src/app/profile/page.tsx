@@ -182,9 +182,9 @@ export default function ProfilePage() {
         }
 
         const parsedAccount = {
-          bankName: String(bankName || "Providus Bank").trim(),
+          bankName: String(bankName || "").trim(),
           accountNumber: String(accountNumber || "").trim(),
-          accountName: String(accountName || "Abdulkadir Shaba").trim()
+          accountName: String(accountName || "").trim()
         };
 
         console.log("Parsed account object (profile):", parsedAccount);
@@ -284,9 +284,9 @@ export default function ProfilePage() {
         }
 
         const parsedAccount = {
-          bankName: String(bankName || "Providus Bank").trim(),
+          bankName: String(bankName || "").trim(),
           accountNumber: String(accountNumber || "").trim(),
-          accountName: String(accountName || "Abdulkadir Shaba").trim()
+          accountName: String(accountName || "").trim()
         };
 
         if (parsedAccount.accountNumber) {
