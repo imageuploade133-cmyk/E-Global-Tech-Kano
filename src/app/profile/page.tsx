@@ -149,12 +149,39 @@ export default function ProfilePage() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success && data.account) {
-          setStaticAccount({
-            bankName: data.account.bankName,
-            accountNumber: data.account.accountNumber,
-            accountName: data.account.accountName,
-          });
+        console.log("Raw API response from profile loadStaticAccount:", data);
+
+        let bankName = "";
+        let accountNumber = "";
+        let accountName = "";
+
+        if (data.account) {
+          bankName = data.account.bankName || data.account.bank_name || "";
+          accountNumber = data.account.accountNumber || data.account.account_number || "";
+          accountName = data.account.accountName || data.account.account_name || "";
+        } else if (data.data) {
+          bankName = data.data.bankName || data.data.bank_name || "";
+          accountNumber = data.data.accountNumber || data.data.account_number || "";
+          accountName = data.data.accountName || data.data.account_name || "";
+        } else {
+          bankName = data.bankName || data.bank_name || "";
+          accountNumber = data.accountNumber || data.account_number || "";
+          accountName = data.accountName || data.account_name || "";
+        }
+
+        const parsedAccount = {
+          bankName: String(bankName || "Providus Bank").trim(),
+          accountNumber: String(accountNumber || "").trim(),
+          accountName: String(accountName || "Abdulkadir Shaba").trim()
+        };
+
+        console.log("Parsed account object (profile):", parsedAccount);
+
+        if (parsedAccount.accountNumber) {
+          setStaticAccount(parsedAccount);
+          console.log("React state after update (setStaticAccount):", parsedAccount);
+        } else {
+          console.log("Why the Pending card is being rendered: parsedAccount.accountNumber is missing or empty.");
         }
       }
     } catch (err) {
@@ -225,10 +252,35 @@ export default function ProfilePage() {
 
       if (res.ok && data.success) {
         toast.success("Identity verified successfully! Static account number allocated.");
-        // Reload page or let snapshots update the state
+
+        let bankName = "";
+        let accountNumber = "";
+        let accountName = "";
+
         if (data.account) {
-          setStaticAccount(data.account);
+          bankName = data.account.bankName || data.account.bank_name || "";
+          accountNumber = data.account.accountNumber || data.account.account_number || "";
+          accountName = data.account.accountName || data.account.account_name || "";
+        } else if (data.data) {
+          bankName = data.data.bankName || data.data.bank_name || "";
+          accountNumber = data.data.accountNumber || data.data.account_number || "";
+          accountName = data.data.accountName || data.data.account_name || "";
+        } else {
+          bankName = data.bankName || data.bank_name || "";
+          accountNumber = data.accountNumber || data.account_number || "";
+          accountName = data.accountName || data.account_name || "";
         }
+
+        const parsedAccount = {
+          bankName: String(bankName || "Providus Bank").trim(),
+          accountNumber: String(accountNumber || "").trim(),
+          accountName: String(accountName || "Abdulkadir Shaba").trim()
+        };
+
+        if (parsedAccount.accountNumber) {
+          setStaticAccount(parsedAccount);
+        }
+
         // Force state reload
         window.location.reload();
       } else {
