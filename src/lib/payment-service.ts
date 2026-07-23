@@ -139,7 +139,7 @@ export class PaymentService {
                  {};
 
     const transferAccount = auth.transfer_account || flwData.transfer_account || resData.transfer_account;
-    const transferBank = auth.transfer_bank || flwData.transfer_bank || resData.transfer_bank || "Wema Bank";
+    const transferBank = auth.transfer_bank || flwData.transfer_bank || resData.transfer_bank || "";
     const transferAmount = Number(auth.transfer_amount || flwData.transfer_amount || resData.transfer_amount || payload.amount);
     const transferReference = auth.transfer_reference || flwData.transfer_reference || resData.transfer_reference || payload.tx_ref;
     const transferNote = auth.transfer_note || flwData.transfer_note || resData.transfer_note || "Make direct transfer to this account number";

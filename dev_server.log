@@ -16,3 +16,29 @@
 (Use `node --trace-deprecation ...` to show where the warning was created)
  GET /?mock=true 200 in 61ms
  GET /?mock=true 200 in 68ms
+ ✓ Compiled in 4.4s (756 modules)
+ ✓ Compiled in 1676ms (1709 modules)
+ ✓ Compiled in 375ms (756 modules)
+ ✓ Compiled in 448ms (756 modules)
+ ✓ Compiled in 309ms (756 modules)
+ ✓ Compiled in 301ms (756 modules)
+ GET /?mock=true 200 in 339ms
+ ○ Compiling /store ...
+ ✓ Compiled /store in 2.9s (1730 modules)
+ GET /history 200 in 3121ms
+ GET /cards 200 in 3122ms
+ GET /bills?type=airtime 200 in 3127ms
+ GET /store 200 in 3126ms
+ GET /support 200 in 3129ms
+ ○ Compiling /profile ...
+ ✓ Compiled /profile in 3.1s (1744 modules)
+ GET /investment 200 in 4026ms
+ GET /profile 200 in 4029ms
+ GET /?mock=true 200 in 3960ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1224ms (1748 modules)
+ GET /_next/static/css/app/layout.css?v=1784827130506 404 in 1791ms
+ GET /_next/static/chunks/main-app.js?v=1784827130506 404 in 1777ms
+ GET /_next/static/chunks/app/page.js 404 in 1766ms
+ GET /_next/static/chunks/app/layout.js 404 in 1775ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 1779ms
