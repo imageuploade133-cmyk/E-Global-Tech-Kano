@@ -13,6 +13,7 @@ import { useAppConfig } from "@/lib/ConfigContext";
 interface HeaderProps {
   userName: string;
   profileImage: string;
+  isLoading?: boolean;
 }
 
 const INITIAL_NOTIFICATIONS: Notification[] = [
@@ -42,7 +43,7 @@ const INITIAL_NOTIFICATIONS: Notification[] = [
   },
 ];
 
-export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
+export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoading }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const { config } = useAppConfig();
@@ -81,29 +82,41 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage }) => {
     <>
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile py-2.5 min-[375px]:py-3 bg-surface-dim/80 backdrop-blur-xl shadow-sm text-black">
         <div className="flex items-center gap-1.5 min-[375px]:gap-2.5 flex-1 min-w-0 mr-2">
-          <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative flex-shrink-0">
+          {isLoading ? (
+            <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full skeleton-shimmer flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative flex-shrink-0">
+              <Image
+                className="object-cover"
+                alt="Profile"
+                src={profileImage}
+                fill
+                sizes="36px"
+                priority
+              />
+            </div>
+          )}
+          <div className="relative w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 flex-shrink-0 bg-black/5 rounded p-0.5 overflow-hidden animate-fade-in" style={{ width: "28px", height: "28px" }}>
             <Image
-              className="object-cover"
-              alt="Profile"
-              src={profileImage}
-              fill
-              sizes="36px"
-            />
-          </div>
-          <div className="relative w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 flex-shrink-0 bg-black/5 rounded p-0.5">
-            <img
               src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
               alt="E-Tech Logo"
-              className="w-full h-full object-contain"
+              fill
+              sizes="28px"
+              className="object-contain"
+              priority
             />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-label-sm text-[8px] min-[375px]:text-[9px] text-on-surface-variant uppercase tracking-tighter font-bold leading-none truncate">
               Welcome back
             </p>
-            <h1 className="font-hanken text-[14px] min-[375px]:text-[16px] tracking-tight text-black font-bold truncate" title={userName}>
-              {userName}
-            </h1>
+            {isLoading ? (
+              <div className="h-4 bg-gray-200 rounded skeleton-shimmer w-20 mt-1" />
+            ) : (
+              <h1 className="font-hanken text-[14px] min-[375px]:text-[16px] tracking-tight text-black font-bold truncate" title={userName}>
+                {userName}
+              </h1>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
