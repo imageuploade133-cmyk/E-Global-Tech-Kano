@@ -70,6 +70,8 @@ export class VirtualAccountService {
     // 3. Request a permanent virtual account from VM Payment Gateway
     const bvnToPass = hasValidBvn ? bvn : nin;
 
+    const customNarration = `${firstname} ${lastname} - E-Tech`.trim().slice(0, 35);
+
     const response = await fetch(`${FLW_BASE_URL}/create-virtual-account`, {
       method: "POST",
       headers: {
@@ -86,7 +88,7 @@ export class VirtualAccountService {
         currency: "NGN",
         firstname,
         lastname,
-        narration: "E-Tech Wallet Funding Link",
+        narration: customNarration,
         bvn: bvnToPass,
         userId,
       }),
