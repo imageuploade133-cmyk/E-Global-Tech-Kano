@@ -559,42 +559,58 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAddMoneyOpen, isTransferOpen, banksList.length]);
 
-  // Safely calculate active locked savings from sessionStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("active_investments");
-      if (saved) {
-        try {
-          const list = JSON.parse(saved);
-          if (Array.isArray(list)) {
-            const sum = list.reduce((acc: number, curr: { amount: number }) => acc + (parseFloat(curr.amount.toString()) || 0), 0);
-            setTotalInvestment(sum);
+  const fetchInvestmentBalance = async () => {
+    if (!user) return;
+    const isMock = sessionStorage.getItem("mock") === "true";
+    if (isMock) {
+      if (typeof window !== "undefined") {
+        const saved = sessionStorage.getItem("active_investments");
+        if (saved) {
+          try {
+            const list = JSON.parse(saved);
+            if (Array.isArray(list)) {
+              const sum = list.reduce((acc: number, curr: { amount: number }) => acc + (parseFloat(curr.amount.toString()) || 0), 0);
+              setTotalInvestment(sum);
+            }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
         }
       }
+      return;
     }
 
-    const interval = setInterval(() => {
-      const saved = sessionStorage.getItem("active_investments");
-      if (saved) {
-        try {
-          const list = JSON.parse(saved);
-          if (Array.isArray(list)) {
-            const sum = list.reduce((acc: number, curr: { amount: number }) => acc + (parseFloat(curr.amount.toString()) || 0), 0);
-            setTotalInvestment(sum);
-          }
-        } catch {
-          // ignore
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/investments", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.investments)) {
+          const activeList = data.investments.filter((inv: { status: string }) => inv.status === "ACTIVE");
+          const sum = activeList.reduce((acc: number, curr: { amount: number | string }) => acc + (parseFloat(curr.amount.toString()) || 0), 0);
+          setTotalInvestment(sum);
         }
-      } else {
-        setTotalInvestment(0);
       }
-    }, 1000);
+    } catch (err) {
+      console.error("Failed to fetch investment balance:", err);
+    }
+  };
+
+  // Safely calculate active locked savings from sessionStorage or dynamic backend API
+  useEffect(() => {
+    fetchInvestmentBalance();
+
+    const interval = setInterval(() => {
+      fetchInvestmentBalance();
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Timer Countdown Effect
   useEffect(() => {
