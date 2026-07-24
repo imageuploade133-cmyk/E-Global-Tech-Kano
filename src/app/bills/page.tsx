@@ -59,7 +59,6 @@ export default function GenericBillPage() {
 
   const [customerId, setCustomerId] = useState<string>("");
   const [customAmount, setCustomAmount] = useState<string>("");
-  const [useCustomDataPrice, setUseCustomDataPrice] = useState<boolean>(false);
   const [validatedName, setValidatedName] = useState<string>("");
 
   // Loading States
@@ -123,7 +122,6 @@ export default function GenericBillPage() {
       setItems([]);
       setCustomerId("");
       setCustomAmount("");
-      setUseCustomDataPrice(false);
       setValidatedName("");
 
       try {
@@ -153,7 +151,6 @@ export default function GenericBillPage() {
       setSelectedItem(null);
       setCustomerId("");
       setCustomAmount("");
-      setUseCustomDataPrice(false);
       setValidatedName("");
 
       try {
@@ -196,14 +193,11 @@ export default function GenericBillPage() {
 
   // Compute final transaction amount dynamically
   const finalAmount = selectedItem
-    ? (pageCategory === "DATA" && useCustomDataPrice
-        ? Number(customAmount)
-        : (selectedItem.is_fixed_amount ? selectedItem.amount : Number(customAmount)))
+    ? (selectedItem.is_fixed_amount ? selectedItem.amount : Number(customAmount))
     : 0;
 
   // Frontend input validation checks
   const isAirtimeInvalid = pageCategory === "AIRTIME" && (Number(customAmount) < 100 || Number(customAmount) > 50000);
-  const isCustomPriceInvalid = pageCategory === "DATA" && useCustomDataPrice && Number(customAmount) < (selectedItem?.amount || 0);
 
   // Interactive Validation handler
   const handleValidateCustomer = async () => {
@@ -257,11 +251,6 @@ export default function GenericBillPage() {
 
     if (isAirtimeInvalid) {
       toast.error("Airtime amount must be between ₦100 and ₦50,000.");
-      return;
-    }
-
-    if (isCustomPriceInvalid) {
-      toast.error(`Custom price cannot be less than the standard price of ₦${selectedItem?.amount.toLocaleString()}.`);
       return;
     }
 
@@ -507,7 +496,6 @@ export default function GenericBillPage() {
                     setSuccessReceipt(null);
                     setCustomerId("");
                     setCustomAmount("");
-                    setUseCustomDataPrice(false);
                     setSelectedBiller(null);
                     setSelectedItem(null);
                   }}
@@ -614,7 +602,6 @@ export default function GenericBillPage() {
                               onClick={() => {
                                 setSelectedItem(i);
                                 setCustomAmount(i.amount.toString());
-                                setUseCustomDataPrice(false);
                               }}
                               className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-[120px] transition-all duration-300 cursor-pointer shadow-none ${
                                 isSelected
@@ -672,14 +659,14 @@ export default function GenericBillPage() {
                                   {i.name}
                                 </p>
                                 <p className="font-hanken text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-wider">
-                                  {i.is_fixed_amount ? "Provider Plan" : "Flexible Payment Option"}
+                                  {i.is_fixed_amount ? "Standard Package" : "Custom Payment Amount"}
                                 </p>
                               </div>
                               <div className="text-right flex-shrink-0">
                                 <span className={`px-3 py-1.5 rounded-full font-mono text-[11px] font-black ${
                                   isSelected ? "bg-[#FC7A00] text-white" : "bg-gray-100 text-gray-700"
                                 }`}>
-                                  {i.is_fixed_amount ? `₦${i.amount.toLocaleString()}` : "Flexible"}
+                                  {i.is_fixed_amount ? `₦${i.amount.toLocaleString()}` : "Enter Amount"}
                                 </span>
                               </div>
                             </button>
@@ -737,33 +724,36 @@ export default function GenericBillPage() {
 
                     {/* Step 4: Handle Amount & Pricing selectors */}
                     {pageCategory === "AIRTIME" ? (
-                      /* --- LUXURY AIRTIME SELECT PRESET & CUSTOM PRICES --- */
-                      <div className="space-y-3.5 text-left">
+                      /* --- LUXURY AIRTIME SELECT PRESET & DYNAMIC PRICE INPUT --- */
+                      <div className="space-y-4 text-left">
                         <div>
                           <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                            Select Pre-defined Price (NGN)
+                            Quick Select Amount (NGN)
                           </label>
                           <div className="grid grid-cols-3 gap-2 mt-1.5">
-                            {AIRTIME_PRESETS.map((preset) => (
-                              <button
-                                key={preset}
-                                type="button"
-                                onClick={() => setCustomAmount(preset.toString())}
-                                className={`py-2.5 rounded-xl border font-mono font-black text-[12px] text-center active:scale-95 transition-all cursor-pointer shadow-none ${
-                                  Number(customAmount) === preset
-                                    ? "bg-primary border-primary text-white"
-                                    : "bg-gray-50 border-gray-200 hover:bg-gray-100 text-black"
-                                }`}
-                              >
-                                ₦{preset.toLocaleString()}
-                              </button>
-                            ))}
+                            {AIRTIME_PRESETS.map((preset) => {
+                              const isSelected = Number(customAmount) === preset;
+                              return (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setCustomAmount(preset.toString())}
+                                  className={`py-3.5 rounded-2xl border font-mono font-black text-[12px] text-center active:scale-95 transition-all cursor-pointer shadow-none ${
+                                    isSelected
+                                      ? "bg-[#FC7A00]/10 border-[#FC7A00] text-black"
+                                      : "bg-white border-gray-150 hover:bg-gray-50 text-gray-800"
+                                  }`}
+                                >
+                                  ₦{preset.toLocaleString()}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
                         <div className="space-y-1.5 pt-1">
                           <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                            Or Enter Custom Price (NGN)
+                            Or Enter Amount (NGN)
                           </label>
                           <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
@@ -773,7 +763,7 @@ export default function GenericBillPage() {
                               type="number"
                               pattern="[0-9]*"
                               inputMode="numeric"
-                              placeholder="Specify flexible topup amount"
+                              placeholder="Enter top-up amount manually (Min: ₦100)"
                               value={customAmount}
                               onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
                               className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
@@ -787,85 +777,21 @@ export default function GenericBillPage() {
                         </div>
                       </div>
                     ) : pageCategory === "DATA" ? (
-                      /* --- LUXURY MOBILE DATA SELECT PRESET & CUSTOM PRICES --- */
+                      /* --- LUXURY MOBILE DATA STANDARD PLAN PRICE --- */
                       <div className="space-y-3.5 text-left">
-                        <div>
-                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                            Pricing Option / Mode
-                          </label>
-                          <div className="grid grid-cols-2 p-1 bg-gray-100/80 rounded-full mt-1.5 border border-gray-200/50">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setUseCustomDataPrice(false);
-                                setCustomAmount(selectedItem.amount.toString());
-                              }}
-                              className={`py-2 text-[10.5px] font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
-                                !useCustomDataPrice
-                                  ? "bg-primary text-white shadow-none"
-                                  : "bg-transparent text-gray-400 hover:text-black"
-                              }`}
-                            >
-                              Standard Plan Price
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setUseCustomDataPrice(true)}
-                              className={`py-2 text-[10.5px] font-black font-hanken rounded-full transition-all duration-300 cursor-pointer ${
-                                useCustomDataPrice
-                                  ? "bg-primary text-white shadow-none"
-                                  : "bg-transparent text-gray-400 hover:text-black"
-                              }`}
-                            >
-                              Enter Custom Price
-                            </button>
+                        <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 flex items-center justify-between text-left">
+                          <div>
+                            <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
+                              Plan Package Price
+                            </p>
+                            <p className="font-hanken text-xs font-semibold text-gray-500 mt-0.5">
+                              Standard price for {selectedItem.name}
+                            </p>
                           </div>
+                          <p className="font-mono font-black text-lg text-black">
+                            ₦{selectedItem?.amount.toLocaleString()}
+                          </p>
                         </div>
-
-                        {useCustomDataPrice ? (
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                              Enter Custom Price for this Data Plan (NGN)
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
-                                ₦
-                              </span>
-                              <input
-                                type="number"
-                                pattern="[0-9]*"
-                                inputMode="numeric"
-                                placeholder="E.g. 500"
-                                value={customAmount}
-                                onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                                className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
-                              />
-                            </div>
-                            {isCustomPriceInvalid && (
-                              <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-hanken text-[10px] font-bold text-left flex items-center gap-2 mt-1.5">
-                                <span className="material-symbols-outlined text-[16px] text-rose-500">warning</span>
-                                <span>Custom price cannot be less than the standard plan price of ₦{selectedItem?.amount.toLocaleString()}.</span>
-                              </div>
-                            )}
-                            <p className="text-[8.5px] text-gray-400 font-bold uppercase tracking-wide mt-1">
-                              Standard plan value is ₦{selectedItem?.amount.toLocaleString()}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 flex items-center justify-between">
-                            <div>
-                              <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
-                                Standard Package Price
-                              </p>
-                              <p className="font-hanken text-xs font-semibold text-gray-500 mt-0.5">
-                                Set dynamically by network provider
-                              </p>
-                            </div>
-                            <p className="font-mono font-black text-lg text-black">
-                              ₦{selectedItem?.amount.toLocaleString()}
-                            </p>
-                          </div>
-                        )}
                       </div>
                     ) : (
                       /* Fallback generic categories */
@@ -915,7 +841,7 @@ export default function GenericBillPage() {
                     <button
                       type="button"
                       onClick={handlePayTrigger}
-                      disabled={isPaying || !customerId || (pageCategory === "AIRTIME" && isAirtimeInvalid) || (pageCategory === "DATA" && useCustomDataPrice && isCustomPriceInvalid) || !customAmount}
+                      disabled={isPaying || !customerId || (pageCategory === "AIRTIME" && isAirtimeInvalid) || (finalAmount <= 0)}
                       className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                     >
                       {isPaying ? "Processing Debit..." : `Proceed to Pay (₦${finalAmount.toLocaleString()})`}

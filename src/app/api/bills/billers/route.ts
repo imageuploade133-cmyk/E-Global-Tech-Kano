@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-
 const MOCK_BILLERS: Record<string, Array<{ name: string; biller_code: string; label_name: string }>> = {
   AIRTIME: [
     { name: "MTN Airtime", biller_code: "BIL099", label_name: "Mobile Phone Number" },
-    { name: "GLO Airtime", biller_code: "BIL100", label_name: "Mobile Phone Number" },
-    { name: "Airtel Airtime", biller_code: "BIL101", label_name: "Mobile Phone Number" },
-    { name: "9mobile Airtime", biller_code: "BIL102", label_name: "Mobile Phone Number" },
+    { name: "GLO Airtime", biller_code: "BIL102", label_name: "Mobile Phone Number" },
+    { name: "Airtel Airtime", biller_code: "BIL100", label_name: "Mobile Phone Number" },
+    { name: "9mobile Airtime", biller_code: "BIL101", label_name: "Mobile Phone Number" },
   ],
   MOBILEDATA: [
     { name: "MTN Mobile Data", biller_code: "BIL104", label_name: "Mobile Phone Number" },
@@ -40,20 +38,16 @@ const MOCK_BILLERS: Record<string, Array<{ name: string; biller_code: string; la
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const category = url.searchParams.get("category") || "AIRTIME";
-    const country = url.searchParams.get("country") || "NG";
-
-    const isSandbox = !FLW_SECRET_KEY || FLW_SECRET_KEY.startsWith("FLWSECK_TEST-");
+    const category = (url.searchParams.get("category") || "AIRTIME").toUpperCase();
+    const authHeader = req.headers.get("Authorization") || "";
 
     const fallback = MOCK_BILLERS[category] || MOCK_BILLERS.AIRTIME;
 
-    if (isSandbox) {
-      return NextResponse.json({ success: true, data: fallback });
-    }
-
-    const response = await fetch(`https://api.flutterwave.com/v3/billers?category=${category}&country=${country}`, {
+    // Call the payment gateway cached billers endpoint
+    const response = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/bills/${category}/billers`, {
+      method: "GET",
       headers: {
-        "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+        "Authorization": authHeader,
         "Content-Type": "application/json",
       },
     });
@@ -66,7 +60,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: true, data: resData.data || fallback });
   } catch {
     const url = new URL(req.url);
-    const category = url.searchParams.get("category") || "AIRTIME";
+    const category = (url.searchParams.get("category") || "AIRTIME").toUpperCase();
     return NextResponse.json({ success: true, data: MOCK_BILLERS[category] || MOCK_BILLERS.AIRTIME });
   }
 }

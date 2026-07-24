@@ -1,9 +1,16 @@
 export const MOCK_ITEMS: Record<string, Array<{ name: string; item_code: string; amount: number }>> = {
-  BIL099: [{ name: "MTN Airtime Topup", item_code: "ITEM099", amount: 0 }],
-  BIL100: [{ name: "GLO Airtime Topup", item_code: "ITEM100", amount: 0 }],
-  BIL101: [{ name: "Airtel Airtime Topup", item_code: "ITEM101", amount: 0 }],
-  BIL102: [{ name: "9mobile Airtime Topup", item_code: "ITEM102", amount: 0 }],
-
+  BIL099: [
+    { name: "MTN Airtime Topup", item_code: "AT099", amount: 0 },
+  ],
+  BIL102: [
+    { name: "GLO Airtime Topup", item_code: "AT102", amount: 0 },
+  ],
+  BIL100: [
+    { name: "Airtel Airtime Topup", item_code: "AT100", amount: 0 },
+  ],
+  BIL101: [
+    { name: "9mobile Airtime Topup", item_code: "AT101", amount: 0 },
+  ],
   BIL104: [
     { name: "MTN 1GB Data Plan (30 Days)", item_code: "ITEM104A", amount: 350 },
     { name: "MTN 2.5GB Data Plan (30 Days)", item_code: "ITEM104B", amount: 600 },

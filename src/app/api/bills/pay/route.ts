@@ -45,6 +45,69 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid bill amount. Must be greater than zero." }, { status: 400 });
     }
 
+    // Dynamic Selected Biller and Item Validation before payment
+    const isMock = uid === "mock-uid";
+    if (!isMock) {
+      try {
+        const authHeader = req.headers.get("Authorization") || "";
+        const apiCategory = biller_type?.toUpperCase() === "DATA" ? "MOBILEDATA" : biller_type?.toUpperCase() || "AIRTIME";
+
+        // Validate Biller Provider Exists
+        const billersResponse = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/proxy", {
+          method: "POST",
+          headers: {
+            "Authorization": authHeader,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            method: "get",
+            endpoint: `/billers?category=${apiCategory}&country=NG`,
+          }),
+        });
+
+        if (billersResponse.ok) {
+          const resData = await billersResponse.json();
+          const billerList = (resData.data || []) as Array<{ biller_code: string }>;
+          const exists = billerList.some((b) => b.biller_code === biller_code);
+          if (!exists) {
+            return NextResponse.json(
+              { error: "The selected billing provider does not exist on Flutterwave active directory." },
+              { status: 400 }
+            );
+          }
+        }
+
+        // Validate Biller Package Item Exists
+        const itemsResponse = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/proxy", {
+          method: "POST",
+          headers: {
+            "Authorization": authHeader,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            method: "get",
+            endpoint: `/bill-items?biller_code=${biller_code}&country=NG`,
+          }),
+        });
+
+        if (itemsResponse.ok) {
+          const itemsData = await itemsResponse.json();
+          const itemList = (itemsData.data || []) as Array<{ item_code: string }>;
+          if (itemList.length > 0) {
+            const itemExists = itemList.some((i) => i.item_code === item_code);
+            if (!itemExists && apiCategory !== "AIRTIME") {
+              return NextResponse.json(
+                { error: "The selected billing package plan does not exist or is inactive." },
+                { status: 400 }
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[Biller Validation Fail] Skipping verification due to gateway down time:", err);
+      }
+    }
+
     // Backend Custom Data Amount floor validation
     if (biller_type?.toUpperCase() === "DATA") {
       let matchedPlan = null;
@@ -75,7 +138,14 @@ export async function POST(req: Request) {
     const description = `${biller_name || "Bill Payment"} (${item_code}) to ${customer_id}`;
 
     // Atomically verify PIN and debit wallet
+    // FIRESTORE TRANSACTION CONSTRAINTS:
+    // Firestore transactions strictly require all reads (transaction.get()) to be executed BEFORE any writes
+    // (transaction.set(), transaction.update(), transaction.delete()). Mixing reads after writes within the
+    // same transaction block breaks Firestore's optimistic concurrency control mechanisms and throws an immediate
+    // runtime exception. To guarantee strict serializability and avoid concurrency errors, we pre-load all
+    // required records up front first, and then execute all mutation writes sequentially at the end.
     const transactionResult = await adminDb.runTransaction(async (transaction) => {
+      // 1. ALL READS: Execute all transaction.get() reads first to lock target documents
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
         throw new Error("USER_NOT_FOUND");
@@ -86,6 +156,15 @@ export async function POST(req: Request) {
       const currentPlainPin = userData.pin;
       const lockedUntil = userData.lockedUntil;
       let pinAttempts = Number(userData.pinAttempts) || 0;
+
+      // Construct a pre-loaded user profile payload to pass downstream to WalletService.debitWallet().
+      // This completely suppresses any subsequent internal transaction.get() reads inside WalletService,
+      // strictly ensuring zero reads-after-writes and preventing Firestore transaction state invalidation.
+      const preLoadedUser = {
+        ref: userRef,
+        data: userData,
+        balance: Number(userData.balance) || 0,
+      };
 
       // Lockout check
       if (lockedUntil) {
@@ -144,7 +223,8 @@ export async function POST(req: Request) {
         };
       }
 
-      // Safe debit
+      // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end of the transaction block
+      // Safe debit using preLoadedUser to completely avoid secondary reads-after-writes inside WalletService
       await WalletService.debitWallet(transaction, {
         userId: uid,
         amount: numAmount,
@@ -154,6 +234,7 @@ export async function POST(req: Request) {
         description,
         recipientName: customer_id,
         fee: 0,
+        preLoadedUser,
       });
 
       return {
@@ -179,7 +260,7 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
 
-    const isSandbox = sessionStorage.getItem("mock") === "true";
+    const isSandbox = uid === "mock-uid";
 
     if (isSandbox) {
       logPaymentEvent({
