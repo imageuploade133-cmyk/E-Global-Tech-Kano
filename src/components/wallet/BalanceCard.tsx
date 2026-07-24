@@ -7,6 +7,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { db } from "@/lib/firebase";
+import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 
 interface BalanceCardProps {
   balance: number;
@@ -110,6 +112,183 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [transferResult, setTransferResult] = useState<{ success: boolean; message: string; reference?: string } | null>(null);
   const [bankSearchQuery, setBankSearchQuery] = useState("");
   const [showTrfBankSelector, setShowTrfBankSelector] = useState(false);
+
+  // Recents & Beneficiaries States
+  interface SavedRecipientItem {
+    id?: string;
+    userId: string;
+    accountNumber: string;
+    bankCode: string;
+    bankName: string;
+    accountName: string;
+    createdAt: string;
+  }
+
+  const [recents, setRecents] = useState<SavedRecipientItem[]>([]);
+  const [beneficiaries, setBeneficiaries] = useState<SavedRecipientItem[]>([]);
+  const [recentsLimit, setRecentsLimit] = useState(5);
+  const [beneficiariesLimit, setBeneficiariesLimit] = useState(5);
+  const [listTab, setListTab] = useState<"recents" | "beneficiaries">("recents");
+  const [showSaveBeneficiaryPrompt, setShowSaveBeneficiaryPrompt] = useState(false);
+
+  // Mute background body scrolling when any full screen bottom drawer is open
+  useEffect(() => {
+    if (isTransferOpen || isAddMoneyOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+    };
+  }, [isTransferOpen, isAddMoneyOpen]);
+
+  const loadRecentsAndBeneficiaries = async () => {
+    if (!user) return;
+    try {
+      // Fetch Recents
+      const recentsQuery = query(
+        collection(db, "recents"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(20)
+      );
+      const recentsSnap = await getDocs(recentsQuery);
+      const recentsList: SavedRecipientItem[] = [];
+      recentsSnap.forEach((doc) => {
+        recentsList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
+      });
+      setRecents(recentsList);
+
+      // Fetch Beneficiaries
+      const benQuery = query(
+        collection(db, "beneficiaries"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(20)
+      );
+      const benSnap = await getDocs(benQuery);
+      const benList: SavedRecipientItem[] = [];
+      benSnap.forEach((doc) => {
+        benList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
+      });
+      setBeneficiaries(benList);
+    } catch (err) {
+      console.error("Failed to load recents and beneficiaries:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (isTransferOpen && user) {
+      loadRecentsAndBeneficiaries();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTransferOpen, user]);
+
+  const handleSelectRecipient = (item: SavedRecipientItem) => {
+    setTrfAccount(item.accountNumber);
+    setTrfAccountName(item.accountName);
+    setIsManualFallback(false);
+    const matchedBank = banksList.find(b => b.code === item.bankCode || b.id === item.bankCode || b.name === item.bankName);
+    if (matchedBank) {
+      setTrfBank(matchedBank);
+    } else {
+      setTrfBank({ id: item.bankCode, name: item.bankName, code: item.bankCode });
+    }
+  };
+
+  const handleSaveRecent = async () => {
+    if (!user || isBulkMode) return;
+    try {
+      const docId = `rec-${user.uid}-${trfAccount}`;
+      await setDoc(doc(db, "recents", docId), {
+        userId: user.uid,
+        accountNumber: trfAccount,
+        bankCode: trfBank?.code || trfBank?.id || "",
+        bankName: trfBank?.name || "",
+        accountName: trfAccountName,
+        createdAt: new Date().toISOString(),
+      });
+      const alreadyBen = beneficiaries.some(b => b.accountNumber === trfAccount);
+      if (!alreadyBen) {
+        setShowSaveBeneficiaryPrompt(true);
+      } else {
+        loadRecentsAndBeneficiaries();
+      }
+    } catch (err) {
+      console.error("Failed to save recent recipient:", err);
+    }
+  };
+
+  const handleSaveBeneficiary = async () => {
+    if (!user) return;
+    try {
+      const docId = `ben-${user.uid}-${trfAccount}`;
+      await setDoc(doc(db, "beneficiaries", docId), {
+        userId: user.uid,
+        accountNumber: trfAccount,
+        bankCode: trfBank?.code || trfBank?.id || "",
+        bankName: trfBank?.name || "",
+        accountName: trfAccountName,
+        createdAt: new Date().toISOString(),
+      });
+      toast.success("Recipient successfully added to saved Beneficiaries!");
+      setShowSaveBeneficiaryPrompt(false);
+      loadRecentsAndBeneficiaries();
+    } catch (err) {
+      console.error("Failed to save beneficiary:", err);
+      toast.error("Failed to save beneficiary.");
+    }
+  };
+
+  const handleSaveBulkRecents = async () => {
+    if (!user || bulkRecipients.length === 0) return;
+    try {
+      for (const rec of bulkRecipients) {
+        const docId = `rec-${user.uid}-${rec.accountNumber}`;
+        await setDoc(doc(db, "recents", docId), {
+          userId: user.uid,
+          accountNumber: rec.accountNumber,
+          bankCode: rec.bankId,
+          bankName: rec.bankName,
+          accountName: rec.recipientName,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      setShowSaveBeneficiaryPrompt(true);
+    } catch (err) {
+      console.error("Failed to save bulk recents:", err);
+    }
+  };
+
+  const handleSaveBulkBeneficiaries = async () => {
+    if (!user || bulkRecipients.length === 0) return;
+    try {
+      for (const rec of bulkRecipients) {
+        const docId = `ben-${user.uid}-${rec.accountNumber}`;
+        await setDoc(doc(db, "beneficiaries", docId), {
+          userId: user.uid,
+          accountNumber: rec.accountNumber,
+          bankCode: rec.bankId,
+          bankName: rec.bankName,
+          accountName: rec.recipientName,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      toast.success("All batch recipients added to saved Beneficiaries!");
+      setShowSaveBeneficiaryPrompt(false);
+      loadRecentsAndBeneficiaries();
+    } catch (err) {
+      console.error("Failed to save bulk beneficiaries:", err);
+      toast.error("Failed to save bulk beneficiaries.");
+    }
+  };
 
   // Active checkout data
   const [activeTxRef, setActiveTxRef] = useState("");
@@ -987,6 +1166,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             message: `Your bulk transfer of ${bulkRecipients.length} recipients has been successfully queued in the background!`,
             reference: data.bulkTransferId || data.reference,
           });
+          handleSaveBulkRecents();
           setTrfStep("completion");
           toast.success("Bulk batch queued successfully!");
         } else {
@@ -1053,6 +1233,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           message: `Your outward bank transfer has been initiated successfully! ₦${parseFloat(trfAmount).toLocaleString()} is being settled to ${trfAccountName}.`,
           reference: data.reference,
         });
+        handleSaveRecent();
         setTrfStep("completion");
         toast.success("Transfer initiated successfully!");
       } else {
@@ -2287,6 +2468,102 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         />
                       </div>
 
+                      {/* Tappable Recents and Beneficiaries List (Paginates to prevent excessive Firestore reads) */}
+                      {trfAccount.length === 0 && (
+                        <div className="space-y-3 pt-1 border-t border-gray-100 mt-2">
+                          <div className="flex border-b border-gray-200">
+                            <button
+                              type="button"
+                              onClick={() => setListTab("recents")}
+                              className={`flex-1 pb-2 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                listTab === "recents" ? "border-b-2 border-[#FC7A00] text-[#FC7A00]" : "text-gray-400 hover:text-black"
+                              }`}
+                            >
+                              Recent Recipients
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setListTab("beneficiaries")}
+                              className={`flex-1 pb-2 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                listTab === "beneficiaries" ? "border-b-2 border-[#FC7A00] text-[#FC7A00]" : "text-gray-400 hover:text-black"
+                              }`}
+                            >
+                              Saved Beneficiaries
+                            </button>
+                          </div>
+
+                          {listTab === "recents" ? (
+                            <div className="space-y-2">
+                              {recents.length === 0 ? (
+                                <p className="text-[10px] text-gray-400 font-semibold text-center py-4">No recent recipients found.</p>
+                              ) : (
+                                <>
+                                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto no-scrollbar">
+                                    {recents.slice(0, recentsLimit).map((rec, i) => (
+                                      <button
+                                        key={rec.id || i}
+                                        type="button"
+                                        onClick={() => handleSelectRecipient(rec)}
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-150 hover:border-[#FC7A00] rounded-xl flex items-center justify-between text-left transition-all cursor-pointer"
+                                      >
+                                        <div className="min-w-0 flex-1">
+                                          <p className="font-hanken text-[11px] font-bold text-black truncate">{rec.accountName}</p>
+                                          <p className="font-hanken text-[9px] text-gray-400 font-semibold">{rec.accountNumber} • {rec.bankName}</p>
+                                        </div>
+                                        <span className="material-symbols-outlined text-gray-400 text-xs">chevron_right</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {recents.length > recentsLimit && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setRecentsLimit((limit) => limit + 5)}
+                                      className="w-full text-center text-[10px] font-black text-[#FC7A00] uppercase hover:underline py-1.5 cursor-pointer"
+                                    >
+                                      See More Recipients
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {beneficiaries.length === 0 ? (
+                                <p className="text-[10px] text-gray-400 font-semibold text-center py-4">No saved beneficiaries found.</p>
+                              ) : (
+                                <>
+                                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto no-scrollbar">
+                                    {beneficiaries.slice(0, beneficiariesLimit).map((ben, i) => (
+                                      <button
+                                        key={ben.id || i}
+                                        type="button"
+                                        onClick={() => handleSelectRecipient(ben)}
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-150 hover:border-[#FC7A00] rounded-xl flex items-center justify-between text-left transition-all cursor-pointer"
+                                      >
+                                        <div className="min-w-0 flex-1">
+                                          <p className="font-hanken text-[11px] font-bold text-black truncate">{ben.accountName}</p>
+                                          <p className="font-hanken text-[9px] text-gray-400 font-semibold">{ben.accountNumber} • {ben.bankName}</p>
+                                        </div>
+                                        <span className="material-symbols-outlined text-gray-400 text-xs">chevron_right</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {beneficiaries.length > beneficiariesLimit && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setBeneficiariesLimit((limit) => limit + 5)}
+                                      className="w-full text-center text-[10px] font-black text-[#FC7A00] uppercase hover:underline py-1.5 cursor-pointer"
+                                    >
+                                      See More Beneficiaries
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Graceful Fallback: Recipient Bank Selector (Shown only if automatic discovery fails or is overridden) */}
                       {isManualFallback && (
                         <div className="space-y-1.5 animate-fade-in">
@@ -2911,6 +3188,41 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         Funds are usually settled instantly. You can check your transaction history ledger any time.
                       </p>
                     </div>
+
+                    {/* Dynamic Beneficiary Add Prompt */}
+                    {showSaveBeneficiaryPrompt && (
+                      <div className="w-full bg-[#FFF9F5] border border-orange-200 rounded-2xl p-4 text-left space-y-2 animate-fade-in">
+                        <p className="font-hanken text-[11px] font-black text-gray-700 uppercase tracking-wide flex items-center gap-1">
+                          <span className="material-symbols-outlined text-orange-500 text-[14px]">person_add</span>
+                          Save Recipient to Beneficiaries?
+                        </p>
+                        <p className="font-hanken text-[10px] text-gray-500 font-semibold leading-relaxed">
+                          Would you like to save {isBulkMode ? `${bulkRecipients.length} batch recipients` : trfAccountName} to your Beneficiaries list for faster access next time?
+                        </p>
+                        <div className="flex gap-2.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={isBulkMode ? handleSaveBulkBeneficiaries : handleSaveBeneficiary}
+                            className="flex-1 py-2 bg-[#FC7A00] text-white rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-sm"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">check</span>
+                            Yes, Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSaveBeneficiaryPrompt(false);
+                              toast.info("Recipient kept as Recent only.");
+                              loadRecentsAndBeneficiaries();
+                            }}
+                            className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">close</span>
+                            No, Skip
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions Bar */}
