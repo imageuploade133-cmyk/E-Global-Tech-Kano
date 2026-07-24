@@ -1,27 +1,35 @@
 export const MOCK_ITEMS: Record<string, Array<{ name: string; item_code: string; amount: number }>> = {
+  BIL099: [
+    { name: "MTN Airtime Topup", item_code: "AT099", amount: 0 },
+  ],
+  BIL102: [
+    { name: "GLO Airtime Topup", item_code: "AT102", amount: 0 },
+  ],
+  BIL100: [
+    { name: "Airtel Airtime Topup", item_code: "AT100", amount: 0 },
+  ],
+  BIL101: [
+    { name: "9mobile Airtime Topup", item_code: "AT101", amount: 0 },
+  ],
   BIL104: [
-    { name: "MTN Airtime Topup", item_code: "ITEM104A", amount: 0 },
-    { name: "MTN 1GB Data Plan (30 Days)", item_code: "ITEM104B", amount: 350 },
-    { name: "MTN 2.5GB Data Plan (30 Days)", item_code: "ITEM104C", amount: 600 },
-    { name: "MTN 5GB Data Plan (30 Days)", item_code: "ITEM104D", amount: 1200 },
-    { name: "MTN 10GB Data Plan (30 Days)", item_code: "ITEM104E", amount: 2200 },
+    { name: "MTN 1GB Data Plan (30 Days)", item_code: "ITEM104A", amount: 350 },
+    { name: "MTN 2.5GB Data Plan (30 Days)", item_code: "ITEM104B", amount: 600 },
+    { name: "MTN 5GB Data Plan (30 Days)", item_code: "ITEM104C", amount: 1200 },
+    { name: "MTN 10GB Data Plan (30 Days)", item_code: "ITEM104D", amount: 2200 },
   ],
   BIL105: [
-    { name: "GLO Airtime Topup", item_code: "ITEM105A", amount: 0 },
-    { name: "GLO 1.5GB Data Plan (30 Days)", item_code: "ITEM105B", amount: 300 },
-    { name: "GLO 3GB Data Plan (30 Days)", item_code: "ITEM105C", amount: 550 },
-    { name: "GLO 6GB Data Plan (30 Days)", item_code: "ITEM105D", amount: 1100 },
+    { name: "GLO 1.5GB Data Plan (30 Days)", item_code: "ITEM105A", amount: 300 },
+    { name: "GLO 3GB Data Plan (30 Days)", item_code: "ITEM105B", amount: 550 },
+    { name: "GLO 6GB Data Plan (30 Days)", item_code: "ITEM105C", amount: 1100 },
   ],
   BIL106: [
-    { name: "Airtel Airtime Topup", item_code: "ITEM106A", amount: 0 },
-    { name: "Airtel 1.5GB Data Plan (30 Days)", item_code: "ITEM106B", amount: 350 },
-    { name: "Airtel 3GB Data Plan (30 Days)", item_code: "ITEM106C", amount: 600 },
-    { name: "Airtel 6GB Data Plan (30 Days)", item_code: "ITEM106D", amount: 1200 },
+    { name: "Airtel 1.5GB Data Plan (30 Days)", item_code: "ITEM106A", amount: 350 },
+    { name: "Airtel 3GB Data Plan (30 Days)", item_code: "ITEM106B", amount: 600 },
+    { name: "Airtel 6GB Data Plan (30 Days)", item_code: "ITEM106C", amount: 1200 },
   ],
   BIL107: [
-    { name: "9mobile Airtime Topup", item_code: "ITEM107A", amount: 0 },
-    { name: "9mobile 1.5GB Data Plan (30 Days)", item_code: "ITEM107B", amount: 300 },
-    { name: "9mobile 3GB Data Plan (30 Days)", item_code: "ITEM107C", amount: 500 },
+    { name: "9mobile 1.5GB Data Plan (30 Days)", item_code: "ITEM107A", amount: 300 },
+    { name: "9mobile 3GB Data Plan (30 Days)", item_code: "ITEM107B", amount: 500 },
   ],
 
   BIL108: [

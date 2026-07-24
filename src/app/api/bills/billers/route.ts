@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 const MOCK_BILLERS: Record<string, Array<{ name: string; biller_code: string; label_name: string }>> = {
   AIRTIME: [
-    { name: "MTN Airtime", biller_code: "BIL104", label_name: "Mobile Phone Number" },
-    { name: "GLO Airtime", biller_code: "BIL105", label_name: "Mobile Phone Number" },
-    { name: "Airtel Airtime", biller_code: "BIL106", label_name: "Mobile Phone Number" },
-    { name: "9mobile Airtime", biller_code: "BIL107", label_name: "Mobile Phone Number" },
+    { name: "MTN Airtime", biller_code: "BIL099", label_name: "Mobile Phone Number" },
+    { name: "GLO Airtime", biller_code: "BIL102", label_name: "Mobile Phone Number" },
+    { name: "Airtel Airtime", biller_code: "BIL100", label_name: "Mobile Phone Number" },
+    { name: "9mobile Airtime", biller_code: "BIL101", label_name: "Mobile Phone Number" },
   ],
   MOBILEDATA: [
     { name: "MTN Mobile Data", biller_code: "BIL104", label_name: "Mobile Phone Number" },
