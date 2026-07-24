@@ -75,7 +75,14 @@ export async function POST(req: Request) {
     const description = `${biller_name || "Bill Payment"} (${item_code}) to ${customer_id}`;
 
     // Atomically verify PIN and debit wallet
+    // FIRESTORE TRANSACTION CONSTRAINTS:
+    // Firestore transactions strictly require all reads (transaction.get()) to be executed BEFORE any writes
+    // (transaction.set(), transaction.update(), transaction.delete()). Mixing reads after writes within the
+    // same transaction block breaks Firestore's optimistic concurrency control mechanisms and throws an immediate
+    // runtime exception. To guarantee strict serializability and avoid concurrency errors, we pre-load all
+    // required records up front first, and then execute all mutation writes sequentially at the end.
     const transactionResult = await adminDb.runTransaction(async (transaction) => {
+      // 1. ALL READS: Execute all transaction.get() reads first to lock target documents
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
         throw new Error("USER_NOT_FOUND");
@@ -86,6 +93,15 @@ export async function POST(req: Request) {
       const currentPlainPin = userData.pin;
       const lockedUntil = userData.lockedUntil;
       let pinAttempts = Number(userData.pinAttempts) || 0;
+
+      // Construct a pre-loaded user profile payload to pass downstream to WalletService.debitWallet().
+      // This completely suppresses any subsequent internal transaction.get() reads inside WalletService,
+      // strictly ensuring zero reads-after-writes and preventing Firestore transaction state invalidation.
+      const preLoadedUser = {
+        ref: userRef,
+        data: userData,
+        balance: Number(userData.balance) || 0,
+      };
 
       // Lockout check
       if (lockedUntil) {
@@ -144,7 +160,8 @@ export async function POST(req: Request) {
         };
       }
 
-      // Safe debit
+      // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end of the transaction block
+      // Safe debit using preLoadedUser to completely avoid secondary reads-after-writes inside WalletService
       await WalletService.debitWallet(transaction, {
         userId: uid,
         amount: numAmount,
@@ -154,6 +171,7 @@ export async function POST(req: Request) {
         description,
         recipientName: customer_id,
         fee: 0,
+        preLoadedUser,
       });
 
       return {
