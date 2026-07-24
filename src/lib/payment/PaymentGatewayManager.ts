@@ -119,6 +119,7 @@ export class PaymentGatewayManager {
             amount: payload.amount,
             recurrence: "ONCE",
             type: payload.item_code,
+            biller_code: payload.biller_code,
             reference: payload.reference,
           }),
         });
