@@ -2467,6 +2467,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         />
                       </div>
 
+                      {/* Graceful Fallback: Recipient Bank Selector (Shown only if automatic discovery fails or is overridden) */}
+                      {isManualFallback && (
+                        <div className="space-y-1.5 animate-fade-in">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Destination Bank (Manual Fallback)</label>
+                          <button
+                            type="button"
+                            onClick={() => setShowTrfBankSelector(true)}
+                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-extrabold text-black flex items-center justify-between cursor-pointer transition-all hover:bg-gray-100/50"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
+                              {trfBank ? trfBank.name : "Choose bank..."}
+                            </span>
+                            <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* Tappable Recents and Beneficiaries List (Paginates to prevent excessive Firestore reads) */}
                       {trfAccount.length === 0 && (
                         <div className="space-y-3 pt-1 border-t border-gray-100 mt-2">
@@ -2560,24 +2578,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               )}
                             </div>
                           )}
-                        </div>
-                      )}
-
-                      {/* Graceful Fallback: Recipient Bank Selector (Shown only if automatic discovery fails or is overridden) */}
-                      {isManualFallback && (
-                        <div className="space-y-1.5 animate-fade-in">
-                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Destination Bank (Manual Fallback)</label>
-                          <button
-                            type="button"
-                            onClick={() => setShowTrfBankSelector(true)}
-                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-extrabold text-black flex items-center justify-between cursor-pointer transition-all hover:bg-gray-100/50"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
-                              {trfBank ? trfBank.name : "Choose bank..."}
-                            </span>
-                            <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
-                          </button>
                         </div>
                       )}
 
