@@ -43,6 +43,12 @@ const INITIAL_NOTIFICATIONS: Notification[] = [
   },
 ];
 
+const isCustomAvatar = (url?: string) => {
+  if (!url) return false;
+  if (url.includes("aida-public") || url.includes("googleusercontent.com/aida-public")) return false;
+  return url.includes("i.ibb.co") || url.includes("ibb.co") || url.includes("images.unsplash.com");
+};
+
 export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoading }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
@@ -50,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const hasCustomPhoto = isCustomAvatar(profileImage);
 
   const handleSignOut = async () => {
     setIsLogoutOpen(false);
@@ -84,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
         <div className="flex items-center gap-1.5 min-[375px]:gap-2.5 flex-1 min-w-0 mr-2">
           {isLoading ? (
             <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full skeleton-shimmer flex-shrink-0" />
-          ) : (
+          ) : hasCustomPhoto ? (
             <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative flex-shrink-0">
               <Image
                 className="object-cover"
@@ -94,6 +101,10 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
                 sizes="36px"
                 priority
               />
+            </div>
+          ) : (
+            <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gradient-to-tr from-[#FC7A00] to-[#FF9022] flex items-center justify-center text-white scale-95 active:scale-90 transition-transform relative flex-shrink-0 shadow-sm">
+              <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] font-bold">person</span>
             </div>
           )}
           <div className="relative w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 flex-shrink-0 bg-black/5 rounded p-0.5 overflow-hidden animate-fade-in" style={{ width: "28px", height: "28px" }}>
