@@ -6,7 +6,7 @@ export interface TransactionRecord {
   amount: number;
   currency: string;
   reference: string;
-  flwId?: string;
+  flwId?: string | null;
   type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS";
   description: string;
   recipientName: string;
@@ -116,7 +116,7 @@ export class WalletService {
       amount: creditAmount,
       currency,
       reference,
-      flwId,
+      flwId: flwId || null,
       type: "DEPOSIT",
       description,
       recipientName,

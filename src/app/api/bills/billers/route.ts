@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
-
 const MOCK_BILLERS: Record<string, Array<{ name: string; biller_code: string; label_name: string }>> = {
   AIRTIME: [
     { name: "MTN Airtime", biller_code: "BIL099", label_name: "Mobile Phone Number" },
@@ -42,20 +40,21 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const category = url.searchParams.get("category") || "AIRTIME";
     const country = url.searchParams.get("country") || "NG";
-
-    const isSandbox = !FLW_SECRET_KEY || FLW_SECRET_KEY.startsWith("FLWSECK_TEST-");
+    const authHeader = req.headers.get("Authorization") || "";
 
     const fallback = MOCK_BILLERS[category] || MOCK_BILLERS.AIRTIME;
 
-    if (isSandbox) {
-      return NextResponse.json({ success: true, data: fallback });
-    }
-
-    const response = await fetch(`https://api.flutterwave.com/v3/billers?category=${category}&country=${country}`, {
+    // Dynamically retrieve live/test billers from Flutterwave via the payment gateway proxy
+    const response = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/proxy", {
+      method: "POST",
       headers: {
-        "Authorization": `Bearer ${FLW_SECRET_KEY}`,
+        "Authorization": authHeader,
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        method: "get",
+        endpoint: `/billers?category=${category}&country=${country}`,
+      }),
     });
 
     if (!response.ok) {
@@ -63,7 +62,9 @@ export async function GET(req: Request) {
     }
 
     const resData = await response.json();
-    return NextResponse.json({ success: true, data: resData.data || fallback });
+    // Proxy returns the direct Flutterwave wrapper which wraps result inside .data
+    const finalBillers = resData.data || resData || fallback;
+    return NextResponse.json({ success: true, data: finalBillers });
   } catch {
     const url = new URL(req.url);
     const category = url.searchParams.get("category") || "AIRTIME";

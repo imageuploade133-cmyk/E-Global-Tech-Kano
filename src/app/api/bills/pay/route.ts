@@ -45,6 +45,69 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid bill amount. Must be greater than zero." }, { status: 400 });
     }
 
+    // Dynamic Selected Biller and Item Validation before payment
+    const isMock = uid === "mock-uid";
+    if (!isMock) {
+      try {
+        const authHeader = req.headers.get("Authorization") || "";
+        const apiCategory = biller_type?.toUpperCase() === "DATA" ? "MOBILEDATA" : biller_type?.toUpperCase() || "AIRTIME";
+
+        // Validate Biller Provider Exists
+        const billersResponse = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/proxy", {
+          method: "POST",
+          headers: {
+            "Authorization": authHeader,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            method: "get",
+            endpoint: `/billers?category=${apiCategory}&country=NG`,
+          }),
+        });
+
+        if (billersResponse.ok) {
+          const resData = await billersResponse.json();
+          const billerList = (resData.data || []) as Array<{ biller_code: string }>;
+          const exists = billerList.some((b) => b.biller_code === biller_code);
+          if (!exists) {
+            return NextResponse.json(
+              { error: "The selected billing provider does not exist on Flutterwave active directory." },
+              { status: 400 }
+            );
+          }
+        }
+
+        // Validate Biller Package Item Exists
+        const itemsResponse = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/proxy", {
+          method: "POST",
+          headers: {
+            "Authorization": authHeader,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            method: "get",
+            endpoint: `/bill-items?biller_code=${biller_code}&country=NG`,
+          }),
+        });
+
+        if (itemsResponse.ok) {
+          const itemsData = await itemsResponse.json();
+          const itemList = (itemsData.data || []) as Array<{ item_code: string }>;
+          if (itemList.length > 0) {
+            const itemExists = itemList.some((i) => i.item_code === item_code);
+            if (!itemExists && apiCategory !== "AIRTIME") {
+              return NextResponse.json(
+                { error: "The selected billing package plan does not exist or is inactive." },
+                { status: 400 }
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[Biller Validation Fail] Skipping verification due to gateway down time:", err);
+      }
+    }
+
     // Backend Custom Data Amount floor validation
     if (biller_type?.toUpperCase() === "DATA") {
       let matchedPlan = null;
