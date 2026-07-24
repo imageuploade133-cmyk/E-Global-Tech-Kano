@@ -2600,104 +2600,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </div>
                       )}
 
-                      {/* BANK SELECTION OVERLAY DRAWER */}
-                      <AnimatePresence>
-                        {showTrfBankSelector && (
-                          <>
-                            <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              onClick={() => setShowTrfBankSelector(false)}
-                              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999998]"
-                            />
 
-                            <motion.div
-                              initial={{ y: "100%" }}
-                              animate={{ y: 0 }}
-                              exit={{ y: "100%" }}
-                              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-                              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[999999] p-6 pb-8 shadow-none text-black h-[90vh] max-h-[90vh] flex flex-col no-scrollbar"
-                            >
-                              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
-
-                              <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
-                                <h3 className="font-hanken font-bold text-base text-black">Select Recipient Bank</h3>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowTrfBankSelector(false)}
-                                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer transition-all"
-                                >
-                                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
-                                </button>
-                              </div>
-
-                              <div className="relative mb-4">
-                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">search</span>
-                                <input
-                                  type="text"
-                                  placeholder="Search bank name (e.g. GTBank, Opay)..."
-                                  value={bankSearchQuery}
-                                  onChange={(e) => setBankSearchQuery(e.target.value)}
-                                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
-                                />
-                              </div>
-
-                              {/* Loading Banks State (TASK 5) */}
-                              {isBanksLoading ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                                  <span className="material-symbols-outlined text-[32px] animate-spin mb-2 text-[#FC7A00]">progress_activity</span>
-                                  <p className="font-hanken text-xs font-semibold">Loading banks directory...</p>
-                                </div>
-                              ) : (
-                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 no-scrollbar pb-6">
-                                  {filteredTrfBanks.map((bank) => {
-                                    const initials = bank.name.substring(0, 2).toUpperCase();
-                                    const colors = [
-                                      "bg-orange-100 text-orange-700 border-orange-200",
-                                      "bg-emerald-100 text-emerald-700 border-emerald-200",
-                                      "bg-blue-100 text-blue-700 border-blue-200",
-                                      "bg-purple-100 text-purple-700 border-purple-200",
-                                      "bg-rose-100 text-rose-700 border-rose-200",
-                                      "bg-amber-100 text-amber-700 border-amber-200",
-                                    ];
-                                    let sum = 0;
-                                    for (let i = 0; i < bank.name.length; i++) {
-                                      sum += bank.name.charCodeAt(i);
-                                    }
-                                    const logoColorClass = colors[sum % colors.length];
-
-                                    return (
-                                      <button
-                                        key={bank.id}
-                                        type="button"
-                                        onClick={() => {
-                                          if (isBulkMode) {
-                                            setBulkBank(bank);
-                                          } else {
-                                            setTrfBank(bank);
-                                            setTrfAccountName(""); // Reset name to force re-verification
-                                          }
-                                          setShowTrfBankSelector(false);
-                                        }}
-                                        className="w-full p-3 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50/50 flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none"
-                                      >
-                                        <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
-                                          {initials}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
-                                        </div>
-                                        <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </motion.div>
-                          </>
-                        )}
-                      </AnimatePresence>
 
                       {/* Resolving Account Loading State Indicator (TASK 5) */}
                       {isResolvingAccount && (
@@ -2970,6 +2873,106 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </button>
                     </div>
                   )}
+
+                  {/* BANK SELECTION OVERLAY DRAWER - Outside condition so it can be triggered on both Single and Bulk modes */}
+                  {/* BANK SELECTION OVERLAY DRAWER */}
+                      <AnimatePresence>
+                        {showTrfBankSelector && (
+                          <>
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              onClick={() => setShowTrfBankSelector(false)}
+                              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999998]"
+                            />
+
+                            <motion.div
+                              initial={{ y: "100%" }}
+                              animate={{ y: 0 }}
+                              exit={{ y: "100%" }}
+                              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+                              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[999999] p-6 pb-8 shadow-none text-black h-[90vh] max-h-[90vh] flex flex-col no-scrollbar"
+                            >
+                              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
+
+                              <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+                                <h3 className="font-hanken font-bold text-base text-black">Select Recipient Bank</h3>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowTrfBankSelector(false)}
+                                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer transition-all"
+                                >
+                                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                                </button>
+                              </div>
+
+                              <div className="relative mb-4">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">search</span>
+                                <input
+                                  type="text"
+                                  placeholder="Search bank name (e.g. GTBank, Opay)..."
+                                  value={bankSearchQuery}
+                                  onChange={(e) => setBankSearchQuery(e.target.value)}
+                                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                                />
+                              </div>
+
+                              {/* Loading Banks State (TASK 5) */}
+                              {isBanksLoading ? (
+                                <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                                  <span className="material-symbols-outlined text-[32px] animate-spin mb-2 text-[#FC7A00]">progress_activity</span>
+                                  <p className="font-hanken text-xs font-semibold">Loading banks directory...</p>
+                                </div>
+                              ) : (
+                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 no-scrollbar pb-6">
+                                  {filteredTrfBanks.map((bank) => {
+                                    const initials = bank.name.substring(0, 2).toUpperCase();
+                                    const colors = [
+                                      "bg-orange-100 text-orange-700 border-orange-200",
+                                      "bg-emerald-100 text-emerald-700 border-emerald-200",
+                                      "bg-blue-100 text-blue-700 border-blue-200",
+                                      "bg-purple-100 text-purple-700 border-purple-200",
+                                      "bg-rose-100 text-rose-700 border-rose-200",
+                                      "bg-amber-100 text-amber-700 border-amber-200",
+                                    ];
+                                    let sum = 0;
+                                    for (let i = 0; i < bank.name.length; i++) {
+                                      sum += bank.name.charCodeAt(i);
+                                    }
+                                    const logoColorClass = colors[sum % colors.length];
+
+                                    return (
+                                      <button
+                                        key={bank.id}
+                                        type="button"
+                                        onClick={() => {
+                                          if (isBulkMode) {
+                                            setBulkBank(bank);
+                                          } else {
+                                            setTrfBank(bank);
+                                            setTrfAccountName(""); // Reset name to force re-verification
+                                          }
+                                          setShowTrfBankSelector(false);
+                                        }}
+                                        className="w-full p-3 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50/50 flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none"
+                                      >
+                                        <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
+                                          {initials}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                          <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
+                                        </div>
+                                        <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
                 </motion.div>
               )}
 
