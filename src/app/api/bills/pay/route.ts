@@ -197,7 +197,7 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
 
-    const isSandbox = sessionStorage.getItem("mock") === "true";
+    const isSandbox = uid === "mock-uid";
 
     if (isSandbox) {
       logPaymentEvent({
