@@ -9,8 +9,8 @@ export async function GET(req: Request) {
 
     const fallback = MOCK_ITEMS[biller_code] || [{ name: "Custom Package", item_code: "ITEM_CUSTOM", amount: 0 }];
 
-    // Fetch the unified cached active bill directory from the payment-gateway
-    const response = await fetch("https://etechglobalhub.duckdns.org/api/flutterwave/bills/directory", {
+    // Call the payment gateway cached biller items endpoint
+    const response = await fetch(`https://etechglobalhub.duckdns.org/api/flutterwave/billers/${biller_code}/items`, {
       method: "GET",
       headers: {
         "Authorization": authHeader,
@@ -23,39 +23,7 @@ export async function GET(req: Request) {
     }
 
     const resData = await response.json();
-    const directory = (resData.data || []) as Array<{
-      biller_code: string;
-      item_code: string;
-      biller_name: string;
-      item_name: string;
-      country: string;
-      amount: number;
-      is_airtime: boolean;
-      label_name: string;
-    }>;
-
-    if (directory.length === 0) {
-      return NextResponse.json({ success: true, data: fallback });
-    }
-
-    // Filter items belonging to the selected biller_code
-    const filteredItems = directory.filter(item => item.biller_code === biller_code);
-
-    if (filteredItems.length === 0) {
-      return NextResponse.json({ success: true, data: fallback });
-    }
-
-    // Format to standard BillItem structure expected by frontend
-    const finalItems = filteredItems.map((item, idx) => ({
-      id: idx + 1,
-      biller_code: item.biller_code,
-      name: item.item_name,
-      item_code: item.item_code,
-      amount: item.amount,
-      is_fixed_amount: item.amount > 0,
-    }));
-
-    return NextResponse.json({ success: true, data: finalItems });
+    return NextResponse.json({ success: true, data: resData.data || fallback });
   } catch {
     const url = new URL(req.url);
     const biller_code = url.searchParams.get("biller_code") || "";
