@@ -2654,19 +2654,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                 <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 no-scrollbar pb-6">
                                   {filteredTrfBanks.map((bank) => {
                                     const initials = bank.name.substring(0, 2).toUpperCase();
-                                    const colors = [
-                                      "bg-orange-100 text-orange-700 border-orange-200",
-                                      "bg-emerald-100 text-emerald-700 border-emerald-200",
-                                      "bg-blue-100 text-blue-700 border-blue-200",
-                                      "bg-purple-100 text-purple-700 border-purple-200",
-                                      "bg-rose-100 text-rose-700 border-rose-200",
-                                      "bg-amber-100 text-amber-700 border-amber-200",
-                                    ];
-                                    let sum = 0;
-                                    for (let i = 0; i < bank.name.length; i++) {
-                                      sum += bank.name.charCodeAt(i);
-                                    }
-                                    const logoColorClass = colors[sum % colors.length];
 
                                     return (
                                       <button
@@ -2681,15 +2668,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                           }
                                           setShowTrfBankSelector(false);
                                         }}
-                                        className="w-full p-3 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50/50 flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none"
+                                        className="w-full p-3.5 rounded-2xl border border-gray-150 hover:border-[#FC7A00] hover:bg-orange-50/20 bg-gray-50/50 flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-sm relative group overflow-hidden"
                                       >
-                                        <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
+                                        <div className="absolute right-0 top-0 w-20 h-20 bg-gradient-to-tr from-primary/5 to-transparent rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+                                        <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-[#FC7A00] to-[#FF9022] text-white flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 shadow-md shadow-primary/20">
                                           {initials}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                          <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
+                                          <p className="font-hanken text-[13px] font-black text-black group-hover:text-primary leading-tight truncate transition-colors">
+                                            {bank.name}
+                                          </p>
+                                          <p className="font-hanken text-[9px] text-gray-400 font-bold mt-0.5 uppercase tracking-wider">
+                                            Click to Select
+                                          </p>
                                         </div>
-                                        <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
+                                        <span className="material-symbols-outlined text-gray-400 group-hover:text-primary text-[18px] group-hover:translate-x-0.5 transition-all">
+                                          chevron_right
+                                        </span>
                                       </button>
                                     );
                                   })}

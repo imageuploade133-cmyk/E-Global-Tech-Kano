@@ -74,6 +74,14 @@ export default function ProfilePage() {
   const userEmail = (userData?.email || user?.email || "captain@example.com") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
+  const isCustomAvatar = (url?: string) => {
+    if (!url) return false;
+    if (url.includes("aida-public") || url.includes("googleusercontent.com/aida-public")) return false;
+    return url.includes("i.ibb.co") || url.includes("ibb.co") || url.includes("images.unsplash.com");
+  };
+
+  const hasCustomPhoto = isCustomAvatar(currentPhoto);
+
   // Interactive KYC flow states
   const [kycType, setKycType] = useState<"bvn" | "nin">("bvn");
   const [idNumber, setIdNumber] = useState("");
@@ -620,7 +628,7 @@ export default function ProfilePage() {
           <section className="premium-gradient-card premium-gradient-border p-6 flex flex-col items-center text-center h-[230px]">
             {isProfileLoading ? (
               <div className="w-24 h-24 rounded-full skeleton-shimmer shadow-lg" />
-            ) : (
+            ) : hasCustomPhoto ? (
               <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-[#FC7A00] flex items-center justify-center bg-gray-50 shadow-lg">
                 <Image
                   src={currentPhoto}
@@ -629,6 +637,10 @@ export default function ProfilePage() {
                   className="object-cover"
                   priority
                 />
+              </div>
+            ) : (
+              <div className="relative w-24 h-24 rounded-full bg-gradient-to-tr from-[#FC7A00] to-[#FF9022] border-2 border-[#FC7A00] flex items-center justify-center text-white shadow-lg">
+                <span className="material-symbols-outlined text-[48px] font-bold">person</span>
               </div>
             )}
 
@@ -720,7 +732,7 @@ export default function ProfilePage() {
                 )}
 
                 {loadingAccount || isProfileLoading ? (
-                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-250 rounded-2xl p-4 space-y-3.5 relative overflow-hidden h-[126px]">
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-250 rounded-2xl p-5 space-y-4 relative overflow-hidden">
                     <div className="flex justify-between items-center pb-2 border-b border-gray-200/50">
                       <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-1/3" />
                       <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-1/4" />
@@ -729,43 +741,53 @@ export default function ProfilePage() {
                       <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-1/4" />
                       <div className="h-3.5 bg-gray-200 rounded skeleton-shimmer w-1/3" />
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center pt-1">
                       <div className="space-y-1.5 flex-1">
                         <div className="h-2.5 bg-gray-150 rounded skeleton-shimmer w-1/4" />
                         <div className="h-4.5 bg-gray-200 rounded skeleton-shimmer w-1/3" />
                       </div>
-                      <div className="h-7 bg-gray-200 rounded-lg skeleton-shimmer w-12" />
+                      <div className="h-8 bg-gray-200 rounded-lg skeleton-shimmer w-16" />
                     </div>
                   </div>
                 ) : staticAccount ? (
-                  <div className="bg-[#0f172a] rounded-2xl p-4 text-white border border-white/5 space-y-3 relative overflow-hidden h-[126px]">
-                    <div className="absolute right-0 bottom-0 text-[100px] text-white/5 pointer-events-none select-none translate-x-1/4 translate-y-1/4">
+                  <div className="bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] rounded-2xl p-5 text-white border-2 border-primary/20 space-y-4 relative overflow-hidden shadow-xl">
+                    <div className="absolute right-0 bottom-0 text-[120px] text-white/5 pointer-events-none select-none translate-x-1/6 translate-y-1/6">
                       <span className="material-symbols-outlined">account_balance</span>
                     </div>
 
-                    <div className="flex justify-between border-b border-white/10 pb-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                      <span>Assigned Bank Name</span>
-                      <span className="text-white font-black">{staticAccount.bankName}</span>
+                    <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/25 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-primary text-[20px]">account_balance</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Assigned Bank Name</p>
+                        <p className="text-sm text-white font-extrabold tracking-wide mt-0.5 truncate">{staticAccount.bankName}</p>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between border-b border-white/10 pb-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                      <span>Account Holder Name</span>
-                      <span className="text-white font-black truncate max-w-[180px]">{staticAccount.accountName}</span>
+                    <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#00d084]/10 border border-[#00d084]/25 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[#00d084] text-[20px]">badge</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Account Holder Name</p>
+                        <p className="text-sm text-white font-extrabold tracking-wide mt-0.5 truncate">{staticAccount.accountName}</p>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider pt-1">
-                      <div>
-                        <span>Static Account Number</span>
-                        <p className="font-mono text-base font-black text-[#FC7A00] tracking-widest mt-0.5 select-all">
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Static Account Number</p>
+                        <p className="font-mono text-lg min-[360px]:text-xl font-black text-primary tracking-widest mt-0.5 select-all">
                           {staticAccount.accountNumber}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => copyToClipboard(staticAccount.accountNumber, "Static Account")}
-                        className="bg-white/10 hover:bg-white/20 text-[10px] font-bold py-1.5 px-3 rounded-lg text-gray-200 flex items-center gap-1 active:scale-95 transition-all"
+                        className="bg-primary hover:bg-primary/90 text-surface-dim text-[11px] font-black py-2.5 px-4 rounded-xl flex items-center gap-1.5 active:scale-95 transition-all shadow-md shadow-primary/10 shrink-0 cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                        <span className="material-symbols-outlined text-[14px] font-bold">content_copy</span>
                         Copy
                       </button>
                     </div>

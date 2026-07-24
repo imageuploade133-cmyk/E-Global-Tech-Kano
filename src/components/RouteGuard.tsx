@@ -282,7 +282,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
 
   // Show nothing while redirecting
-  if (!user && !isPublicRoute) return null;
+  if (!user && !isPublicRoute && !isMockRoute) return null;
   if (pathname === "/cpanel") return <>{children}</>;
   if (user && !(userData?.pin || userData?.pinHash) && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
