@@ -104,7 +104,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [bulkName, setBulkName] = useState("");
   const [bulkAmountVal, setBulkAmountVal] = useState("");
   const [isBulkResolving, setIsBulkResolving] = useState(false);
-  const [showBulkBankSelector, setShowBulkBankSelector] = useState(false);
 
   // PIN states
   const [trfPin, setTrfPin] = useState("");
@@ -890,7 +889,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setBulkAccount("");
       setBulkName("");
       setBulkAmountVal("");
-      setShowBulkBankSelector(false);
 
     }, 300);
   };
@@ -2675,8 +2673,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                         key={bank.id}
                                         type="button"
                                         onClick={() => {
-                                          setTrfBank(bank);
-                                          setTrfAccountName(""); // Reset name to force re-verification
+                                          if (isBulkMode) {
+                                            setBulkBank(bank);
+                                          } else {
+                                            setTrfBank(bank);
+                                            setTrfAccountName(""); // Reset name to force re-verification
+                                          }
                                           setShowTrfBankSelector(false);
                                         }}
                                         className="w-full p-3 rounded-2xl border border-gray-150 hover:border-[#FC7A00] bg-gray-50/50 flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none"
@@ -2827,42 +2829,21 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
                         <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Add Recipient to Batch</p>
 
-                        {/* Bank selector */}
+                        {/* Bank selector (Reuses the elegant Select Bank Drawer Overlay) */}
                         <button
                           type="button"
-                          onClick={() => setShowBulkBankSelector(!showBulkBankSelector)}
+                          onClick={() => {
+                            setBankSearchQuery("");
+                            setShowTrfBankSelector(true);
+                          }}
                           className="w-full px-3 py-3 bg-white border border-gray-200 rounded-xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
                         >
-                          <span>{bulkBank ? bulkBank.name : "Choose Bank..."}</span>
+                          <span className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
+                            {bulkBank ? bulkBank.name : "Choose bank..."}
+                          </span>
                           <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
                         </button>
-
-                        {showBulkBankSelector && (
-                          <div className="p-2 bg-white border border-gray-200 rounded-xl space-y-2">
-                            <input
-                              type="text"
-                              placeholder="Search bank name..."
-                              value={bankSearchQuery}
-                              onChange={(e) => setBankSearchQuery(e.target.value)}
-                              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg font-hanken text-[11px] outline-none"
-                            />
-                            <div className="max-h-[100px] overflow-y-auto flex flex-col bg-white">
-                              {filteredTrfBanks.map((bank) => (
-                                <button
-                                  key={bank.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setBulkBank(bank);
-                                    setShowBulkBankSelector(false);
-                                  }}
-                                  className="w-full px-3 py-1.5 text-left font-hanken text-[11px] font-semibold hover:bg-gray-50 cursor-pointer"
-                                >
-                                  {bank.name}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
 
                         {/* Account number */}
                         <input
@@ -2882,7 +2863,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         {bulkAccount.length === 10 && !bulkName && (
                           <button
                             type="button"
-                            onClick={() => setShowBulkBankSelector(true)}
+                            onClick={() => {
+                              setBankSearchQuery("");
+                              setShowTrfBankSelector(true);
+                            }}
                             className="w-full py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-xs font-bold uppercase tracking-wider rounded-xl active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[14px]">search</span>
