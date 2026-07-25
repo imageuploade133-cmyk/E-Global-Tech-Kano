@@ -3,6 +3,9 @@ import time
 from playwright.sync_api import sync_playwright
 
 def run_verification():
+    os.makedirs("verification/screenshots", exist_ok=True)
+    os.makedirs("verification/videos", exist_ok=True)
+
     with sync_playwright() as p:
         # Launch headless browser
         browser = p.chromium.launch(headless=True)
@@ -15,7 +18,7 @@ def run_verification():
 
         # We must go to the page and then set sessionStorage
         print("Navigating to dashboard to initialize origin...")
-        page.goto("http://localhost:3004")
+        page.goto("http://localhost:3000")
         page.wait_for_timeout(1000)
 
         # Enable mock authentication mode via sessionStorage
@@ -27,7 +30,7 @@ def run_verification():
         # TEST 1: CARDS PAGE REQUEST SHEET
         # ----------------------------------------------------
         print("Testing Cards Page Request Sheet...")
-        page.goto("http://localhost:3004/cards")
+        page.goto("http://localhost:3000/cards")
         page.wait_for_timeout(2000)  # Wait for page hydration
 
         # Verify initial overflow is empty/unset
@@ -63,7 +66,7 @@ def run_verification():
         # TEST 2: SERVICES INFO MODAL (ServiceGrid.tsx)
         # ----------------------------------------------------
         print("\nTesting Service Grid Info Modals...")
-        page.goto("http://localhost:3004")
+        page.goto("http://localhost:3000")
         page.wait_for_timeout(2000)
 
         # Find the 'Loan' or 'Wealth' button in ServiceGrid
