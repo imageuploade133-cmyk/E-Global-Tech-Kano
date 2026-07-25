@@ -695,35 +695,35 @@ export default function CardsPage() {
                   </div>
 
                   {/* Text Input: Card Holder Name Customization */}
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">4. Display Card Name</label>
                     <input
                       type="text"
                       required
                       value={formName}
                       onChange={(e) => setFormName(e.target.value.toUpperCase())}
-                      className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-sm uppercase font-mono font-bold"
+                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                       placeholder="CARD DISPLAY NAME"
                     />
                   </div>
 
                   {/* Text Input: Card Delivery Address (Only for Physical Cards) */}
                   {formType === "PHYSICAL" && (
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">5. Home Delivery Address</label>
                       <input
                         type="text"
                         required
                         value={deliveryAddress}
                         onChange={(e) => setDeliveryAddress(e.target.value)}
-                        className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-sm font-semibold"
+                        className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                         placeholder="Enter full physical address"
                       />
                     </div>
                   )}
 
                   {/* PIN setup field */}
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Card Setup 4-Digit PIN</label>
                     <input
                       type="password"
@@ -731,7 +731,7 @@ export default function CardsPage() {
                       required
                       value={cardPin}
                       onChange={(e) => setCardPin(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
+                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
                       placeholder="••••"
                     />
                   </div>
