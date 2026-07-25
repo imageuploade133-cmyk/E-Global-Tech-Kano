@@ -18,8 +18,8 @@ def run_verification():
             page.goto("http://localhost:3000/?mock=true")
             page.wait_for_timeout(2000)
 
-            print("Locating and clicking 'Transfer' button on the balance card...")
-            page.get_by_role("button", name="Transfer").first.click()
+            print("Locating and clicking 'Withdraw' button on the balance card...")
+            page.get_by_role("button", name="Withdraw").first.click()
             page.wait_for_timeout(1000)
 
             print("Locating Account Number input field...")
