@@ -1954,7 +1954,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         onChange={(e) => setAddAmount(e.target.value)}
                         placeholder="Enter amount (e.g. 5000)"
                         required
-                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                        className="w-full bg-white border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                       />
                     </div>
                     <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mt-1">Minimum funding threshold is ₦100.00</p>
@@ -2102,7 +2102,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       placeholder="Search bank (e.g. GTBank, Opay, Moniepoint)..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3 font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                      className="w-full bg-white border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                     />
                   </div>
 
@@ -2462,7 +2462,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               setIsManualFallback(true);
                             }
                           }}
-                          className="w-full appearance-none bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                          className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                         />
                       </div>
 
@@ -2662,7 +2662,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                 onChange={(e) => {
                                   setTrfAmount(e.target.value);
                                 }}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-4 font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                                className="w-full bg-white border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                               />
                             </div>
                           </div>
@@ -2675,7 +2675,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               placeholder="e.g. Rent, Payment for items, Food"
                               value={trfNarration}
                               onChange={(e) => setTrfNarration(e.target.value)}
-                              className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                              className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                             />
                           </div>
 
@@ -2759,7 +2759,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               setBulkName(""); // reset on edit
                             }
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00]"
+                          className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                         />
 
                         {/* Find Bank button for Bulk */}
@@ -2808,13 +2808,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           <div className="space-y-1">
                             <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Recipient Amount (NGN)</label>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-gray-500">₦</span>
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">₦</span>
                               <input
                                 type="number"
                                 placeholder="Recipient Amount"
                                 value={bulkAmountVal}
                                 onChange={(e) => setBulkAmountVal(e.target.value)}
-                                className="w-full bg-white border border-gray-200 rounded-xl pl-6 pr-3 py-3 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00]"
+                                className="w-full bg-white border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                               />
                             </div>
                           </div>
@@ -2915,7 +2915,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                   placeholder="Search bank name (e.g. GTBank, Opay)..."
                                   value={bankSearchQuery}
                                   onChange={(e) => setBankSearchQuery(e.target.value)}
-                                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl font-hanken text-xs font-semibold text-black outline-none focus:border-[#FC7A00] focus:bg-white transition-all shadow-inner"
+                                  className="w-full bg-white border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                                 />
                               </div>
 

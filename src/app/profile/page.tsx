@@ -871,7 +871,7 @@ export default function ProfilePage() {
                       value={idNumber}
                       onChange={(e) => setIdNumber(e.target.value.slice(0, 11))}
                       placeholder={`Enter 11-digit ${kycType.toUpperCase()}...`}
-                      className="w-full bg-gray-50 border border-gray-250 rounded-2xl py-3 px-4 font-mono font-bold text-xs text-black outline-none focus:border-black focus:bg-white transition-all"
+                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                     />
                   </div>
 
@@ -998,7 +998,7 @@ export default function ProfilePage() {
 
             <form onSubmit={handleUpdatePin} className="space-y-4">
               <div className="space-y-3">
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-black">Current 4-Digit PIN</label>
                   <input
                     type="password"
@@ -1006,13 +1006,13 @@ export default function ProfilePage() {
                     required
                     value={oldPin}
                     onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ""))}
-                    className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
+                    className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
                     placeholder="••••"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-black">New 4-Digit PIN</label>
                     <input
                       type="password"
@@ -1020,11 +1020,11 @@ export default function ProfilePage() {
                       required
                       value={newPin}
                       onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
+                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
                       placeholder="••••"
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-black">Confirm PIN</label>
                     <input
                       type="password"
@@ -1032,7 +1032,7 @@ export default function ProfilePage() {
                       required
                       value={confirmPin}
                       onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-center tracking-[0.5em] text-sm font-bold"
+                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
                       placeholder="••••"
                     />
                   </div>
@@ -1057,19 +1057,19 @@ export default function ProfilePage() {
 
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div className="space-y-3">
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-black">Current Password</label>
                   <input
                     type="password"
                     required
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
-                    className="w-full bg-gray-50 border-b border-gray-200 py-2 px-1 outline-none focus:border-black transition-colors text-black text-sm"
+                    className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                     placeholder="••••••••"
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-black">New Password</label>
                   <div className="relative">
                     <input
@@ -1077,7 +1077,7 @@ export default function ProfilePage() {
                       required
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full bg-gray-50 border-b border-gray-200 py-2 pl-1 pr-10 outline-none focus:border-black transition-colors text-black text-sm"
+                      className="w-full bg-white border border-gray-100 rounded-2xl pl-4 pr-10 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                       placeholder="••••••••"
                     />
                     <button

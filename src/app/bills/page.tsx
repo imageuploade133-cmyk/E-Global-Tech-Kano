@@ -706,7 +706,7 @@ export default function GenericBillPage() {
                           placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
                           value={customerId}
                           onChange={(e) => setCustomerId(e.target.value)}
-                          className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-4 font-mono font-bold text-sm text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
+                          className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                         />
                         {/* Validation Action inside input if applicable */}
                         {customerId.length >= 6 && (
@@ -778,7 +778,7 @@ export default function GenericBillPage() {
                               placeholder="Enter top-up amount manually (Min: ₦100)"
                               value={customAmount}
                               onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
+                              className="w-full bg-white border border-gray-100 rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                             />
                           </div>
                           {isAirtimeInvalid && customAmount !== "" && (
@@ -823,7 +823,7 @@ export default function GenericBillPage() {
                               placeholder="Amount (e.g. 2000)"
                               value={customAmount}
                               onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full appearance-none bg-gray-50/50 border border-gray-200 rounded-2xl pl-9 pr-4 py-4 font-mono font-black text-base text-black outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300"
+                              className="w-full bg-white border border-gray-100 rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                             />
                           </div>
                         </div>
