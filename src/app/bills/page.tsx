@@ -113,6 +113,18 @@ export default function GenericBillPage() {
     shuffleKeypad();
   }, [isPinModalOpen]);
 
+  // Prevent background scrolling while pay bills PIN keypad modal is active
+  useEffect(() => {
+    if (isPinModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isPinModalOpen]);
+
   // Fetch billers when pageCategory changes
   useEffect(() => {
     async function fetchBillers() {

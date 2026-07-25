@@ -7,4 +7,25 @@
    - Network:      http://192.168.0.2:3000
 
  ✓ Starting...
- ✓ Ready in 1951ms
+ ✓ Ready in 2s
+ ○ Compiling / ...
+ ✓ Compiled / in 15.6s (1727 modules)
+ GET / 200 in 17459ms
+ ○ Compiling /auth/login ...
+ ✓ Compiled /cards in 6s (1709 modules)
+ GET /auth/login 200 in 3923ms
+ GET /cards 200 in 2667ms
+ GET / 200 in 123ms
+ ✓ Compiled in 502ms (760 modules)
+ GET / 200 in 45ms
+ ✓ Compiled in 358ms (760 modules)
+ ✓ Compiled in 468ms (760 modules)
+ GET / 200 in 52ms
+ ✓ Compiled in 468ms (760 modules)
+ GET /cards 200 in 44ms
+ ✓ Compiled in 323ms (760 modules)
+ GET /cards 200 in 46ms
+ GET / 200 in 116ms
+ ✓ Compiled in 466ms (760 modules)
+ GET / 200 in 37ms
+ ✓ Compiled in 410ms (760 modules)
