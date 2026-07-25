@@ -29,10 +29,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       },
     });
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     return NextResponse.json(data, { status: response.status });
-  } catch (error: any) {
-    return NextResponse.json({ error: `Connection failed: ${error.message}` }, { status: 502 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return NextResponse.json({ error: `Connection failed: ${errorMessage}` }, { status: 502 });
   }
 }
 
@@ -49,7 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
   const pathStr = path.join("/");
   const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
-  let body: any = {};
+  let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {
@@ -71,9 +72,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     return NextResponse.json(data, { status: response.status });
-  } catch (error: any) {
-    return NextResponse.json({ error: `Connection failed: ${error.message}` }, { status: 502 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return NextResponse.json({ error: `Connection failed: ${errorMessage}` }, { status: 502 });
   }
 }
