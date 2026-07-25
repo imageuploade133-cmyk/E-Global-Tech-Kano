@@ -871,7 +871,7 @@ export default function ProfilePage() {
                       value={idNumber}
                       onChange={(e) => setIdNumber(e.target.value.slice(0, 11))}
                       placeholder={`Enter 11-digit ${kycType.toUpperCase()}...`}
-                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                     />
                   </div>
 
@@ -1006,7 +1006,7 @@ export default function ProfilePage() {
                     required
                     value={oldPin}
                     onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ""))}
-                    className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
+                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all text-center tracking-[0.5em]"
                     placeholder="••••"
                   />
                 </div>
@@ -1020,7 +1020,7 @@ export default function ProfilePage() {
                       required
                       value={newPin}
                       onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all text-center tracking-[0.5em]"
                       placeholder="••••"
                     />
                   </div>
@@ -1032,7 +1032,7 @@ export default function ProfilePage() {
                       required
                       value={confirmPin}
                       onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all text-center tracking-[0.5em]"
                       placeholder="••••"
                     />
                   </div>
@@ -1064,7 +1064,7 @@ export default function ProfilePage() {
                     required
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
-                    className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                     placeholder="••••••••"
                   />
                 </div>
@@ -1077,7 +1077,7 @@ export default function ProfilePage() {
                       required
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full bg-white border border-gray-100 rounded-2xl pl-4 pr-10 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                      className="w-full bg-white border border-black rounded-2xl pl-4 pr-10 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                       placeholder="••••••••"
                     />
                     <button

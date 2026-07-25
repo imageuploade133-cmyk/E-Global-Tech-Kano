@@ -702,7 +702,7 @@ export default function CardsPage() {
                       required
                       value={formName}
                       onChange={(e) => setFormName(e.target.value.toUpperCase())}
-                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                       placeholder="CARD DISPLAY NAME"
                     />
                   </div>
@@ -716,7 +716,7 @@ export default function CardsPage() {
                         required
                         value={deliveryAddress}
                         onChange={(e) => setDeliveryAddress(e.target.value)}
-                        className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                         placeholder="Enter full physical address"
                       />
                     </div>
@@ -731,7 +731,7 @@ export default function CardsPage() {
                       required
                       value={cardPin}
                       onChange={(e) => setCardPin(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all text-center tracking-[0.5em]"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all text-center tracking-[0.5em]"
                       placeholder="••••"
                     />
                   </div>
