@@ -26,10 +26,9 @@ export async function GET(req: Request) {
       },
     });
 
-    const data = await response.json() as Record<string, unknown>;
+    const data = await response.json();
     return NextResponse.json(data, { status: response.status });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    return NextResponse.json({ error: `Connection failed: ${errorMessage}` }, { status: 502 });
+  } catch (error: any) {
+    return NextResponse.json({ error: `Connection failed: ${error.message}` }, { status: 502 });
   }
 }
