@@ -1215,3 +1215,6 @@ Import trace for requested module:
  ✓ Compiled in 856ms (1717 modules)
  GET /?mock=true 200 in 796ms
  GET /history 200 in 120ms
+ ✓ Compiled in 13.8s (1717 modules)
+ GET /?mock=true 200 in 1110ms
+ GET /history 200 in 56ms

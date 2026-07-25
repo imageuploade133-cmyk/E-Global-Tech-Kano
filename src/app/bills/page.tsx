@@ -48,7 +48,7 @@ export default function GenericBillPage() {
   const balance = Number(userData?.balance) || 0;
 
   // Determine Category from URL query or default to AIRTIME
-  const pageCategory = (searchParams.get("type") || "AIRTIME").toUpperCase();
+  const pageCategory = ((searchParams ? searchParams.get("type") : "AIRTIME") || "AIRTIME").toUpperCase();
 
   // Dynamic States
   const [billers, setBillers] = useState<Biller[]>([]);
@@ -137,12 +137,36 @@ export default function GenericBillPage() {
       setValidatedName("");
 
       try {
-        // Map page category to API expected category code
-        const apiCategory = pageCategory === "DATA" ? "MOBILEDATA" : pageCategory;
-        const res = await fetch(`/api/bills/billers?category=${apiCategory}`);
-        if (!res.ok) throw new Error("Failed to load billing providers.");
-        const data = await res.json();
-        setBillers(data.data || []);
+        // Option 1 Design: If category is Airtime or Data, query networks directly from Payment Gateway!
+        if (pageCategory === "AIRTIME" || pageCategory === "DATA") {
+          const res = await fetch("/api/vtu/networks");
+          if (!res.ok) throw new Error("Failed to load networks from gateway.");
+          const data = await res.json();
+          const networkList = (data.networks || []).map((name: string, index: number) => ({
+            id: index + 1,
+            name: `${name} Network`,
+            biller_code: name,
+            logo: "",
+          }));
+          setBillers(networkList);
+        } else if (pageCategory === "UTILITY") {
+          // Option 1 Design: Expose standard Nigerian Electricity companies directly via Clubkonnect integration!
+          const companies = ["IKEDC", "EKEDC", "AEDC", "KEDCO", "PHED", "JED", "EEDC", "IBEDC", "KAEDCO"];
+          const discoList = companies.map((name, index) => ({
+            id: index + 1,
+            name: `${name} Electricity`,
+            biller_code: name,
+            logo: "",
+          }));
+          setBillers(discoList);
+        } else {
+          // Standard other bill payments from Flutterwave path
+          const apiCategory = pageCategory;
+          const res = await fetch(`/api/bills/billers?category=${apiCategory}`);
+          if (!res.ok) throw new Error("Failed to load billing providers.");
+          const data = await res.json();
+          setBillers(data.data || []);
+        }
       } catch (err: unknown) {
         const error = err as Error;
         console.error("Error fetching billers:", error.message);
@@ -158,6 +182,8 @@ export default function GenericBillPage() {
   useEffect(() => {
     if (!selectedBiller) return;
 
+    const currentBiller = selectedBiller;
+
     async function fetchItems() {
       setIsItemsLoading(true);
       setSelectedItem(null);
@@ -166,10 +192,57 @@ export default function GenericBillPage() {
       setValidatedName("");
 
       try {
-        const res = await fetch(`/api/bills/items?biller_code=${selectedBiller?.biller_code}`);
-        if (!res.ok) throw new Error("Failed to load packages.");
-        const data = await res.json();
-        setItems(data.data || []);
+        if (pageCategory === "DATA") {
+          // Dynamic Option 1 Data Plan loading directly from S2S Payment Gateway cache!
+          const res = await fetch(`/api/vtu/data/plans?network=${currentBiller.biller_code}`);
+          if (!res.ok) throw new Error("Failed to load data plans from gateway.");
+          const data = await res.json();
+          const planList = (data.data || []).map((plan: { item_code: string; name: string; amount: number; plan_code: string }, index: number) => ({
+            id: index + 1,
+            biller_code: currentBiller.biller_code,
+            name: plan.name,
+            item_code: plan.item_code,
+            amount: plan.amount,
+            is_fixed_amount: true,
+          }));
+          setItems(planList);
+        } else if (pageCategory === "AIRTIME") {
+          // Pre-populate single customizable manual amount item for Airtime
+          setItems([{
+            id: 1,
+            biller_code: currentBiller.biller_code,
+            name: `${currentBiller.name} Airtime topup`,
+            item_code: "airtime",
+            amount: 0,
+            is_fixed_amount: false,
+          }]);
+        } else if (pageCategory === "UTILITY") {
+          // Pre-populate Prepaid and Postpaid options for Electricity bill payment
+          setItems([
+            {
+              id: 1,
+              biller_code: currentBiller.biller_code,
+              name: "Prepaid Meter Bill Payment",
+              item_code: "prepaid",
+              amount: 0,
+              is_fixed_amount: false,
+            },
+            {
+              id: 2,
+              biller_code: currentBiller.biller_code,
+              name: "Postpaid Meter Bill Payment",
+              item_code: "postpaid",
+              amount: 0,
+              is_fixed_amount: false,
+            }
+          ]);
+        } else {
+          // Standard other bill payments from Flutterwave path
+          const res = await fetch(`/api/bills/items?biller_code=${currentBiller.biller_code}`);
+          if (!res.ok) throw new Error("Failed to load packages.");
+          const data = await res.json();
+          setItems(data.data || []);
+        }
       } catch (err: unknown) {
         const error = err as Error;
         console.error("Error fetching items:", error.message);
@@ -222,23 +295,32 @@ export default function GenericBillPage() {
     setValidatedName("");
 
     try {
-      const res = await fetch("/api/bills/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item_code: selectedItem.item_code,
-          customer_id: customerId,
-          biller_code: selectedBiller.biller_code,
-        }),
-      });
+      let res;
+      if (pageCategory === "UTILITY") {
+        // Direct validation via S2S Payment Gateway validate meter endpoint!
+        res = await fetch(`/api/vtu/electricity/validate?provider=${selectedBiller.biller_code}&meterNo=${customerId}&meterType=${selectedItem.item_code}`);
+      } else {
+        res = await fetch("/api/bills/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item_code: selectedItem.item_code,
+            customer_id: customerId,
+            biller_code: selectedBiller.biller_code,
+          }),
+        });
+      }
 
       const resData = await res.json();
 
       if (!res.ok || !resData.success) {
-        throw new Error(resData.error || "Customer validation failed. Check customer ID.");
+        throw new Error(resData.error || resData.message || "Customer validation failed. Please check identifier.");
       }
 
-      setValidatedName(resData.data.name || "VALIDATED CUSTOMER");
+      setValidatedName(resData.name || "VALIDATED CUSTOMER");
+      if (resData.address) {
+        setValidatedName((prev) => `${prev} (${resData.address})`);
+      }
       toast.success("Billing verification successful!");
     } catch (err: unknown) {
       const error = err as Error;
@@ -297,34 +379,95 @@ export default function GenericBillPage() {
   const executePayment = async (pin: string) => {
     setIsPaying(true);
     setIsPinModalOpen(false);
-    toast.loading("Processing your utility debit transaction...");
+    toast.loading("Verifying your transaction PIN securely...");
 
     try {
       let idToken = await user?.getIdToken();
 
-      let res = await fetch("/api/bills/pay", {
+      // Step 1: Securely verify user's transaction PIN against parent authentication system first
+      const pinVerifyRes = await fetch("/api/auth/pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          biller_code: selectedBiller?.biller_code,
-          item_code: selectedItem?.item_code,
-          amount: finalAmount,
-          customer_id: customerId,
-          biller_name: selectedBiller?.name,
-          biller_type: pageCategory.toLowerCase(),
-          pin,
-        }),
+        body: JSON.stringify({ action: "verify", pin }),
       });
 
-      // Automatic Firebase ID Token refresh retry on 401 Unauthorized
-      if (res.status === 401) {
-        console.log("[Bills Pay] Auth token expired or invalid, forcing refresh and retrying...");
-        idToken = await user?.getIdToken(true);
+      const pinData = await pinVerifyRes.json();
+      if (!pinVerifyRes.ok || !pinData.success) {
+        throw new Error(pinData.message || "Incorrect transaction PIN. Please try again.");
+      }
 
-        res = await fetch("/api/bills/pay", {
+      toast.loading("Processing your VTU transaction with gateway...");
+
+      // Step 2: Route request directly S2S to Payment Gateway VTU endpoints (Option 1)
+      const isData = pageCategory === "DATA";
+      const isAirtime = pageCategory === "AIRTIME";
+      const isUtility = pageCategory === "UTILITY";
+
+      if (isAirtime || isData || isUtility) {
+        const endpoint = isData ? "/api/vtu/data" : (isUtility ? "/api/vtu/electricity" : "/api/vtu/airtime");
+        const payload = isData
+          ? {
+              network: selectedBiller?.biller_code,
+              phone: customerId,
+              item_code: selectedItem?.item_code,
+            }
+          : (isUtility
+              ? {
+                  provider: selectedBiller?.biller_code,
+                  meterNo: customerId,
+                  meterType: selectedItem?.item_code,
+                  amount: finalAmount,
+                }
+              : {
+                  network: selectedBiller?.biller_code,
+                  phone: customerId,
+                  amount: finalAmount,
+                });
+
+        let res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        // Automatic Firebase ID Token refresh retry on 401 Unauthorized
+        if (res.status === 401) {
+          console.log("[VTU Pay] Auth token expired or invalid, forcing refresh and retrying S2S...");
+          idToken = await user?.getIdToken(true);
+
+          res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`,
+            },
+            body: JSON.stringify(payload),
+          });
+        }
+
+        const data = await res.json();
+        toast.dismiss();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || data.error || "Failed to process VTU transaction.");
+        }
+
+        // Success VTU
+        setSuccessReceipt({
+          reference: data.requestId,
+          tx_ref: data.orderId || data.requestId,
+          amount: finalAmount,
+        });
+        toast.success("VTU transaction completed successfully!");
+      } else {
+        // Standard other bill payments from Flutterwave path
+        let res = await fetch("/api/bills/pay", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -340,22 +483,45 @@ export default function GenericBillPage() {
             pin,
           }),
         });
+
+        // Automatic Firebase ID Token refresh retry on 401 Unauthorized
+        if (res.status === 401) {
+          console.log("[Bills Pay] Auth token expired or invalid, forcing refresh and retrying...");
+          idToken = await user?.getIdToken(true);
+
+          res = await fetch("/api/bills/pay", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              biller_code: selectedBiller?.biller_code,
+              item_code: selectedItem?.item_code,
+              amount: finalAmount,
+              customer_id: customerId,
+              biller_name: selectedBiller?.name,
+              biller_type: pageCategory.toLowerCase(),
+              pin,
+            }),
+          });
+        }
+
+        const data = await res.json();
+        toast.dismiss();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Failed to process bill payment.");
+        }
+
+        // Success standard bill
+        setSuccessReceipt(data.data);
+        toast.success("Bill payment processed successfully!");
       }
-
-      const data = await res.json();
-      toast.dismiss();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to process bill payment.");
-      }
-
-      // Success
-      setSuccessReceipt(data.data);
-      toast.success("Bill payment processed successfully!");
     } catch (err: unknown) {
       const error = err as Error;
       toast.dismiss();
-      toast.error(error.message || "Your bill payment failed. Funds are intact.");
+      toast.error(error.message || "Your VTU transaction failed. Your wallet balance is safe.");
     } finally {
       setIsPaying(false);
     }
@@ -729,7 +895,7 @@ export default function GenericBillPage() {
                           placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
                           value={customerId}
                           onChange={(e) => setCustomerId(e.target.value)}
-                          className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                         />
                         {/* Validation Action inside input if applicable */}
                         {customerId.length >= 6 && (
@@ -801,7 +967,7 @@ export default function GenericBillPage() {
                               placeholder="Enter top-up amount manually (Min: ₦100)"
                               value={customAmount}
                               onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full bg-white border border-gray-100 rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                              className="w-full bg-white border border-black rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                             />
                           </div>
                           {isAirtimeInvalid && customAmount !== "" && (
@@ -846,7 +1012,7 @@ export default function GenericBillPage() {
                               placeholder="Amount (e.g. 2000)"
                               value={customAmount}
                               onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full bg-white border border-gray-100 rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                              className="w-full bg-white border border-black rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                             />
                           </div>
                         </div>
@@ -879,7 +1045,7 @@ export default function GenericBillPage() {
                       disabled={isPaying || !customerId || (pageCategory === "AIRTIME" && isAirtimeInvalid) || (finalAmount <= 0)}
                       className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                     >
-                      {isPaying ? "Processing Debit..." : `Proceed to Pay (₦${finalAmount.toLocaleString()})`}
+                      {isPaying ? "Processing..." : `Proceed to Pay (₦${finalAmount.toLocaleString()})`}
                     </button>
                   </motion.div>
                 )}
