@@ -33,6 +33,18 @@ export const OfflineDrawer: React.FC = () => {
     }
   }, []);
 
+  // Prevent background body scroll when offline drawer is active
+  useEffect(() => {
+    if (isOffline) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOffline]);
+
   const handleManualCheck = () => {
     if (typeof window !== "undefined") {
       const isNowOnline = window.navigator.onLine;

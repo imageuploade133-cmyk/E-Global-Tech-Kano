@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -29,6 +29,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   transaction,
   onClose,
 }) => {
+  // Prevent background scrolling while the transaction receipt is displayed
+  useEffect(() => {
+    if (transaction) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [transaction]);
+
   const handleCopyReference = (ref: string) => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(ref);

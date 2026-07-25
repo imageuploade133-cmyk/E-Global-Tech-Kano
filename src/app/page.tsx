@@ -28,6 +28,18 @@ export default function Home() {
       return () => clearTimeout(timer);
     }
   }, [loading]);
+
+  // Prevent background scrolling while any settlement verification overlay is shown
+  useEffect(() => {
+    if (verificationStatus !== "idle") {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [verificationStatus]);
   const [verifiedAmount, setVerifiedAmount] = useState(0);
   const [verifyMessage, setVerifyMessage] = useState("");
   const [isDuplicate, setIsDuplicate] = useState(false);

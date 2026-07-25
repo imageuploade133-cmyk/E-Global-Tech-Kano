@@ -123,6 +123,18 @@ export default function InvestmentPage() {
     }
   }, [showConfirmModal, showCancelModal]);
 
+  // Prevent background scroll when investment confirm or cancel modals are open
+  useEffect(() => {
+    if (showConfirmModal || showCancelModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showConfirmModal, showCancelModal]);
+
   // Load specs and records from dynamic backend or sessionStorage fallback
   const loadInvestmentData = async () => {
     const isMock = sessionStorage.getItem("mock") === "true";

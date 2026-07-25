@@ -97,6 +97,18 @@ export default function ProfilePage() {
   const [showCameraDrawer, setShowCameraDrawer] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
+  // Prevent background scrolling while the selfie camera drawer is open
+  useEffect(() => {
+    if (showCameraDrawer) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showCameraDrawer]);
+
   // Camera & Image Variables
   const [flash, setFlash] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
