@@ -38,6 +38,231 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const router = useRouter();
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
 
+  // Multi-currency States
+  const [selectedCurrency, setSelectedCurrency] = useState<"NGN" | "USD">("NGN");
+  const [walletBalances, setWalletBalances] = useState({ NGN: balance, USD: 0 });
+  const [usdAccountData, setUsdAccountData] = useState<{
+    accountNumber: string;
+    bankName: string;
+    routingNumber: string;
+    swiftCode?: string;
+  } | null>(null);
+
+  const [isUsdFundingOpen, setIsUsdFundingOpen] = useState(false);
+  const [isSwapOpen, setIsSwapOpen] = useState(false);
+
+  // Swap states
+  const [swapAmount, setSwapAmount] = useState("");
+  const [swapRate, setSwapRate] = useState<number | null>(null);
+  const [swapTargetAmount, setSwapTargetAmount] = useState<number>(0);
+  const [isRatesLoading, setIsRatesLoading] = useState(false);
+  const [isSwapping, setIsSwapping] = useState(false);
+
+  useEffect(() => {
+    setWalletBalances(prev => ({ ...prev, NGN: balance }));
+  }, [balance]);
+
+  const fetchWalletBalances = async () => {
+    if (!user) return;
+    try {
+      let idToken = "mock-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock) {
+        idToken = await user.getIdToken();
+      } else {
+        // Mock data
+        setWalletBalances({ NGN: balance, USD: 1250 });
+        setUsdAccountData({
+          accountNumber: "2209418374",
+          bankName: "Silicon Valley Bank",
+          routingNumber: "021000021",
+          swiftCode: "SVBKNM2E"
+        });
+        return;
+      }
+
+      const res = await fetch("/api/wallets", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.wallets) {
+          const ngnBal = data.wallets.NGN?.balance ?? balance;
+          const usdBal = data.wallets.USD?.balance ?? 0;
+          setWalletBalances({ NGN: ngnBal, USD: usdBal });
+        }
+      }
+
+      const accRes = await fetch("/api/wallets/accounts", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      if (accRes.ok) {
+        const accData = await accRes.json();
+        if (accData.success && accData.accounts?.USD) {
+          setUsdAccountData(accData.accounts.USD);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching multi-currency wallet state:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchWalletBalances();
+    // Fetch occasionally
+    const intv = setInterval(fetchWalletBalances, 10000);
+    return () => clearInterval(intv);
+  }, [user, balance]);
+
+  useEffect(() => {
+    if (!isSwapOpen) {
+      setSwapAmount("");
+      setSwapRate(null);
+      setSwapTargetAmount(0);
+      return;
+    }
+
+    const amt = parseFloat(swapAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setSwapRate(null);
+      setSwapTargetAmount(0);
+      return;
+    }
+
+    const fetchRate = async () => {
+      setIsRatesLoading(true);
+      try {
+        const fromCurrency = selectedCurrency;
+        const toCurrency = selectedCurrency === "NGN" ? "USD" : "NGN";
+
+        if (sessionStorage.getItem("mock") === "true") {
+          setTimeout(() => {
+            const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
+            setSwapRate(rate);
+            setSwapTargetAmount(amt * rate);
+            setIsRatesLoading(false);
+          }, 300);
+          return;
+        }
+
+        let idToken = "";
+        if (user) {
+          idToken = await user.getIdToken();
+        }
+
+        const res = await fetch(`/api/wallets/rates?from=${fromCurrency}&to=${toCurrency}&amount=${amt}`, {
+          headers: {
+            "Authorization": `Bearer ${idToken}`
+          }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setSwapRate(data.rate);
+          setSwapTargetAmount(data.targetAmount);
+        } else {
+          // fallback
+          const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
+          setSwapRate(rate);
+          setSwapTargetAmount(amt * rate);
+        }
+      } catch (err) {
+        console.error("Error fetching rate:", err);
+        const fromCurrency = selectedCurrency;
+        const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
+        setSwapRate(rate);
+        setSwapTargetAmount(amt * rate);
+      } finally {
+        setIsRatesLoading(false);
+      }
+    };
+
+    const delay = setTimeout(fetchRate, 400);
+    return () => clearTimeout(delay);
+  }, [swapAmount, isSwapOpen, selectedCurrency, user]);
+
+  const handleSwapExecute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(swapAmount);
+    const fromCurrency = selectedCurrency;
+    const toCurrency = selectedCurrency === "NGN" ? "USD" : "NGN";
+    const available = fromCurrency === "NGN" ? walletBalances.NGN : walletBalances.USD;
+
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid swap amount");
+      return;
+    }
+
+    if (amt > available) {
+      toast.error(`Insufficient balance in your ${fromCurrency} wallet.`);
+      return;
+    }
+
+    setIsSwapping(true);
+    toast.loading("Processing your currency exchange...");
+
+    try {
+      if (sessionStorage.getItem("mock") === "true") {
+        setTimeout(() => {
+          toast.dismiss();
+          const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
+          const targetAmt = amt * rate;
+
+          // Deduct from source and credit target
+          setWalletBalances(prev => {
+            const next = { ...prev };
+            next[fromCurrency] -= amt;
+            next[toCurrency] += targetAmt;
+            return next;
+          });
+
+          toast.success("Currency swapped successfully (MOCK)!");
+          setIsSwapping(false);
+          setIsSwapOpen(false);
+        }, 1000);
+        return;
+      }
+
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/wallets/swap", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          fromCurrency,
+          toCurrency,
+          amount: amt
+        })
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || "Swap transaction completed!");
+        fetchWalletBalances();
+        setIsSwapOpen(false);
+      } else {
+        toast.error(data.error || data.message || "Failed to execute swap.");
+      }
+    } catch (err) {
+      console.error("Swap Error:", err);
+      toast.dismiss();
+      toast.error("Network communication error during swap.");
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+
   // Add Money Wizard States
   const [isAddMoneyOpen, setIsAddMoneyOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<"amount" | "methods" | "ussd-bank" | "ussd-pay" | "transfer-pay" | "success">("amount");
@@ -899,13 +1124,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const formattedBalance = new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 2,
-  }).format(balance);
+  const currentSelectedBalance = selectedCurrency === "NGN" ? walletBalances.NGN : walletBalances.USD;
 
-  const balanceStr = isVisible ? formattedBalance : "₦ •••,•••.••";
+  const formattedBalance = new Intl.NumberFormat(selectedCurrency === "NGN" ? "en-NG" : "en-US", {
+    style: "currency",
+    currency: selectedCurrency,
+    minimumFractionDigits: 2,
+  }).format(currentSelectedBalance);
+
+  const balanceStr = isVisible ? formattedBalance : (selectedCurrency === "NGN" ? "₦ •••,•••.••" : "$ •••,•••.••");
 
   // Dynamic font scaling
   let fontSizeClass = "text-[20px] min-[360px]:text-[24px] min-[400px]:text-[30px] md:text-[36px] lg:text-[40px]";
@@ -1591,6 +1818,25 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   return (
     <>
+    <div className="flex justify-center gap-2 mb-4 w-full select-none">
+      {["NGN", "USD"].map((curr) => (
+        <button
+          key={curr}
+          onClick={() => {
+            setSelectedCurrency(curr as "NGN" | "USD");
+            toast.info(`Switched to ${curr} Wallet`);
+          }}
+          className={`flex-1 max-w-[120px] py-2 text-xs font-bold rounded-xl transition-all border ${
+            selectedCurrency === curr
+              ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-md"
+              : "bg-gray-50 text-gray-400 border-gray-200 hover:text-black hover:bg-gray-100"
+          }`}
+        >
+          {curr}
+        </button>
+      ))}
+    </div>
+
     <motion.section
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -1693,7 +1939,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
           {/* Bottom section: Card Number, User Name, Expiry/infinite badge */}
           <div className="space-y-1.5 w-full overflow-hidden flex-shrink-0">
-            {isLoading || isPermAccountLoading ? (
+            {isLoading || (selectedCurrency === "NGN" && isPermAccountLoading) ? (
               <div className="space-y-2">
                 {/* Skeleton placeholders with precise height and size to prevent layout shift */}
                 <div className="flex justify-between items-center">
@@ -1713,17 +1959,27 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 {/* Prominent Account Number / Card Number styling */}
                 <div className="font-mono text-[13px] min-[360px]:text-[15px] text-white tracking-[0.2em] font-semibold flex items-center justify-between select-all leading-none mb-1">
                   <span>
-                    {permanentAccount ? (
-                      permanentAccount.accountNumber.replace(/(\d{4})(\d{4})(\d{2})/, "$1 $2 $3")
+                    {selectedCurrency === "NGN" ? (
+                      permanentAccount ? (
+                        permanentAccount.accountNumber.replace(/(\d{4})(\d{4})(\d{2})/, "$1 $2 $3")
+                      ) : (
+                        "9921 4732 81" // fallback/mock permanent account number format
+                      )
                     ) : (
-                      "9921 4732 81" // fallback/mock permanent account number format
+                      usdAccountData ? (
+                        usdAccountData.accountNumber.replace(/(\d{4})(\d{4})(\d{2})/, "$1 $2 $3")
+                      ) : (
+                        "2209 4183 74"
+                      )
                     )}
                   </span>
-                  {permanentAccount && (
-                    <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 font-bold">
-                      {permanentAccount.bankName}
-                    </span>
-                  )}
+                  <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 font-bold">
+                    {selectedCurrency === "NGN" ? (
+                      permanentAccount ? permanentAccount.bankName : "Wema Bank"
+                    ) : (
+                      usdAccountData ? usdAccountData.bankName : "Silicon Valley Bank"
+                    )}
+                  </span>
                 </div>
 
                 <div className="flex justify-between items-end gap-2 w-full overflow-hidden">
@@ -1734,7 +1990,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </p>
                   </div>
                   <div className="flex flex-col items-end flex-shrink-0 bg-white/10 px-2 py-0.5 rounded border border-white/15 backdrop-blur-xs select-none">
-                       <span className="font-mono text-[8px] min-[360px]:text-[10px] text-[#FFFFFF] font-black tracking-wider leading-none">NGN</span>
+                       <span className="font-mono text-[8px] min-[360px]:text-[10px] text-[#FFFFFF] font-black tracking-wider leading-none">{selectedCurrency}</span>
                   </div>
                 </div>
               </>
@@ -1749,14 +2005,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           disabled={isLoading}
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
-          onClick={() => setIsAddMoneyOpen(true)}
+          onClick={() => {
+            if (selectedCurrency === "USD") {
+              setIsUsdFundingOpen(true);
+            } else {
+              setIsAddMoneyOpen(true);
+            }
+          }}
           className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">add_card</span>
           </div>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
-            Add Money
+            Fund
           </span>
         </motion.button>
 
@@ -1764,29 +2026,35 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           disabled={isLoading}
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
-          onClick={() => setIsTransferOpen(true)}
+          onClick={() => setIsSwapOpen(true)}
+          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">swap_horiz</span>
+          </div>
+          <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
+            Swap
+          </span>
+        </motion.button>
+
+        <motion.button
+          disabled={isLoading}
+          whileTap={isLoading ? {} : { scale: 0.96 }}
+          whileHover={isLoading ? {} : { scale: 1.02 }}
+          onClick={() => {
+            if (selectedCurrency === "NGN") {
+              setIsTransferOpen(true);
+            } else {
+              toast.info("USD Outward Transfers are coming soon! Swap to NGN to withdraw to domestic bank accounts.");
+            }
+          }}
           className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
             <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">send</span>
           </div>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
-            Transfer
-          </span>
-        </motion.button>
-
-        <motion.button
-          disabled={isLoading}
-          whileTap={isLoading ? {} : { scale: 0.96 }}
-          whileHover={isLoading ? {} : { scale: 1.02 }}
-          onClick={() => router.push("/investment")}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">savings</span>
-          </div>
-          <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
-            Investment
+            Withdraw
           </span>
         </motion.button>
       </div>
@@ -3294,6 +3562,233 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
             </AnimatePresence>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+
+    {/* USD Virtual Funding Instructions Modal */}
+    <AnimatePresence>
+      {isUsdFundingOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsUsdFundingOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+          />
+
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar"
+          >
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
+
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+              <h3 className="font-hanken font-bold text-base text-black">Fund USD Wallet</h3>
+              <button
+                type="button"
+                onClick={() => setIsUsdFundingOpen(false)}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-4 text-left">
+              <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl text-orange-800">
+                <p className="font-hanken font-bold text-xs">Direct USD Inbound Funding</p>
+                <p className="font-hanken text-[10.5px] leading-relaxed mt-1 text-orange-700">
+                  Fund your USD wallet by initiating a local SWIFT or domestic ACH/wire transfer to the virtual bank account details below. Settlement is credited automatically within minutes of confirmation.
+                </p>
+              </div>
+
+              {usdAccountData ? (
+                <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-2xl p-5 space-y-3.5 relative overflow-hidden">
+                  <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">USD RECEIVING ACCOUNT</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded">ACTIVE</span>
+                  </div>
+
+                  <div className="space-y-3 font-hanken text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Bank Name</span>
+                      <span className="font-extrabold text-white">{usdAccountData.bankName}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Account Number</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-black text-white tracking-wider select-all">{usdAccountData.accountNumber}</span>
+                        <button
+                          onClick={() => copyToClipboard(usdAccountData.accountNumber, "Account number")}
+                          className="material-symbols-outlined text-gray-400 hover:text-white text-[16px]"
+                        >
+                          content_copy
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Routing Number</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-white tracking-wider select-all">{usdAccountData.routingNumber}</span>
+                        <button
+                          onClick={() => copyToClipboard(usdAccountData.routingNumber, "Routing number")}
+                          className="material-symbols-outlined text-gray-400 hover:text-white text-[16px]"
+                        >
+                          content_copy
+                        </button>
+                      </div>
+                    </div>
+
+                    {usdAccountData.swiftCode && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">SWIFT / BIC</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-white tracking-wider select-all">{usdAccountData.swiftCode}</span>
+                          <button
+                            onClick={() => copyToClipboard(usdAccountData.swiftCode || "", "SWIFT code")}
+                            className="material-symbols-outlined text-gray-400 hover:text-white text-[16px]"
+                          >
+                            content_copy
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Beneficiary Name</span>
+                      <span className="font-bold text-white truncate max-w-[200px]">{resolvedName}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 text-center text-gray-400 flex flex-col items-center justify-center">
+                  <span className="material-symbols-outlined text-[32px] animate-spin mb-2 text-[#FC7A00]">progress_activity</span>
+                  <p className="font-hanken text-xs font-semibold">Generating your custom USD account...</p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUsdFundingOpen(false);
+                  setIsSwapOpen(true);
+                }}
+                className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                Fund Using NGN Wallet Instead
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+
+    {/* Multi-Currency Swap Modal */}
+    <AnimatePresence>
+      {isSwapOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSwapOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+          />
+
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar"
+          >
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
+
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+              <h3 className="font-hanken font-bold text-base text-black">
+                Swap {selectedCurrency} → {selectedCurrency === "NGN" ? "USD" : "NGN"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsSwapOpen(false)}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSwapExecute} className="space-y-4 text-left">
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Available Balance</p>
+                  <p className="font-mono font-black text-black text-sm mt-0.5">
+                    {selectedCurrency === "NGN" ? "₦" : "$"}{currentSelectedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <span className="text-[10px] bg-[#FC7A00]/10 text-[#FC7A00] font-black px-2 py-0.5 rounded">
+                  {selectedCurrency} WALLET
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Swap</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">
+                    {selectedCurrency === "NGN" ? "₦" : "$"}
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={swapAmount}
+                    onChange={(e) => setSwapAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="w-full bg-white border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                  />
+                </div>
+              </div>
+
+              {isRatesLoading && (
+                <div className="flex items-center gap-2.5 p-3 bg-[#FFF9F5] border border-[#FFECD8] rounded-xl text-xs font-bold text-[#FC7A00] animate-pulse">
+                  <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                  <span>Fetching live exchange rate...</span>
+                </div>
+              )}
+
+              {!isRatesLoading && swapRate !== null && (
+                <div className="bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-4 space-y-2 text-xs">
+                  <div className="flex justify-between text-gray-500">
+                    <span className="font-semibold">Exchange Rate</span>
+                    <span className="font-mono font-black text-black">
+                      1 {selectedCurrency} = {swapRate.toFixed(6)} {selectedCurrency === "NGN" ? "USD" : "NGN"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-500 border-t border-gray-150 pt-2 items-center">
+                    <span className="font-bold">You will receive</span>
+                    <span className="font-mono font-black text-emerald-600 text-sm">
+                      {selectedCurrency === "NGN" ? "$" : "₦"}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSwapping || isRatesLoading || !swapAmount || parseFloat(swapAmount) > currentSelectedBalance}
+                className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                Authorize Swap
+              </button>
+            </form>
           </motion.div>
         </>
       )}

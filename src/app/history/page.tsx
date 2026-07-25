@@ -113,6 +113,7 @@ export default function HistoryPage() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState<"all" | "deposit" | "transfer" | "bills" | "card">("all");
+  const [selectedCurrencyFilter, setSelectedCurrencyFilter] = useState<"ALL" | "NGN" | "USD">("ALL");
   const hasPushedState = React.useRef(false);
 
   // Sync state with browser back history (device physical/swipe back button support)
@@ -150,16 +151,17 @@ export default function HistoryPage() {
     return "all";
   };
 
-  // Filter logic based on category buttons and search key characters
+  // Filter logic based on category buttons, currency, and search key characters
   const filteredTransactions = HISTORICAL_TRANSACTIONS.filter((tx) => {
     const txCategory = getCategoryFromTx(tx);
     const matchesCategory = activeCategory === "all" || txCategory === activeCategory;
+    const matchesCurrency = selectedCurrencyFilter === "ALL" || (tx.currency || "NGN") === selectedCurrencyFilter;
     const matchesSearch =
       tx.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (tx.recipientName && tx.recipientName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       tx.type.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesCategory && matchesSearch && matchesCurrency;
   });
 
   return (
@@ -229,6 +231,28 @@ export default function HistoryPage() {
                 )}
               >
                 {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Currency Filter Row */}
+          <div className="flex gap-2 select-none border-b border-gray-100 pb-2">
+            {[
+              { id: "ALL" as const, label: "All Currencies" },
+              { id: "NGN" as const, label: "NGN (₦)" },
+              { id: "USD" as const, label: "USD ($)" }
+            ].map((cur) => (
+              <button
+                key={cur.id}
+                onClick={() => setSelectedCurrencyFilter(cur.id)}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer border",
+                  selectedCurrencyFilter === cur.id
+                    ? "bg-black text-white border-black"
+                    : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+                )}
+              >
+                {cur.label}
               </button>
             ))}
           </div>

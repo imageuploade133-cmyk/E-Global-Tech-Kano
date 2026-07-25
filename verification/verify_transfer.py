@@ -10,7 +10,7 @@ def run_cuj(page):
 
     # Click the transfer button to open the outward transfer bottom drawer
     print("[Playwright] Opening Outward Transfer drawer...")
-    page.get_by_role("button", name="Transfer").click()
+    page.get_by_role("button", name="Withdraw").click()
     page.wait_for_timeout(1000)
 
     # Open bank selector
