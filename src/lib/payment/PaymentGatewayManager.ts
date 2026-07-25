@@ -104,6 +104,56 @@ export class PaymentGatewayManager {
   }): Promise<{ name: string; payBills: (payload: BillPaymentPayload, idToken?: string) => Promise<BillPaymentResponse> }> {
     console.log(`[PaymentGatewayManager] Selecting gateway for feature: ${params.feature}`);
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+    const gatewayApiKey = process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+
+    // Option 1 Design: If feature is airtime, route to Clubkonnect VTU endpoint on the Payment Gateway
+    if (params.feature === "airtime") {
+      return {
+        name: "clubkonnect",
+        payBills: async (payload: BillPaymentPayload, idToken?: string) => {
+          console.log(`[PaymentGatewayManager] Routing airtime purchase S2S to Clubkonnect VTU endpoint | ref=${payload.reference}`);
+
+          const response = await fetch(`${gatewayUrl}/api/vtu/airtime`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${idToken || ""}`,
+              "x-api-key": gatewayApiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              network: payload.biller_name || "MTN",
+              phone: payload.customer_id,
+              amount: payload.amount,
+            }),
+          });
+
+          const resData = await response.json();
+          if (response.ok && resData.success) {
+            return {
+              success: true,
+              reference: payload.reference,
+              tx_ref: payload.reference,
+              flw_ref: resData.orderId || resData.requestId,
+              amount: payload.amount,
+              customer: payload.customer_id,
+              biller_name: payload.biller_name,
+            };
+          }
+
+          return {
+            success: false,
+            reference: payload.reference,
+            tx_ref: payload.reference,
+            amount: payload.amount,
+            customer: payload.customer_id,
+            biller_name: payload.biller_name,
+            error: resData.message || "Failed to process airtime VTU payment via Clubkonnect.",
+          };
+        }
+      };
+    }
+
+    // Default Flutterwave path for other bills (sends both Firebase ID Token & Gateway S2S API Key)
     return {
       name: "flutterwave",
       payBills: async (payload: BillPaymentPayload, idToken?: string) => {
@@ -111,6 +161,7 @@ export class PaymentGatewayManager {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${idToken || ""}`,
+            "x-api-key": gatewayApiKey,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
