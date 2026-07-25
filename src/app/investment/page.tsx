@@ -618,7 +618,7 @@ export default function InvestmentPage() {
                   placeholder={`Min ₦${minInvestment.toLocaleString()}`}
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
-                  className="w-full pl-8 pr-12 py-3.5 bg-white border border-gray-100 rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                  className="w-full pl-8 pr-12 py-3.5 bg-white border border-black rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                 />
                 <button
                   type="button"
@@ -640,7 +640,7 @@ export default function InvestmentPage() {
                 value={maturityDate}
                 onChange={(e) => setMaturityDate(e.target.value)}
                 min={new Date(Date.now() + selectedProduct.durationDays * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
-                className="w-full px-4 py-3.5 bg-white border border-gray-100 rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                className="w-full max-w-full box-border px-4 py-3.5 bg-white border border-black rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
               />
             </div>
 

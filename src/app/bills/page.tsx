@@ -848,7 +848,7 @@ export default function GenericBillPage() {
                           placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
                           value={customerId}
                           onChange={(e) => setCustomerId(e.target.value)}
-                          className="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                         />
                         {/* Validation Action inside input if applicable */}
                         {customerId.length >= 6 && pageCategory !== "DATA" && pageCategory !== "AIRTIME" && (
@@ -920,7 +920,7 @@ export default function GenericBillPage() {
                               placeholder="Enter top-up amount manually (Min: ₦100)"
                               value={customAmount}
                               onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full bg-white border border-gray-100 rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                              className="w-full bg-white border border-black rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                             />
                           </div>
                           {isAirtimeInvalid && customAmount !== "" && (
@@ -965,7 +965,7 @@ export default function GenericBillPage() {
                               placeholder="Amount (e.g. 2000)"
                               value={customAmount}
                               onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full bg-white border border-gray-100 rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                              className="w-full bg-white border border-black rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                             />
                           </div>
                         </div>
