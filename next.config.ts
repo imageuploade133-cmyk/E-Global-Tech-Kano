@@ -7,10 +7,6 @@ const nextConfig = {
         source: "/api/flutterwave/:path*",
         destination: "https://etechglobalhub.duckdns.org/api/flutterwave/:path*",
       },
-      {
-        source: "/api/vtu/:path*",
-        destination: "https://etechglobalhub.duckdns.org/api/vtu/:path*",
-      },
     ];
   },
   images: {
