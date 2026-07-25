@@ -2380,7 +2380,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   )}
 
-                  <div className="max-h-[250px] overflow-y-auto space-y-2.5 pr-1 no-scrollbar pb-2">
+                  <div className="max-h-[400px] overflow-y-auto space-y-2.5 px-1 pr-1.5 no-scrollbar pb-2">
                     {isBanksLoading ? (
                       <div className="p-4 space-y-3.5">
                         {[1, 2, 3, 4].map((i) => (
@@ -3214,7 +3214,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                   <p className="font-hanken text-xs font-semibold">Loading banks directory...</p>
                                 </div>
                               ) : (
-                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 no-scrollbar pb-6">
+                                <div className="flex-1 overflow-y-auto space-y-2.5 px-1 pr-1.5 no-scrollbar pb-6">
                                   {filteredTrfBanks.map((bank) => {
                                     const initials = bank.name.substring(0, 2).toUpperCase();
                                     const colors = [
