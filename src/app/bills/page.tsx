@@ -288,9 +288,9 @@ export default function GenericBillPage() {
     toast.loading("Processing your utility debit transaction...");
 
     try {
-      const idToken = await user?.getIdToken();
+      let idToken = await user?.getIdToken();
 
-      const res = await fetch("/api/bills/pay", {
+      let res = await fetch("/api/bills/pay", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -306,6 +306,29 @@ export default function GenericBillPage() {
           pin,
         }),
       });
+
+      // Automatic Firebase ID Token refresh retry on 401 Unauthorized
+      if (res.status === 401) {
+        console.log("[Bills Pay] Auth token expired or invalid, forcing refresh and retrying...");
+        idToken = await user?.getIdToken(true);
+
+        res = await fetch("/api/bills/pay", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            biller_code: selectedBiller?.biller_code,
+            item_code: selectedItem?.item_code,
+            amount: finalAmount,
+            customer_id: customerId,
+            biller_name: selectedBiller?.name,
+            biller_type: pageCategory.toLowerCase(),
+            pin,
+          }),
+        });
+      }
 
       const data = await res.json();
       toast.dismiss();
