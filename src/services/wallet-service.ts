@@ -7,7 +7,7 @@ export interface TransactionRecord {
   currency: string;
   reference: string;
   flwId?: string | null;
-  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS";
+  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS" | "SWAP_DEBIT" | "SWAP_CREDIT";
   description: string;
   recipientName: string;
   status: "SUCCESS" | "FAILED" | "PENDING";
@@ -42,7 +42,8 @@ export class WalletService {
    * Validates a currency code.
    */
   static validateCurrency(currency: string): void {
-    if (currency !== "NGN" && currency !== "USD") {
+    const uc = (currency || "").toUpperCase();
+    if (uc !== "NGN" && uc !== "USD") {
       throw new Error(`Unsupported currency: ${currency}. Only NGN and USD are supported.`);
     }
   }
@@ -84,6 +85,7 @@ export class WalletService {
       description: string;
       recipientName: string;
       fee?: number;
+      type?: TransactionRecord["type"];
       preLoadedUser?: {
         ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
         data: FirebaseFirestore.DocumentData;
@@ -91,22 +93,37 @@ export class WalletService {
       };
     }
   ): Promise<{ previousBalance: number; newBalance: number }> {
-    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0, preLoadedUser } = params;
+    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0, type = "DEPOSIT", preLoadedUser } = params;
+
+    const ucCurrency = (currency || "NGN").toUpperCase();
 
     // Strict validation
     this.validateAmount(amount);
-    this.validateCurrency(currency);
+    this.validateCurrency(ucCurrency);
 
-    // Retrieve user and current balance
-    const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
-    const currentBalance = user.balance;
+    // Retrieve specific wallet balance from wallets collection
+    const walletRef = adminDb.collection("wallets").doc(`${userId}_${ucCurrency}`);
+    const walletDoc = await transaction.get(walletRef);
+    const currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
     const creditAmount = amount;
     const newBalance = currentBalance + creditAmount;
 
-    // Update wallet balance atomically
-    transaction.update(user.ref, {
+    // Update specific wallet balance atomically
+    transaction.set(walletRef, {
+      userId,
+      currency: ucCurrency,
       balance: FieldValue.increment(creditAmount),
-    });
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    // Keep legacy root balance updated for NGN
+    if (ucCurrency === "NGN") {
+      const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
+      transaction.update(user.ref, {
+        balance: FieldValue.increment(creditAmount),
+      });
+    }
 
     // Record transaction in general ledger
     const ledgerDocId = docId || `tx-${reference}`;
@@ -114,10 +131,10 @@ export class WalletService {
     const ledgerRecord: TransactionRecord = {
       userId,
       amount: creditAmount,
-      currency,
+      currency: ucCurrency,
       reference,
       flwId: flwId || null,
-      type: "DEPOSIT",
+      type,
       description,
       recipientName,
       status: "SUCCESS",
@@ -146,7 +163,7 @@ export class WalletService {
       currency: string;
       reference: string;
       docId?: string;
-      type: "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS";
+      type: TransactionRecord["type"];
       description: string;
       recipientName: string;
       fee?: number;
@@ -160,26 +177,40 @@ export class WalletService {
   ): Promise<{ previousBalance: number; newBalance: number }> {
     const { userId, amount, currency, reference, docId, type, description, recipientName, fee = 0, isPending = false, preLoadedUser } = params;
 
+    const ucCurrency = (currency || "NGN").toUpperCase();
+
     // Strict validation
     this.validateAmount(amount);
-    this.validateCurrency(currency);
+    this.validateCurrency(ucCurrency);
 
-    // Retrieve user and current balance
-    const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
-    const currentBalance = user.balance;
+    // Retrieve specific wallet balance from wallets collection
+    const walletRef = adminDb.collection("wallets").doc(`${userId}_${ucCurrency}`);
+    const walletDoc = await transaction.get(walletRef);
+    const currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
 
     const totalDeduction = amount; // Fee is handled separately or included in amount
 
     if (currentBalance < totalDeduction) {
-      throw new Error(`Insufficient wallet funds to complete this ${type.toLowerCase()}. Required: ₦${totalDeduction}, Available: ₦${currentBalance}`);
+      throw new Error(`Insufficient wallet funds to complete this ${type.toLowerCase()}. Required: ${ucCurrency === "NGN" ? "₦" : "$"}${totalDeduction}, Available: ${ucCurrency === "NGN" ? "₦" : "$"}${currentBalance}`);
     }
 
     const newBalance = currentBalance - totalDeduction;
 
-    // Update wallet balance atomically
-    transaction.update(user.ref, {
+    // Update specific wallet balance atomically
+    transaction.set(walletRef, {
+      userId,
+      currency: ucCurrency,
       balance: FieldValue.increment(-totalDeduction),
-    });
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    // Keep legacy root balance updated for NGN
+    if (ucCurrency === "NGN") {
+      const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
+      transaction.update(user.ref, {
+        balance: FieldValue.increment(-totalDeduction),
+      });
+    }
 
     // Record transaction in general ledger
     const ledgerDocId = docId || `tx-${reference}`;
@@ -187,7 +218,7 @@ export class WalletService {
     const ledgerRecord: TransactionRecord = {
       userId,
       amount,
-      currency,
+      currency: ucCurrency,
       reference,
       type,
       description,

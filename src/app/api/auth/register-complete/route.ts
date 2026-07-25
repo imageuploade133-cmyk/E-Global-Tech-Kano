@@ -92,7 +92,55 @@ export async function POST(req: Request) {
     // Use merge to prevent deletion of fields like PIN, pinHash, dailyLimit, isPinRequired, etc.
     await userRef.set(updatedProfile, { merge: true });
 
-    return NextResponse.json({ success: true, message: "User document stored successfully." });
+    // Initialize Multi-Currency Wallets and Virtual Accounts
+    const ngnWalletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
+    const usdWalletRef = adminDb.collection("wallets").doc(`${uid}_USD`);
+
+    await ngnWalletRef.set({
+      userId: uid,
+      currency: "NGN",
+      balance: finalBalance,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    await usdWalletRef.set({
+      userId: uid,
+      currency: "USD",
+      balance: 0.00,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    // Initialize default/pending virtual accounts in Firestore
+    const ngnAccountRef = adminDb.collection("wallet_accounts").doc(uid);
+    const usdAccountRef = adminDb.collection("wallet_accounts").doc(`${uid}_USD`);
+
+    await ngnAccountRef.set({
+      userId: uid,
+      accountNumber: "9921473281",
+      bankName: "Wema Bank",
+      accountName: `${cleanFirstName} ${cleanLastName} - E-Tech`,
+      currency: "NGN",
+      isPermanent: true,
+      status: "active",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    await usdAccountRef.set({
+      userId: uid,
+      accountNumber: "2209418374",
+      bankName: "Silicon Valley Bank",
+      accountName: `${cleanFirstName} ${cleanLastName} - E-Tech`,
+      routingNumber: "021000021",
+      swiftCode: "SVBKNM2E",
+      currency: "USD",
+      isPermanent: true,
+      status: "active",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    return NextResponse.json({ success: true, message: "User document stored successfully and multi-currency wallets initialized." });
   } catch (err: unknown) {
     const error = err as Error;
     return NextResponse.json({ error: error.message || "An error occurred writing user registration data." }, { status: 500 });
