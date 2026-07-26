@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { MOCK_ITEMS } from "./config";
+import { safeParseJson } from "@/lib/utils";
 
 export async function GET(req: Request) {
   try {
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, data: fallback });
     }
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
     return NextResponse.json({ success: true, data: resData.data || fallback });
   } catch {
     const url = new URL(req.url);

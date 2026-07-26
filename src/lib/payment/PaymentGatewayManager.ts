@@ -1,5 +1,6 @@
 import { adminDb } from "../firebase-admin";
 import { logPaymentEvent } from "../payment-logger";
+import { safeParseJson } from "@/lib/utils";
 
 export interface GatewayConfig {
   id: string;
@@ -127,7 +128,7 @@ export class PaymentGatewayManager {
             }),
           });
 
-          const resData = await response.json();
+          const resData = await safeParseJson(response);
           if (response.ok && resData.success) {
             return {
               success: true,
@@ -175,7 +176,7 @@ export class PaymentGatewayManager {
           }),
         });
 
-        const resData = await response.json();
+        const resData = await safeParseJson(response);
         if (response.ok && resData.status === "success") {
           return {
             success: true,

@@ -32,3 +32,24 @@ export function formatFirebaseError(error: unknown): string {
       return err.message || "An error occurred during secure authentication. Please check your network and try again.";
   }
 }
+
+/**
+ * Safely parses response JSON, detecting HTML error pages and generating informative errors.
+ * This prevents throwing vague "Unexpected token '<'" exceptions.
+ */
+export async function safeParseJson(response: Response): Promise<any> {
+  const contentType = response.headers.get("content-type") || "";
+  const text = await response.text();
+
+  if (contentType.includes("text/html") || text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
+    console.error(`[Safe JSON Parse Error] Expected JSON but received HTML from ${response.url}. Status: ${response.status}. Body prefix: ${text.slice(0, 500)}`);
+    throw new Error(`Upstream server returned an HTML error page (Status: ${response.status}). Body: ${text.slice(0, 150)}...`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (err: any) {
+    console.error(`[Safe JSON Parse Error] Failed to parse JSON from ${response.url}. Status: ${response.status}. Error: ${err.message}. Body prefix: ${text.slice(0, 500)}`);
+    throw new Error(`Malformed JSON response from upstream (Status: ${response.status}). Body: ${text.slice(0, 150)}...`);
+  }
+}

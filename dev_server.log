@@ -7,112 +7,35 @@
    - Network:      http://192.168.0.2:3000
 
  ✓ Starting...
- ✓ Ready in 2.3s
+ ✓ Ready in 1863ms
  ○ Compiling / ...
- ✓ Compiled / in 20.3s (1727 modules)
- HEAD / 200 in 22345ms
- ○ Compiling /bills ...
- ✓ Compiled /bills in 1815ms (1716 modules)
- GET /bills?type=cable&mock=true 200 in 2545ms
- ✓ Compiled in 485ms (758 modules)
- ○ Compiling /api/vtu/cable/packages ...
- ✓ Compiled /api/vtu/cable/packages in 1372ms (1721 modules)
- GET /api/vtu/cable/packages?provider=dstv 200 in 1351ms
- GET /bills?type=cable&mock=true 200 in 278ms
- ✓ Compiled in 303ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 694ms
- ✓ Compiled in 862ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 46ms
- ○ Compiling /api/vtu/waec/products ...
- ✓ Compiled /api/vtu/waec/products in 1264ms (1711 modules)
-WAEC PRODUCTS HEADERS: {
-  accept: '*/*',
-  'accept-encoding': 'gzip, deflate, br, zstd',
-  authorization: 'Bearer mock-token',
-  connection: 'keep-alive',
-  host: 'localhost:3000',
-  referer: 'http://localhost:3000/bills?type=waec&mock=true',
-  'sec-ch-ua': '"Not:A-Brand";v="99", "HeadlessChrome";v="145", "Chromium";v="145"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"iOS"',
-  'sec-fetch-dest': 'empty',
-  'sec-fetch-mode': 'cors',
-  'sec-fetch-site': 'same-origin',
-  'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
-  'x-forwarded-for': '::1',
-  'x-forwarded-host': 'localhost:3000',
-  'x-forwarded-port': '3000',
-  'x-forwarded-proto': 'http'
-}
- GET /api/vtu/waec/products 200 in 1092ms
- GET /bills?type=waec&mock=true 200 in 177ms
- ✓ Compiled in 306ms (759 modules)
- ✓ Compiled in 537ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 528ms
- ✓ Compiled in 320ms (759 modules)
- ✓ Compiled in 309ms (759 modules)
- ✓ Compiled in 284ms (759 modules)
- ✓ Compiled in 560ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 71ms
- ✓ Compiled in 535ms (759 modules)
- ✓ Compiled in 306ms (759 modules)
- ✓ Compiled in 270ms (759 modules)
- ✓ Compiled in 597ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 43ms
- ✓ Compiled in 400ms (759 modules)
- ✓ Compiled in 291ms (759 modules)
- ✓ Compiled in 301ms (759 modules)
- ✓ Compiled in 504ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 54ms
- ✓ Compiled in 371ms (759 modules)
- ✓ Compiled in 278ms (759 modules)
- ✓ Compiled in 233ms (759 modules)
- ✓ Compiled in 548ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 40ms
- ✓ Compiled in 486ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 40ms
- ✓ Compiled in 324ms (759 modules)
- ✓ Compiled in 296ms (759 modules)
- GET /bills?type=cable&mock=true 200 in 45ms
- ✓ Compiled in 587ms (759 modules)
- ○ Compiling /api/vtu/cable/packages ...
- ✓ Compiled /api/vtu/cable/packages in 804ms (1725 modules)
- GET /api/vtu/cable/packages?provider=dstv 200 in 764ms
- GET /bills?type=cable&mock=true 200 in 201ms
- ✓ Compiled in 290ms (759 modules)
- ✓ Compiled in 580ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 514ms
- ✓ Compiled in 343ms (759 modules)
- ✓ Compiled in 293ms (759 modules)
- ✓ Compiled in 357ms (759 modules)
- ✓ Compiled in 569ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 41ms
- ✓ Compiled in 389ms (759 modules)
- ○ Compiling /api/vtu/waec/products ...
- ✓ Compiled /api/vtu/waec/products in 1406ms (1725 modules)
-WAEC PRODUCTS HEADERS: {
-  accept: '*/*',
-  'accept-encoding': 'gzip, deflate, br, zstd',
-  authorization: 'Bearer mock-token',
-  connection: 'keep-alive',
-  host: 'localhost:3000',
-  referer: 'http://localhost:3000/bills?type=waec&mock=true',
-  'sec-ch-ua': '"Not:A-Brand";v="99", "HeadlessChrome";v="145", "Chromium";v="145"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"iOS"',
-  'sec-fetch-dest': 'empty',
-  'sec-fetch-mode': 'cors',
-  'sec-fetch-site': 'same-origin',
-  'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
-  'x-forwarded-for': '::1',
-  'x-forwarded-host': 'localhost:3000',
-  'x-forwarded-port': '3000',
-  'x-forwarded-proto': 'http'
-}
- GET /api/vtu/waec/products 200 in 1327ms
- GET /bills?type=waec&mock=true 200 in 165ms
- ✓ Compiled in 349ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 34ms
- ✓ Compiled in 246ms (759 modules)
- GET /bills?type=waec&mock=true 200 in 28ms
- ✓ Compiled in 295ms (759 modules)
+ ✓ Compiled / in 13.5s (1727 modules)
+ GET /?mock=true 200 in 15146ms
+ ○ Compiling /history ...
+ ✓ Compiled /history in 1475ms (1716 modules)
+ GET /history 200 in 1624ms
+ GET /history 200 in 50ms
+ ○ Compiling /api/wallets ...
+ ✓ Compiled /api/wallets in 703ms (1725 modules)
+[Firebase Admin] Initialized with explicit fallback projectId: e-tech-global-hub
+[GET /api/wallets] [req-1785083151570-0su6] Received get-wallets request
+[GET /api/wallets] [req-1785083151570-0su6] Auth failure: Missing Firebase ID token in Authorization header.
+ GET /api/wallets 401 in 1227ms
+ ✓ Compiled /api/wallets/[...path] in 445ms (1727 modules)
+[Firebase Admin] Initialized with explicit fallback projectId: e-tech-global-hub
+[GET /api/wallets/[...path]] [req-1785083176795-ffim] Auth failure: Missing Firebase ID token in Authorization header.
+ GET /api/wallets/accounts 401 in 1526ms
+[GET /api/wallets/[...path]] [req-1785083206645-i1vo] Auth failure: Missing Firebase ID token in Authorization header.
+ GET /api/wallets/rates?from=NGN&to=USD&amount=1000 401 in 31ms
+[Firebase Admin] Initialized with explicit fallback projectId: e-tech-global-hub
+ GET / 200 in 682ms
+ ✓ Compiled in 453ms (759 modules)
+ ○ Compiling /auth/login ...
+ ✓ Compiled /auth/login in 504ms (1732 modules)
+ GET /auth/login 200 in 613ms
+ GET / 200 in 292ms
+ ✓ Compiled in 307ms (761 modules)
+ GET /?mock=true 200 in 69ms
+(node:290010) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ Compiled in 745ms (761 modules)

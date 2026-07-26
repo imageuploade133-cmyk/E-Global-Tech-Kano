@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeParseJson } from "@/lib/utils";
 
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       }),
     });
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
 
     if (!response.ok || resData.status !== "success") {
       return NextResponse.json({ error: resData.message || "Customer validation failed. Please check details and try again." }, { status: 400 });

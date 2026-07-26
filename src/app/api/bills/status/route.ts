@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeParseJson } from "@/lib/utils";
 
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
 
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
       },
     });
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
 
     if (!response.ok || resData.status !== "success") {
       return NextResponse.json({ error: resData.message || "Failed to retrieve bill payment status." }, { status: 400 });

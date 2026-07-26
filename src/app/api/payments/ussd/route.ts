@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
+import { safeParseJson } from "@/lib/utils";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
 
@@ -126,7 +127,7 @@ export async function POST(req: Request) {
       body: JSON.stringify(gatewayPayload),
     });
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
 
     // Step 5: Log everything - After forwarding
     console.log("Gateway response", resData);

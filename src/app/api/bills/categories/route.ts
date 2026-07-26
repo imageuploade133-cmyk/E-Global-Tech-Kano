@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeParseJson } from "@/lib/utils";
 
 const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY || "";
 
@@ -29,7 +30,7 @@ export async function GET() {
       return NextResponse.json({ success: true, data: MOCK_CATEGORIES });
     }
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
     return NextResponse.json({ success: true, data: resData.data || MOCK_CATEGORIES });
   } catch {
     return NextResponse.json({ success: true, data: MOCK_CATEGORIES });
