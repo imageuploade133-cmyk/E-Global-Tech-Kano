@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
+import { safeParseJson } from "@/lib/utils";
 
 const BANKS_API_URL = "https://etechglobalhub.duckdns.org/api/flutterwave/banks";
 
@@ -127,7 +128,7 @@ export class BankService {
       throw new Error(`Flutterwave API bank sync failed: ${errText}`);
     }
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
     if (resData.status !== "success" || !Array.isArray(resData.data)) {
       console.error("[BankService Sync Error] Unexpected payload structure:", resData);
       throw new Error("Failed to sync banks: Unexpected Flutterwave API response payload.");

@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { UserWalletAccount, FLWVirtualAccountResponse } from "@/types/flutterwave";
+import { safeParseJson } from "@/lib/utils";
 
 const FLW_BASE_URL = "https://etechglobalhub.duckdns.org/api/flutterwave";
 
@@ -94,7 +95,7 @@ export class VirtualAccountService {
       }),
     });
 
-    const resData: FLWVirtualAccountResponse = await response.json();
+    const resData: FLWVirtualAccountResponse = await safeParseJson(response);
 
     console.log(`[Virtual Account API Call] HTTP Status: ${response.status}`);
     console.log(`[Virtual Account API Raw Response] ${JSON.stringify(resData)}`);

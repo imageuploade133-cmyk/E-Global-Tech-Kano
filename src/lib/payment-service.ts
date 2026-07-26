@@ -1,3 +1,5 @@
+import { safeParseJson } from "@/lib/utils";
+
 const FLW_BASE_URL = "https://etechglobalhub.duckdns.org/api/flutterwave";
 
 export interface USSDPaymentPayload {
@@ -55,7 +57,7 @@ export class PaymentService {
       }),
     });
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
 
     console.log(`[VM Payment Gateway USSD Charge API] HTTP Status: ${response.status}`);
     console.log(`[VM Payment Gateway USSD Charge API] Raw Response: ${JSON.stringify(resData)}`);
@@ -122,7 +124,7 @@ export class PaymentService {
       }),
     });
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
 
     console.log(`[VM Payment Gateway Bank Transfer Charge API] HTTP Status: ${response.status}`);
     console.log(`[VM Payment Gateway Bank Transfer Charge API] Raw Response: ${JSON.stringify(resData)}`);
@@ -180,7 +182,7 @@ export class PaymentService {
       body: JSON.stringify({ txRef }),
     });
 
-    const resData = await response.json();
+    const resData = await safeParseJson(response);
 
     if (!response.ok) {
       const errorMsg = resData.message || "";
