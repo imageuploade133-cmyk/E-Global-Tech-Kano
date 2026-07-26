@@ -1394,6 +1394,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           handleSaveBulkRecents();
           setTrfStep("completion");
           toast.success("Bulk batch queued successfully!");
+          fetchWalletBalances(); // Re-fetch immediately to update balance state in UI
         } else {
           setTrfPin("");
           const backendErr = data.error || data.message || data.data?.message || "Bulk transfer queuing failed.";
@@ -1461,6 +1462,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         handleSaveRecent();
         setTrfStep("completion");
         toast.success("Transfer initiated successfully!");
+        fetchWalletBalances(); // Re-fetch immediately to update balance state in UI
       } else {
         setTrfPin("");
         // Specific improved error reporting from backend (TASK 4)
