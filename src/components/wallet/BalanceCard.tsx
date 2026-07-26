@@ -2029,7 +2029,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       </div>
 
       {/* Action Buttons Below Card */}
-      <div className="mt-4 min-[360px]:mt-5 flex gap-2 min-[360px]:gap-3 select-none">
+      <div className="mt-4 min-[360px]:mt-5 flex gap-2 min-[360px]:gap-3 select-none w-full">
         <motion.button
           disabled={isLoading}
           whileTap={isLoading ? {} : { scale: 0.96 }}
@@ -2041,11 +2041,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               setIsAddMoneyOpen(true);
             }
           }}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 min-w-0 py-2.5 min-[360px]:py-3.5 px-1.5 min-[360px]:px-2 bg-gradient-to-br from-[#045C1D] via-[#07B038] to-[#034A17] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">add_card</span>
-          </div>
+          <span className="material-symbols-outlined text-white text-[14px] min-[360px]:text-[16px] font-bold block leading-none group-hover:scale-110 transition-transform duration-300 flex-shrink-0">add_card</span>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Fund
           </span>
@@ -2056,11 +2054,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => setIsSwapOpen(true)}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 min-w-0 py-2.5 min-[360px]:py-3.5 px-1.5 min-[360px]:px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">swap_horiz</span>
-          </div>
+          <span className="material-symbols-outlined text-white text-[14px] min-[360px]:text-[16px] font-bold block leading-none group-hover:scale-110 transition-transform duration-300 flex-shrink-0">swap_horiz</span>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Swap
           </span>
@@ -2077,11 +2073,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               toast.info("USD Outward Transfers are coming soon! Swap to NGN to withdraw to domestic bank accounts.");
             }
           }}
-          className="flex-grow py-2.5 min-[360px]:py-3.5 px-2 bg-gradient-to-br from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 min-w-0 py-2.5 min-[360px]:py-3.5 px-1.5 min-[360px]:px-2 bg-gradient-to-br from-[#B35200] via-[#FC7A00] to-[#8C4000] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <div className="w-5.5 h-5.5 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-none group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[11px] min-[360px]:text-[13px] font-bold block leading-none">send</span>
-          </div>
+          <span className="material-symbols-outlined text-white text-[14px] min-[360px]:text-[16px] font-bold block leading-none group-hover:scale-110 transition-transform duration-300 flex-shrink-0">send</span>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
             Withdraw
           </span>
