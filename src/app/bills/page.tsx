@@ -37,7 +37,11 @@ export default function GenericBillPage() {
   const [pagePreloading, setPagePreloading] = useState(true);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" });
+    try {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } catch (err) {
+      console.warn("scrollTo failed:", err);
+    }
     const timer = setTimeout(() => {
       setPagePreloading(false);
     }, 1200);
@@ -73,7 +77,7 @@ export default function GenericBillPage() {
   const [keypadNumbers, setKeypadNumbers] = useState<string[]>([]);
 
   // Payment Success Screen States
-  const [successReceipt, setSuccessReceipt] = useState<{ reference?: string; tx_ref?: string; amount?: number } | null>(null);
+  const [successReceipt, setSuccessReceipt] = useState<{ reference?: string; tx_ref?: string; amount?: number; pins?: Array<{ pin: string; serial?: string }> } | null>(null);
 
   const getPageTitle = () => {
     switch (pageCategory) {
@@ -83,6 +87,7 @@ export default function GenericBillPage() {
       case "CABLE": return "Cable TV Bills";
       case "UTILITY": return "Electricity Utility Bills";
       case "INTERNET": return "Internet Subscriptions";
+      case "WAEC": return "Buy WAEC PINs";
       default: return "Bill Payments";
     }
   };
@@ -95,6 +100,7 @@ export default function GenericBillPage() {
       case "CABLE": return "tv";
       case "UTILITY": return "bolt";
       case "INTERNET": return "language";
+      case "WAEC": return "school";
       default: return "payments";
     }
   };
@@ -137,9 +143,20 @@ export default function GenericBillPage() {
       setValidatedName("");
 
       try {
+        const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+        let idToken = "mock-token";
+        if (!isMock && user) {
+          try {
+            idToken = await user.getIdToken();
+          } catch (tokErr) {
+            console.warn("Failed to get idToken:", tokErr);
+          }
+        }
+        const authHeaders = { "Authorization": `Bearer ${idToken}` };
+
         // Option 1 Design: If category is Airtime or Data, query networks directly from Payment Gateway!
         if (pageCategory === "AIRTIME" || pageCategory === "DATA") {
-          const res = await fetch("/api/vtu/networks");
+          const res = await fetch("/api/vtu/networks", { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load networks from gateway.");
           const data = await res.json();
           const networkList = (data.networks || []).map((name: string, index: number) => ({
@@ -159,6 +176,25 @@ export default function GenericBillPage() {
             logo: "",
           }));
           setBillers(discoList);
+        } else if (pageCategory === "CABLE") {
+          // Expose supported Cable TV providers directly via Clubkonnect integration!
+          const providers = ["DStv", "GOtv", "StarTimes"];
+          const providerList = providers.map((name, index) => ({
+            id: index + 1,
+            name: name,
+            biller_code: name.toLowerCase(),
+            logo: "",
+          }));
+          setBillers(providerList);
+        } else if (pageCategory === "WAEC") {
+          // Expose WAEC Virtual Provider for the card interface selector
+          const providerList = [{
+            id: 1,
+            name: "WAEC Council",
+            biller_code: "waec",
+            logo: "",
+          }];
+          setBillers(providerList);
         } else {
           // Standard other bill payments from Flutterwave path
           const apiCategory = pageCategory;
@@ -192,9 +228,20 @@ export default function GenericBillPage() {
       setValidatedName("");
 
       try {
+        const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+        let idToken = "mock-token";
+        if (!isMock && user) {
+          try {
+            idToken = await user.getIdToken();
+          } catch (tokErr) {
+            console.warn("Failed to get idToken:", tokErr);
+          }
+        }
+        const authHeaders = { "Authorization": `Bearer ${idToken}` };
+
         if (pageCategory === "DATA") {
           // Dynamic Option 1 Data Plan loading directly from S2S Payment Gateway cache!
-          const res = await fetch(`/api/vtu/data/plans?network=${currentBiller.biller_code}`);
+          const res = await fetch(`/api/vtu/data/plans?network=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load data plans from gateway.");
           const data = await res.json();
           const planList = (data.data || []).map((plan: { item_code: string; name: string; amount: number; plan_code: string }, index: number) => ({
@@ -236,9 +283,37 @@ export default function GenericBillPage() {
               is_fixed_amount: false,
             }
           ]);
+        } else if (pageCategory === "CABLE") {
+          // Fetch Cable TV bouquets/packages dynamically from secure Next.js route!
+          const res = await fetch(`/api/vtu/cable/packages?provider=${currentBiller.biller_code}`, { headers: authHeaders });
+          if (!res.ok) throw new Error("Failed to load bouquets from gateway.");
+          const data = await res.json();
+          const packageList = (data.data || []).map((pkg: { item_code: string; name: string; amount: number; package_code: string }, index: number) => ({
+            id: index + 1,
+            biller_code: currentBiller.biller_code,
+            name: pkg.name,
+            item_code: pkg.package_code || pkg.item_code,
+            amount: pkg.amount,
+            is_fixed_amount: true,
+          }));
+          setItems(packageList);
+        } else if (pageCategory === "WAEC") {
+          // Fetch WAEC products dynamically from secure Next.js route!
+          const res = await fetch(`/api/vtu/waec/products`, { headers: authHeaders });
+          if (!res.ok) throw new Error("Failed to load WAEC products.");
+          const data = await res.json();
+          const productList = (data.data || []).map((prod: { item_code: string; name: string; amount: number; product_code: string }, index: number) => ({
+            id: index + 1,
+            biller_code: currentBiller.biller_code,
+            name: prod.name,
+            item_code: prod.product_code || prod.item_code,
+            amount: prod.amount,
+            is_fixed_amount: true,
+          }));
+          setItems(productList);
         } else {
           // Standard other bill payments from Flutterwave path
-          const res = await fetch(`/api/bills/items?biller_code=${currentBiller.biller_code}`);
+          const res = await fetch(`/api/bills/items?biller_code=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load packages.");
           const data = await res.json();
           setItems(data.data || []);
@@ -278,7 +353,9 @@ export default function GenericBillPage() {
 
   // Compute final transaction amount dynamically
   const finalAmount = selectedItem
-    ? (selectedItem.is_fixed_amount ? selectedItem.amount : Number(customAmount))
+    ? (pageCategory === "WAEC"
+        ? selectedItem.amount * (Number(customerId) || 1)
+        : (selectedItem.is_fixed_amount ? selectedItem.amount : Number(customAmount)))
     : 0;
 
   // Frontend input validation checks
@@ -299,6 +376,9 @@ export default function GenericBillPage() {
       if (pageCategory === "UTILITY") {
         // Direct validation via S2S Payment Gateway validate meter endpoint!
         res = await fetch(`/api/vtu/electricity/validate?provider=${selectedBiller.biller_code}&meterNo=${customerId}&meterType=${selectedItem.item_code}`);
+      } else if (pageCategory === "CABLE") {
+        // Direct validation via S2S Payment Gateway validate Smartcard/IUC number endpoint!
+        res = await fetch(`/api/vtu/cable/validate?provider=${selectedBiller.biller_code}&smartCardNo=${customerId}`);
       } else {
         res = await fetch("/api/bills/validate", {
           method: "POST",
@@ -405,9 +485,11 @@ export default function GenericBillPage() {
       const isData = pageCategory === "DATA";
       const isAirtime = pageCategory === "AIRTIME";
       const isUtility = pageCategory === "UTILITY";
+      const isCable = pageCategory === "CABLE";
+      const isWaec = pageCategory === "WAEC";
 
-      if (isAirtime || isData || isUtility) {
-        const endpoint = isData ? "/api/vtu/data" : (isUtility ? "/api/vtu/electricity" : "/api/vtu/airtime");
+      if (isAirtime || isData || isUtility || isCable || isWaec) {
+        const endpoint = isData ? "/api/vtu/data" : (isUtility ? "/api/vtu/electricity" : (isCable ? "/api/vtu/cable" : (isWaec ? "/api/vtu/waec" : "/api/vtu/airtime")));
         const payload = isData
           ? {
               network: selectedBiller?.biller_code,
@@ -421,11 +503,22 @@ export default function GenericBillPage() {
                   meterType: selectedItem?.item_code,
                   amount: finalAmount,
                 }
-              : {
-                  network: selectedBiller?.biller_code,
-                  phone: customerId,
-                  amount: finalAmount,
-                });
+              : (isCable
+                  ? {
+                      provider: selectedBiller?.biller_code,
+                      smartCardNo: customerId,
+                      packageCode: selectedItem?.item_code,
+                    }
+                  : (isWaec
+                      ? {
+                          productCode: selectedItem?.item_code,
+                          quantity: Number(customerId) || 1,
+                        }
+                      : {
+                          network: selectedBiller?.biller_code,
+                          phone: customerId,
+                          amount: finalAmount,
+                        })));
 
         let res = await fetch(endpoint, {
           method: "POST",
@@ -463,6 +556,7 @@ export default function GenericBillPage() {
           reference: data.requestId,
           tx_ref: data.orderId || data.requestId,
           amount: finalAmount,
+          pins: data.pins || undefined,
         });
         toast.success("VTU transaction completed successfully!");
       } else {
@@ -543,6 +637,8 @@ export default function GenericBillPage() {
         return "Smartcard / Decoder Number";
       case "UTILITY":
         return "Meter Number";
+      case "WAEC":
+        return "Quantity (1-5)";
       default:
         return "Customer Identifier";
     }
@@ -565,16 +661,9 @@ export default function GenericBillPage() {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                className="relative w-6 h-6 bg-white rounded-full p-1 shadow-sm flex items-center justify-center"
+                className="relative w-6 h-6 bg-white rounded-full p-1 shadow-sm flex items-center justify-center text-[#FC7A00]"
               >
-                <Image
-                  src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-                  alt="E-Tech Logo"
-                  width={16}
-                  height={16}
-                  className="object-contain"
-                  priority
-                />
+                <span className="material-symbols-outlined text-[16px] font-bold">school</span>
               </motion.div>
             </div>
             <motion.p
@@ -682,6 +771,46 @@ export default function GenericBillPage() {
                       </button>
                     </div>
                   </div>
+
+                  {successReceipt.pins && Array.isArray(successReceipt.pins) && (
+                    <div className="border-b border-gray-100 pb-2.5 pt-1 text-gray-500 text-left">
+                      <span className="font-semibold block mb-2 text-black">Purchased WAEC E-PINs:</span>
+                      <div className="space-y-2">
+                        {successReceipt.pins.map((pinObj: { pin: string; serial?: string }, index: number) => (
+                          <div key={index} className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl flex flex-col space-y-1">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-gray-400">PIN</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-black font-extrabold">{pinObj.pin}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(pinObj.pin, "PIN")}
+                                  className="text-primary font-black hover:underline"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </div>
+                            {pinObj.serial && (
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="font-bold text-gray-400">SERIAL</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-black font-bold">{pinObj.serial}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(pinObj.serial!, "Serial")}
+                                    className="text-primary font-black hover:underline"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center pt-1">
                     <span className="font-black text-black">Total Paid Amount</span>
