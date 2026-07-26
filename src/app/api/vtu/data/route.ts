@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
+import { safeParseJson } from "@/lib/utils";
 
 export async function POST(req: Request) {
   try {
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const data = await gatewayRes.json();
+    const data = await safeParseJson(gatewayRes);
     return NextResponse.json(data);
   } catch (err: unknown) {
     const error = err as Error;
