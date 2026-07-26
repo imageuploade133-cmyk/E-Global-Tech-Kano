@@ -130,6 +130,7 @@ export async function POST(req: Request) {
 
     // Verify user transaction PIN and debit wallet inside single atomic Firestore transaction
     const userRef = adminDb.collection("users").doc(uid);
+    const walletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
     const reference = `BILL-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const transactionType = biller_type?.toUpperCase() === "AIRTIME" ? "AIRTIME" :
@@ -151,6 +152,10 @@ export async function POST(req: Request) {
         throw new Error("USER_NOT_FOUND");
       }
 
+      // Preload NGN wallet balance
+      const walletDoc = await transaction.get(walletRef);
+      const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
       const userData = userDoc.data() || {};
       const pinHash = userData.pinHash;
       const currentPlainPin = userData.pin;
@@ -164,6 +169,12 @@ export async function POST(req: Request) {
         ref: userRef,
         data: userData,
         balance: Number(userData.balance) || 0,
+      };
+
+      const preLoadedWallet = {
+        ref: walletRef,
+        data: walletDoc.exists ? walletDoc.data() || {} : {},
+        balance: walletBalance,
       };
 
       // Lockout check
@@ -212,19 +223,19 @@ export async function POST(req: Request) {
         };
       }
 
-      // PIN is correct, reset pinAttempts and check balance
+      // PIN is correct, reset pinAttempts and check balance (WRITES start here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      const currentBalance = Number(userData.balance) || 0;
-      if (currentBalance < numAmount) {
+      // Check wallet balance using preloaded wallet doc
+      if (walletBalance < numAmount) {
         return {
           success: false,
-          error: `Insufficient wallet funds to pay this bill. Required: ₦${numAmount.toLocaleString()}, Available: ₦${currentBalance.toLocaleString()}`,
+          error: `Insufficient wallet funds to pay this bill. Required: ₦${numAmount.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
         };
       }
 
       // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end of the transaction block
-      // Safe debit using preLoadedUser to completely avoid secondary reads-after-writes inside WalletService
+      // Safe debit using preLoadedUser and preLoadedWallet to completely avoid secondary reads-after-writes inside WalletService
       await WalletService.debitWallet(transaction, {
         userId: uid,
         amount: numAmount,
@@ -235,6 +246,7 @@ export async function POST(req: Request) {
         recipientName: customer_id,
         fee: 0,
         preLoadedUser,
+        preLoadedWallet,
       });
 
       return {
