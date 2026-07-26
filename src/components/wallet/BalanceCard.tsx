@@ -2672,7 +2672,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 <button
                   type="button"
                   onClick={() => {
-                    if (trfStep === "confirm") {
+                    if (trfStep === "pin") {
+                      setTrfStep("confirm");
+                    } else if (trfStep === "confirm") {
                       setTrfStep("input");
                     }
                   }}
@@ -3265,7 +3267,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
 
-              {/* STAGE 2: Secure Payment Confirmation & PIN Input Screen (TASK 6) */}
+              {/* STAGE 2: Secure Payment Confirmation Screen (TASK 6) */}
               {trfStep === "confirm" && (
                 <motion.div
                   key="trf-confirm"
@@ -3347,9 +3349,62 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </div>
                     </div>
 
-                    {/* PIN input placeholder indicators (TASK 6) */}
-                    <div className="text-center space-y-2">
-                      <p className="font-hanken text-xs font-extrabold text-gray-800">Enter Your secure Transaction PIN</p>
+                    <div className="p-3 bg-blue-50 border border-blue-100/50 rounded-2xl flex items-start gap-2">
+                      <span className="material-symbols-outlined text-blue-500 text-[18px]">info</span>
+                      <p className="font-hanken text-[11px] text-blue-800 leading-normal">
+                        To authorize this transaction, your secure 4-digit transaction PIN will be requested on the next screen.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Proceed to PIN Button */}
+                  <div className="w-full px-4 mt-2 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setTrfStep("pin")}
+                      className="w-full py-3.5 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
+                    >
+                      <span>Confirm and Proceed</span>
+                      <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STAGE 2.5: Fullscreen PIN Verification Screen (Separated PIN model) */}
+              {trfStep === "pin" && (
+                <motion.div
+                  key="trf-pin"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-4 text-left flex-1 flex flex-col justify-between"
+                >
+                  <div className="space-y-4 pr-1">
+                    <div className="text-center space-y-1">
+                      <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-primary mx-auto">
+                        <span className="material-symbols-outlined text-[24px] font-black">lock</span>
+                      </div>
+                      <h4 className="font-hanken font-extrabold text-base text-black mt-2">Enter Transaction PIN</h4>
+                      <p className="font-hanken text-[11px] text-gray-400">Authorize your transfer securely using your 4-digit PIN.</p>
+                    </div>
+
+                    {/* Displaying user Balance and amount user wants to Transfer inside nice UI card */}
+                    <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-5 space-y-3 font-hanken">
+                      <div className="text-center space-y-1">
+                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Transfer</span>
+                        <h2 className="text-2xl font-mono font-black text-[#E11D48] leading-none">
+                          ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </h2>
+                      </div>
+                      <div className="flex items-center justify-center gap-1.5 pt-1 text-xs text-gray-500 font-bold border-t border-gray-200/40">
+                        <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+                        <span>My Wallet Balance: ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+
+                    {/* PIN Input dots */}
+                    <div className="text-center space-y-2 pt-2">
                       <div className="flex justify-center gap-3">
                         {[0, 1, 2, 3].map((i) => (
                           <div
