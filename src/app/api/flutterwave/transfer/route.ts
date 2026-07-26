@@ -103,13 +103,18 @@ export async function POST(req: Request) {
     // 3. Atomically verify PIN and debit user balance inside Firestore transaction
     console.log("STEP 4 - Starting Firestore transaction");
     const userRef = adminDb.collection("users").doc(uid);
+    const walletRef = adminDb.collection("wallets").doc(`${uid}_${trfCurrency}`);
 
     const transactionResult = await adminDb.runTransaction(async (transaction) => {
-      console.log("STEP 5 - User document loaded (fetching inside transaction)");
+      console.log("STEP 5 - ALL READS: Loading user and wallet documents first");
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
         throw new Error("USER_NOT_FOUND");
       }
+
+      // Fetch the specific wallet document
+      const walletDoc = await transaction.get(walletRef);
+      const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
 
       const userData = userDoc.data() || {};
       const pinHash = userData.pinHash;
@@ -164,21 +169,20 @@ export async function POST(req: Request) {
         };
       }
 
-      // PIN matches, reset attempts
+      // PIN matches, reset attempts (WRITE operation starts here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      // Check balance
-      const currentBalance = Number(userData.balance) || 0;
-      console.log(`STEP 7 - Balance checked. Available: ${currentBalance}, Required: ${totalDeduction}`);
-      if (currentBalance < totalDeduction) {
+      // Check balance using the pre-loaded specific wallet balance
+      console.log(`STEP 7 - Balance checked. Available wallet: ${walletBalance}, Required: ${totalDeduction}`);
+      if (walletBalance < totalDeduction) {
         return {
           success: false,
-          error: `Insufficient wallet balance to complete this transfer. Required: ₦${totalDeduction.toLocaleString()}, Available: ₦${currentBalance.toLocaleString()}`,
+          error: `Insufficient wallet balance to complete this transfer. Required: ₦${totalDeduction.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
         };
       }
 
       // Perform local debit atomically
-      console.log("STEP 8 - Calling WalletService.debitWallet()");
+      console.log("STEP 8 - Calling WalletService.debitWallet() with preloaded parameters");
       await WalletService.debitWallet(transaction, {
         userId: uid,
         amount: totalDeduction,
@@ -191,7 +195,12 @@ export async function POST(req: Request) {
         preLoadedUser: {
           ref: userRef,
           data: userData,
-          balance: currentBalance,
+          balance: Number(userData.balance) || 0,
+        },
+        preLoadedWallet: {
+          ref: walletRef,
+          data: walletDoc.exists ? walletDoc.data() || {} : {},
+          balance: walletBalance,
         },
       });
       console.log("STEP 9 - Wallet debited");
@@ -289,8 +298,10 @@ export async function POST(req: Request) {
       // Rollback debit atomically inside transaction
       await adminDb.runTransaction(async (rollbackTx) => {
         const userDoc = await rollbackTx.get(userRef);
+        const walletDoc = await rollbackTx.get(walletRef);
         if (userDoc.exists) {
           const uData = userDoc.data() || {};
+          const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
             amount: totalDeduction,
@@ -302,6 +313,11 @@ export async function POST(req: Request) {
               ref: userRef,
               data: uData,
               balance: Number(uData.balance) || 0,
+            },
+            preLoadedWallet: {
+              ref: walletRef,
+              data: walletDoc.exists ? walletDoc.data() || {} : {},
+              balance: wBalance,
             },
           });
         }

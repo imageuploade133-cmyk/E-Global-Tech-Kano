@@ -91,9 +91,14 @@ export class WalletService {
         data: FirebaseFirestore.DocumentData;
         balance: number;
       };
+      preLoadedWallet?: {
+        ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+        data: FirebaseFirestore.DocumentData;
+        balance: number;
+      };
     }
   ): Promise<{ previousBalance: number; newBalance: number }> {
-    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0, type = "DEPOSIT", preLoadedUser } = params;
+    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0, type = "DEPOSIT", preLoadedUser, preLoadedWallet } = params;
 
     const ucCurrency = (currency || "NGN").toUpperCase();
 
@@ -101,11 +106,23 @@ export class WalletService {
     this.validateAmount(amount);
     this.validateCurrency(ucCurrency);
 
-    // Retrieve specific wallet balance from wallets collection
+    // 1. ALL READS: Must be executed before any writes
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${ucCurrency}`);
-    const walletDoc = await transaction.get(walletRef);
-    const currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+    let currentBalance = 0;
+    if (preLoadedWallet) {
+      currentBalance = preLoadedWallet.balance;
+    } else {
+      const walletDoc = await transaction.get(walletRef);
+      currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+    }
 
+    // Load user profile before executing any writes if currency is NGN
+    let user = null;
+    if (ucCurrency === "NGN") {
+      user = preLoadedUser || (await this.getUserProfile(transaction, userId));
+    }
+
+    // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
     const creditAmount = amount;
     const newBalance = currentBalance + creditAmount;
 
@@ -118,8 +135,7 @@ export class WalletService {
     }, { merge: true });
 
     // Keep legacy root balance updated for NGN
-    if (ucCurrency === "NGN") {
-      const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
+    if (ucCurrency === "NGN" && user) {
       transaction.update(user.ref, {
         balance: FieldValue.increment(creditAmount),
       });
@@ -173,9 +189,14 @@ export class WalletService {
         data: FirebaseFirestore.DocumentData;
         balance: number;
       };
+      preLoadedWallet?: {
+        ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
+        data: FirebaseFirestore.DocumentData;
+        balance: number;
+      };
     }
   ): Promise<{ previousBalance: number; newBalance: number }> {
-    const { userId, amount, currency, reference, docId, type, description, recipientName, fee = 0, isPending = false, preLoadedUser } = params;
+    const { userId, amount, currency, reference, docId, type, description, recipientName, fee = 0, isPending = false, preLoadedUser, preLoadedWallet } = params;
 
     const ucCurrency = (currency || "NGN").toUpperCase();
 
@@ -183,11 +204,23 @@ export class WalletService {
     this.validateAmount(amount);
     this.validateCurrency(ucCurrency);
 
-    // Retrieve specific wallet balance from wallets collection
+    // 1. ALL READS: Must be executed before any writes
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${ucCurrency}`);
-    const walletDoc = await transaction.get(walletRef);
-    const currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+    let currentBalance = 0;
+    if (preLoadedWallet) {
+      currentBalance = preLoadedWallet.balance;
+    } else {
+      const walletDoc = await transaction.get(walletRef);
+      currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+    }
 
+    // Load user profile before executing any writes if currency is NGN
+    let user = null;
+    if (ucCurrency === "NGN") {
+      user = preLoadedUser || (await this.getUserProfile(transaction, userId));
+    }
+
+    // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
     const totalDeduction = amount; // Fee is handled separately or included in amount
 
     if (currentBalance < totalDeduction) {
@@ -205,8 +238,7 @@ export class WalletService {
     }, { merge: true });
 
     // Keep legacy root balance updated for NGN
-    if (ucCurrency === "NGN") {
-      const user = preLoadedUser || (await this.getUserProfile(transaction, userId));
+    if (ucCurrency === "NGN" && user) {
       transaction.update(user.ref, {
         balance: FieldValue.increment(-totalDeduction),
       });
