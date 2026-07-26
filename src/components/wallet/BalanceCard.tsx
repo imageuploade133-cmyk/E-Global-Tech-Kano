@@ -1818,30 +1818,59 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   return (
     <>
-    <div className="flex justify-center gap-2 mb-4 w-full select-none">
-      {["NGN", "USD"].map((curr) => (
-        <button
-          key={curr}
-          onClick={() => {
-            setSelectedCurrency(curr as "NGN" | "USD");
-            toast.info(`Switched to ${curr} Wallet`);
-          }}
-          className={`flex-1 max-w-[120px] py-2 text-xs font-bold rounded-xl transition-all border ${
-            selectedCurrency === curr
-              ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-md"
-              : "bg-gray-50 text-gray-400 border-gray-200 hover:text-black hover:bg-gray-100"
-          }`}
-        >
-          {curr}
-        </button>
-      ))}
+    <div className="relative p-[1px] rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#E06600] w-full max-w-[240px] mx-auto mb-5 shadow-sm select-none">
+      <div className="bg-white rounded-[15px] p-1 flex w-full relative overflow-hidden">
+        {["NGN", "USD"].map((curr) => {
+          const isActive = selectedCurrency === curr;
+          return (
+            <button
+              key={curr}
+              onClick={() => {
+                setSelectedCurrency(curr as "NGN" | "USD");
+                toast.info(`Switched to ${curr} Wallet`);
+              }}
+              className={`relative flex-1 py-2 text-xs font-extrabold uppercase tracking-widest rounded-xl transition-colors duration-300 focus:outline-none z-10 cursor-pointer ${
+                isActive ? "text-white" : "text-gray-400 hover:text-black"
+              }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="activeCurrencyTab"
+                  className="absolute inset-0 bg-gradient-to-r from-[#FC7A00] to-[#E06600] rounded-xl -z-10 shadow-sm"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              {curr}
+            </button>
+          );
+        })}
+      </div>
     </div>
 
     <motion.section
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="mb-stack-lg text-black w-full"
+      className="mb-stack-lg text-black w-full cursor-grab active:cursor-grabbing select-none"
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.15}
+      onDragEnd={(event, info) => {
+        const threshold = 60; // minimum drag distance in pixels to trigger transition
+        if (info.offset.x < -threshold) {
+          // Dragged left -> switch to USD
+          if (selectedCurrency !== "USD") {
+            setSelectedCurrency("USD");
+            toast.info("Switched to USD Wallet");
+          }
+        } else if (info.offset.x > threshold) {
+          // Dragged right -> switch to NGN
+          if (selectedCurrency !== "NGN") {
+            setSelectedCurrency("NGN");
+            toast.info("Switched to NGN Wallet");
+          }
+        }
+      }}
     >
       {/* Physical Card Design */}
       <div className="relative aspect-[1.586/1] w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 group min-h-[175px] min-[360px]:min-h-[195px]">
