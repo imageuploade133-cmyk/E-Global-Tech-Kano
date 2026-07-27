@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local logs
+*.log
+logs/
+
+# local verification artifacts
+verification/videos/
+verification/screenshots/1_dashboard_ngn.png
+verification/screenshots/2_dashboard_usd.png
+verification/screenshots/3_swap_modal.png
+verification/screenshots/4_swap_calculated.png
+verification/screenshots/5_post_swap.png
+verification/screenshots/6_history.png
+verification/screenshots/7_history_filtered_usd.png
+verification/screenshots/error.png

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
+import { safeParseJson } from "@/lib/utils";
 
 export async function GET(req: Request) {
   try {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Failed to validate meter", details: errText }, { status: gatewayRes.status });
     }
 
-    const data = await gatewayRes.json();
+    const data = await safeParseJson(gatewayRes);
     return NextResponse.json(data);
   } catch (err: unknown) {
     const error = err as Error;
