@@ -20,23 +20,36 @@ def run_verification():
         page.goto("http://localhost:3002/auth/signup")
         page.wait_for_timeout(2000)
 
-        # Step 2: Capture screenshot of Stage 1 (Personal Details)
+        # Step 2: Capture screenshot of Stage 1 (Personal Details) with empty manual text DOB
         path1 = "/home/jules/verification/screenshots/signup_stage_1.png"
         print(f"Taking screenshot of SignUp Stage 1: {path1}")
         page.screenshot(path=path1)
         page.wait_for_timeout(500)
 
-        # Step 3: Enter some mock values for Step 1
+        # Step 3: Enter some mock values for Step 1 manually (text input)
         print("Filling in Stage 1 details...")
         page.locator("#firstName").fill("Abdulkadir")
         page.locator("#lastName").fill("Shaba")
-        page.locator("#dateOfBirth").fill("1995-10-15")
+
+        # Fill manual date of birth text
+        page.locator("#dateOfBirth").fill("19951015") # formats to 1995-10-15
         page.wait_for_timeout(500)
 
         # Take another screenshot of filled Stage 1
         path2 = "/home/jules/verification/screenshots/signup_stage_1_filled.png"
         print(f"Taking screenshot of filled SignUp Stage 1: {path2}")
         page.screenshot(path=path2)
+        page.wait_for_timeout(500)
+
+        # Step 4: Test the BVN / NIN checkbox tick
+        print("Checking the Use BVN / NIN Date of Birth tickbox...")
+        page.locator("#bvnNinDobCheck").click()
+        page.wait_for_timeout(500)
+
+        # Take another screenshot of ticked State
+        path3 = "/home/jules/verification/screenshots/signup_stage_1_bvn_ticked.png"
+        print(f"Taking screenshot of ticked SignUp Stage 1: {path3}")
+        page.screenshot(path=path3)
         page.wait_for_timeout(500)
 
         print("[SUCCESS] SignUp Wizard verification completed successfully!")

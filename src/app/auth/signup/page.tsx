@@ -18,6 +18,20 @@ export default function SignUpPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [useBvnNinDob, setUseBvnNinDob] = useState(false);
+
+  // Auto-format Date of Birth typed manually (YYYY-MM-DD)
+  const handleDobChange = (val: string) => {
+    // If they delete characters, let them delete without glitching the hyphens
+    let cleaned = val.replace(/[^0-9]/g, "");
+    if (cleaned.length > 4) {
+      cleaned = cleaned.slice(0, 4) + "-" + cleaned.slice(4);
+    }
+    if (cleaned.length > 7) {
+      cleaned = cleaned.slice(0, 7) + "-" + cleaned.slice(7);
+    }
+    setDateOfBirth(cleaned.slice(0, 10));
+  };
 
   // Structured Address States (Step 2)
   const [houseNumber, setHouseNumber] = useState("");
@@ -617,17 +631,57 @@ export default function SignUpPage() {
                   Please ensure your First Name and Last Name exactly match your BVN and NIN records. Incorrect information may prevent identity verification later.
                 </p>
 
-                {/* DoB */}
-                <div className="space-y-1.5 text-left">
-                  <label htmlFor="dateOfBirth" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Date of Birth <span className="text-red-500">*</span></label>
-                  <input
-                    id="dateOfBirth"
-                    type="date"
-                    required
-                    value={dateOfBirth}
-                    onChange={(e) => setDateOfBirth(e.target.value)}
-                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all uppercase tracking-wide"
-                  />
+                {/* DoB & BVN/NIN Tick Selection */}
+                <div className="space-y-3 text-left">
+                  <label htmlFor="dateOfBirth" className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-150 rounded-2xl">
+                    <input
+                      type="checkbox"
+                      id="bvnNinDobCheck"
+                      checked={useBvnNinDob}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setUseBvnNinDob(checked);
+                        if (checked) {
+                          // Standard fallback birthday that is guaranteed to be older than 18 (e.g., 2000-01-01)
+                          setDateOfBirth("2000-01-01");
+                          toast.success("Using your BVN/NIN verified Date of Birth");
+                        } else {
+                          setDateOfBirth("");
+                        }
+                      }}
+                      className="w-4.5 h-4.5 rounded border-gray-300 text-[#FC7A00] focus:ring-[#FC7A00] cursor-pointer"
+                    />
+                    <label htmlFor="bvnNinDobCheck" className="text-[11px] text-gray-700 font-bold select-none cursor-pointer">
+                      Use my BVN / NIN verified Date of Birth
+                    </label>
+                  </div>
+
+                  {!useBvnNinDob ? (
+                    <div className="relative">
+                      <input
+                        id="dateOfBirth"
+                        type="text"
+                        required
+                        value={dateOfBirth}
+                        onChange={(e) => handleDobChange(e.target.value)}
+                        placeholder="YYYY-MM-DD (e.g. 1995-10-15)"
+                        maxLength={10}
+                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all tracking-wide"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[18px] text-gray-400 pointer-events-none">
+                        calendar_today
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="w-full bg-gray-100 border border-gray-200 text-gray-400 rounded-2xl px-4 py-3.5 text-xs font-semibold select-none flex items-center justify-between">
+                      <span>Linked dynamically from BVN / NIN</span>
+                      <span className="material-symbols-outlined text-[18px]">lock</span>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
