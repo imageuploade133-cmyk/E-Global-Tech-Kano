@@ -11,12 +11,15 @@ import Image from "next/image";
 import { cn, formatFirebaseError } from "@/lib/utils";
 
 export default function SignUpPage() {
-  // Personal Info States
+  // Wizard Step State
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Personal Info States (Step 1)
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
 
-  // Structured Address States
+  // Structured Address States (Step 2)
   const [houseNumber, setHouseNumber] = useState("");
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
@@ -24,16 +27,14 @@ export default function SignUpPage() {
   const [country, setCountry] = useState("Nigeria");
   const [postalCode, setPostalCode] = useState("");
 
-  // Phone states (International Prefix Selector)
+  // Account Contact States (Step 3)
   const [phonePrefix, setPhonePrefix] = useState("+234");
   const [phoneNumber, setPhoneNumber] = useState("");
-
-  // Account Info States
   const [email, setEmail] = useState("");
+
+  // Account Security States (Step 4)
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  // Terms and Privacy check constraints
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
 
@@ -54,7 +55,7 @@ export default function SignUpPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
 
-  // Ripple Effect State for Create Account Button
+  // Ripple Effect State
   const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -260,71 +261,91 @@ export default function SignUpPage() {
     }, 600);
   };
 
+  // Stage-by-Stage validation and navigation handlers
+  const handleNextStep = () => {
+    if (currentStep === 1) {
+      if (!photo) {
+        toast.error("Profile picture / Selfie capture is required to set up your account.");
+        return;
+      }
+      if (!firstName || firstName.trim().length < 2) {
+        toast.error("First name must be at least 2 characters.");
+        return;
+      }
+      if (!lastName || lastName.trim().length < 2) {
+        toast.error("Last name must be at least 2 characters.");
+        return;
+      }
+      if (!dateOfBirth) {
+        toast.error("Date of birth is required.");
+        return;
+      }
+
+      const dob = new Date(dateOfBirth);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (isNaN(dob.getTime())) {
+        toast.error("Invalid Date of Birth.");
+        return;
+      }
+      if (dob >= today) {
+        toast.error("Date of Birth cannot be today or in the future.");
+        return;
+      }
+
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      if (age < 18) {
+        toast.error("You must be at least 18 years old to proceed.");
+        return;
+      }
+
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      if (!houseNumber || houseNumber.trim().length === 0) {
+        toast.error("House number is required.");
+        return;
+      }
+      if (!street || street.trim().length === 0) {
+        toast.error("Street name is required.");
+        return;
+      }
+      if (!city || city.trim().length === 0) {
+        toast.error("City is required.");
+        return;
+      }
+      if (!state || state.trim().length === 0) {
+        toast.error("State is required.");
+        return;
+      }
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
+      if (!phoneNumber || phoneNumber.trim().length === 0) {
+        toast.error("Phone number is required.");
+        return;
+      }
+      if (!email || !email.includes("@")) {
+        toast.error("Please provide a valid email address.");
+        return;
+      }
+      setCurrentStep(4);
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Reset Terms error
     setTermsError("");
 
-    // Client-side Validations
-    if (!firstName || firstName.trim().length < 2) {
-      toast.error("First Name must be at least 2 characters.");
-      return;
-    }
-    if (!lastName || lastName.trim().length < 2) {
-      toast.error("Last Name must be at least 2 characters.");
-      return;
-    }
-    if (!dateOfBirth) {
-      toast.error("Date of Birth is required.");
-      return;
-    }
-
-    const dob = new Date(dateOfBirth);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (isNaN(dob.getTime())) {
-      toast.error("Invalid Date of Birth.");
-      return;
-    }
-    if (dob >= today) {
-      toast.error("Date of Birth cannot be today or in the future.");
-      return;
-    }
-
-    let age = today.getFullYear() - dob.getFullYear();
-    const m = today.getMonth() - dob.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-      age--;
-    }
-    if (age < 18) {
-      toast.error("You must be at least 18 years old to proceed.");
-      return;
-    }
-
-    if (!houseNumber || houseNumber.trim().length === 0) {
-      toast.error("House Number is required.");
-      return;
-    }
-    if (!street || street.trim().length === 0) {
-      toast.error("Street name is required.");
-      return;
-    }
-    if (!city || city.trim().length === 0) {
-      toast.error("City is required.");
-      return;
-    }
-    if (!state || state.trim().length === 0) {
-      toast.error("State is required.");
-      return;
-    }
-
-    if (!phoneNumber || phoneNumber.trim().length === 0) {
-      toast.error("Phone Number is required.");
-      return;
-    }
-
+    // Step 4 final validations
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!password || !passwordRegex.test(password)) {
       toast.error("Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.");
@@ -339,11 +360,6 @@ export default function SignUpPage() {
     if (!acceptedTerms || !acceptedPrivacy) {
       setTermsError("You must accept both the Terms & Conditions and Privacy Policy.");
       toast.error("Please accept both the Terms and Privacy Policy.");
-      return;
-    }
-
-    if (!photo) {
-      toast.error("Please upload a profile picture or take a selfie to proceed.");
       return;
     }
 
@@ -437,8 +453,8 @@ export default function SignUpPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-xl mx-auto"
       >
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="relative w-16 h-16 mb-3">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div className="relative w-14 h-14 mb-2">
             <Image
               src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
               alt="E-Tech Logo"
@@ -447,393 +463,497 @@ export default function SignUpPage() {
               priority
             />
           </div>
-          <h1 className="font-hanken font-bold text-2xl tracking-tight text-black">E-TECH GLOBAL HUB</h1>
-          <p className="text-gray-500 font-hanken mt-1 text-xs font-semibold">Create your modern premium fintech account</p>
+          <h1 className="font-hanken font-bold text-xl tracking-tight text-black">E-TECH GLOBAL HUB</h1>
+          <p className="text-gray-500 font-hanken mt-1 text-[11px] font-semibold">Stage-by-Stage Premium Account Setup</p>
         </div>
 
-        {/* Profile Picture Upload & Selfie Selection Section */}
-        <div className="mb-8 flex flex-col items-center">
-          <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 block">
-            Profile Picture <span className="text-red-500">*</span>
-          </label>
+        {/* Wizard Progress Bar & Step Indicators */}
+        <div className="mb-8 max-w-md mx-auto">
+          <div className="flex justify-between items-center relative mb-2">
+            {/* Background progress bar line */}
+            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 bg-gray-150 z-0 rounded-full" />
+            <div
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] z-0 rounded-full transition-all duration-300"
+              style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
+            />
 
-          <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-dashed border-[#FC7A00] flex items-center justify-center bg-gray-50 group shadow-md">
-            {photo ? (
-              <Image
-                src={photo}
-                alt="Profile Preview"
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <span className="material-symbols-outlined text-[48px] text-gray-300">
-                account_circle
-              </span>
+            {[1, 2, 3, 4].map((sIndex) => {
+              const isActive = currentStep === sIndex;
+              const isCompleted = currentStep > sIndex;
+              return (
+                <button
+                  key={sIndex}
+                  type="button"
+                  onClick={() => {
+                    // Prevent skip-ahead without stage validation
+                    if (sIndex < currentStep) {
+                      setCurrentStep(sIndex);
+                    }
+                  }}
+                  disabled={sIndex > currentStep}
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center font-hanken text-xs font-black z-10 transition-all duration-300 shadow-sm border",
+                    isCompleted
+                      ? "bg-[#FC7A00] border-[#FC7A00] text-white"
+                      : isActive
+                      ? "bg-white border-black text-black scale-110"
+                      : "bg-white border-gray-250 text-gray-400"
+                  )}
+                >
+                  {isCompleted ? "✓" : sIndex}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-between text-[9px] font-black text-gray-400 uppercase px-1">
+            <span className={cn(currentStep === 1 && "text-[#FC7A00]")}>Personal</span>
+            <span className={cn(currentStep === 2 && "text-[#FC7A00]")}>Address</span>
+            <span className={cn(currentStep === 3 && "text-[#FC7A00]")}>Contact</span>
+            <span className={cn(currentStep === 4 && "text-[#FC7A00]")}>Security</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSignUp} className="space-y-6">
+          <AnimatePresence mode="wait">
+            {/* STEP 1: Personal Details */}
+            {currentStep === 1 && (
+              <motion.div
+                key="step-1"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="space-y-5"
+              >
+                {/* Profile Picture Upload & Selfie Selection Section */}
+                <div className="flex flex-col items-center">
+                  <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 block">
+                    Profile Picture <span className="text-red-500">*</span>
+                  </label>
+
+                  <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-dashed border-[#FC7A00] flex items-center justify-center bg-gray-50 group shadow-md">
+                    {photo ? (
+                      <Image
+                        src={photo}
+                        alt="Profile Preview"
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-[48px] text-gray-300">
+                        account_circle
+                      </span>
+                    )}
+
+                    {photo && (
+                      <button
+                        type="button"
+                        onClick={() => setPhoto(null)}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex gap-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1 transition-all cursor-pointer border border-gray-200/50"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">upload_file</span>
+                      Upload Image
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPermissionDrawer(true)}
+                      className="px-3 py-2 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">photo_camera</span>
+                      Take Selfie
+                    </button>
+                  </div>
+                </div>
+
+                {/* First & Last Name */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 text-left">
+                    <label htmlFor="firstName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name <span className="text-red-500">*</span></label>
+                    <input
+                      id="firstName"
+                      type="text"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                      placeholder="John"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label htmlFor="lastName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Last Name <span className="text-red-500">*</span></label>
+                    <input
+                      id="lastName"
+                      type="text"
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                      placeholder="Doe"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-amber-600 font-bold leading-relaxed bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-left">
+                  Please ensure your First Name and Last Name exactly match your BVN and NIN records. Incorrect information may prevent identity verification later.
+                </p>
+
+                {/* DoB */}
+                <div className="space-y-1.5 text-left">
+                  <label htmlFor="dateOfBirth" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Date of Birth <span className="text-red-500">*</span></label>
+                  <input
+                    id="dateOfBirth"
+                    type="date"
+                    required
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all uppercase tracking-wide"
+                  />
+                </div>
+              </motion.div>
             )}
 
-            {photo && (
+            {/* STEP 2: Address Block */}
+            {currentStep === 2 && (
+              <motion.div
+                key="step-2"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="space-y-4 text-left"
+              >
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Residential Address</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="md:col-span-1 space-y-1">
+                    <label htmlFor="houseNumber" className="text-[9px] font-bold text-gray-400 uppercase">House No. <span className="text-red-500">*</span></label>
+                    <input
+                      id="houseNumber"
+                      type="text"
+                      required
+                      value={houseNumber}
+                      onChange={(e) => setHouseNumber(e.target.value)}
+                      placeholder="24B"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                    />
+                  </div>
+                  <div className="md:col-span-3 space-y-1">
+                    <label htmlFor="street" className="text-[9px] font-bold text-gray-400 uppercase">Street Name <span className="text-red-500">*</span></label>
+                    <input
+                      id="street"
+                      type="text"
+                      required
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      placeholder="Adetokunbo Ademola Street"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label htmlFor="city" className="text-[9px] font-bold text-gray-400 uppercase">City <span className="text-red-500">*</span></label>
+                    <input
+                      id="city"
+                      type="text"
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Victoria Island"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="state" className="text-[9px] font-bold text-gray-400 uppercase">State <span className="text-red-500">*</span></label>
+                    <input
+                      id="state"
+                      type="text"
+                      required
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      placeholder="Lagos"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="postalCode" className="text-[9px] font-bold text-gray-400 uppercase">Postal Code</label>
+                    <input
+                      id="postalCode"
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder="101241"
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label htmlFor="country" className="text-[9px] font-bold text-gray-400 uppercase">Country <span className="text-red-500">*</span></label>
+                    <select
+                      id="country"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all appearance-none"
+                    >
+                      <option value="Nigeria">Nigeria</option>
+                      <option value="Niger">Niger</option>
+                    </select>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STEP 3: Contact details */}
+            {currentStep === 3 && (
+              <motion.div
+                key="step-3"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="space-y-5"
+              >
+                {/* Phone Input */}
+                <div className="space-y-1.5 text-left">
+                  <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
+                  <div className="flex gap-2">
+                    <select
+                      id="phonePrefix"
+                      value={phonePrefix}
+                      onChange={(e) => setPhonePrefix(e.target.value)}
+                      className="bg-white border border-black rounded-2xl px-3.5 outline-none text-xs font-black text-black appearance-none shadow-sm"
+                      aria-label="Phone Prefix"
+                    >
+                      <option value="+234">🇳🇬 +234</option>
+                      <option value="+227">🇳🇪 +227</option>
+                    </select>
+                    <input
+                      id="phoneNumber"
+                      type="tel"
+                      required
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                      className="flex-grow bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all font-mono"
+                      placeholder="08012345678"
+                    />
+                  </div>
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-1.5 text-left">
+                  <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address <span className="text-red-500">*</span></label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                    placeholder="doe@example.com"
+                  />
+                </div>
+              </motion.div>
+            )}
+
+            {/* STEP 4: Security details */}
+            {currentStep === 4 && (
+              <motion.div
+                key="step-4"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="space-y-5"
+              >
+                {/* Passwords */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 text-left">
+                    <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          {showPassword ? "visibility" : "visibility_off"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label htmlFor="confirmPassword" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm Password <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          {showConfirmPassword ? "visibility" : "visibility_off"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Password Strength Indicator */}
+                {password && (
+                  <div className="space-y-1.5 text-left bg-gray-50 p-3 rounded-2xl border border-gray-150">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black uppercase text-gray-400">Password Strength</span>
+                      <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded text-white", pStrength.color)}>
+                        {pStrength.label}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-250 rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full transition-all duration-300", pStrength.color)}
+                        style={{ width: `${(pStrength.score / 5) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-[8px] text-gray-400 font-semibold leading-tight">Must include at least 8 characters, an uppercase letter, a lowercase letter, a number, and a special character.</p>
+                  </div>
+                )}
+
+                {/* Terms checkbox */}
+                <div className="space-y-3 text-left pt-2">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="termsCheck"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="w-4.5 h-4.5 rounded border-gray-300 text-[#FC7A00] focus:ring-[#FC7A00] cursor-pointer mt-0.5"
+                    />
+                    <label htmlFor="termsCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
+                      I agree to the{" "}
+                      <Link href="/auth/terms" className="text-[#FC7A00] hover:underline font-bold">
+                        Terms & Conditions
+                      </Link> (v1.0.0).
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="privacyCheck"
+                      checked={acceptedPrivacy}
+                      onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                      className="w-4.5 h-4.5 rounded border-gray-300 text-[#FC7A00] focus:ring-[#FC7A00] cursor-pointer mt-0.5"
+                    />
+                    <label htmlFor="privacyCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
+                      I agree to the{" "}
+                      <Link href="/auth/privacy" className="text-[#FC7A00] hover:underline font-bold">
+                        Privacy Policy
+                      </Link> (v1.0.0).
+                    </label>
+                  </div>
+
+                  {termsError && (
+                    <p className="text-[10px] text-red-500 font-bold text-left animate-pulse">{termsError}</p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Navigation Controls Bar */}
+          <div className="flex gap-4 pt-4">
+            {currentStep > 1 && (
               <button
                 type="button"
-                onClick={() => setPhoto(null)}
-                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1 cursor-pointer"
+                onClick={handlePrevStep}
+                className="flex-1 py-4 bg-white border border-black hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-none cursor-pointer text-center"
               >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
-                Clear
+                Back
               </button>
             )}
-          </div>
 
-          <div className="mt-4 flex gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*"
-              onChange={handlePhotoUpload}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1 transition-all cursor-pointer border border-gray-200/50"
-            >
-              <span className="material-symbols-outlined text-[16px]">upload_file</span>
-              Upload Image
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPermissionDrawer(true)}
-              className="px-3 py-2 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider rounded-xl flex items-center gap-1 shadow-xs transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">photo_camera</span>
-              Take Selfie
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSignUp} className="space-y-5">
-          {/* First & Last Name */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5 text-left">
-              <label htmlFor="firstName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name <span className="text-red-500">*</span></label>
-              <input
-                id="firstName"
-                type="text"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
-                placeholder="John"
-                aria-required="true"
-              />
-            </div>
-
-            <div className="space-y-1.5 text-left">
-              <label htmlFor="lastName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Last Name <span className="text-red-500">*</span></label>
-              <input
-                id="lastName"
-                type="text"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
-                placeholder="Doe"
-                aria-required="true"
-              />
-            </div>
-          </div>
-
-          <p className="text-[10px] text-amber-600 font-bold leading-relaxed bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-left">
-            Please ensure your First Name and Last Name exactly match your BVN and NIN records. Incorrect information may prevent identity verification later.
-          </p>
-
-          {/* DoB */}
-          <div className="space-y-1.5 text-left">
-            <label htmlFor="dateOfBirth" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Date of Birth <span className="text-red-500">*</span></label>
-            <input
-              id="dateOfBirth"
-              type="date"
-              required
-              value={dateOfBirth}
-              onChange={(e) => setDateOfBirth(e.target.value)}
-              className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
-              aria-required="true"
-            />
-          </div>
-
-          {/* Structured Address Block */}
-          <div className="border border-dashed border-gray-200 rounded-3xl p-4 bg-gray-50/50 space-y-4 text-left">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Residential Address</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div className="md:col-span-1 space-y-1">
-                <label htmlFor="houseNumber" className="text-[9px] font-bold text-gray-400 uppercase">House No. <span className="text-red-500">*</span></label>
-                <input
-                  id="houseNumber"
-                  type="text"
-                  required
-                  value={houseNumber}
-                  onChange={(e) => setHouseNumber(e.target.value)}
-                  placeholder="24B"
-                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
-                />
-              </div>
-              <div className="md:col-span-3 space-y-1">
-                <label htmlFor="street" className="text-[9px] font-bold text-gray-400 uppercase">Street Name <span className="text-red-500">*</span></label>
-                <input
-                  id="street"
-                  type="text"
-                  required
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  placeholder="Adetokunbo Ademola Street"
-                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <label htmlFor="city" className="text-[9px] font-bold text-gray-400 uppercase">City <span className="text-red-500">*</span></label>
-                <input
-                  id="city"
-                  type="text"
-                  required
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Victoria Island"
-                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="state" className="text-[9px] font-bold text-gray-400 uppercase">State <span className="text-red-500">*</span></label>
-                <input
-                  id="state"
-                  type="text"
-                  required
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  placeholder="Lagos"
-                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
-                />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="postalCode" className="text-[9px] font-bold text-gray-400 uppercase">Postal Code</label>
-                <input
-                  id="postalCode"
-                  type="text"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="101241"
-                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label htmlFor="country" className="text-[9px] font-bold text-gray-400 uppercase">Country <span className="text-red-500">*</span></label>
-                <select
-                  id="country"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full appearance-none bg-white border border-gray-200 py-2.5 px-3.5 outline-none text-xs font-semibold text-black focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 rounded-xl"
-                >
-                  <option value="Nigeria">Nigeria</option>
-                  <option value="Niger">Niger</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* International Phone Input */}
-          <div className="space-y-1.5 text-left">
-            <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
-            <div className="flex gap-2">
-              <select
-                id="phonePrefix"
-                value={phonePrefix}
-                onChange={(e) => setPhonePrefix(e.target.value)}
-                className="bg-gray-50 border border-gray-200 px-3.5 outline-none text-xs font-bold text-black focus:border-[#FC7A00] rounded-2xl appearance-none"
-                aria-label="Phone Prefix"
+            {currentStep < 4 ? (
+              <button
+                type="button"
+                onClick={handleNextStep}
+                className="flex-grow py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-none cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <option value="+234">🇳🇬 +234</option>
-                <option value="+227">🇳🇪 +227</option>
-              </select>
-              <input
-                id="phoneNumber"
-                type="tel"
-                required
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-                className="flex-grow appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black font-mono rounded-2xl"
-                placeholder="08012345678"
-                aria-required="true"
-              />
-            </div>
-          </div>
-
-          {/* Email Address */}
-          <div className="space-y-1.5 text-left">
-            <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address <span className="text-red-500">*</span></label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black rounded-2xl"
-              placeholder="doe@example.com"
-              aria-required="true"
-            />
-          </div>
-
-          {/* Passwords */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5 text-left">
-              <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
-                  placeholder="••••••••"
-                  aria-required="true"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {showPassword ? "visibility" : "visibility_off"}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 text-left">
-              <label htmlFor="confirmPassword" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm Password <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-3.5 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-xs font-semibold text-black"
-                  placeholder="••••••••"
-                  aria-required="true"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
-                >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {showConfirmPassword ? "visibility" : "visibility_off"}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Password Strength Indicator */}
-          {password && (
-            <div className="space-y-1.5 text-left bg-gray-50 p-3 rounded-2xl border border-gray-150">
-              <div className="flex justify-between items-center">
-                <span className="text-[9px] font-black uppercase text-gray-400">Password Strength</span>
-                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded text-white", pStrength.color)}>
-                  {pStrength.label}
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-gray-250 rounded-full overflow-hidden">
-                <div
-                  className={cn("h-full transition-all duration-300", pStrength.color)}
-                  style={{ width: `${(pStrength.score / 5) * 100}%` }}
-                />
-              </div>
-              <p className="text-[8px] text-gray-400 font-semibold leading-tight">Must include at least 8 characters, an uppercase letter, a lowercase letter, a number, and a special character.</p>
-            </div>
-          )}
-
-          {/* Terms checkbox */}
-          <div className="space-y-3 text-left pt-2">
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="termsCheck"
-                checked={acceptedTerms}
-                onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="w-4.5 h-4.5 rounded border-gray-300 text-[#FC7A00] focus:ring-[#FC7A00] cursor-pointer mt-0.5"
-              />
-              <label htmlFor="termsCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
-                I agree to the{" "}
-                <Link href="/auth/terms" className="text-[#FC7A00] hover:underline font-bold">
-                  Terms & Conditions
-                </Link> (v1.0.0).
-              </label>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="privacyCheck"
-                checked={acceptedPrivacy}
-                onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-                className="w-4.5 h-4.5 rounded border-gray-300 text-[#FC7A00] focus:ring-[#FC7A00] cursor-pointer mt-0.5"
-              />
-              <label htmlFor="privacyCheck" className="text-xs text-gray-600 font-semibold select-none leading-relaxed">
-                I agree to the{" "}
-                <Link href="/auth/privacy" className="text-[#FC7A00] hover:underline font-bold">
-                  Privacy Policy
-                </Link> (v1.0.0).
-              </label>
-            </div>
-
-            {termsError && (
-              <p className="text-[10px] text-red-500 font-bold text-left animate-pulse">{termsError}</p>
-            )}
-          </div>
-
-          {/* Create Account Premium Button */}
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              onClick={handleButtonClick}
-              className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-xl border border-white/10 font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2.5 shadow-none"
-            >
-              {/* Ripple Elements */}
-              {ripples.map((ripple) => (
-                <span
-                  key={ripple.id}
-                  className="absolute bg-white/30 rounded-full pointer-events-none animate-ripple"
-                  style={{
-                    left: ripple.x,
-                    top: ripple.y,
-                    width: 100,
-                    height: 100,
-                    transform: "translate(-50%, -50%)",
-                  }}
-                />
-              ))}
-
-              {loading ? (
-                <>
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-                    className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
+                Next Step
+                <span className="material-symbols-outlined text-[16px] font-bold">chevron_right</span>
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                onClick={handleButtonClick}
+                className="flex-grow relative overflow-hidden bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-xl border border-white/10 font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2.5 shadow-none"
+              >
+                {/* Ripple Elements */}
+                {ripples.map((ripple) => (
+                  <span
+                    key={ripple.id}
+                    className="absolute bg-white/30 rounded-full pointer-events-none animate-ripple"
+                    style={{
+                      left: ripple.x,
+                      top: ripple.y,
+                      width: 100,
+                      height: 100,
+                      transform: "translate(-50%, -50%)",
+                    }}
                   />
-                  <span>Creating Account...</span>
-                </>
-              ) : (
-                "Create Account"
-              )}
-            </button>
+                ))}
+
+                {loading ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                      className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
+                    />
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  "Create Account"
+                )}
+              </button>
+            )}
           </div>
         </form>
 
