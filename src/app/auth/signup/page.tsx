@@ -19,6 +19,11 @@ export default function SignUpPage() {
   const [lastName, setLastName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [useBvnNinDob, setUseBvnNinDob] = useState(false);
+  const [bvnNin, setBvnNin] = useState("");
+
+  // Duplicate Account Check state
+  const [accountExistsError, setAccountExistsError] = useState<string | null>(null);
+  const [isCheckingExists, setIsCheckingExists] = useState(false);
 
   // Auto-format Date of Birth typed manually (YYYY-MM-DD)
   const handleDobChange = (val: string) => {
@@ -31,6 +36,30 @@ export default function SignUpPage() {
       cleaned = cleaned.slice(0, 7) + "-" + cleaned.slice(7);
     }
     setDateOfBirth(cleaned.slice(0, 10));
+  };
+
+  const checkAccountExists = async (phoneVal: string, bvnNinVal: string) => {
+    setIsCheckingExists(true);
+    try {
+      const res = await fetch("/api/auth/check-exists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: phoneVal,
+          bvnNin: bvnNinVal,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.exists) {
+        setAccountExistsError(data.message);
+        return true;
+      }
+    } catch (err) {
+      console.error("Error checking account existence:", err);
+    } finally {
+      setIsCheckingExists(false);
+    }
+    return false;
   };
 
   // Structured Address States (Step 2)
@@ -276,7 +305,7 @@ export default function SignUpPage() {
   };
 
   // Stage-by-Stage validation and navigation handlers
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     if (currentStep === 1) {
       if (!photo) {
         toast.error("Profile picture / Selfie capture is required to set up your account.");
@@ -290,31 +319,43 @@ export default function SignUpPage() {
         toast.error("Last name must be at least 2 characters.");
         return;
       }
-      if (!dateOfBirth) {
-        toast.error("Date of birth is required.");
-        return;
-      }
 
-      const dob = new Date(dateOfBirth);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (isNaN(dob.getTime())) {
-        toast.error("Invalid Date of Birth.");
-        return;
-      }
-      if (dob >= today) {
-        toast.error("Date of Birth cannot be today or in the future.");
-        return;
-      }
+      if (useBvnNinDob) {
+        if (!bvnNin || bvnNin.trim().length !== 11 || !/^\d+$/.test(bvnNin.trim())) {
+          toast.error("BVN/NIN must be exactly 11 digits.");
+          return;
+        }
 
-      let age = today.getFullYear() - dob.getFullYear();
-      const m = today.getMonth() - dob.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-        age--;
-      }
-      if (age < 18) {
-        toast.error("You must be at least 18 years old to proceed.");
-        return;
+        // Check if this BVN/NIN already exists!
+        const alreadyExists = await checkAccountExists("", bvnNin);
+        if (alreadyExists) return;
+      } else {
+        if (!dateOfBirth) {
+          toast.error("Date of birth is required.");
+          return;
+        }
+
+        const dob = new Date(dateOfBirth);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (isNaN(dob.getTime())) {
+          toast.error("Invalid Date of Birth.");
+          return;
+        }
+        if (dob >= today) {
+          toast.error("Date of Birth cannot be today or in the future.");
+          return;
+        }
+
+        let age = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+          age--;
+        }
+        if (age < 18) {
+          toast.error("You must be at least 18 years old to proceed.");
+          return;
+        }
       }
 
       setCurrentStep(2);
@@ -345,6 +386,12 @@ export default function SignUpPage() {
         toast.error("Please provide a valid email address.");
         return;
       }
+
+      // Check if phone number already exists before proceeding to Step 4!
+      const fullPhone = `${phonePrefix}${phoneNumber}`;
+      const alreadyExists = await checkAccountExists(fullPhone, bvnNin);
+      if (alreadyExists) return;
+
       setCurrentStep(4);
     }
   };
@@ -393,7 +440,7 @@ export default function SignUpPage() {
           city,
           state,
           country,
-          postalCode,
+          postalCode: "",
           phonePrefix,
           phoneNumber,
           email,
@@ -436,9 +483,11 @@ export default function SignUpPage() {
           city,
           state,
           country,
-          postalCode,
+          postalCode: null,
           phonePrefix,
           phoneNumber,
+          bvn: useBvnNinDob ? bvnNin : null,
+          nin: useBvnNinDob ? bvnNin : null,
         }),
       });
 
@@ -677,9 +726,26 @@ export default function SignUpPage() {
                       </span>
                     </div>
                   ) : (
-                    <div className="w-full bg-gray-100 border border-gray-200 text-gray-400 rounded-2xl px-4 py-3.5 text-xs font-semibold select-none flex items-center justify-between">
-                      <span>Linked dynamically from BVN / NIN</span>
-                      <span className="material-symbols-outlined text-[18px]">lock</span>
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <input
+                          id="bvnNinInput"
+                          type="tel"
+                          required
+                          value={bvnNin}
+                          onChange={(e) => setBvnNin(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                          placeholder="Enter your 11-digit BVN or NIN"
+                          maxLength={11}
+                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all font-mono"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[18px] text-gray-400 pointer-events-none">
+                          fingerprint
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 border border-gray-200 text-gray-500 rounded-2xl px-4 py-3 text-[11px] font-semibold select-none flex items-center justify-between">
+                        <span>DoB will be matched dynamically from BVN/NIN</span>
+                        <span className="material-symbols-outlined text-[16px]">lock</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -724,7 +790,7 @@ export default function SignUpPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label htmlFor="city" className="text-[9px] font-bold text-gray-400 uppercase">City <span className="text-red-500">*</span></label>
                     <input
@@ -746,17 +812,6 @@ export default function SignUpPage() {
                       value={state}
                       onChange={(e) => setState(e.target.value)}
                       placeholder="Lagos"
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label htmlFor="postalCode" className="text-[9px] font-bold text-gray-400 uppercase">Postal Code</label>
-                    <input
-                      id="postalCode"
-                      type="text"
-                      value={postalCode}
-                      onChange={(e) => setPostalCode(e.target.value)}
-                      placeholder="101241"
                       className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                     />
                   </div>
@@ -1196,6 +1251,93 @@ export default function SignUpPage() {
                     className="w-full py-4 bg-white hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer premium-gradient-border"
                   >
                     Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Global Checking Database Loader Overlay */}
+        <AnimatePresence>
+          {isCheckingExists && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-white/80 backdrop-blur-xs z-[99999] flex flex-col items-center justify-center p-6"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                className="w-10 h-10 rounded-full border-3 border-gray-200 border-t-[#FC7A00]"
+              />
+              <p className="mt-4 font-hanken font-bold text-xs tracking-wider uppercase text-gray-800">
+                Verifying Credentials...
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Account Already Exists Premium Warning Dialog */}
+        <AnimatePresence>
+          {accountExistsError && (
+            <>
+              {/* Overlay Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+              />
+
+              {/* Center Modal Dialog */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="fixed inset-x-4 inset-y-auto my-auto m-auto max-w-sm h-fit bg-white rounded-[32px] p-6 z-[99999] flex flex-col items-center border border-gray-150 shadow-2xl text-black"
+              >
+                <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center text-[#FC7A00] mb-4 border border-amber-200">
+                  <span className="material-symbols-outlined text-[32px] font-bold">warning</span>
+                </div>
+
+                <h3 className="font-hanken font-bold text-base text-black text-center mb-2">Account Already Exists</h3>
+
+                <p className="font-hanken text-[11px] text-gray-500 text-center leading-relaxed mb-6">
+                  {accountExistsError}
+                </p>
+
+                <div className="flex flex-col gap-2.5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountExistsError(null);
+                      router.push("/auth/login");
+                    }}
+                    className="w-full py-3.5 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
+                  >
+                    Login to your Account
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountExistsError(null);
+                      router.push("/auth/login?forgot=true");
+                    }}
+                    className="w-full py-3.5 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
+                  >
+                    Reset Password or PIN
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAccountExistsError(null)}
+                    className="w-full py-3.5 bg-white hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer border border-gray-200"
+                  >
+                    Use Different Details
                   </button>
                 </div>
               </motion.div>
