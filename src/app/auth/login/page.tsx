@@ -9,12 +9,14 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { formatFirebaseError } from "@/lib/utils";
+import { ForgotPasswordDrawer } from "@/components/layout/ForgotPasswordDrawer";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
   const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const router = useRouter();
 
@@ -85,9 +87,13 @@ export default function LoginPage() {
           <div className="space-y-1.5 text-left">
             <div className="flex justify-between items-center">
               <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password</label>
-              <Link href="/auth/forgot-password" className="text-xs text-[#FC7A00] hover:underline font-bold">
+              <button
+                type="button"
+                onClick={() => setIsForgotOpen(true)}
+                className="text-xs text-[#FC7A00] hover:underline font-bold cursor-pointer bg-transparent border-none outline-none"
+              >
                 Forgot Password?
-              </Link>
+              </button>
             </div>
             <div className="relative">
               <input
@@ -159,6 +165,11 @@ export default function LoginPage() {
           </Link>
         </p>
       </motion.div>
+
+      <ForgotPasswordDrawer
+        isOpen={isForgotOpen}
+        onClose={() => setIsForgotOpen(false)}
+      />
     </div>
   );
 }
