@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
 
 interface LogoutDrawerProps {
@@ -11,34 +11,6 @@ interface LogoutDrawerProps {
 
 export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onConfirm }) => {
   const controls = useAnimation();
-  const hasPushedState = useRef(false);
-
-  // Sync state with browser back history (device physical/swipe back button support)
-  useEffect(() => {
-    if (isOpen) {
-      // Push state to history so back button closes drawer instead of leaving page
-      window.history.pushState({ drawerOpen: true }, "");
-      hasPushedState.current = true;
-
-      const handlePopState = (e: PopStateEvent) => {
-        // Only trigger close if this is the explicit drawer state
-        if (e.state && e.state.drawerOpen) {
-          hasPushedState.current = false;
-          onClose();
-        }
-      };
-
-      window.addEventListener("popstate", handlePopState);
-      return () => {
-        window.removeEventListener("popstate", handlePopState);
-        // If drawer is closed through click (not back button), pop the state we pushed
-        if (hasPushedState.current) {
-          window.history.back();
-          hasPushedState.current = false;
-        }
-      };
-    }
-  }, [isOpen, onClose]);
 
   // Prevent background body scroll when drawer is open
   useEffect(() => {
