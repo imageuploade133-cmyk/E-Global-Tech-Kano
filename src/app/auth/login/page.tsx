@@ -20,6 +20,15 @@ export default function LoginPage() {
   const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const router = useRouter();
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("forgot") === "true") {
+        setIsForgotOpen(true);
+      }
+    }
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
