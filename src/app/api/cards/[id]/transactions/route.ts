@@ -1,0 +1,34 @@
+import { NextResponse } from "next/server";
+import { authenticateUserRequest } from "@/lib/auth-util";
+import { CardService } from "@/services/card-service";
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  let uid = "";
+  let idToken = "";
+  try {
+    const authResult = await authenticateUserRequest(req);
+    uid = authResult.uid;
+    const authHeader = req.headers.get("Authorization") || "";
+    idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+  } catch (err: any) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  try {
+    const transactions = await CardService.getCardTransactions({
+      userId: uid,
+      cardId: id,
+      idToken,
+      isMock: uid === "mock-uid",
+    });
+
+    return NextResponse.json({ success: true, transactions });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}

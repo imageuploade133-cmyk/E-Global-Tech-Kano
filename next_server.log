@@ -1,0 +1,11 @@
+
+> e-global-wallet@0.1.0 start
+> next start
+
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.2:3000
+
+ ✓ Starting...
+ ✓ Ready in 642ms
+[Firebase Admin] Initialized with explicit fallback projectId: e-tech-global-hub
