@@ -2,6 +2,7 @@ import { adminDb, hasAdminCredentials } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { safeParseJson } from "@/lib/utils";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
@@ -112,7 +113,7 @@ export class CardService {
           body: JSON.stringify(payload),
         });
 
-        const data = await res.json();
+        const data = await safeParseJson(res);
         if (res.ok && data.status === "success" && data.data) {
           flwCardId = data.data.id;
           maskedPan = data.data.masked_pan || maskedPan;
@@ -312,7 +313,7 @@ export class CardService {
           }),
         });
 
-        const data = await res.json();
+        const data = await safeParseJson(res);
         if (!res.ok || data.status !== "success") {
           throw new Error(data.message || "Failed to fund card on rails.");
         }
@@ -454,7 +455,7 @@ export class CardService {
           body: JSON.stringify({ amount }),
         });
 
-        const data = await res.json();
+        const data = await safeParseJson(res);
         if (!res.ok || data.status !== "success") {
           throw new Error(data.message || "Failed to withdraw from card on rails.");
         }
@@ -556,7 +557,7 @@ export class CardService {
           body: JSON.stringify({ status_action: action }),
         });
 
-        const data = await res.json();
+        const data = await safeParseJson(res);
         if (!res.ok || data.status !== "success") {
           throw new Error(data.message || "Failed to update freeze status on gateway rails.");
         }
@@ -612,7 +613,7 @@ export class CardService {
           },
         });
 
-        const data = await res.json();
+        const data = await safeParseJson(res);
         if (!res.ok || data.status !== "success" || !data.data) {
           throw new Error(data.message || "Failed to terminate card on gateway rails.");
         }
@@ -708,7 +709,7 @@ export class CardService {
         },
       });
 
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok || data.status !== "success" || !data.data) {
         throw new Error(data.message || "Failed to retrieve secure card details.");
       }
@@ -808,7 +809,7 @@ export class CardService {
         },
       });
 
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (res.ok && data.status === "success" && Array.isArray(data.data)) {
         const fetchedTxs: CardTransaction[] = data.data.map((flwTx: any) => ({
           id: flwTx.id?.toString() || flwTx.reference,
