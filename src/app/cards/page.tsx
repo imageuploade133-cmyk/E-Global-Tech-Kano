@@ -7,27 +7,31 @@ import { toast } from "sonner";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { useAuth } from "@/lib/AuthContext";
+import { useCards } from "@/hooks/useCards";
+import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { cn } from "@/lib/utils";
-
-interface CardItem {
-  id: string;
-  type: "VIRTUAL" | "PHYSICAL";
-  currency: "NGN" | "USD";
-  cardNumber: string;
-  expiry: string;
-  cvv: string;
-  cardholder: string;
-  theme: "obsidian" | "platinum" | "sunset";
-  isLocked: boolean;
-  onlinePayments: boolean;
-  intlPayments: boolean;
-}
 
 export default function CardsPage() {
   const { userData, user } = useAuth();
-  const [cards, setCards] = useState<CardItem[]>([]);
+  const {
+    cards,
+    loading,
+    error,
+    refreshCards,
+    createCard,
+    fundCard,
+    withdrawFromCard,
+    toggleFreeze,
+    terminateCard,
+    viewSecureDetails,
+    getTransactions,
+  } = useCards();
+
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [revealDetails, setRevealDetails] = useState<Record<string, boolean>>({});
+  const [secureDetails, setSecureDetails] = useState<Record<string, { cardNumber: string; expiry: string; cvv: string }>>({});
+  const [transactions, setTransactions] = useState<CardTransaction[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -37,16 +41,41 @@ export default function CardsPage() {
   const [mintProgress, setMintProgress] = useState(0);
   const [mintStatusText, setMintStatusText] = useState("");
 
-  const [formCurrency, setFormCurrency] = useState<"NGN" | "USD">("NGN");
-  const [formType, setFormType] = useState<"VIRTUAL" | "PHYSICAL">("VIRTUAL");
-  const [formTheme, setFormTheme] = useState<"obsidian" | "platinum" | "sunset">("obsidian");
+  const [formCurrency, setFormCurrency] = useState<"NGN" | "USD">("USD");
+  const [initialAmount, setInitialAmount] = useState<string>("5.00");
   const [formName, setFormName] = useState("");
-  const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [cardPin, setCardPin] = useState("");
 
-  // Prevent background scrolling while request cards drawer is active
+  // Billing Address States
+  const [billingCountry, setBillingCountry] = useState("US");
+  const [billingState, setBillingState] = useState("CA");
+  const [billingCity, setBillingCity] = useState("San Francisco");
+  const [billingPostalCode, setBillingPostalCode] = useState("94105");
+  const [billingStreetAddress, setBillingStreetAddress] = useState("333 Fremont Street");
+
+  // Funding & Withdrawal Modal states
+  const [fundModalOpen, setFundModalOpen] = useState(false);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [fundAmount, setFundAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [isActionSubmitting, setIsActionSubmitting] = useState(false);
+
+  // Transactions Filtering & Pagination States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "SUCCESSFUL" | "FAILED">("ALL");
+  const [merchantFilter, setMerchantFilter] = useState("ALL");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3;
+
+  // Reset page on filter changes
   useEffect(() => {
-    if (showRequestSheet) {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, merchantFilter, startDate, endDate, activeCardIndex]);
+
+  // Prevent background scrolling while request cards drawer or modals are active
+  useEffect(() => {
+    if (showRequestSheet || fundModalOpen || withdrawModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -54,72 +83,32 @@ export default function CardsPage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showRequestSheet]);
+  }, [showRequestSheet, fundModalOpen, withdrawModalOpen]);
 
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
   const activeCard = cards[activeCardIndex] || null;
 
-  // Seed / load cards from local storage so that "Not no Mockup Card" requirement is fully satisfied
+  // Sync displayed Name On Card
   useEffect(() => {
-    const isMock = sessionStorage.getItem("mock") === "true";
-    const key = isMock ? "e_tech_cards_mock" : (user ? `e_tech_cards_${user.uid}` : "e_tech_cards_anonymous");
-    const stored = sessionStorage.getItem(key);
-    const resolvedName = (userData?.name || user?.displayName || "JULES VERNE").toUpperCase();
-
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCards(parsed);
-          return;
-        }
-      } catch (err) {
-        console.error("Failed to restore cards:", err);
-      }
+    if (userData || user) {
+      const resolvedName = (userData?.name || user?.displayName || "JULES VERNE").toUpperCase();
+      setFormName(resolvedName);
     }
-
-    // Default Seed with user profile link
-    const seed: CardItem[] = [
-      {
-        id: "card-1",
-        type: "VIRTUAL",
-        currency: "NGN",
-        cardNumber: "5061  4822  9100  4829",
-        expiry: "08 / 29",
-        cvv: "394",
-        cardholder: resolvedName,
-        theme: "obsidian",
-        isLocked: false,
-        onlinePayments: true,
-        intlPayments: false,
-      },
-      {
-        id: "card-2",
-        type: "PHYSICAL",
-        currency: "USD",
-        cardNumber: "4150  8829  1104  6354",
-        expiry: "11 / 29",
-        cvv: "108",
-        cardholder: resolvedName,
-        theme: "platinum",
-        isLocked: false,
-        onlinePayments: true,
-        intlPayments: true,
-      }
-    ];
-
-    setCards(seed);
-    sessionStorage.setItem(key, JSON.stringify(seed));
   }, [user, userData]);
 
-  const saveCards = (updated: CardItem[]) => {
-    const isMock = sessionStorage.getItem("mock") === "true";
-    const key = isMock ? "e_tech_cards_mock" : (user ? `e_tech_cards_${user.uid}` : "e_tech_cards_anonymous");
-    setCards(updated);
-    sessionStorage.setItem(key, JSON.stringify(updated));
-  };
+  // Load transactions whenever active card index changes
+  useEffect(() => {
+    if (activeCard) {
+      setTxLoading(true);
+      getTransactions(activeCard.id)
+        .then((txs) => setTransactions(txs))
+        .finally(() => setTxLoading(false));
+    } else {
+      setTransactions([]);
+    }
+  }, [activeCardIndex, cards]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const container = e.currentTarget;
@@ -128,7 +117,6 @@ export default function CardsPage() {
     const progress = scrollWidth > 0 ? (scrollLeft / scrollWidth) * 100 : 0;
     setScrollProgress(progress);
 
-    // Dynamic index snapping calculation based on center of view
     const children = container.children;
     if (children.length > 0) {
       let closestIndex = 0;
@@ -150,41 +138,67 @@ export default function CardsPage() {
     }
   };
 
-  const toggleReveal = (id: string) => {
-    setRevealDetails((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleRevealToggle = async (card: CardItem) => {
+    const isCurrentlyRevealed = revealDetails[card.id];
+    if (isCurrentlyRevealed) {
+      setRevealDetails((prev) => ({ ...prev, [card.id]: false }));
+      return;
+    }
+
+    try {
+      toast.info("Retrieving secure card details...");
+      const details = await viewSecureDetails(card.id);
+      if (details) {
+        setSecureDetails((prev) => ({
+          ...prev,
+          [card.id]: {
+            cardNumber: details.cardNumber,
+            expiry: details.expiry,
+            cvv: details.cvv,
+          },
+        }));
+        setRevealDetails((prev) => ({ ...prev, [card.id]: true }));
+
+        // Auto-hide secure details after 15 seconds to ensure premium security
+        setTimeout(() => {
+          setRevealDetails((prev) => ({ ...prev, [card.id]: false }));
+        }, 15000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const toggleLockCard = (id: string) => {
-    const updated = cards.map((c) => {
-      if (c.id === id) {
-        const nextState = !c.isLocked;
-        toast.success(nextState ? "Card frozen successfully" : "Card activated successfully");
-        return { ...c, isLocked: nextState };
-      }
-      return c;
-    });
-    saveCards(updated);
+  const handleToggleFreeze = async (card: CardItem) => {
+    try {
+      const nextLockedState = !card.isLocked;
+      await toggleFreeze(card.id, nextLockedState);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleToggleCardSetting = (id: string, setting: "onlinePayments" | "intlPayments") => {
-    const updated = cards.map((c) => {
-      if (c.id === id) {
-        const nextValue = !c[setting];
-        toast.success(`Card settings updated!`);
-        return { ...c, [setting]: nextValue };
-      }
-      return c;
-    });
-    saveCards(updated);
+  const handleTerminateCard = async (card: CardItem) => {
+    if (!confirm("Are you sure you want to terminate this virtual card permanently? All remaining balances will be automatically refunded back to your wallet.")) {
+      return;
+    }
+    try {
+      toast.info("Terminating your virtual card...");
+      await terminateCard(card.id);
+      setActiveCardIndex(0);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleOpenRequest = () => {
-    setFormCurrency("NGN");
-    setFormType("VIRTUAL");
-    setFormTheme("obsidian");
-    setFormName((userData?.name || user?.displayName || "JULES VERNE").toUpperCase());
-    setDeliveryAddress("");
-    setCardPin("");
+    setFormCurrency("USD");
+    setInitialAmount("5.00");
+    setBillingCountry("US");
+    setBillingState("CA");
+    setBillingCity("San Francisco");
+    setBillingPostalCode("94105");
+    setBillingStreetAddress("333 Fremont Street");
     setShowRequestSheet(true);
   };
 
@@ -193,23 +207,20 @@ export default function CardsPage() {
     setShowRequestSheet(false);
   };
 
-  const handleSubmitRequest = (e: React.FormEvent) => {
+  const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formType === "PHYSICAL" && !deliveryAddress.trim()) {
-      toast.error("Please provide a delivery address for physical cards.");
-      return;
-    }
-    if (cardPin.length !== 4 || isNaN(Number(cardPin))) {
-      toast.error("Please set a valid 4-digit card PIN.");
+    const initAmt = Number(initialAmount);
+    if (isNaN(initAmt) || initAmt < 0) {
+      toast.error("Please enter a valid initial funding amount.");
       return;
     }
 
     setIsMinting(true);
     setMintProgress(0);
-    setMintStatusText("VERIFYING ACCOUNT PROFILE...");
+    setMintStatusText("VERIFYING WALLET LEDGER...");
 
     const steps = [
-      { progress: 20, text: "PROVISIONING SECURE CRYPTO KEYS..." },
+      { progress: 20, text: "PROVISIONING SECURE S2S KEYS..." },
       { progress: 50, text: "GENERATING CARD NUMBER & SEEDING CVV..." },
       { progress: 80, text: "ISSUING DIGITAL SANCTIONS CLEARANCE..." },
       { progress: 100, text: "CARD MINTED SUCCESSFULLY!" }
@@ -234,47 +245,125 @@ export default function CardsPage() {
     }, 150);
   };
 
-  const executeMintCard = () => {
-    const prefix = formCurrency === "NGN" ? "5061" : "4150";
-    const part2 = Math.floor(1000 + Math.random() * 9000);
-    const part3 = Math.floor(1000 + Math.random() * 9000);
-    const part4 = Math.floor(1000 + Math.random() * 9000);
-    const generatedNumber = `${prefix}  ${part2}  ${part3}  ${part4}`;
+  const executeMintCard = async () => {
+    try {
+      await createCard({
+        currency: formCurrency,
+        amount: Number(initialAmount),
+        billingAddress: {
+          country: billingCountry,
+          state: billingState,
+          city: billingCity,
+          postalCode: billingPostalCode,
+          address: billingStreetAddress,
+        },
+        cardholder: formName,
+      });
+      setIsMinting(false);
+      setShowRequestSheet(false);
+      setActiveCardIndex(0);
+    } catch (err) {
+      setIsMinting(false);
+    }
+  };
 
-    const newCard: CardItem = {
-      id: `card-${Date.now()}`,
-      type: formType,
-      currency: formCurrency,
-      cardNumber: generatedNumber,
-      expiry: "12 / 30",
-      cvv: String(Math.floor(100 + Math.random() * 900)),
-      cardholder: formName.trim().toUpperCase() || "JULES VERNE",
-      theme: formTheme,
-      isLocked: false,
-      onlinePayments: true,
-      intlPayments: formCurrency === "USD",
-    };
+  const handleFundSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCard) return;
+    const amount = Number(fundAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
 
-    const nextCards = [...cards, newCard];
-    saveCards(nextCards);
-    setIsMinting(false);
-    setShowRequestSheet(false);
+    setIsActionSubmitting(true);
+    try {
+      await fundCard(activeCard.id, amount);
+      setFundModalOpen(false);
+      setFundAmount("");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsActionSubmitting(false);
+    }
+  };
 
-    // Switch to view newly created card with quick timeout to let DOM render
-    setTimeout(() => {
-      if (scrollContainerRef.current) {
-        const container = scrollContainerRef.current;
-        const targetScrollLeft = (nextCards.length - 1) * (container.clientWidth - 32);
-        container.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
-      }
-      setActiveCardIndex(nextCards.length - 1);
-    }, 100);
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCard) return;
+    const amount = Number(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
 
-    toast.success(`Congratulations! Your ${formCurrency} ${formType} card has been created successfully.`);
+    setIsActionSubmitting(true);
+    try {
+      await withdrawFromCard(activeCard.id, amount);
+      setWithdrawModalOpen(false);
+      setWithdrawAmount("");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsActionSubmitting(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard!`);
   };
 
   const thumbWidth = Math.max(20, 100 / (cards.length || 1));
   const thumbLeft = (scrollProgress / 100) * (100 - thumbWidth);
+
+  // Dynamic filter lists for layout calculation
+  const filteredTransactions = transactions.filter((tx) => {
+    // 1. Search text
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchDesc = tx.description?.toLowerCase().includes(term);
+      const matchMerch = tx.merchant?.toLowerCase().includes(term);
+      if (!matchDesc && !matchMerch) return false;
+    }
+
+    // 2. Status Filter
+    if (statusFilter !== "ALL") {
+      if (tx.status?.toUpperCase() !== statusFilter) return false;
+    }
+
+    // 3. Merchant Filter
+    if (merchantFilter !== "ALL") {
+      if (tx.merchant?.toLowerCase() !== merchantFilter.toLowerCase()) return false;
+    }
+
+    // 4. Date Range Filter
+    if (startDate) {
+      const start = new Date(startDate);
+      const txDate = new Date(tx.createdAt);
+      if (txDate < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      const txDate = new Date(tx.createdAt);
+      if (txDate > end) return false;
+    }
+
+    return true;
+  });
+
+  // Calculate Paginated Transactions
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage) || 1;
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Extract unique merchants list for quick filter select
+  const uniqueMerchants = Array.from(
+    new Set(transactions.map((tx) => tx.merchant))
+  ).filter(Boolean);
 
   return (
     <>
@@ -297,8 +386,8 @@ export default function CardsPage() {
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
               <div>
-                <h2 className="font-hanken font-extrabold text-lg text-black leading-tight">My Cards</h2>
-                <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider">E-Tech Cards Center</p>
+                <h2 className="font-hanken font-extrabold text-lg text-black leading-tight">Virtual Cards</h2>
+                <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider">E-Tech secure center</p>
               </div>
             </div>
 
@@ -307,73 +396,99 @@ export default function CardsPage() {
               className="px-3.5 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-[11px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
             >
               <span className="material-symbols-outlined text-[15px]">add_card</span>
-              Request Card
+              Create Card
             </button>
           </div>
 
-          {/* Cards Switcher Slider / Horizontal Scrollsnapping Carousel */}
-          {cards.length > 0 && (
-            <div className="space-y-4">
+          {/* Error State */}
+          {error && (
+            <div className="p-4 bg-error/5 text-error rounded-2xl border border-error/10 text-xs font-semibold text-center">
+              Failed to load cards: {error}. Please reload.
+            </div>
+          )}
 
-              {/* Horizontal Scroll Deck */}
+          {/* Skeleton Loaders */}
+          {loading ? (
+            <div className="space-y-4">
+              <div className="w-full aspect-[1.58/1] rounded-[24px] skeleton-shimmer bg-gray-200" />
+              <div className="h-10 w-full skeleton-shimmer bg-gray-100 rounded-2xl" />
+            </div>
+          ) : cards.length === 0 ? (
+            /* Empty State */
+            <div className="text-center py-12 space-y-3 bg-white border border-gray-150 rounded-2xl p-6 shadow-sm">
+              <span className="material-symbols-outlined text-[48px] text-gray-300">credit_card</span>
+              <p className="font-hanken font-bold text-xs text-gray-400 uppercase tracking-widest">No Active Cards Found</p>
+              <p className="font-hanken text-[10px] text-gray-400">Request your first USD or NGN Virtual Card to get started.</p>
+              <button
+                onClick={handleOpenRequest}
+                className="mx-auto px-4 py-2 bg-black text-white rounded-xl text-xs font-bold uppercase tracking-wider"
+              >
+                Issue Card
+              </button>
+            </div>
+          ) : (
+            /* Deck of Cards */
+            <div className="space-y-4">
               <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar px-margin-mobile -mx-margin-mobile py-2.5"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
-                {cards.map((card, idx) => (
-                  <div
-                    key={card.id}
-                    className="snap-center shrink-0 w-[calc(100vw-32px)] max-w-sm"
-                  >
-                    <div
-                      className={cn(
-                        "w-full aspect-[1.58/1] rounded-[24px] p-6 text-white relative overflow-hidden flex flex-col justify-between shadow-lg transition-all duration-300",
-                        activeCardIndex === idx ? "scale-100 opacity-100 ring-2 ring-[#FC7A00]/45" : "scale-[0.96] opacity-60",
-                        card.theme === "obsidian" && "bg-gradient-to-br from-[#111] via-[#222] to-[#0d0d0d] border border-white/5",
-                        card.theme === "platinum" && "bg-gradient-to-br from-[#5c5c64] via-[#8e8e93] to-[#3a3a3c] border border-white/10",
-                        card.theme === "sunset" && "bg-gradient-to-br from-[#FC7A00] via-[#FF9022] to-[#dd5500] border border-white/10"
-                      )}
-                    >
-                      {/* Glowing background highlights */}
-                      <div className="absolute right-[-40px] bottom-[-40px] w-48 h-48 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+                {cards.map((card, idx) => {
+                  const revealed = revealDetails[card.id];
+                  const sDetails = secureDetails[card.id];
+                  const displayPan = revealed && sDetails ? sDetails.cardNumber : card.maskedPan;
+                  const displayCvv = revealed && sDetails ? sDetails.cvv : "•••";
 
-                      {/* Row 1: Logo & Currency Badge */}
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2">
-                          <div className="relative w-5 h-5 flex-shrink-0">
-                            <Image
-                              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-                              alt="E-Tech Logo"
-                              fill
-                              sizes="20px"
-                              className="object-contain brightness-0 invert"
-                            />
+                  return (
+                    <div
+                      key={card.id}
+                      className="snap-center shrink-0 w-[calc(100vw-32px)] max-w-sm"
+                    >
+                      <div
+                        className={cn(
+                          "w-full aspect-[1.58/1] rounded-[24px] p-6 text-white relative overflow-hidden flex flex-col justify-between shadow-lg transition-all duration-300",
+                          activeCardIndex === idx ? "scale-100 opacity-100 ring-2 ring-[#FC7A00]/45" : "scale-[0.96] opacity-60",
+                          card.currency === "USD"
+                            ? "bg-gradient-to-br from-[#111] via-[#222] to-[#0d0d0d] border border-white/5"
+                            : "bg-gradient-to-br from-[#FC7A00] via-[#FF9022] to-[#dd5500] border border-white/10"
+                        )}
+                      >
+                        <div className="absolute right-[-40px] bottom-[-40px] w-48 h-48 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+
+                        {/* Top: Logo & Currency Badge */}
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-2">
+                            <div className="relative w-5 h-5 flex-shrink-0">
+                              <Image
+                                src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+                                alt="E-Tech Logo"
+                                fill
+                                sizes="20px"
+                                className="object-contain brightness-0 invert"
+                              />
+                            </div>
+                            <span className="font-hanken font-bold text-[10px] uppercase tracking-wider">
+                              E-TECH GLOBAL HUB
+                            </span>
                           </div>
-                          <span className="font-hanken font-bold text-[10px] uppercase tracking-wider">
-                            E-TECH GLOBAL HUB
+
+                          <span className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 text-[10px] font-black uppercase tracking-widest text-white flex-shrink-0">
+                            {card.currency} Virtual
                           </span>
                         </div>
 
-                        <span className="px-3 py-1 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 text-[10px] font-black uppercase tracking-widest text-white flex-shrink-0">
-                          {card.currency}
-                        </span>
-                      </div>
-
-                      {/* Row 2: Chip & Freeze Overlay if Frozen */}
-                      <div className="flex justify-between items-end">
+                        {/* Middle: PAN, Expiry, CVV */}
                         <div className="space-y-4 w-full">
-                          {/* Masked/Unmasked Card Number */}
-                          <p className="font-mono font-bold text-base min-[370px]:text-lg tracking-widest text-white">
-                            {revealDetails[card.id]
-                              ? card.cardNumber
-                              : card.cardNumber.replace(/\d(?=\s*\d{4})/g, "•")
-                            }
+                          <p
+                            onClick={() => copyToClipboard(displayPan.replace(/\s+/g, ""), "Card Number")}
+                            className="font-mono font-bold text-base min-[370px]:text-lg tracking-widest text-white cursor-pointer hover:opacity-80 transition-all"
+                          >
+                            {displayPan}
                           </p>
 
-                          {/* Info Bar */}
-                          <div className="flex justify-between items-center w-full">
+                          <div className="flex justify-between items-end w-full">
                             <div>
                               <p className="text-[7px] uppercase text-white/50 tracking-wider">Card Holder</p>
                               <p className="font-mono text-xs font-bold text-white truncate max-w-[150px]">
@@ -391,30 +506,25 @@ export default function CardsPage() {
                               <div>
                                 <p className="text-[7px] uppercase text-white/50 tracking-wider">CVV</p>
                                 <p className="font-mono text-xs font-bold text-white">
-                                  {revealDetails[card.id] ? card.cvv : "•••"}
+                                  {displayCvv}
                                 </p>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Card Locked Freeze Screen Overlay */}
-                      {card.isLocked && (
-                        <div className="absolute inset-0 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center text-center p-4 z-20 rounded-[24px]">
-                          <span className="material-symbols-outlined text-[36px] text-error mb-2 animate-pulse">ac_unit</span>
-                          <p className="font-hanken font-bold text-sm text-white">Card Temporarily Frozen</p>
-                          <p className="font-hanken text-[10px] text-gray-400 mt-1">Tap activate below to lift freeze</p>
-                        </div>
-                      )}
-
-                      {/* Card format tag */}
-                      <div className="absolute right-6 top-14 text-white/15 font-hanken font-black text-3xl select-none pointer-events-none">
-                        {card.type}
+                        {/* Frozen Overlay */}
+                        {card.isLocked && (
+                          <div className="absolute inset-0 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center text-center p-4 z-20 rounded-[24px]">
+                            <span className="material-symbols-outlined text-[36px] text-error mb-2 animate-pulse">ac_unit</span>
+                            <p className="font-hanken font-bold text-sm text-white">Card Temporarily Frozen</p>
+                            <p className="font-hanken text-[10px] text-gray-400 mt-1">Tap activate below to lift freeze</p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Slider Drag/Slide Card Progress Bar Indicator */}
@@ -425,7 +535,7 @@ export default function CardsPage() {
                     style={{
                       width: `${thumbWidth}%`,
                       left: `${thumbLeft}%`
-}}
+                    }}
                   />
                 </div>
                 <span className="font-hanken text-[9px] font-bold uppercase tracking-widest text-gray-400">
@@ -433,117 +543,242 @@ export default function CardsPage() {
                 </span>
               </div>
 
-              {/* Interactive Quick Action Toolbar for active card */}
+              {/* Card Action Menu Grid */}
               {activeCard && (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleReveal(activeCard.id)}
-                    className="py-3 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm text-gray-700"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      {revealDetails[activeCard.id] ? "visibility_off" : "visibility"}
-                    </span>
-                    {revealDetails[activeCard.id] ? "Hide Details" : "Show Details"}
-                  </button>
+                <div className="space-y-4">
+                  {/* Balance Display Card */}
+                  <div className="bg-white border border-gray-150 rounded-2xl p-5 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Card Balance</p>
+                      <h3 className="font-mono text-2xl font-black text-black mt-1">
+                        {activeCard.currency === "NGN" ? "₦" : "$"}
+                        {activeCard.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </h3>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setFundModalOpen(true)}
+                        className="px-3.5 py-2 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">add</span>
+                        Fund
+                      </button>
+                      <button
+                        onClick={() => setWithdrawModalOpen(true)}
+                        className="px-3.5 py-2 bg-black hover:brightness-110 active:scale-95 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">vertical_align_bottom</span>
+                        Withdraw
+                      </button>
+                    </div>
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleLockCard(activeCard.id)}
-                    className={cn(
-                      "py-3 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm",
-                      activeCard.isLocked
-                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                        : "bg-error/5 text-error border border-error/15"
-                    )}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      {activeCard.isLocked ? "lock_open" : "lock"}
-                    </span>
-                    {activeCard.isLocked ? "Unfreeze Card" : "Freeze Card"}
-                  </button>
+                  {/* Actions Matrix */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleRevealToggle(activeCard)}
+                      className="py-3 bg-white border border-gray-150 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm text-gray-700"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {revealDetails[activeCard.id] ? "visibility_off" : "visibility"}
+                      </span>
+                      {revealDetails[activeCard.id] ? "Hide Details" : "Show Details"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFreeze(activeCard)}
+                      className={cn(
+                        "py-3 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-sm",
+                        activeCard.isLocked
+                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                          : "bg-error/5 text-error border border-error/15"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {activeCard.isLocked ? "lock_open" : "lock"}
+                      </span>
+                      {activeCard.isLocked ? "Unfreeze" : "Freeze"}
+                    </button>
+                  </div>
+
+                  {/* Danger Zone Termination */}
+                  <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex justify-between items-center shadow-none">
+                    <div>
+                      <p className="font-hanken font-bold text-xs text-red-600">Terminate Virtual Card</p>
+                      <p className="font-hanken text-[9px] text-red-400 mt-0.5">Permanently disable and close this card profile.</p>
+                    </div>
+                    <button
+                      onClick={() => handleTerminateCard(activeCard)}
+                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all"
+                    >
+                      Terminate
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Cards Control Suite & Interactive Slider Tools */}
+          {/* Transactions Module */}
           {activeCard && (
-            <section className="premium-gradient-card premium-gradient-border p-5 space-y-4 bg-white shadow-sm">
-              <h3 className="font-hanken font-bold text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100 pb-2.5">
-                Manage Card Permissions
+            <div className="space-y-4 pt-2">
+              <h3 className="font-hanken font-extrabold text-xs text-gray-400 tracking-wider uppercase border-b border-gray-100 pb-2">
+                Card Transactions
               </h3>
 
-              {/* Setting 1: Online Payments */}
-              <div className="flex justify-between items-center py-1">
-                <div>
-                  <p className="font-hanken font-bold text-xs text-black">Web & Online Transactions</p>
-                  <p className="font-hanken text-[9px] text-gray-400 mt-0.5">Allow usage for online web portals and store checkouts</p>
+              {/* Transactions Controls & Filters */}
+              {transactions.length > 0 && (
+                <div className="space-y-3 bg-white border border-gray-150 p-4 rounded-2xl shadow-sm">
+                  {/* Search and Merchant Select */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Search</span>
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search Netflix, Spotify..."
+                        className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black placeholder-gray-400 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Merchant</span>
+                      <select
+                        value={merchantFilter}
+                        onChange={(e) => setMerchantFilter(e.target.value)}
+                        className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none h-[34px] cursor-pointer"
+                      >
+                        <option value="ALL">All Merchants</option>
+                        {uniqueMerchants.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Status & Date Range Filters */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Status</span>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as any)}
+                        className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none h-[34px] cursor-pointer"
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="SUCCESSFUL">Successful</option>
+                        <option value="FAILED">Failed</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Start Date</span>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full bg-white border border-black rounded-xl px-2 py-1.5 text-[11px] font-semibold text-black outline-none h-[34px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">End Date</span>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full bg-white border border-black rounded-xl px-2 py-1.5 text-[11px] font-semibold text-black outline-none h-[34px]"
+                      />
+                    </div>
+
+                    <div className="flex items-end justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setMerchantFilter("ALL");
+                          setStatusFilter("ALL");
+                          setStartDate("");
+                          setEndDate("");
+                        }}
+                        className="w-full h-[34px] bg-gray-100 hover:bg-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-700 rounded-xl transition-all"
+                      >
+                        Clear Filters
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleToggleCardSetting(activeCard.id, "onlinePayments")}
-                  className={cn(
-                    "w-11 h-5 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative cursor-pointer",
-                    activeCard.onlinePayments ? "bg-[#07B038]" : "bg-gray-200"
+              )}
+
+              {txLoading ? (
+                <div className="space-y-2">
+                  <div className="h-10 skeleton-shimmer bg-gray-100 rounded-xl" />
+                  <div className="h-10 skeleton-shimmer bg-gray-100 rounded-xl" />
+                </div>
+              ) : filteredTransactions.length === 0 ? (
+                <div className="text-center py-8 bg-white border border-gray-150 rounded-2xl text-gray-400 text-xs font-semibold p-4 shadow-sm">
+                  No transaction history matched your filters.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {paginatedTransactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="bg-white border border-gray-150 p-4 rounded-xl flex justify-between items-center shadow-sm"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-hanken font-bold text-xs text-black leading-tight">{tx.description}</p>
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider",
+                            tx.status === "SUCCESSFUL" ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                          )}>
+                            {tx.status}
+                          </span>
+                        </div>
+                        <p className="font-hanken text-[8px] text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                          {tx.merchant} • {new Date(tx.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <p className="font-mono font-bold text-xs text-black">
+                        -{tx.currency === "NGN" ? "₦" : "$"}{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  ))}
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex justify-between items-center bg-white border border-gray-150 p-3 rounded-xl mt-4 shadow-sm">
+                      <button
+                        type="button"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                        className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-black rounded-lg text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer"
+                      >
+                        Prev
+                      </button>
+                      <span className="font-hanken text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                        className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-black rounded-lg text-[10px] font-bold uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    </div>
                   )}
-                >
-                  <motion.div
-                    layout
-                    className="w-4 h-4 bg-white rounded-full shadow-md"
-                    animate={{ x: activeCard.onlinePayments ? 24 : 0 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                </button>
-              </div>
-
-              {/* Setting 2: International Transactions */}
-              <div className="flex justify-between items-center py-1">
-                <div>
-                  <p className="font-hanken font-bold text-xs text-black">International Currency Payments</p>
-                  <p className="font-hanken text-[9px] text-gray-400 mt-0.5">Permit global multi-currency settlements (Default on USD card)</p>
                 </div>
-                <button
-                  onClick={() => handleToggleCardSetting(activeCard.id, "intlPayments")}
-                  className={cn(
-                    "w-11 h-5 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative cursor-pointer",
-                    activeCard.intlPayments ? "bg-[#07B038]" : "bg-gray-200"
-                  )}
-                >
-                  <motion.div
-                    layout
-                    className="w-4 h-4 bg-white rounded-full shadow-md"
-                    animate={{ x: activeCard.intlPayments ? 24 : 0 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                </button>
-              </div>
-            </section>
-          )}
-
-          {/* Card Benefits Guide Info-graphic */}
-          <section className="premium-gradient-card premium-gradient-border p-5 space-y-4.5 bg-gradient-to-br from-surface-container-highest to-surface-container shadow-sm">
-            <h3 className="font-hanken font-extrabold text-xs text-black tracking-wider uppercase border-b border-white/10 pb-2.5">
-              Secure Shield Protection Guarantee
-            </h3>
-
-            <div className="grid grid-cols-1 gap-3">
-              <div className="flex gap-3 items-start">
-                <span className="material-symbols-outlined text-[18px] text-[#FC7A00] mt-0.5 flex-shrink-0">verified_user</span>
-                <div>
-                  <p className="font-hanken font-bold text-[11px] text-black">3D Secure v2 Authentication</p>
-                  <p className="font-hanken text-[9px] text-gray-500 mt-0.5 font-semibold">Every web transaction is authenticated through instant native SMS/Push OTP requests.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 items-start">
-                <span className="material-symbols-outlined text-[18px] text-[#FC7A00] mt-0.5 flex-shrink-0">account_balance_wallet</span>
-                <div>
-                  <p className="font-hanken font-bold text-[11px] text-black">Instant Zero-Fee Settlement</p>
-                  <p className="font-hanken text-[9px] text-gray-500 mt-0.5 font-semibold">Move funds instantly from your E-Tech wallet balance to Virtual Cards without commission fees.</p>
-                </div>
-              </div>
+              )}
             </div>
-          </section>
+          )}
         </motion.div>
       </main>
 
@@ -568,11 +803,10 @@ export default function CardsPage() {
             >
               <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-4 mb-2 mx-auto flex-shrink-0" />
 
-              {/* Sheet Header */}
               <div className="w-full px-6 flex justify-between items-center border-b border-gray-100 pb-4 flex-shrink-0">
                 <div className="w-8" />
                 <h3 className="font-hanken font-extrabold text-base text-black text-center">
-                  Request New Card
+                  Request Virtual Card
                 </h3>
                 <button
                   type="button"
@@ -583,31 +817,12 @@ export default function CardsPage() {
                 </button>
               </div>
 
-              {/* Form Content */}
               <form onSubmit={handleSubmitRequest} className="flex-grow flex flex-col justify-between overflow-y-auto w-full">
                 <div className="p-6 space-y-5 flex-grow">
-
-                  {/* Selector 1: Currency */}
+                  {/* Currency Selector */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">1. Select Card Currency</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setFormCurrency("NGN")}
-                        className={cn(
-                          "p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer",
-                          formCurrency === "NGN"
-                            ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">payments</span>
-                        <div>
-                          <p className="font-hanken font-bold text-xs text-black">Naira (NGN)</p>
-                          <p className="font-hanken text-[9px] text-gray-400">Zero issuance fee</p>
-                        </div>
-                      </button>
-
                       <button
                         type="button"
                         onClick={() => setFormCurrency("USD")}
@@ -615,7 +830,7 @@ export default function CardsPage() {
                           "p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer",
                           formCurrency === "USD"
                             ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
+                            : "border-gray-200 bg-white"
                         )}
                       >
                         <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">currency_exchange</span>
@@ -624,79 +839,42 @@ export default function CardsPage() {
                           <p className="font-hanken text-[9px] text-gray-400">$2.00 setup cost</p>
                         </div>
                       </button>
-                    </div>
-                  </div>
-
-                  {/* Selector 2: Card Format */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">2. Card Type Format</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setFormType("VIRTUAL")}
-                        className={cn(
-                          "p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer",
-                          formType === "VIRTUAL"
-                            ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-[20px] text-gray-700">smartphone</span>
-                        <div>
-                          <p className="font-hanken font-bold text-xs text-black">Virtual Card</p>
-                          <p className="font-hanken text-[9px] text-gray-400">Instant activation</p>
-                        </div>
-                      </button>
 
                       <button
                         type="button"
-                        onClick={() => setFormType("PHYSICAL")}
+                        onClick={() => setFormCurrency("NGN")}
                         className={cn(
                           "p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer",
-                          formType === "PHYSICAL"
+                          formCurrency === "NGN"
                             ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
+                            : "border-gray-200 bg-white"
                         )}
                       >
-                        <span className="material-symbols-outlined text-[20px] text-gray-700">credit_card</span>
+                        <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">payments</span>
                         <div>
-                          <p className="font-hanken font-bold text-xs text-black">Physical Card</p>
-                          <p className="font-hanken text-[9px] text-gray-400">Delivered home</p>
+                          <p className="font-hanken font-bold text-xs text-black">Naira (NGN)</p>
+                          <p className="font-hanken text-[9px] text-gray-400">Zero setup fee</p>
                         </div>
                       </button>
                     </div>
                   </div>
 
-                  {/* Selector 3: Card Color Theme */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">3. Select Card Theme Design</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: "obsidian" as const, label: "Obsidian", bg: "bg-[#111]" },
-                        { id: "platinum" as const, label: "Platinum", bg: "bg-[#8e8e93]" },
-                        { id: "sunset" as const, label: "Sunset Orange", bg: "bg-[#FC7A00]" }
-                      ].map((themeOpt) => (
-                        <button
-                          key={themeOpt.id}
-                          type="button"
-                          onClick={() => setFormTheme(themeOpt.id)}
-                          className={cn(
-                            "py-2 px-1 rounded-xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer",
-                            formTheme === themeOpt.id
-                              ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                              : "border-gray-200 bg-white"
-                          )}
-                        >
-                          <div className={cn("w-6 h-4 rounded", themeOpt.bg)} />
-                          <span className="font-hanken text-[10px] font-bold text-black">{themeOpt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Text Input: Card Holder Name Customization */}
+                  {/* Initial Funding Amount */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">4. Display Card Name</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">2. Initial Funding Amount</label>
+                    <input
+                      type="text"
+                      required
+                      value={initialAmount}
+                      onChange={(e) => setInitialAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  {/* Display Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">3. Card Holder Display Name</label>
                     <input
                       type="text"
                       required
@@ -707,51 +885,82 @@ export default function CardsPage() {
                     />
                   </div>
 
-                  {/* Text Input: Card Delivery Address (Only for Physical Cards) */}
-                  {formType === "PHYSICAL" && (
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">5. Home Delivery Address</label>
+                  {/* Billing Address Details */}
+                  <div className="space-y-3.5 pt-2 border-t border-gray-100">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">4. Card Billing Address</label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-bold text-gray-400">Country Code</span>
+                        <input
+                          type="text"
+                          required
+                          value={billingCountry}
+                          onChange={(e) => setBillingCountry(e.target.value.toUpperCase())}
+                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
+                          placeholder="US"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-bold text-gray-400">State / Region</span>
+                        <input
+                          type="text"
+                          required
+                          value={billingState}
+                          onChange={(e) => setBillingState(e.target.value)}
+                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
+                          placeholder="CA"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-bold text-gray-400">City</span>
+                        <input
+                          type="text"
+                          required
+                          value={billingCity}
+                          onChange={(e) => setBillingCity(e.target.value)}
+                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
+                          placeholder="San Francisco"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[8px] font-bold text-gray-400">Postal / ZIP Code</span>
+                        <input
+                          type="text"
+                          required
+                          value={billingPostalCode}
+                          onChange={(e) => setBillingPostalCode(e.target.value)}
+                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
+                          placeholder="94105"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[8px] font-bold text-gray-400">Street Address</span>
                       <input
                         type="text"
                         required
-                        value={deliveryAddress}
-                        onChange={(e) => setDeliveryAddress(e.target.value)}
-                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                        placeholder="Enter full physical address"
+                        value={billingStreetAddress}
+                        onChange={(e) => setBillingStreetAddress(e.target.value)}
+                        className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
+                        placeholder="333 Fremont Street"
                       />
                     </div>
-                  )}
-
-                  {/* PIN setup field */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Card Setup 4-Digit PIN</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      required
-                      value={cardPin}
-                      onChange={(e) => setCardPin(e.target.value.replace(/\D/g, ""))}
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all text-center tracking-[0.5em]"
-                      placeholder="••••"
-                    />
                   </div>
                 </div>
 
                 {/* Footer Submit */}
                 <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-col gap-3 flex-shrink-0">
                   <div className="flex justify-between text-xs font-semibold text-gray-500">
-                    <span>Issuance Cost:</span>
+                    <span>Card Issuance Setup:</span>
                     <span className="font-bold text-black">
                       {formCurrency === "USD" ? "$2.00 USD" : "Free (₦0.00)"}
                     </span>
                   </div>
-
-                  {formType === "PHYSICAL" && (
-                    <div className="flex justify-between text-xs font-semibold text-gray-500">
-                      <span>Physical Delivery Fee:</span>
-                      <span className="font-bold text-black">₦2,500.00 NGN</span>
-                    </div>
-                  )}
 
                   <button
                     type="submit"
@@ -763,15 +972,12 @@ export default function CardsPage() {
                 </div>
               </form>
 
-              {/* Progress/Simulating Mint Modal Overlay */}
+              {/* Progress Modal Overlay */}
               {isMinting && (
                 <div className="absolute inset-0 bg-white/95 z-[100000] flex flex-col items-center justify-center p-6 text-center">
                   <div className="relative w-36 h-36 flex items-center justify-center mb-6">
-                    {/* Pulsing Outer tech circle */}
                     <div className="absolute inset-0 border-2 border-dashed border-[#FC7A00]/30 rounded-full animate-spin" style={{ animationDuration: "12s" }} />
                     <div className="absolute inset-2 border border-dashed border-[#FC7A00]/50 rounded-full animate-spin" style={{ animationDuration: "6s" }} />
-
-                    {/* Shimmering card element */}
                     <motion.div
                       animate={{
                         scale: [0.9, 1.05, 0.9],
@@ -804,6 +1010,62 @@ export default function CardsPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Fund Modal */}
+      {fundModalOpen && activeCard && (
+        <div className="fixed inset-0 z-[100001] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setFundModalOpen(false)} />
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full z-10 space-y-4 text-black border border-gray-100">
+            <h3 className="font-hanken font-extrabold text-sm text-black uppercase tracking-wider">Fund Virtual Card</h3>
+            <p className="text-[10px] text-gray-400">Deduct from your main {activeCard.currency} wallet atomically.</p>
+            <form onSubmit={handleFundSubmit} className="space-y-4">
+              <input
+                type="text"
+                required
+                value={fundAmount}
+                onChange={(e) => setFundAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="Enter amount to fund"
+                className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+              />
+              <button
+                type="submit"
+                disabled={isActionSubmitting}
+                className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-xs font-bold rounded-2xl uppercase tracking-wider"
+              >
+                {isActionSubmitting ? "Processing..." : "Confirm Funding"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Withdraw Modal */}
+      {withdrawModalOpen && activeCard && (
+        <div className="fixed inset-0 z-[100001] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setWithdrawModalOpen(false)} />
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full z-10 space-y-4 text-black border border-gray-100">
+            <h3 className="font-hanken font-extrabold text-sm text-black uppercase tracking-wider">Withdraw Card Funds</h3>
+            <p className="text-[10px] text-gray-400">Move money instantly from Card to main {activeCard.currency} wallet.</p>
+            <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+              <input
+                type="text"
+                required
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="Enter amount to withdraw"
+                className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+              />
+              <button
+                type="submit"
+                disabled={isActionSubmitting}
+                className="w-full py-3.5 bg-black text-white text-xs font-bold rounded-2xl uppercase tracking-wider"
+              >
+                {isActionSubmitting ? "Processing..." : "Confirm Withdrawal"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </>
