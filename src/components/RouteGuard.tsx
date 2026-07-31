@@ -253,9 +253,15 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                className="relative w-6 h-6 bg-white rounded-full p-1 shadow-sm flex items-center justify-center text-[#FC7A00]"
+                className="relative w-7 h-7 bg-white rounded-full p-0.5 shadow-sm flex items-center justify-center overflow-hidden"
               >
-                <span className="material-symbols-outlined text-[16px] font-bold">school</span>
+                <Image
+                  src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+                  alt="E-Tech Logo"
+                  width={24}
+                  height={24}
+                  className="object-contain"
+                />
               </motion.div>
             </div>
 

@@ -38,7 +38,7 @@ export default function SignUpPage() {
     setDateOfBirth(cleaned.slice(0, 10));
   };
 
-  const checkAccountExists = async (phoneVal: string, bvnNinVal: string) => {
+  const checkAccountExists = async (phoneVal: string, bvnNinVal: string, emailVal: string = "") => {
     setIsCheckingExists(true);
     try {
       const res = await fetch("/api/auth/check-exists", {
@@ -47,6 +47,7 @@ export default function SignUpPage() {
         body: JSON.stringify({
           phoneNumber: phoneVal,
           bvnNin: bvnNinVal,
+          email: emailVal,
         }),
       });
       const data = await res.json();
@@ -389,7 +390,7 @@ export default function SignUpPage() {
 
       // Check if phone number already exists before proceeding to Step 4!
       const fullPhone = `${phonePrefix}${phoneNumber}`;
-      const alreadyExists = await checkAccountExists(fullPhone, bvnNin);
+      const alreadyExists = await checkAccountExists(fullPhone, bvnNin, email);
       if (alreadyExists) return;
 
       setCurrentStep(4);
