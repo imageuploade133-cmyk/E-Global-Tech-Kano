@@ -1988,8 +1988,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             ) : (
               <>
                 {/* Prominent Account Number / Card Number styling */}
-                <div className="font-mono text-[13px] min-[360px]:text-[15px] text-white tracking-[0.2em] font-semibold flex items-center justify-between select-all leading-none mb-1">
-                  <span>
+                <div className="font-mono text-[11px] min-[360px]:text-[13px] min-[390px]:text-[14px] text-white tracking-[0.1em] font-semibold flex flex-wrap items-center justify-between gap-x-2 gap-y-1 select-all leading-none mb-1 w-full overflow-hidden">
+                  <span className="whitespace-nowrap">
                     {selectedCurrency === "NGN" ? (
                       permanentAccount ? (
                         permanentAccount.accountNumber.replace(/(\d{4})(\d{4})(\d{2})/, "$1 $2 $3")
@@ -2004,7 +2004,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       )
                     )}
                   </span>
-                  <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/50 font-bold">
+                  <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/70 font-bold truncate max-w-[120px]" title={selectedCurrency === "NGN" ? (permanentAccount ? permanentAccount.bankName : "Wema Bank") : (usdAccountData ? usdAccountData.bankName : "Silicon Valley Bank")}>
                     {selectedCurrency === "NGN" ? (
                       permanentAccount ? permanentAccount.bankName : "Wema Bank"
                     ) : (

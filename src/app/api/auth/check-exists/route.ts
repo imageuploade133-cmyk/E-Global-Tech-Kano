@@ -4,9 +4,22 @@ import { adminDb } from "@/lib/firebase-admin";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { phoneNumber, bvnNin } = body;
+    const { phoneNumber, bvnNin, email } = body;
 
     const queryResults: string[] = [];
+
+    // 0. Check email if provided
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase();
+      const emailQuery = await adminDb.collection("users")
+        .where("email", "==", cleanEmail)
+        .limit(1)
+        .get();
+
+      if (!emailQuery.empty) {
+        queryResults.push("Email Address");
+      }
+    }
 
     // 1. Check phone number if provided
     if (phoneNumber) {
