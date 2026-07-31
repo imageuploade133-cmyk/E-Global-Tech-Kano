@@ -10,6 +10,8 @@ const services = [
   { icon: "swap_vert", label: "Data", color: "text-secondary", href: "/bills?type=data" },
   { icon: "sports_basketball", label: "Betting", color: "text-secondary", href: "/bills?type=betting" },
   { icon: "tv", label: "TV", color: "text-secondary", href: "/bills?type=cable" },
+  { icon: "bolt", label: "Electricity", color: "text-secondary", href: "/bills?type=utility" },
+  { icon: "school", label: "WAEC", color: "text-secondary", href: "/bills?type=waec" },
   { icon: "credit_card", label: "Cards", color: "text-primary", href: "/cards", fill: true },
   { icon: "real_estate_agent", label: "Loan", color: "text-primary", href: "#", action: "loan" },
   { icon: "diamond", label: "Wealth", color: "text-primary", href: "#", action: "wealth" },
