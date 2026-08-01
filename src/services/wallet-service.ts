@@ -15,6 +15,7 @@ export interface TransactionRecord {
   time: string;
   fee: number;
   createdAt: string;
+  walletType?: "MAIN" | "BONUS";
 }
 
 export class WalletService {
@@ -86,6 +87,7 @@ export class WalletService {
       recipientName: string;
       fee?: number;
       type?: TransactionRecord["type"];
+      walletType?: "MAIN" | "BONUS";
       preLoadedUser?: {
         ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
         data: FirebaseFirestore.DocumentData;
@@ -98,7 +100,7 @@ export class WalletService {
       };
     }
   ): Promise<{ previousBalance: number; newBalance: number }> {
-    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0, type = "DEPOSIT", preLoadedUser, preLoadedWallet } = params;
+    const { userId, amount, currency, reference, flwId, docId, description, recipientName, fee = 0, type = "DEPOSIT", walletType = "MAIN", preLoadedUser, preLoadedWallet } = params;
 
     const ucCurrency = (currency || "NGN").toUpperCase();
 
@@ -106,14 +108,21 @@ export class WalletService {
     this.validateAmount(amount);
     this.validateCurrency(ucCurrency);
 
+    const isBonus = walletType === "BONUS";
+
     // 1. ALL READS: Must be executed before any writes
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${ucCurrency}`);
     let currentBalance = 0;
     if (preLoadedWallet) {
-      currentBalance = preLoadedWallet.balance;
+      currentBalance = isBonus
+        ? (preLoadedWallet.data?.bonusBalance !== undefined ? Number(preLoadedWallet.data.bonusBalance) : 1000.00)
+        : preLoadedWallet.balance;
     } else {
       const walletDoc = await transaction.get(walletRef);
-      currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+      const wData = walletDoc.data() || {};
+      currentBalance = walletDoc.exists
+        ? (isBonus ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 1000.00) : (Number(wData.balance) || 0))
+        : (isBonus ? 1000.00 : 0);
     }
 
     // Load user profile before executing any writes if currency is NGN
@@ -127,18 +136,32 @@ export class WalletService {
     const newBalance = currentBalance + creditAmount;
 
     // Update specific wallet balance atomically
-    transaction.set(walletRef, {
-      userId,
-      currency: ucCurrency,
-      balance: FieldValue.increment(creditAmount),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    if (isBonus) {
+      transaction.set(walletRef, {
+        userId,
+        currency: ucCurrency,
+        bonusBalance: FieldValue.increment(creditAmount),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
 
-    // Keep legacy root balance updated for NGN
-    if (ucCurrency === "NGN" && user) {
-      transaction.update(user.ref, {
+      if (ucCurrency === "NGN" && user) {
+        transaction.update(user.ref, {
+          bonusBalance: FieldValue.increment(creditAmount),
+        });
+      }
+    } else {
+      transaction.set(walletRef, {
+        userId,
+        currency: ucCurrency,
         balance: FieldValue.increment(creditAmount),
-      });
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+
+      if (ucCurrency === "NGN" && user) {
+        transaction.update(user.ref, {
+          balance: FieldValue.increment(creditAmount),
+        });
+      }
     }
 
     // Record transaction in general ledger
@@ -158,6 +181,7 @@ export class WalletService {
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
       fee,
       createdAt: new Date().toISOString(),
+      walletType,
     };
 
     transaction.set(ledgerRef, ledgerRecord);
@@ -184,6 +208,7 @@ export class WalletService {
       recipientName: string;
       fee?: number;
       isPending?: boolean; // If true, sets status to PENDING instead of SUCCESS
+      walletType?: "MAIN" | "BONUS";
       preLoadedUser?: {
         ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
         data: FirebaseFirestore.DocumentData;
@@ -196,7 +221,7 @@ export class WalletService {
       };
     }
   ): Promise<{ previousBalance: number; newBalance: number }> {
-    const { userId, amount, currency, reference, docId, type, description, recipientName, fee = 0, isPending = false, preLoadedUser, preLoadedWallet } = params;
+    const { userId, amount, currency, reference, docId, type, description, recipientName, fee = 0, isPending = false, walletType = "MAIN", preLoadedUser, preLoadedWallet } = params;
 
     const ucCurrency = (currency || "NGN").toUpperCase();
 
@@ -204,14 +229,21 @@ export class WalletService {
     this.validateAmount(amount);
     this.validateCurrency(ucCurrency);
 
+    const isBonus = walletType === "BONUS";
+
     // 1. ALL READS: Must be executed before any writes
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${ucCurrency}`);
     let currentBalance = 0;
     if (preLoadedWallet) {
-      currentBalance = preLoadedWallet.balance;
+      currentBalance = isBonus
+        ? (preLoadedWallet.data?.bonusBalance !== undefined ? Number(preLoadedWallet.data.bonusBalance) : 1000.00)
+        : preLoadedWallet.balance;
     } else {
       const walletDoc = await transaction.get(walletRef);
-      currentBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+      const wData = walletDoc.data() || {};
+      currentBalance = walletDoc.exists
+        ? (isBonus ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 1000.00) : (Number(wData.balance) || 0))
+        : (isBonus ? 1000.00 : 0);
     }
 
     // Load user profile before executing any writes if currency is NGN
@@ -224,24 +256,38 @@ export class WalletService {
     const totalDeduction = amount; // Fee is handled separately or included in amount
 
     if (currentBalance < totalDeduction) {
-      throw new Error(`Insufficient wallet funds to complete this ${type.toLowerCase()}. Required: ${ucCurrency === "NGN" ? "₦" : "$"}${totalDeduction}, Available: ${ucCurrency === "NGN" ? "₦" : "$"}${currentBalance}`);
+      throw new Error(`Insufficient ${isBonus ? "bonus reward" : "wallet"} funds to complete this ${type.toLowerCase()}. Required: ${ucCurrency === "NGN" ? "₦" : "$"}${totalDeduction}, Available: ${ucCurrency === "NGN" ? "₦" : "$"}${currentBalance}`);
     }
 
     const newBalance = currentBalance - totalDeduction;
 
     // Update specific wallet balance atomically
-    transaction.set(walletRef, {
-      userId,
-      currency: ucCurrency,
-      balance: FieldValue.increment(-totalDeduction),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    if (isBonus) {
+      transaction.set(walletRef, {
+        userId,
+        currency: ucCurrency,
+        bonusBalance: FieldValue.increment(-totalDeduction),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
 
-    // Keep legacy root balance updated for NGN
-    if (ucCurrency === "NGN" && user) {
-      transaction.update(user.ref, {
+      if (ucCurrency === "NGN" && user) {
+        transaction.update(user.ref, {
+          bonusBalance: FieldValue.increment(-totalDeduction),
+        });
+      }
+    } else {
+      transaction.set(walletRef, {
+        userId,
+        currency: ucCurrency,
         balance: FieldValue.increment(-totalDeduction),
-      });
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+
+      if (ucCurrency === "NGN" && user) {
+        transaction.update(user.ref, {
+          balance: FieldValue.increment(-totalDeduction),
+        });
+      }
     }
 
     // Record transaction in general ledger
@@ -260,6 +306,7 @@ export class WalletService {
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
       fee,
       createdAt: new Date().toISOString(),
+      walletType,
     };
 
     transaction.set(ledgerRef, ledgerRecord);

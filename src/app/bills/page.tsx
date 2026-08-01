@@ -50,6 +50,10 @@ export default function GenericBillPage() {
 
   // Wallet Balance sync
   const balance = Number(userData?.balance) || 0;
+  const bonusBalance = Number(userData?.bonusBalance) || 0;
+
+  // Selected Wallet Type
+  const [walletTypeSelected, setWalletTypeSelected] = useState<"MAIN" | "BONUS">("MAIN");
 
   // Determine Category from URL query or default to AIRTIME
   const pageCategory = ((searchParams ? searchParams.get("type") : "AIRTIME") || "AIRTIME").toUpperCase();
@@ -428,8 +432,9 @@ export default function GenericBillPage() {
       return;
     }
 
-    if (finalAmount > balance) {
-      toast.error(`Insufficient balance. Required: ₦${finalAmount.toLocaleString()}, Available: ₦${balance.toLocaleString()}`);
+    const currentSelectedBalance = walletTypeSelected === "BONUS" ? bonusBalance : balance;
+    if (finalAmount > currentSelectedBalance) {
+      toast.error(`Insufficient ${walletTypeSelected === "BONUS" ? "bonus reward" : "wallet"} balance. Required: ₦${finalAmount.toLocaleString()}, Available: ₦${currentSelectedBalance.toLocaleString()}`);
       return;
     }
 
@@ -495,6 +500,7 @@ export default function GenericBillPage() {
               network: selectedBiller?.biller_code,
               phone: customerId,
               item_code: selectedItem?.item_code,
+              walletType: walletTypeSelected,
             }
           : (isUtility
               ? {
@@ -518,6 +524,7 @@ export default function GenericBillPage() {
                           network: selectedBiller?.biller_code,
                           phone: customerId,
                           amount: finalAmount,
+                          walletType: walletTypeSelected,
                         })));
 
         let res = await fetch(endpoint, {
@@ -575,6 +582,7 @@ export default function GenericBillPage() {
             biller_name: selectedBiller?.name,
             biller_type: pageCategory.toLowerCase(),
             pin,
+            walletType: walletTypeSelected,
           }),
         });
 
@@ -597,6 +605,7 @@ export default function GenericBillPage() {
               biller_name: selectedBiller?.name,
               biller_type: pageCategory.toLowerCase(),
               pin,
+              walletType: walletTypeSelected,
             }),
           });
         }
@@ -1020,7 +1029,56 @@ export default function GenericBillPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-4 border-t border-gray-100 pt-5"
                   >
-                    <div className="space-y-1.5 text-left">
+                    {/* Wallet Selector Toggles (Only for Airtime & Data) */}
+                    {(pageCategory === "AIRTIME" || pageCategory === "DATA") && (
+                      <div className="space-y-3 pb-3 text-left font-hanken">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                          Select Payment Wallet
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setWalletTypeSelected("MAIN")}
+                            className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
+                              walletTypeSelected === "MAIN"
+                                ? "bg-orange-50/50 border-[#FC7A00]"
+                                : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-bold text-[10px] text-gray-400 uppercase">Main Wallet</span>
+                              <p className="font-hanken text-xs font-black text-black mt-1">Real Balance</p>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-[#FC7A00] mt-3">
+                              ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setWalletTypeSelected("BONUS")}
+                            className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
+                              walletTypeSelected === "BONUS"
+                                ? "bg-orange-50/50 border-[#FC7A00]"
+                                : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-bold text-[10px] text-gray-400 uppercase">Bonus Wallet</span>
+                              <p className="font-hanken text-xs font-black text-black mt-1">Reward Balance</p>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-emerald-600 mt-3">
+                              ₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                          </button>
+                        </div>
+                        <p className="text-[9.5px] text-gray-400 font-bold uppercase tracking-wide leading-none mt-1">
+                          Bonus wallet is only applicable for Airtime topups and Mobile Data plans.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5 text-left border-t border-gray-100 pt-4">
                       <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
                         {getCustomerFieldLabel()}
                       </label>

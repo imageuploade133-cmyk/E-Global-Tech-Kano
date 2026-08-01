@@ -103,6 +103,19 @@ export async function GET(req: Request) {
 
     const userData = userSnap.data() || {};
     const legacyBalance = typeof userData.balance === "number" ? userData.balance : 10000.00;
+    const legacyBonusBalance = typeof userData.bonusBalance === "number" ? userData.bonusBalance : 1000.00;
+
+    // Generate unique short account ID if not present
+    let accountId = userData.accountId || "";
+    if (!accountId) {
+      const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      let code = "";
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      accountId = `ET-${code}`;
+      await userRef.update({ accountId });
+    }
 
     // 2. Fetch NGN and USD wallets concurrently
     const ngnWalletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
@@ -114,6 +127,7 @@ export async function GET(req: Request) {
     ]);
 
     let ngnBalance = legacyBalance;
+    let ngnBonusBalance = legacyBonusBalance;
     let ngnUpdatedAt = new Date().toISOString();
     let usdBalance = 0.00;
     let usdUpdatedAt = new Date().toISOString();
@@ -125,11 +139,13 @@ export async function GET(req: Request) {
         userId: uid,
         currency: "NGN",
         balance: legacyBalance,
+        bonusBalance: legacyBonusBalance,
         updatedAt: ngnUpdatedAt
       }, { merge: true });
     } else {
       const ngnData = ngnSnap.data() || {};
       ngnBalance = typeof ngnData.balance === "number" ? ngnData.balance : legacyBalance;
+      ngnBonusBalance = typeof ngnData.bonusBalance === "number" ? ngnData.bonusBalance : legacyBonusBalance;
       ngnUpdatedAt = ngnData.updatedAt || ngnUpdatedAt;
     }
 
@@ -162,22 +178,35 @@ export async function GET(req: Request) {
       ngnBalance = userData.balance;
     }
 
-    console.log(`[GET /api/wallets] [${reqId}] Wallet balances retrieved in ${Date.now() - startTime}ms. NGN: ₦${ngnBalance}, USD: $${usdBalance}`);
+    if (userData.bonusBalance !== ngnBonusBalance) {
+      console.log(`[GET /api/wallets] [${reqId}] Synchronizing user profile bonusBalance to NGN wallet bonusBalance: ${ngnBonusBalance}`);
+      await userRef.update({ bonusBalance: ngnBonusBalance });
+    }
+
+    console.log(`[GET /api/wallets] [${reqId}] Wallet balances retrieved in ${Date.now() - startTime}ms. NGN: ₦${ngnBalance}, USD: $${usdBalance}, BONUS: ₦${ngnBonusBalance}`);
 
     return NextResponse.json({
       success: true,
+      accountId,
       wallets: {
         NGN: {
           userId: uid,
           currency: "NGN",
           balance: ngnBalance,
-          updatedAt: ngnUpdatedAt
+          updatedAt: ngnUpdatedAt,
+          bonusBalance: ngnBonusBalance
         },
         USD: {
           userId: uid,
           currency: "USD",
           balance: usdBalance,
           updatedAt: usdUpdatedAt
+        },
+        BONUS: {
+          userId: uid,
+          currency: "NGN",
+          balance: ngnBonusBalance,
+          updatedAt: new Date().toISOString()
         }
       }
     });
