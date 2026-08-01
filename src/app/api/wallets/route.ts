@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
+import { ReferralService } from "@/services/referral-service";
 
 export async function GET(req: Request) {
   const reqId = `req-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
@@ -18,6 +19,13 @@ export async function GET(req: Request) {
   }
 
   try {
+    // --- AUTOMATIC SECURE REFERRAL CHECK ENGINE ---
+    try {
+      await ReferralService.checkAndProcessReferral(uid);
+    } catch (refCheckErr: any) {
+      console.error(`[Referral Check Engine Error] [${reqId}] Execution failed:`, refCheckErr.message);
+    }
+
     // --- SELF-HEALING AUTO-REFUND ENGINE ---
     try {
       const failedTxQuery = await adminDb.collection("transactions")

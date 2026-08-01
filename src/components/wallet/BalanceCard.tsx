@@ -289,6 +289,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   } | null>(null);
   const [isPermAccountLoading, setIsPermAccountLoading] = useState(false);
 
+  const showPendingCard = !isPermAccountLoading && !permanentAccount;
+  const showSuccessCard = !isPermAccountLoading && !!permanentAccount;
+
   // Outward Transfer Wizard States
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [trfStep, setTrfStep] = useState<"input" | "amount" | "confirm" | "pin" | "completion">("input");
@@ -1085,6 +1088,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setIsAddMoneyOpen(false);
     stopPolling();
     if (timerRef.current) clearInterval(timerRef.current);
+    fetchWalletBalances();
     // Reset steps
     setTimeout(() => {
       setWizardStep("amount");
@@ -2232,7 +2236,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         <div className="h-8 bg-gray-200 rounded-lg skeleton-shimmer w-14" />
                       </div>
                     </div>
-                  ) : permanentAccount ? (
+                  ) : null}
+
+                  {showSuccessCard ? (
                     <div className="bg-gradient-to-r from-[#1E293B] to-[#0F172A] border border-white/5 rounded-2xl p-4 text-white relative overflow-hidden select-none">
                       <div className="absolute right-0 bottom-0 opacity-15 text-[100px] select-none pointer-events-none translate-x-1/4 translate-y-1/4">
                         <span className="material-symbols-outlined font-black text-white">account_balance</span>
@@ -2248,13 +2254,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                       <div className="flex justify-between items-start gap-4">
                         <div>
-                          <p className="font-hanken font-bold text-xs text-gray-300 leading-tight">Bank: <strong className="text-white">{permanentAccount.bankName}</strong></p>
-                          <p className="font-mono font-black text-sm text-[#FC7A00] tracking-wider mt-1 select-all">{permanentAccount.accountNumber}</p>
-                          <p className="font-hanken text-[9px] text-gray-400 font-bold uppercase mt-1 truncate max-w-[200px]">{permanentAccount.accountName}</p>
+                          <p className="font-hanken font-bold text-xs text-gray-300 leading-tight">Bank: <strong className="text-white">{permanentAccount?.bankName}</strong></p>
+                          <p className="font-mono font-black text-sm text-[#FC7A00] tracking-wider mt-1 select-all">{permanentAccount?.accountNumber}</p>
+                          <p className="font-hanken text-[9px] text-gray-400 font-bold uppercase mt-1 truncate max-w-[200px]">{permanentAccount?.accountName}</p>
                         </div>
                         <button
                           type="button"
-                          onClick={() => copyToClipboard(permanentAccount.accountNumber, "Account number")}
+                          onClick={() => copyToClipboard(permanentAccount?.accountNumber || "", "Account number")}
                           className="bg-white/10 hover:bg-white/20 hover:text-white px-2.5 py-1.5 rounded-lg text-gray-200 text-[10px] font-bold tracking-wide active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[13px]">content_copy</span>
@@ -2262,7 +2268,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </button>
                       </div>
                     </div>
-                  ) : (
+                  ) : null}
+
+                  {showPendingCard ? (
                     <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-amber-800 text-left">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="material-symbols-outlined text-amber-600 text-[18px]">info</span>
@@ -2270,6 +2278,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </div>
                       <p className="font-hanken text-[10.5px] leading-relaxed text-amber-700">
                         BVN/NIN verification is required by Flutterwave to activate your permanent NGN account. To fund instantly, please click &quot;Choose Payment Method&quot; below to use dynamic checkouts.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* Referral Program Info Card */}
+                  {!!userData?.accountId && (
+                    <div className="bg-gradient-to-r from-[#FC7A00]/10 to-[#E06600]/10 border border-[#FC7A00]/20 rounded-2xl p-4 text-black text-left relative overflow-hidden shadow-xs">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">group_add</span>
+                        <p className="font-hanken font-bold text-xs text-black">Referral Program</p>
+                      </div>
+                      <p className="font-hanken text-[11px] leading-relaxed text-gray-700">
+                        Refer a user with your Account ID <strong className="font-mono text-[#FC7A00] tracking-wider select-all">{String(userData?.accountId || "")}</strong> and you will get <strong className="text-black">₦1,000 Naira</strong> once their account is funded with a minimum of ₦2,000.
                       </p>
                     </div>
                   )}
