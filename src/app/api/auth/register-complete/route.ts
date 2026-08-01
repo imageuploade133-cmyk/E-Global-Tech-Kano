@@ -61,6 +61,7 @@ export async function POST(req: Request) {
       firstName: cleanFirstName,
       lastName: cleanLastName,
       fullName: fullName,
+      name: fullName,
       displayName: fullName,
       dateOfBirth: dateOfBirth,
       // Structured address

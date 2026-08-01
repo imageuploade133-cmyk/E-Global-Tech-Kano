@@ -44,8 +44,9 @@ export default function Home() {
   const [verifyMessage, setVerifyMessage] = useState("");
   const [isDuplicate, setIsDuplicate] = useState(false);
 
+  const nameStr = (userData?.firstName || userData?.name || userData?.fullName || user?.displayName || "Captain") as string;
   const currentUser = {
-    userName: userData?.name?.split(" ")[0]?.toUpperCase() || user?.displayName?.split(" ")[0]?.toUpperCase() || "CAPTAIN",
+    userName: nameStr.split(" ")[0].toUpperCase(),
     profileImage: user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M",
     balance: userData?.balance || 0,
     currency: "NGN",
