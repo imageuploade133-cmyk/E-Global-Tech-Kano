@@ -17,7 +17,7 @@ def run_verification():
         page.goto("http://localhost:3000/auth/login")
         page.wait_for_timeout(1000)
 
-        # 2. Inject mock session storage bypass
+        # 2. Inject mock playtest authorization bypass
         print("[Playwright Verification] Injecting mock playtest authorization bypass...")
         page.evaluate('() => { window.sessionStorage.setItem("mock", "true"); }')
         page.wait_for_timeout(1000)
@@ -32,32 +32,29 @@ def run_verification():
         page.screenshot(path="verification/screenshots/referrals_page.png")
         page.wait_for_timeout(1000)
 
-        # 4. Navigate back to Home and open Fund Wallet Checkout Drawer
+        # 4. Navigate back to Home and check ServiceGrid with Referral icon
         print("[Playwright Verification] Navigating to homepage dashboard...")
         page.goto("http://localhost:3000/")
-        page.wait_for_timeout(2000)
+        page.evaluate('() => { window.sessionStorage.setItem("mock", "true"); }')
+        page.goto("http://localhost:3000/")
+        page.wait_for_timeout(2500)
 
-        # Find the Fund/Add button or click Balance Card funding area
-        print("[Playwright Verification] Locating Fund button...")
-        # Search for buttons or text "Fund"
-        fund_button = page.get_by_role("button", name="Fund")
-        if fund_button.is_visible():
-            print("[Playwright Verification] Clicking Fund button...")
-            fund_button.click()
-            page.wait_for_timeout(1000)
-            print("[Playwright Verification] Taking Fund drawer screenshot...")
-            page.screenshot(path="verification/screenshots/fund_drawer.png")
-            page.wait_for_timeout(1000)
-        else:
-            # Try clicking elements with text containing "Fund"
-            fund_el = page.locator("text=Fund").first
-            if fund_el.is_visible():
-                print("[Playwright Verification] Clicking Fund text locator...")
-                fund_el.click()
-                page.wait_for_timeout(1000)
-                print("[Playwright Verification] Taking Fund drawer screenshot...")
-                page.screenshot(path="verification/screenshots/fund_drawer.png")
-                page.wait_for_timeout(1000)
+        # Take screenshot of homepage showing the Referral icon!
+        print("[Playwright Verification] Taking homepage dashboard screenshot...")
+        page.screenshot(path="verification/screenshots/dashboard.png")
+        page.wait_for_timeout(1000)
+
+        # 5. Navigate to profile page
+        print("[Playwright Verification] Navigating to profile page...")
+        page.goto("http://localhost:3000/profile")
+        page.evaluate('() => { window.sessionStorage.setItem("mock", "true"); }')
+        page.goto("http://localhost:3000/profile")
+        page.wait_for_timeout(2500)
+
+        # Take screenshot of profile page showing the Referral Program card!
+        print("[Playwright Verification] Taking profile page screenshot...")
+        page.screenshot(path="verification/screenshots/profile_page.png")
+        page.wait_for_timeout(1000)
 
         print("[Playwright Verification] Closing browser context...")
         context.close()
