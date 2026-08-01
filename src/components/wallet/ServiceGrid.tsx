@@ -11,11 +11,12 @@ import { VerificationRequiredDrawer } from "@/components/layout/VerificationRequ
 const services = [
   { icon: "cell_tower", label: "Airtime", color: "text-secondary", href: "/bills?type=airtime" },
   { icon: "swap_vert", label: "Data", color: "text-secondary", href: "/bills?type=data" },
-  { icon: "sports_basketball", label: "Betting", color: "text-secondary", href: "/bills?type=betting" },
   { icon: "tv", label: "TV", color: "text-secondary", href: "/bills?type=cable" },
   { icon: "bolt", label: "Electricity", color: "text-secondary", href: "/bills?type=utility" },
   { icon: "school", label: "WAEC", color: "text-secondary", href: "/bills?type=waec" },
+  { icon: "sports_basketball", label: "Betting", color: "text-secondary", href: "/bills?type=betting" },
   { icon: "credit_card", label: "Cards", color: "text-primary", href: "/cards", fill: true },
+  { icon: "group_add", label: "Referral", color: "text-[#FC7A00]", href: "/referrals", fill: true },
   { icon: "real_estate_agent", label: "Loan", color: "text-primary", href: "#", action: "loan" },
   { icon: "diamond", label: "Wealth", color: "text-primary", href: "#", action: "wealth" },
   { icon: "apps", label: "More", color: "text-primary", href: "#", action: "more" },
@@ -69,7 +70,7 @@ export const ServiceGrid: React.FC = () => {
 
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
-    if (userData?.kycStatus !== "VERIFIED") {
+    if (href !== "/referrals" && userData?.kycStatus !== "VERIFIED") {
       setIsKycDrawerOpen(true);
       return;
     }

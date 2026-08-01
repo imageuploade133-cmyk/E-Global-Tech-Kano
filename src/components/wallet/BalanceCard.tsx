@@ -2292,6 +2292,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       <p className="font-hanken text-[11px] leading-relaxed text-gray-700">
                         Refer a user with your Account ID <strong className="font-mono text-[#FC7A00] tracking-wider select-all">{String(userData?.accountId || "")}</strong> and you will get <strong className="text-black">₦1,000 Naira</strong> once their account is funded with a minimum of ₦2,000.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(String(userData?.accountId || ""), "Referral ID")}
+                        className="mt-3 bg-[#FC7A00]/15 hover:bg-[#FC7A00]/25 text-[#E06600] border border-[#FC7A00]/30 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-wide active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer w-fit"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                        Copy Referral ID
+                      </button>
                     </div>
                   )}
 
