@@ -44,6 +44,66 @@ export default function Home() {
   const [verifyMessage, setVerifyMessage] = useState("");
   const [isDuplicate, setIsDuplicate] = useState(false);
 
+  // Touch / Pull-To-Refresh States
+  const [startY, setStartY] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0 && !isRefreshing) {
+      setStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startY === 0 || isRefreshing) return;
+    const currentY = e.touches[0].clientY;
+    const distance = currentY - startY;
+
+    if (distance > 0 && window.scrollY === 0) {
+      // Apply a logarithmic damping curve for luxury spring resistance
+      const dampedDistance = Math.min(100, distance * 0.45);
+      setPullDistance(dampedDistance);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (startY === 0 || isRefreshing) return;
+    setStartY(0);
+
+    if (pullDistance > 60) {
+      setIsRefreshing(true);
+      setPullDistance(70); // Hold spinner container open during fetch
+
+      try {
+        let idToken = "mock-token";
+        const isMock = sessionStorage.getItem("mock") === "true";
+        if (!isMock && user) {
+          idToken = await user.getIdToken();
+        }
+
+        // Fetch /api/wallets to run the Self-Healing Auto-Refund and Bi-directional Wallet Sync
+        const res = await fetch("/api/wallets", {
+          headers: {
+            "Authorization": `Bearer ${idToken}`,
+          },
+        });
+
+        if (res.ok) {
+          toast.success("Wallet balance refreshed!");
+        }
+      } catch (err) {
+        console.error("Refresh Error:", err);
+        toast.error("Failed to refresh wallet.");
+      } finally {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }
+    } else {
+      setPullDistance(0);
+    }
+  };
+
   const nameStr = (userData?.firstName || userData?.name || userData?.fullName || user?.displayName || "Captain") as string;
   const currentUser = {
     userName: nameStr.split(" ")[0].toUpperCase(),
@@ -187,12 +247,37 @@ export default function Home() {
   };
 
   return (
-    <>
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="min-h-screen flex flex-col justify-between"
+    >
       <Header
         userName={currentUser.userName}
         profileImage={currentUser.profileImage}
         isLoading={isPageLoading}
       />
+
+      {/* Pull-To-Refresh Interactive Spinner */}
+      <div
+        className="w-full flex justify-center overflow-hidden transition-all duration-300 flex-shrink-0"
+        style={{
+          height: pullDistance > 0 ? `${pullDistance}px` : "0px",
+          opacity: pullDistance > 0 ? 1 : 0,
+        }}
+      >
+        <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border border-gray-150 shadow-sm mt-20">
+          <motion.div
+            animate={isRefreshing ? { rotate: 360 } : { rotate: pullDistance * 3.6 }}
+            transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : { duration: 0 }}
+            className="w-5 h-5 rounded-full border-2 border-gray-200 border-t-[#FC7A00] flex items-center justify-center flex-shrink-0"
+          />
+          <span className="font-hanken text-[11px] font-black uppercase text-gray-500 tracking-wider">
+            {isRefreshing ? "Refreshing Balance..." : "Pull to Refresh"}
+          </span>
+        </div>
+      </div>
 
       {/* Dynamic transaction verification overlays */}
       <AnimatePresence>
@@ -317,6 +402,6 @@ export default function Home() {
       </main>
 
       <BottomNav />
-    </>
+    </div>
   );
 }

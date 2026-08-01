@@ -80,7 +80,8 @@ export default function ProfilePage() {
     return url.includes("i.ibb.co") || url.includes("ibb.co") || url.includes("images.unsplash.com");
   };
 
-  const hasCustomPhoto = isCustomAvatar(currentPhoto);
+  const [imgError, setImgError] = useState(false);
+  const hasCustomPhoto = isCustomAvatar(currentPhoto) && !imgError;
 
   // Interactive KYC flow states
   const [kycType, setKycType] = useState<"bvn" | "nin">("bvn");
@@ -648,6 +649,7 @@ export default function ProfilePage() {
                   fill
                   className="object-cover"
                   priority
+                  onError={() => setImgError(true)}
                 />
               </div>
             ) : (

@@ -54,9 +54,10 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const { config } = useAppConfig();
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+  const [imgError, setImgError] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  const hasCustomPhoto = isCustomAvatar(profileImage);
+  const hasCustomPhoto = isCustomAvatar(profileImage) && !imgError;
 
   const handleSignOut = async () => {
     setIsLogoutOpen(false);
@@ -100,6 +101,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
                 fill
                 sizes="36px"
                 priority
+                onError={() => setImgError(true)}
               />
             </div>
           ) : (
