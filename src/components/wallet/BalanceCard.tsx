@@ -1926,16 +1926,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 <div className="h-4 w-24 bg-white/10 rounded skeleton-shimmer" />
               ) : (
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {/* Bonus Reward Balance Badge */}
-                  {selectedCurrency === "NGN" && (
-                    <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 backdrop-blur-xs select-none">
-                      <span className="material-symbols-outlined text-[9px] text-emerald-400 font-bold animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>stars</span>
-                      <span className="font-label-sm text-[7.5px] min-[360px]:text-[8.5px] text-[#FFFFFF]/95 font-bold uppercase tracking-wider">
-                        Bonus: ₦{isVisible ? (userData?.bonusBalance !== undefined ? Number(userData.bonusBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "1,000.00") : "•••,•••"}
-                      </span>
-                    </div>
-                  )}
-
                   {/* Savings Badge */}
                   <div className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded-md border border-white/5 backdrop-blur-xs select-none">
                     <span className="material-symbols-outlined text-[9px] text-[#FC7A00] font-bold">lock_clock</span>
@@ -1967,14 +1957,22 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   exit={{ opacity: 0, y: -5 }}
                   className="flex items-center justify-between gap-1.5 w-full overflow-hidden"
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 text-left">
                     <h2 className={`${fontSizeClass} font-display-lg text-[#FFFFFF] font-bold tracking-tight truncate leading-none`} title={formattedBalance}>
                       {balanceStr}
                     </h2>
+                    {selectedCurrency === "NGN" && (
+                      <div className="flex items-center gap-1 mt-1 text-[#FFFFFF]/80 select-none animate-fade-in">
+                        <span className="material-symbols-outlined text-[10px] min-[360px]:text-[12px] text-emerald-400 font-bold animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>stars</span>
+                        <span className="font-hanken text-[8px] min-[360px]:text-[9.5px] font-bold tracking-wide uppercase">
+                          Reward Bonus: ₦{isVisible ? (userData?.bonusBalance !== undefined ? Number(userData.bonusBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "1,000.00") : "•••,•••"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={toggleVisibility}
-                    className="text-[#FFFFFF]/80 hover:text-[#FFFFFF] transition-colors p-1 flex-shrink-0 cursor-pointer"
+                    className="text-[#FFFFFF]/80 hover:text-[#FFFFFF] transition-colors p-1 flex-shrink-0 cursor-pointer self-start"
                   >
                     <span className="material-symbols-outlined text-[15px] min-[360px]:text-[18px] text-[#FFFFFF] block leading-none">
                       {isVisible ? "visibility" : "visibility_off"}
