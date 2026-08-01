@@ -6,6 +6,7 @@ import { ConfigProvider } from "@/lib/ConfigContext";
 import { Toaster } from "sonner";
 import { RouteGuard } from "@/components/RouteGuard";
 import { OfflineDrawer } from "@/components/layout/OfflineDrawer";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -62,6 +63,7 @@ export default function RootLayout({
               {children}
             </RouteGuard>
             <OfflineDrawer />
+            <ServiceWorkerRegister />
           <Toaster
             position="top-center"
             toastOptions={{
