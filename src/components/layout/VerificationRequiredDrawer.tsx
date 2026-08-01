@@ -1,0 +1,375 @@
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
+import { toast } from "sonner";
+import Image from "next/image";
+import { useAuth } from "@/lib/AuthContext";
+
+interface VerificationRequiredDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProps> = ({ isOpen, onClose }) => {
+  const { user, userData } = useAuth();
+
+  // Verification states
+  const [idType, setIdType] = useState<"bvn" | "nin">("bvn");
+  const [idNumber, setIdNumber] = useState("");
+  const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifiedSuccessfully, setIsVerifiedSuccessfully] = useState(false);
+  const [verifiedAccount, setVerifiedAccount] = useState<{ bankName: string; accountNumber: string; accountName: string } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const controls = useAnimation();
+
+  // Reset states on open/close
+  useEffect(() => {
+    if (isOpen) {
+      setIdNumber("");
+      setSelfieBase64(null);
+      setIsSubmitting(false);
+      setIsVerifiedSuccessfully(false);
+      setVerifiedAccount(null);
+    }
+  }, [isOpen]);
+
+  // Prevent background scrolling while the full screen model is active
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  const handleDragEnd = async (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    // Disable drag dismiss if currently submitting or successfully verified to prevent state interruption
+    if (isSubmitting || isVerifiedSuccessfully) return;
+    if (info.offset.y > 100 || info.velocity.y > 500) {
+      onClose();
+    } else {
+      controls.start({ y: 0 });
+    }
+  };
+
+  const triggerCamera = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleSelfieCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Selfie image is too large. Please take another picture.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setSelfieBase64(reader.result);
+        toast.success("Selfie captured successfully! Face biometrics detected.");
+      }
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read selfie picture.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleVerifyKyc = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!idNumber || !/^\d{11}$/.test(idNumber.trim())) {
+      toast.error(`Please enter a valid 11-digit ${idType.toUpperCase()} number.`);
+      return;
+    }
+
+    if (!selfieBase64) {
+      toast.error("A selfie picture is strictly required for live facial match authentication.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    toast.loading(`Verifying ${idType.toUpperCase()} database and analyzing selfie live scan...`);
+
+    try {
+      const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-token";
+
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/profile/verify-kyc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          idNumber: idNumber.trim(),
+          type: idType,
+          idCardImage: selfieBase64,
+        }),
+      });
+
+      const resData = await res.json();
+      toast.dismiss();
+
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.error || `Verification failed.`);
+      }
+
+      setVerifiedAccount(resData.account);
+      setIsVerifiedSuccessfully(true);
+      toast.success("Account successfully verified and static virtual accounts provisioned!");
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Failed to verify identity. Please verify details and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop blur overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              if (!isSubmitting && !isVerifiedSuccessfully) onClose();
+            }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-[19999] pointer-events-auto"
+          />
+
+          {/* Full Screen Sliding Bottom Sheet */}
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 260, mass: 0.95 }}
+            drag={isSubmitting || isVerifiedSuccessfully ? false : "y"}
+            dragDirectionLock
+            dragConstraints={{ top: 0, bottom: 600 }}
+            dragElastic={{ top: 0, bottom: 0.2 }}
+            onDragEnd={handleDragEnd}
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 z-[20000] flex flex-col items-center h-[92vh] max-h-[92vh] overflow-y-auto no-scrollbar text-black shadow-none border-t border-gray-100"
+          >
+            {/* Handle bar */}
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-4 cursor-grab active:cursor-grabbing flex-shrink-0" />
+
+            {/* Header */}
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5 flex-shrink-0">
+              <div className="w-8" />
+              <h2 className="font-hanken font-extrabold text-[15px] text-black text-center uppercase tracking-wider">
+                Identity Verification
+              </h2>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={onClose}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+              </button>
+            </div>
+
+            {/* Step Content */}
+            {!isVerifiedSuccessfully ? (
+              <form onSubmit={handleVerifyKyc} className="w-full flex-1 flex flex-col justify-between">
+                <div className="space-y-5">
+                  {/* Warning banner */}
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl text-left flex gap-3">
+                    <span className="material-symbols-outlined text-amber-600 text-[20px] font-bold flex-shrink-0 mt-0.5">warning</span>
+                    <div>
+                      <p className="font-hanken text-[11px] font-black uppercase text-amber-700 tracking-wider">Verification Required</p>
+                      <p className="font-hanken text-[10.5px] text-amber-800/80 font-bold leading-relaxed mt-1">
+                        In compliance with Central Bank of Nigeria (CBN) regulations, you must link your verified BVN/NIN and record a live selfie to unlock funding, transfers, cards, and utility payments.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* ID Selector Tabs */}
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block">Select Identification Document</label>
+                    <div className="grid grid-cols-2 gap-3.5">
+                      <button
+                        type="button"
+                        onClick={() => setIdType("bvn")}
+                        className={`py-3.5 px-4 rounded-2xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          idType === "bvn"
+                            ? "bg-black border-black text-white"
+                            : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        Bank Verification (BVN)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIdType("nin")}
+                        className={`py-3.5 px-4 rounded-2xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          idType === "nin"
+                            ? "bg-black border-black text-white"
+                            : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        National ID (NIN)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ID Input */}
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block">
+                      Enter your 11-Digit {idType.toUpperCase()} Number
+                    </label>
+                    <input
+                      type="text"
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      maxLength={11}
+                      required
+                      value={idNumber}
+                      onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, ""))}
+                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                      placeholder={`Enter your 11-digit ${idType.toUpperCase()}...`}
+                    />
+                  </div>
+
+                  {/* Selfie Upload Card */}
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block">Biometric Live Selfie Match</label>
+
+                    {/* Capture button with type="file" trigger */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleSelfieCapture}
+                      accept="image/*"
+                      capture="user"
+                      className="hidden"
+                    />
+
+                    <div
+                      onClick={triggerCamera}
+                      className={`w-full p-5 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                        selfieBase64
+                          ? "border-emerald-500 bg-emerald-50/20"
+                          : "border-black/20 hover:border-black/40 bg-gray-50/50"
+                      }`}
+                    >
+                      {selfieBase64 ? (
+                        <div className="flex flex-col items-center space-y-3 relative">
+                          <div className="relative w-24 h-24 rounded-full border-4 border-emerald-500 overflow-hidden shadow-md scale-102">
+                            <img
+                              src={selfieBase64}
+                              alt="Selfie"
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Scanning line animation */}
+                            <motion.div
+                              animate={{ top: ["0%", "100%", "0%"] }}
+                              transition={{ repeat: Infinity, duration: 2.0, ease: "linear" }}
+                              className="absolute left-0 right-0 h-0.5 bg-emerald-400 shadow-lg pointer-events-none"
+                            />
+                          </div>
+                          <span className="font-hanken text-[11px] font-extrabold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                            Selfie Authenticated
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-bold">Tap to capture another picture</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center space-y-2">
+                          <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
+                            <span className="material-symbols-outlined text-[24px]">photo_camera</span>
+                          </div>
+                          <p className="font-hanken text-[11.5px] font-black text-black">TAKE A SELFIE PICTURE</p>
+                          <p className="font-hanken text-[10px] text-gray-400 font-semibold max-w-[220px] text-center leading-normal">
+                            Ensure your face is well-lit and perfectly fits inside the camera viewfinder frame.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action button */}
+                <div className="pt-6 border-t border-gray-100 w-full mt-6">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !idNumber || idNumber.length !== 11 || !selfieBase64}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                  >
+                    {isSubmitting ? "Processing Verification..." : "Verify & Activate Account"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              // --- SUCCESS / WELCOME SCREEN ---
+              <div className="w-full flex-1 flex flex-col justify-between text-center mt-4">
+                <div className="space-y-6 flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 animate-bounce-subtle">
+                    <span className="material-symbols-outlined text-[44px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                      verified
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <h3 className="font-bodoni text-[20px] font-black text-black uppercase tracking-tight">Identity Fully Verified</h3>
+                    <p className="font-hanken text-xs text-gray-500 font-semibold max-w-[280px] leading-relaxed mx-auto">
+                      Thank you! Your BVN/NIN identity and live selfie matching have been verified against banking directories. Your limits are now fully unlocked.
+                    </p>
+                  </div>
+
+                  {verifiedAccount && (
+                    <div className="w-full bg-[#FC7A00]/5 border border-black/10 rounded-2xl p-4 text-left space-y-2 max-w-[320px] mx-auto">
+                      <p className="font-hanken text-[9px] font-black uppercase text-[#FC7A00] tracking-wider leading-none">Your Static Funding Account</p>
+                      <div className="flex justify-between items-center pt-1.5">
+                        <span className="font-hanken text-[10px] font-bold text-gray-400">BANK</span>
+                        <span className="font-hanken text-xs font-extrabold text-black">{verifiedAccount.bankName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-hanken text-[10px] font-bold text-gray-400">ACC NUMBER</span>
+                        <span className="font-mono text-xs font-black text-black tracking-wider">{verifiedAccount.accountNumber}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-hanken text-[10px] font-bold text-gray-400">NAME</span>
+                        <span className="font-hanken text-[10px] font-extrabold text-black truncate max-w-[170px] uppercase">{verifiedAccount.accountName}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-6 border-t border-gray-100 w-full">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-4 bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-110 active:scale-98 transition-all"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};

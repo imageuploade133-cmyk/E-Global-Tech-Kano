@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { VerificationRequiredDrawer } from "@/components/layout/VerificationRequiredDrawer";
 
 interface BalanceCardProps {
   balance: number;
@@ -262,6 +263,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setIsSwapping(false);
     }
   };
+
+  // KYC / Verification Drawer State
+  const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
 
   // Add Money Wizard States
   const [isAddMoneyOpen, setIsAddMoneyOpen] = useState(false);
@@ -2037,6 +2041,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
+            if (userData?.kycStatus !== "VERIFIED") {
+              setIsKycDrawerOpen(true);
+              return;
+            }
             if (selectedCurrency === "USD") {
               setIsUsdFundingOpen(true);
             } else {
@@ -2055,7 +2063,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           disabled={isLoading}
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
-          onClick={() => setIsSwapOpen(true)}
+          onClick={() => {
+            if (userData?.kycStatus !== "VERIFIED") {
+              setIsKycDrawerOpen(true);
+              return;
+            }
+            setIsSwapOpen(true);
+          }}
           className="flex-1 min-w-0 py-2.5 min-[360px]:py-3.5 px-1.5 min-[360px]:px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span className="material-symbols-outlined text-white text-[14px] min-[360px]:text-[16px] font-bold block leading-none group-hover:scale-110 transition-transform duration-300 flex-shrink-0">swap_horiz</span>
@@ -2069,6 +2083,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
+            if (userData?.kycStatus !== "VERIFIED") {
+              setIsKycDrawerOpen(true);
+              return;
+            }
             if (selectedCurrency === "NGN") {
               setIsTransferOpen(true);
             } else {
@@ -2088,7 +2106,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       {userData?.kycStatus !== "VERIFIED" && (
         <motion.div
           whileTap={{ scale: 0.98 }}
-          onClick={() => router.push("/profile")}
+          onClick={() => setIsKycDrawerOpen(true)}
           className="mt-4 p-4.5 bg-gradient-to-br from-[#FFFDF9] via-[#FFF3E6] to-[#FFEADA] border-[1.5px] border-[#FC7A00]/40 rounded-xl flex items-center justify-between cursor-pointer active:brightness-95 hover:brightness-102 transition-all select-none relative overflow-hidden shadow-none"
         >
           {/* Subtle background luxury badge icon */}
@@ -3873,6 +3891,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </>
       )}
     </AnimatePresence>
+
+    {/* Verification Required Drawer Overlay */}
+    <VerificationRequiredDrawer
+      isOpen={isKycDrawerOpen}
+      onClose={() => setIsKycDrawerOpen(false)}
+    />
     </>
   );
 };

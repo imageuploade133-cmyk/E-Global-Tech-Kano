@@ -4,6 +4,9 @@ import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useAuth } from "@/lib/AuthContext";
+import { useRouter } from "next/navigation";
+import { VerificationRequiredDrawer } from "@/components/layout/VerificationRequiredDrawer";
 
 const services = [
   { icon: "cell_tower", label: "Airtime", color: "text-secondary", href: "/bills?type=airtime" },
@@ -34,8 +37,12 @@ const item = {
 };
 
 export const ServiceGrid: React.FC = () => {
+  const { userData } = useAuth();
+  const router = useRouter();
+
   // Modal states
   const [activeModal, setActiveModal] = useState<"loan" | "wealth" | "more" | null>(null);
+  const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
 
   // Prevent background scrolling while the service info modal is active
   useEffect(() => {
@@ -50,9 +57,23 @@ export const ServiceGrid: React.FC = () => {
   }, [activeModal]);
 
   const handleServiceClick = (service: typeof services[0]) => {
+    // If user is not verified, always block service items and show verification drawer
+    if (userData?.kycStatus !== "VERIFIED") {
+      setIsKycDrawerOpen(true);
+      return;
+    }
     if (service.action) {
       setActiveModal(service.action as "loan" | "wealth" | "more");
     }
+  };
+
+  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+    e.preventDefault();
+    if (userData?.kycStatus !== "VERIFIED") {
+      setIsKycDrawerOpen(true);
+      return;
+    }
+    router.push(href);
   };
 
   return (
@@ -85,7 +106,11 @@ export const ServiceGrid: React.FC = () => {
 
             if (isLink) {
               return (
-                <Link href={service.href} key={service.label} className="w-full flex justify-center">
+                <button
+                  key={service.label}
+                  onClick={(e) => handleLinkClick(e, service.href!)}
+                  className="w-full flex justify-center bg-transparent border-0 p-0"
+                >
                   <motion.button
                     variants={item}
                     whileTap={{ scale: 0.9 }}
@@ -93,7 +118,7 @@ export const ServiceGrid: React.FC = () => {
                   >
                     {content}
                   </motion.button>
-                </Link>
+                </button>
               );
             }
 
@@ -190,6 +215,12 @@ export const ServiceGrid: React.FC = () => {
           </>
         )}
       </AnimatePresence>
+
+      {/* Verification Required Drawer Overlay */}
+      <VerificationRequiredDrawer
+        isOpen={isKycDrawerOpen}
+        onClose={() => setIsKycDrawerOpen(false)}
+      />
     </>
   );
 };

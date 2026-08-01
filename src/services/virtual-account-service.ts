@@ -111,12 +111,39 @@ export class VirtualAccountService {
       throw new Error("The payment gateway failed to return virtual account number credentials.");
     }
 
+    // Extract official bank-verified name from Flutterwave to overwrite local profiles
+    const flwAccountAny = flwAccount as any;
+    const verifiedAccountName = flwAccountAny.account_name || "";
+    let rawVerifiedName = verifiedAccountName.replace(/\s*-\s*E-Tech\s*$/i, "").trim();
+    if (!rawVerifiedName) {
+      rawVerifiedName = `${firstname} ${lastname}`.trim();
+    }
+
+    const namePartsClean = rawVerifiedName.split(/\s+/);
+    const verifiedFirst = namePartsClean[0] || firstname;
+    const verifiedLast = namePartsClean.slice(1).join(" ") || lastname;
+
+    console.log(`[Virtual Account Service] Overwriting user ${userId} profile name fields with bank-verified BVN name: ${rawVerifiedName}`);
+    try {
+      await adminDb.collection("users").doc(userId).update({
+        firstName: verifiedFirst,
+        lastName: verifiedLast,
+        fullName: rawVerifiedName,
+        displayName: rawVerifiedName,
+        name: rawVerifiedName,
+        kycStatus: "VERIFIED",
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (dbErr: any) {
+      console.warn(`[Virtual Account Service] Warning: Failed to update user profile names: ${dbErr.message}`);
+    }
+
     // Mapped account details format
     const newAccountRecord: UserWalletAccount = {
       userId,
       accountNumber: flwAccount.account_number,
       bankName: flwAccount.bank_name || "",
-      accountName: `${firstname} ${lastname} - E-Tech`,
+      accountName: flwAccountAny.account_name || `${firstname} ${lastname} - E-Tech`,
       currency: flwAccount.currency || "NGN",
       flwRef: flwAccount.order_ref,
       txRef: tx_ref,
