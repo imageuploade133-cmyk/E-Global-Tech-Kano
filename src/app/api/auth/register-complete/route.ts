@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
+import { ReferralService } from "@/services/referral-service";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -145,6 +146,16 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { merge: true });
+
+    // Handle secure referral registration if a referral code was provided
+    if (body.referralCode) {
+      await ReferralService.registerReferral(
+        uid,
+        body.referralCode,
+        fullName,
+        body.email || existingData?.email || ""
+      );
+    }
 
     return NextResponse.json({ success: true, message: "User document stored successfully and multi-currency wallets initialized." });
   } catch (err: unknown) {

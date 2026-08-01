@@ -75,6 +75,7 @@ export default function SignUpPage() {
   const [phonePrefix, setPhonePrefix] = useState("+234");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   // Account Security States (Step 4)
   const [password, setPassword] = useState("");
@@ -487,6 +488,8 @@ export default function SignUpPage() {
           postalCode: null,
           phonePrefix,
           phoneNumber,
+          email,
+          referralCode,
           bvn: useBvnNinDob ? bvnNin : null,
           nin: useBvnNinDob ? bvnNin : null,
         }),
@@ -881,6 +884,19 @@ export default function SignUpPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
                     placeholder="doe@example.com"
+                  />
+                </div>
+
+                {/* Referral Account ID */}
+                <div className="space-y-1.5 text-left">
+                  <label htmlFor="referralCode" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Referral Account ID (Optional)</label>
+                  <input
+                    id="referralCode"
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
+                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all font-mono"
+                    placeholder="ET-XXXXXX"
                   />
                 </div>
               </motion.div>
