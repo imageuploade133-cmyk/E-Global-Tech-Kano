@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
 import { toast } from "sonner";
-import Image from "next/image";
 import { useAuth } from "@/lib/AuthContext";
 
 interface VerificationRequiredDrawerProps {

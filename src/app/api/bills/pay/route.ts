@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       biller_name,
       biller_type, // "airtime", "data", "cable", "utility", "internet"
       pin,
+      walletType, // "MAIN" | "BONUS"
     } = body;
 
     // Validations
@@ -154,7 +155,12 @@ export async function POST(req: Request) {
 
       // Preload NGN wallet balance
       const walletDoc = await transaction.get(walletRef);
-      const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+      const wData = walletDoc.exists ? walletDoc.data() || {} : {};
+
+      const isBonus = walletType === "BONUS";
+      const walletBalance = isBonus
+        ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 1000.00)
+        : (wData.balance !== undefined ? Number(wData.balance) : 0);
 
       const userData = userDoc.data() || {};
       const pinHash = userData.pinHash;
@@ -173,7 +179,7 @@ export async function POST(req: Request) {
 
       const preLoadedWallet = {
         ref: walletRef,
-        data: walletDoc.exists ? walletDoc.data() || {} : {},
+        data: wData,
         balance: walletBalance,
       };
 
@@ -230,7 +236,7 @@ export async function POST(req: Request) {
       if (walletBalance < numAmount) {
         return {
           success: false,
-          error: `Insufficient wallet funds to pay this bill. Required: ₦${numAmount.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
+          error: `Insufficient ${isBonus ? "bonus reward" : "wallet"} funds to pay this bill. Required: ₦${numAmount.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
         };
       }
 
@@ -245,6 +251,7 @@ export async function POST(req: Request) {
         description,
         recipientName: customer_id,
         fee: 0,
+        walletType: walletType || "MAIN",
         preLoadedUser,
         preLoadedWallet,
       });
@@ -340,6 +347,7 @@ export async function POST(req: Request) {
             reference: `REFUND-${reference}`,
             description: `Refund for failed bill payment: ${description}`,
             recipientName: customer_id,
+            walletType: walletType || "MAIN",
           });
         }
       });
