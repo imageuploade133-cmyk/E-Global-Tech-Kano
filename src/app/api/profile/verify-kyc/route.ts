@@ -55,6 +55,29 @@ export async function POST(req: Request) {
     const cleanIdNumber = idNumber.trim();
     console.log(`[KYC Verification] Starting for user: ${uid}, Type: ${type}, ID: ${cleanIdNumber.slice(0, 4)}*******`);
 
+    // Server-side active database lookup to prevent duplicate linking of BVN/NIN during KYC
+    const duplicateBvnQuery = await adminDb.collection("users")
+      .where("bvn", "==", cleanIdNumber)
+      .limit(1)
+      .get();
+
+    const duplicateNinQuery = await adminDb.collection("users")
+      .where("nin", "==", cleanIdNumber)
+      .limit(1)
+      .get();
+
+    if (!duplicateBvnQuery.empty || !duplicateNinQuery.empty) {
+      const matchedBvnDoc = !duplicateBvnQuery.empty ? duplicateBvnQuery.docs[0] : null;
+      const matchedNinDoc = !duplicateNinQuery.empty ? duplicateNinQuery.docs[0] : null;
+      const matchedUid = matchedBvnDoc ? matchedBvnDoc.id : matchedNinDoc?.id;
+
+      if (matchedUid !== uid) {
+        return NextResponse.json({
+          error: "This BVN/NIN is already linked to another active account. Please login to your existing account."
+        }, { status: 400 });
+      }
+    }
+
     const bvnInput = type === "bvn" ? cleanIdNumber : undefined;
     const ninInput = type === "nin" ? cleanIdNumber : undefined;
 

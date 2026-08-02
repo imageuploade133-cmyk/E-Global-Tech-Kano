@@ -44,6 +44,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "A valid 11-digit BVN or NIN is required." }, { status: 400 });
     }
 
+    // Server-side active database lookup to prevent duplicate linking of BVN/NIN
+    const { adminDb } = await import("@/lib/firebase-admin");
+    const cleanBvnNin = bvnNin.trim();
+
+    const bvnQuery = await adminDb.collection("users")
+      .where("bvn", "==", cleanBvnNin)
+      .limit(1)
+      .get();
+
+    const ninQuery = await adminDb.collection("users")
+      .where("nin", "==", cleanBvnNin)
+      .limit(1)
+      .get();
+
+    if (!bvnQuery.empty || !ninQuery.empty) {
+      return NextResponse.json({
+        error: "This BVN/NIN is already linked to another active account. Please login to your existing account."
+      }, { status: 400 });
+    }
+
     // Phone Prefix Validation
     const validPrefixes = ["+234", "+227"];
     if (!phonePrefix || !validPrefixes.includes(phonePrefix)) {
@@ -54,10 +74,36 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid phone number length." }, { status: 400 });
     }
 
+    // Active database lookup to prevent duplicate linking of Phone Numbers
+    const fullPhone = `${phonePrefix}${phoneNumber.trim()}`;
+    const phoneQuery = await adminDb.collection("users")
+      .where("phoneNumber", "==", fullPhone)
+      .limit(1)
+      .get();
+
+    if (!phoneQuery.empty) {
+      return NextResponse.json({
+        error: "An account with this Phone Number already exists. Please login to your existing account."
+      }, { status: 400 });
+    }
+
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email.trim())) {
       return NextResponse.json({ error: "Invalid email address format." }, { status: 400 });
+    }
+
+    // Active database lookup to prevent duplicate linking of Email Address
+    const cleanEmail = email.trim().toLowerCase();
+    const emailQuery = await adminDb.collection("users")
+      .where("email", "==", cleanEmail)
+      .limit(1)
+      .get();
+
+    if (!emailQuery.empty) {
+      return NextResponse.json({
+        error: "An account with this Email Address already exists. Please login to your existing account."
+      }, { status: 400 });
     }
 
     // Password Validation: 8 chars, uppercase, lowercase, number, special char
