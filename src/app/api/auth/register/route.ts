@@ -38,51 +38,10 @@ export async function POST(req: Request) {
     if (!lastName || lastName.trim().length < 2) {
       return NextResponse.json({ error: "Last Name must be at least 2 characters." }, { status: 400 });
     }
-    if (!dateOfBirth) {
-      return NextResponse.json({ error: "Date of Birth is required." }, { status: 400 });
-    }
 
-    const dob = new Date(dateOfBirth);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (isNaN(dob.getTime())) {
-      return NextResponse.json({ error: "Invalid Date of Birth." }, { status: 400 });
-    }
-    if (dob >= today) {
-      return NextResponse.json({ error: "Date of Birth cannot be today or in the future." }, { status: 400 });
-    }
-
-    // Age validation: must be at least 18 years old
-    let age = today.getFullYear() - dob.getFullYear();
-    const m = today.getMonth() - dob.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-      age--;
-    }
-    if (age < 18) {
-      return NextResponse.json({ error: "You must be at least 18 years old to register." }, { status: 400 });
-    }
-
-    // Structured Address Validation
-    if (!houseNumber || houseNumber.trim().length === 0) {
-      return NextResponse.json({ error: "House Number is required." }, { status: 400 });
-    }
-    if (!street || street.trim().length === 0) {
-      return NextResponse.json({ error: "Street name is required." }, { status: 400 });
-    }
-    if (!city || city.trim().length === 0) {
-      return NextResponse.json({ error: "City is required." }, { status: 400 });
-    }
-    if (!state || state.trim().length === 0) {
-      return NextResponse.json({ error: "State is required." }, { status: 400 });
-    }
-    if (!country || country.trim().length === 0) {
-      return NextResponse.json({ error: "Country is required." }, { status: 400 });
-    }
-
-    // Postal code validation
-    if (postalCode && postalCode.trim().length > 0 && !/^\d+$/.test(postalCode.trim())) {
-      return NextResponse.json({ error: "Postal code must be numeric if provided." }, { status: 400 });
+    const { bvnNin } = body;
+    if (!bvnNin || bvnNin.trim().length !== 11 || !/^\d+$/.test(bvnNin.trim())) {
+      return NextResponse.json({ error: "A valid 11-digit BVN or NIN is required." }, { status: 400 });
     }
 
     // Phone Prefix Validation

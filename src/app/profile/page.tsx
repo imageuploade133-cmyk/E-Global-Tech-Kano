@@ -142,7 +142,7 @@ export default function ProfilePage() {
       setStaticAccount({
         bankName: "Wema Bank",
         accountNumber: "9921473281",
-        accountName: `${userName.toUpperCase()} - E-Tech`,
+        accountName: `${userName.toUpperCase()}`,
       });
       return;
     }
@@ -168,7 +168,7 @@ export default function ProfilePage() {
         isPermanent: true,
         is_permanent: true,
         bvn: userData?.bvn || userData?.nin || "22222222222",
-        narration: `${firstname} ${lastname} - E-Tech`.trim().slice(0, 35)
+        narration: `${firstname} ${lastname}`.trim().slice(0, 35)
       };
 
       const res = await fetch("/api/flutterwave/create-virtual-account", {
@@ -260,7 +260,7 @@ export default function ProfilePage() {
           setStaticAccount({
             bankName: "Wema Bank",
             accountNumber: "9921473281",
-            accountName: `${userName.toUpperCase()} - E-Tech`,
+            accountName: `${userName.toUpperCase()}`,
           });
           setVerifyingKyc(false);
         }, 1500);

@@ -865,7 +865,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         isPermanent: true,
         is_permanent: true,
         bvn: userData?.bvn || userData?.nin || "22222222222",
-        narration: `${firstname} ${lastname} - E-Tech`.trim().slice(0, 35)
+        narration: `${firstname} ${lastname}`.trim().slice(0, 35)
       };
 
       const res = await fetch("/api/flutterwave/create-virtual-account", {
