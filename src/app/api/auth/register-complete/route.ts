@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
     // Defensive Fields: NEVER overwrite protected fields if they already exist
     const finalKycStatus = existingData?.kycStatus !== undefined ? existingData.kycStatus : "PENDING";
-    const finalBalance = existingData?.balance !== undefined ? existingData.balance : 10000.00;
+    const finalBalance = existingData?.balance !== undefined ? existingData.balance : 0.00;
     const finalRole = existingData?.role !== undefined ? existingData.role : "user";
 
     // Create new profile update, completely preserving all protected fields
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
       accountName: `${cleanFirstName} ${cleanLastName}`,
       currency: "NGN",
       isPermanent: true,
-      status: "active",
+      status: "pending", // starts as pending until verified
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { merge: true });
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
       swiftCode: "SVBKNM2E",
       currency: "USD",
       isPermanent: true,
-      status: "active",
+      status: "pending", // starts as pending until verified
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { merge: true });

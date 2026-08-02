@@ -110,8 +110,8 @@ export async function GET(req: Request) {
     }
 
     const userData = userSnap.data() || {};
-    const legacyBalance = typeof userData.balance === "number" ? userData.balance : 10000.00;
-    const legacyBonusBalance = typeof userData.bonusBalance === "number" ? userData.bonusBalance : 1000.00;
+    const legacyBalance = typeof userData.balance === "number" ? userData.balance : 0.00;
+    const legacyBonusBalance = typeof userData.bonusBalance === "number" ? userData.bonusBalance : 0.00;
 
     // Generate unique short account ID if not present
     let accountId = userData.accountId || "";
