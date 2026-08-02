@@ -438,6 +438,37 @@ export default function GenericBillPage() {
       return;
     }
 
+    // Secure local simulation block to show upfront dynamic rules and guide the user
+    if (walletTypeSelected === "BONUS") {
+      const typeUpper = (pageCategory || "").toUpperCase();
+      if (typeUpper === "AIRTIME") {
+        if (finalAmount > 200) {
+          toast.error("Bonus Airtime purchases are limited to a maximum of ₦200 NGN per day.");
+          return;
+        }
+      } else if (typeUpper === "DATA") {
+        const normalizedName = (selectedItem?.name || "").toLowerCase();
+        let isWithinLimit = false;
+        if (normalizedName.includes("mb") || normalizedName.includes("megabyte")) {
+          isWithinLimit = true;
+        } else {
+          const match = normalizedName.match(/([\d.]+)\s*gb/);
+          if (match) {
+            const gbVal = parseFloat(match[1]);
+            if (!isNaN(gbVal) && gbVal <= 1.0) {
+              isWithinLimit = true;
+            }
+          } else if (normalizedName.includes("1gb") || normalizedName.includes("1 gb")) {
+            isWithinLimit = true;
+          }
+        }
+        if (!isWithinLimit && normalizedName) {
+          toast.error("Using the bonus wallet, you can only purchase Data plans within a 1GB limit (e.g. 1GB or less).");
+          return;
+        }
+      }
+    }
+
     // Open PIN pad modal
     setEnteredPin("");
     setIsPinModalOpen(true);

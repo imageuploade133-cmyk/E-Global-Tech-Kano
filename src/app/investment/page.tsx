@@ -85,6 +85,7 @@ export default function InvestmentPage() {
   const [selectedProductId, setSelectedProductId] = useState<string>("vault-flex");
   const [amountStr, setAmountStr] = useState<string>("");
   const [maturityDate, setMaturityDate] = useState<string>("");
+  const [walletTypeSelected, setWalletTypeSelected] = useState<"MAIN" | "BONUS">("MAIN");
 
   // Active holdings
   const [investments, setInvestments] = useState<ActiveInvestment[]>([]);
@@ -213,7 +214,9 @@ export default function InvestmentPage() {
   }, [user]);
 
   const selectedProduct = products.find(p => p.id === selectedProductId) || products[0] || DEFAULT_PRODUCTS[0];
-  const userBalance = (userData?.balance as number) ?? 0;
+  const mainBalance = (userData?.balance as number) ?? 0;
+  const bonusBalance = (userData?.bonusBalance as number) ?? 0;
+  const userBalance = walletTypeSelected === "BONUS" ? bonusBalance : mainBalance;
 
   // Real-time server-side mimicking reward calculation for display
   const getEstimatedReward = () => {
@@ -343,6 +346,7 @@ export default function InvestmentPage() {
             amount: amt,
             currency: "NGN",
             productId: selectedProduct.id,
+            walletType: walletTypeSelected,
           })
         });
 
@@ -512,7 +516,7 @@ export default function InvestmentPage() {
           {/* Current Available Balance */}
           <div className="bg-gradient-to-br from-[#111] to-[#222] rounded-[24px] p-5 text-white mb-6 border border-white/5 shadow-md animate-fade-in">
             <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-              Your Available Main Wallet Balance
+              Your Available {walletTypeSelected === "BONUS" ? "Bonus" : "Main"} Wallet Balance
             </p>
             <p className="font-bodoni text-[26px] font-bold mt-1 text-[#FC7A00]">
               ₦{userBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -535,6 +539,42 @@ export default function InvestmentPage() {
               </span>
               Start Saving & Earning
             </h2>
+
+            {/* Premium Wallet Selector */}
+            <div className="mb-5">
+              <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                Select Sourcing Wallet
+              </label>
+              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-2xl border border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setWalletTypeSelected("MAIN")}
+                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all ${
+                    walletTypeSelected === "MAIN"
+                      ? "bg-black text-white shadow-md"
+                      : "text-gray-500 hover:text-black"
+                  }`}
+                >
+                  Main (₦{mainBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletTypeSelected("BONUS")}
+                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all ${
+                    walletTypeSelected === "BONUS"
+                      ? "bg-black text-white shadow-md"
+                      : "text-gray-500 hover:text-black"
+                  }`}
+                >
+                  Bonus (₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                </button>
+              </div>
+              {walletTypeSelected === "BONUS" && (
+                <p className="font-hanken text-[9.5px] text-gray-500 mt-2 leading-relaxed">
+                  * Investing with bonus funds requires a minimum of ₦3,000 NGN in your main wallet or cumulative deposits.
+                </p>
+              )}
+            </div>
 
             {/* Select Options Scroll */}
             <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2.5">

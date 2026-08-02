@@ -109,23 +109,42 @@ export async function POST(req: Request) {
       }
     }
 
+    // Find the item name for bonus checks if needed
+    let matchedItemName = "";
+    let matchedPlan = null;
+    for (const billerCode in MOCK_ITEMS) {
+      const plans = MOCK_ITEMS[billerCode];
+      const plan = plans.find(p => p.item_code === item_code);
+      if (plan) {
+        matchedPlan = plan;
+        matchedItemName = plan.name;
+        break;
+      }
+    }
+
     // Backend Custom Data Amount floor validation
     if (biller_type?.toUpperCase() === "DATA") {
-      let matchedPlan = null;
-      for (const billerCode in MOCK_ITEMS) {
-        const plans = MOCK_ITEMS[billerCode];
-        const plan = plans.find(p => p.item_code === item_code);
-        if (plan) {
-          matchedPlan = plan;
-          break;
-        }
-      }
-
       if (matchedPlan && matchedPlan.amount > 0 && numAmount < matchedPlan.amount) {
         return NextResponse.json(
           { error: `Custom data payment amount (₦${numAmount}) cannot be less than the standard plan price of ₦${matchedPlan.amount}.` },
           { status: 400 }
         );
+      }
+    }
+
+    // Secure Bonus Wallet rules check (must not be hardcoded, runs server-side to prevent tampering)
+    if (walletType === "BONUS") {
+      const { ReferralService } = await import("@/services/referral-service");
+      const checkBonus = await ReferralService.validateBonusPurchase(
+        uid,
+        biller_type || "utility",
+        numAmount,
+        item_code,
+        matchedItemName
+      );
+
+      if (!checkBonus.allowed) {
+        return NextResponse.json({ error: checkBonus.reason }, { status: 400 });
       }
     }
 
