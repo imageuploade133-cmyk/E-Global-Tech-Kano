@@ -44,6 +44,15 @@ def run_verification():
         page.screenshot(path="verification/screenshots/dashboard.png")
         page.wait_for_timeout(1000)
 
+        # Scroll to view Promotions/Privileges section
+        print("[Playwright Verification] Scrolling to Promotions section...")
+        try:
+            page.evaluate('() => { window.scrollTo(0, document.body.scrollHeight); }')
+            page.wait_for_timeout(1000)
+            page.screenshot(path="verification/screenshots/dashboard_promotions.png")
+        except Exception as e:
+            print(f"[Playwright Verification] Scroll error: {e}")
+
         # 5. Navigate to profile page
         print("[Playwright Verification] Navigating to profile page...")
         page.goto("http://localhost:3000/profile")
