@@ -61,6 +61,94 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
+  // WhatsApp OTP Verification States
+  const [isOtpRequested, setIsOtpRequested] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [otpError, setOtpError] = useState("");
+
+  // Cooldown countdown timer for OTP
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCooldown]);
+
+  // Reset verification states if phone number or prefix changes
+  useEffect(() => {
+    setIsOtpVerified(false);
+    setIsOtpRequested(false);
+    setOtpCode("");
+    setOtpError("");
+  }, [phonePrefix, phoneNumber]);
+
+  const handleRequestOtp = async () => {
+    if (!phoneNumber || phoneNumber.trim().length === 0) {
+      toast.error("Please enter your phone number first.");
+      return;
+    }
+    setIsSendingOtp(true);
+    setOtpError("");
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phonePrefix, phoneNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOtpError(data.error || "Failed to send OTP.");
+        toast.error(data.error || "Failed to send OTP.");
+      } else {
+        setIsOtpRequested(true);
+        setOtpCooldown(60);
+        toast.success("Verification code sent to WhatsApp!");
+        if (data.devFallback) {
+          toast.info("Local Test Mode: OTP logged to server terminal.");
+        }
+      }
+    } catch (err) {
+      console.error("Error sending WhatsApp OTP:", err);
+      toast.error("Failed to connect to the server.");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6) {
+      toast.error("Please enter a valid 6-digit OTP code.");
+      return;
+    }
+    setIsVerifyingOtp(true);
+    setOtpError("");
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phonePrefix, phoneNumber, otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOtpError(data.error || "Incorrect code or verification failed.");
+        toast.error(data.error || "Incorrect code.");
+      } else {
+        setIsOtpVerified(true);
+        toast.success("WhatsApp number verified successfully!");
+      }
+    } catch (err) {
+      console.error("Error verifying WhatsApp OTP:", err);
+      toast.error("Failed to verify code.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   // Account Security States (Step 3 now)
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -174,6 +262,11 @@ export default function SignUpPage() {
       }
       if (!email || !email.includes("@")) {
         toast.error("Please provide a valid email address.");
+        return;
+      }
+
+      if (!isOtpVerified) {
+        toast.error("Please verify your WhatsApp number with the OTP code first.");
         return;
       }
 
@@ -442,7 +535,7 @@ export default function SignUpPage() {
                 exit={{ opacity: 0, x: 10 }}
                 className="space-y-5"
               >
-                {/* Phone Input */}
+                {/* Phone Input with WhatsApp Note */}
                 <div className="space-y-1.5 text-left">
                   <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
                   <div className="flex gap-2">
@@ -466,7 +559,83 @@ export default function SignUpPage() {
                       placeholder="08012345678"
                     />
                   </div>
+                  <p className="text-[9.5px] text-amber-600 font-bold leading-tight mt-1">
+                    ⚠️ Note: This phone number must be registered on WhatsApp to receive the verification OTP.
+                  </p>
                 </div>
+
+                {/* OTP Request and Verify Control Panel */}
+                {!isOtpVerified ? (
+                  <div className="space-y-3.5 text-left bg-gray-50 border border-gray-150 p-4 rounded-2xl">
+                    {!isOtpRequested ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">WhatsApp Verification</p>
+                          <p className="text-[9px] text-gray-400 font-semibold leading-tight">Verify your WhatsApp number to secure your account registration.</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isSendingOtp || !phoneNumber}
+                          onClick={handleRequestOtp}
+                          className="bg-black text-white hover:bg-gray-900 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all whitespace-nowrap cursor-pointer"
+                        >
+                          {isSendingOtp ? "Sending..." : "Send OTP"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#FC7A00]">Enter Verification OTP</p>
+                          {otpCooldown > 0 ? (
+                            <span className="text-[9px] text-gray-400 font-bold">Resend in {otpCooldown}s</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleRequestOtp}
+                              className="text-[9px] text-[#FC7A00] hover:underline font-bold cursor-pointer"
+                            >
+                              Resend Code
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2.5">
+                          <input
+                            type="tel"
+                            maxLength={6}
+                            value={otpCode}
+                            onChange={(e) => {
+                              setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                              setOtpError("");
+                            }}
+                            className="flex-grow bg-white border border-black rounded-2xl px-4 py-3 text-xs font-bold tracking-widest text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono text-center"
+                            placeholder="••••••"
+                          />
+                          <button
+                            type="button"
+                            disabled={isVerifyingOtp || otpCode.length !== 6}
+                            onClick={handleVerifyOtp}
+                            className="bg-[#FC7A00] text-white hover:brightness-105 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer"
+                          >
+                            {isVerifyingOtp ? "Verifying..." : "Verify"}
+                          </button>
+                        </div>
+
+                        {otpError && (
+                          <p className="text-[9px] text-red-500 font-bold">{otpError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl text-emerald-800 text-left">
+                    <span className="material-symbols-outlined text-[18px] text-emerald-600 font-bold">verified</span>
+                    <div className="space-y-0.5">
+                      <p className="text-[10px] font-black uppercase tracking-widest">WhatsApp Number Verified</p>
+                      <p className="text-[9px] text-emerald-600 font-semibold leading-none">Your WhatsApp number is successfully secured and verified.</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Email Address */}
                 <div className="space-y-1.5 text-left">
