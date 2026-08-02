@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { amount, currency, productId } = body;
+    const { amount, currency, productId, walletType } = body;
 
     const investAmount = Number(amount);
     if (!amount || isNaN(investAmount) || investAmount <= 0) {
@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       currency: currency || "NGN",
       productId,
       type: "SAVINGS",
+      walletType: walletType || "MAIN",
     });
 
     return NextResponse.json({

@@ -222,6 +222,148 @@ export class ReferralService {
   }
 
   /**
+   * Checks if the user has completed the funding/balance requirement of ₦3,000 NGN.
+   * Requirement is met if:
+   * 1. The user's current NGN wallet balance is >= ₦3,000 NGN.
+   * OR
+   * 2. The user has cumulative successful deposits of >= ₦3,000 NGN.
+   */
+  static async hasCompletedRequirement(userId: string): Promise<boolean> {
+    try {
+      // 1. Check current NGN wallet balance
+      const walletSnap = await adminDb.collection("wallets").doc(`${userId}_NGN`).get();
+      if (walletSnap.exists) {
+        const balance = Number(walletSnap.data()?.balance) || 0;
+        if (balance >= 3000) {
+          return true;
+        }
+      }
+
+      // 2. Check cumulative successful deposits
+      const txQuery = await adminDb.collection("transactions")
+        .where("userId", "==", userId)
+        .where("type", "==", "DEPOSIT")
+        .where("status", "==", "SUCCESS")
+        .get();
+
+      let totalDeposited = 0;
+      txQuery.forEach((doc) => {
+        totalDeposited += Number(doc.data().amount) || 0;
+      });
+
+      if (totalDeposited >= 3000) {
+        return true;
+      }
+
+      return false;
+    } catch (err: any) {
+      console.error("[ReferralService] Error checking user requirement:", err.message);
+      return false;
+    }
+  }
+
+  /**
+   * Validates if a user is allowed to perform a purchase using their BONUS wallet.
+   * If the user has not completed the requirement (funding NGN wallet with >= 3000), they cannot use their bonus wallet.
+   * If completed, they can only buy Airtime <= 200 NGN cumulative per day OR Data <= 1GB plan once per day.
+   */
+  static async validateBonusPurchase(
+    userId: string,
+    billerType: string,
+    amount: number,
+    itemCode: string,
+    itemName: string
+  ): Promise<{ allowed: boolean; reason?: string }> {
+    const completed = await this.hasCompletedRequirement(userId);
+    if (!completed) {
+      return {
+        allowed: false,
+        reason: "You cannot spend your bonus wallet because you have not completed the requirement. To unlock your bonus wallet, you must fund your main account with a minimum of ₦3,000 NGN (either current balance or cumulative deposits)."
+      };
+    }
+
+    const typeUpper = (billerType || "").toUpperCase();
+
+    // Get today's start date
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStartISO = todayStart.toISOString();
+
+    // Query all bonus transactions to aggregate today's spending
+    const txQuery = await adminDb.collection("transactions")
+      .where("userId", "==", userId)
+      .where("walletType", "==", "BONUS")
+      .where("status", "==", "SUCCESS")
+      .get();
+
+    if (typeUpper === "AIRTIME") {
+      let cumulativeToday = 0;
+      txQuery.forEach((doc) => {
+        const tx = doc.data();
+        if (tx.createdAt >= todayStartISO && tx.type === "AIRTIME") {
+          cumulativeToday += Number(tx.amount) || 0;
+        }
+      });
+
+      if (cumulativeToday + amount > 200) {
+        return {
+          allowed: false,
+          reason: `Bonus Airtime purchase limit exceeded. You can only spend up to ₦200 NGN on Airtime per day using your bonus wallet. Today you have already spent ₦${cumulativeToday} NGN.`
+        };
+      }
+    } else if (typeUpper === "DATA") {
+      // 1. Check if the plan is within 1GB
+      const normalizedName = (itemName || "").toLowerCase();
+      let isWithinLimit = false;
+
+      if (normalizedName.includes("mb") || normalizedName.includes("megabyte")) {
+        isWithinLimit = true;
+      } else {
+        const match = normalizedName.match(/([\d.]+)\s*gb/);
+        if (match) {
+          const gbVal = parseFloat(match[1]);
+          if (!isNaN(gbVal) && gbVal <= 1.0) {
+            isWithinLimit = true;
+          }
+        } else if (normalizedName.includes("1gb") || normalizedName.includes("1 gb")) {
+          isWithinLimit = true;
+        }
+      }
+
+      if (!isWithinLimit && normalizedName) {
+        return {
+          allowed: false,
+          reason: "Using the bonus wallet, you can only purchase Data plans within a 1GB limit (e.g. 1GB or less)."
+        };
+      }
+
+      // 2. Check if already purchased data today
+      let dataCountToday = 0;
+      txQuery.forEach((doc) => {
+        const tx = doc.data();
+        if (tx.createdAt >= todayStartISO && tx.type === "DATA") {
+          dataCountToday += 1;
+        }
+      });
+
+      if (dataCountToday >= 1) {
+        return {
+          allowed: false,
+          reason: "Using the bonus wallet, you can only purchase Data plans once per day."
+        };
+      }
+    } else {
+      // Any other bills (e.g. Cable, Utility) are NOT allowed with Bonus wallet
+      return {
+        allowed: false,
+        reason: "Bonus wallet can only be used for Airtime, Mobile Data, or Fixed Deposits once the ₦3,000 NGN funding requirement is completed."
+      };
+    }
+
+    return { allowed: true };
+  }
+
+  /**
    * Fetches the complete list of referrals (both pending and active) for a referrer.
    */
   static async getReferralsList(referrerUid: string): Promise<ReferralRecord[]> {

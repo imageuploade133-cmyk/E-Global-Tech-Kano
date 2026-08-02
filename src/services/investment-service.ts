@@ -144,9 +144,10 @@ export class InvestmentService {
       currency: string;
       productId: string;
       type: "SAVINGS" | "FIXED_DEPOSIT";
+      walletType?: "MAIN" | "BONUS";
     }
   ): Promise<InvestmentRecord> {
-    const { amount, currency, productId, type } = params;
+    const { amount, currency, productId, type, walletType = "MAIN" } = params;
 
     await this.seedDatabaseIfNeeded();
 
@@ -166,6 +167,15 @@ export class InvestmentService {
       throw new Error(`Investment amount exceeds the limit. Maximum allowed: ₦${settings.maxInvestment.toLocaleString()}`);
     }
 
+    // Secure requirement: User can invest using BONUS wallet ONLY if they have funded their own account with a minimum of 3000 NGN.
+    if (walletType === "BONUS") {
+      const { ReferralService } = await import("./referral-service");
+      const hasCompleted = await ReferralService.hasCompletedRequirement(userId);
+      if (!hasCompleted) {
+        throw new Error("You are not allowed to invest using your Bonus wallet because you have not completed the requirement. To unlock investment using bonus funds, please fund your account with a minimum of ₦3,000 NGN (either current balance or cumulative deposits).");
+      }
+    }
+
     const refId = `inv-${userId}-${Date.now()}`;
     const startDate = new Date();
     const maturityDate = new Date();
@@ -183,6 +193,7 @@ export class InvestmentService {
         description: `Created Locked ${type === "SAVINGS" ? "Savings" : "Fixed Deposit"}: ${product.name} (${product.durationDays} Days)`,
         recipientName: product.name,
         fee: 0,
+        walletType,
       });
 
       const investRef = adminDb.collection("investments").doc(refId);
