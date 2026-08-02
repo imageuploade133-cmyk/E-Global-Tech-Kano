@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 export default function Home() {
-  const { userData, user, loading } = useAuth();
+  const { userData, user, loading, updateUserData } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -50,7 +50,7 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY === 0 && !isRefreshing) {
+    if (window.scrollY <= 0 && !isRefreshing) {
       setStartY(e.touches[0].clientY);
     }
   };
@@ -60,10 +60,12 @@ export default function Home() {
     const currentY = e.touches[0].clientY;
     const distance = currentY - startY;
 
-    if (distance > 0 && window.scrollY === 0) {
-      // Apply a logarithmic damping curve for luxury spring resistance
-      const dampedDistance = Math.min(100, distance * 0.45);
+    if (distance > 0 && window.scrollY <= 0) {
+      // Apply a logarithmic damping curve for luxurious mobile physical resistance
+      const dampedDistance = Math.min(120, distance * 0.45);
       setPullDistance(dampedDistance);
+    } else if (distance < 0) {
+      setPullDistance(0);
     }
   };
 
@@ -73,7 +75,7 @@ export default function Home() {
 
     if (pullDistance > 60) {
       setIsRefreshing(true);
-      setPullDistance(70); // Hold spinner container open during fetch
+      setPullDistance(60); // Hold spinner at active rotating offset during fetch
 
       try {
         let idToken = "mock-token";
@@ -82,7 +84,7 @@ export default function Home() {
           idToken = await user.getIdToken();
         }
 
-        // Fetch /api/wallets to run the Self-Healing Auto-Refund and Bi-directional Wallet Sync
+        // Fetch /api/wallets to run Referral Validation & Self-Healing Auto-Refund
         const res = await fetch("/api/wallets", {
           headers: {
             "Authorization": `Bearer ${idToken}`,
@@ -90,11 +92,26 @@ export default function Home() {
         });
 
         if (res.ok) {
-          toast.success("Wallet balance refreshed!");
+          const data = await res.json();
+          console.log("[Pull-To-Refresh] Wallet API Response received:", data);
+
+          // Dispatch the custom global event so all inline sub-components refresh immediately
+          window.dispatchEvent(new CustomEvent("app-refresh"));
+
+          // Securely update local user context memory without full-browser navigation reload
+          if (data.success && data.wallets?.NGN) {
+            await updateUserData({
+              balance: data.wallets.NGN.balance,
+              bonusBalance: data.wallets.NGN.bonusBalance
+            });
+          }
+          toast.success("Balances & activities updated successfully!");
+        } else {
+          toast.error("Refreshed with network error.");
         }
       } catch (err) {
         console.error("Refresh Error:", err);
-        toast.error("Failed to refresh wallet.");
+        toast.error("Failed to sync wallet data.");
       } finally {
         setIsRefreshing(false);
         setPullDistance(0);
@@ -259,22 +276,25 @@ export default function Home() {
         isLoading={isPageLoading}
       />
 
-      {/* Pull-To-Refresh Interactive Spinner */}
+      {/* Floating Pull-To-Refresh App-Like Overlay Spinner */}
       <div
-        className="w-full flex justify-center overflow-hidden transition-all duration-300 flex-shrink-0"
+        className="fixed left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none"
         style={{
-          height: pullDistance > 0 ? `${pullDistance}px` : "0px",
-          opacity: pullDistance > 0 ? 1 : 0,
+          top: `${Math.min(100, 64 + pullDistance)}px`,
+          opacity: pullDistance > 10 || isRefreshing ? 1 : 0,
+          scale: pullDistance > 10 || isRefreshing ? 1 : 0.85,
         }}
       >
-        <div className="flex items-center gap-2.5 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border border-gray-150 shadow-sm mt-20">
-          <motion.div
-            animate={isRefreshing ? { rotate: 360 } : { rotate: pullDistance * 3.6 }}
-            transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : { duration: 0 }}
-            className="w-5 h-5 rounded-full border-2 border-gray-200 border-t-[#FC7A00] flex items-center justify-center flex-shrink-0"
-          />
-          <span className="font-hanken text-[11px] font-black uppercase text-gray-500 tracking-wider">
-            {isRefreshing ? "Refreshing Balance..." : "Pull to Refresh"}
+        <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-full border border-gray-150 shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
+          <div className="relative w-5 h-5 flex items-center justify-center flex-shrink-0">
+            <motion.div
+              animate={isRefreshing ? { rotate: 360 } : { rotate: pullDistance * 4.5 }}
+              transition={isRefreshing ? { repeat: Infinity, duration: 0.8, ease: "linear" } : { duration: 0 }}
+              className="w-4.5 h-4.5 rounded-full border-2 border-gray-200 border-t-[#FC7A00] border-r-[#0b513d] flex items-center justify-center"
+            />
+          </div>
+          <span className="font-hanken text-[10px] font-black uppercase tracking-wider text-gray-500 select-none">
+            {isRefreshing ? "Refreshing..." : "Pull to Refresh"}
           </span>
         </div>
       </div>
