@@ -120,6 +120,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   }, [user, balance]);
 
   useEffect(() => {
+    const handleRefresh = () => {
+      console.log("[app-refresh] Custom event received! Dynamic reload triggered.");
+      fetchWalletBalances();
+      fetchInvestmentBalance();
+    };
+    window.addEventListener("app-refresh", handleRefresh);
+    return () => {
+      window.removeEventListener("app-refresh", handleRefresh);
+    };
+  }, [user, balance]);
+
+  useEffect(() => {
     if (!isSwapOpen) {
       setSwapAmount("");
       setSwapRate(null);
