@@ -17,7 +17,6 @@ export async function POST(req: Request) {
       success: true,
       message: "OTP sent successfully to WhatsApp.",
       cooldownUntil: result.cooldownUntil,
-      devOtpCode: result.devOtpCode, // returned only during dev mode testing to prevent stdout console logging
     });
   } catch (err: unknown) {
     const error = err as Error;

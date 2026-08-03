@@ -1,5 +1,5 @@
 /**
- * Clean Architecture Integration Tests for WhatsAppOtpService.
+ * Clean Architecture Integration Tests for WhatsAppOtpService with dynamic cryptographic mocking.
  * Covers:
  * ✓ Cryptographically secure 6-digit OTP generation
  * ✓ S2S WhatsApp Gateway calling (ban protection templates)
@@ -7,10 +7,27 @@
  * ✓ Brute-force block (max 3 failed attempts invalidation)
  * ✓ Rate-limiting cooldown checking
  * ✓ Successful registration session verification and cleanup
+ * Mocks the `crypto.randomInt` generator inline so our production code remains 100% airtight and clean.
  */
 
+import crypto from "crypto";
 import { WhatsAppOtpService } from "../src/services/whatsapp-otp-service";
 import { OtpStoreService } from "../src/lib/otp-store";
+
+// Cryptographic prediction mock
+const originalRandomInt = crypto.randomInt;
+let mockNextOtp = "555555";
+
+Object.defineProperty(crypto, "randomInt", {
+  value: (min: number, max: number) => {
+    if (min === 100000 && max === 1000000) {
+      return parseInt(mockNextOtp);
+    }
+    return originalRandomInt(min, max);
+  },
+  writable: true,
+  configurable: true
+});
 
 async function runOtpServiceTests() {
   console.log("==================================================");
@@ -39,10 +56,10 @@ async function runOtpServiceTests() {
 
   // --- Test Case 1: Cryptographic Generation and S2S Calling ---
   try {
+    mockNextOtp = "123456";
     const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
     assert(result.success, "sendOtp returns successful dispatch state.");
     assert(!!result.cooldownUntil, "sendOtp returns a future cooldown timestamp.");
-    assert(result.devOtpCode !== undefined && result.devOtpCode.length === 6, "Dev OTP code is successfully returned under non-production environments.");
 
     const stored = await OtpStoreService.getOtp(fullPhone);
     assert(stored !== null, "OTP session metadata successfully stored in the OtpStore.");
@@ -109,8 +126,8 @@ async function runOtpServiceTests() {
   // --- Test Case 5: 10-Minute Expiration Validation ---
   try {
     await OtpStoreService.deleteOtp(fullPhone);
-    const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
-    const code = result.devOtpCode!;
+    mockNextOtp = "777777";
+    await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
 
     const stored = await OtpStoreService.getOtp(fullPhone)!;
     // Backdate expiresAt to 11 minutes ago (expired)
@@ -121,7 +138,7 @@ async function runOtpServiceTests() {
 
     let expired = false;
     try {
-      await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, code);
+      await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, "777777");
     } catch (err: any) {
       expired = err.message.includes("expired");
     }
@@ -134,10 +151,10 @@ async function runOtpServiceTests() {
   // --- Test Case 6: Successful Verification & Validation ---
   try {
     await OtpStoreService.deleteOtp(fullPhone);
-    const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
-    const code = result.devOtpCode!;
+    mockNextOtp = "888888";
+    await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
 
-    const verified = await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, code);
+    const verified = await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, "888888");
     assert(verified, "Correct OTP code verified successfully.");
 
     let validationPassed = true;
@@ -165,6 +182,13 @@ async function runOtpServiceTests() {
   console.log("==================================================");
   console.log(`WhatsAppOtpService TESTS FINISHED: ${passedTests} PASSED, ${failedTests} FAILED.`);
   console.log("==================================================");
+
+  // Restore original randomInt
+  Object.defineProperty(crypto, "randomInt", {
+    value: originalRandomInt,
+    writable: true,
+    configurable: true
+  });
 
   if (failedTests > 0) {
     process.exit(1);

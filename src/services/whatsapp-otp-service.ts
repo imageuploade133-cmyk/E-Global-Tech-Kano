@@ -7,7 +7,7 @@ export class WhatsAppOtpService {
    * stores it securely, and sends it via the company's internal WhatsApp API.
    * "Never log OTP values" is strictly satisfied by avoiding all console logs.
    */
-  static async sendOtp(phonePrefix: string, phoneNumber: string): Promise<{ success: boolean; cooldownUntil: string; devOtpCode?: string }> {
+  static async sendOtp(phonePrefix: string, phoneNumber: string): Promise<{ success: boolean; cooldownUntil: string }> {
     const cleanPrefix = phonePrefix.trim();
     const cleanPhone = phoneNumber.trim().replace(/\D/g, "");
     const fullPhone = `${cleanPrefix}${cleanPhone}`;
@@ -29,7 +29,7 @@ export class WhatsAppOtpService {
     // Secure SHA-256 hashing (never stored plain)
     const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
 
-    // Exactly 10 minutes expiration as requested
+    // Exactly 10 minutes expiration
     const expiresAt = new Date(now + 10 * 60 * 1000).toISOString();
     const cooldownUntil = new Date(now + 60 * 1000).toISOString();
 
@@ -58,12 +58,10 @@ export class WhatsAppOtpService {
     const apiKey = process.env.WHATSAPP_API_KEY;
     const instanceId = process.env.WHATSAPP_INSTANCE_ID;
 
-    let sentSuccessfully = false;
-
     if (gatewayUrl && apiKey && instanceId) {
       const targetUrl = `${gatewayUrl.replace(/\/$/, "")}/api/send/text`;
       try {
-        const response = await fetch(targetUrl, {
+        await fetch(targetUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -75,27 +73,15 @@ export class WhatsAppOtpService {
             message: selectedTemplate,
           }),
         });
-
-        if (response.ok) {
-          sentSuccessfully = true;
-        }
       } catch (err) {
         console.error("[WhatsAppOtpService] S2S gateway dispatch failed:", err);
       }
     }
 
-    const result: { success: boolean; cooldownUntil: string; devOtpCode?: string } = {
+    return {
       success: true,
       cooldownUntil,
     };
-
-    // Return the plain text code *only* during local development/tests to satisfy "Never log OTP values"
-    // while keeping automated verification tests fully functional.
-    if (process.env.NODE_ENV !== "production") {
-      result.devOtpCode = otpCode;
-    }
-
-    return result;
   }
 
   /**
