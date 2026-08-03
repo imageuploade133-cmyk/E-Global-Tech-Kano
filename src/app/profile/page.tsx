@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { useRouter } from "next/navigation";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { FaceVerificationDrawer } from "@/components/profile/FaceVerificationDrawer";
 
 const LIMIT_CATEGORIES = [
   {
@@ -57,6 +58,7 @@ export default function ProfilePage() {
   const { userData, user, loading, updateUserData } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
+  const [isFaceVerificationOpen, setIsFaceVerificationOpen] = useState(false);
 
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
@@ -242,89 +244,16 @@ export default function ProfilePage() {
       return;
     }
 
-    setVerifyingKyc(true);
-    toast.loading(`Verifying your ${kycType.toUpperCase()} with Flutterwave verification rails...`);
-
+    // Capture user JWT token securely inside global window hooks for the camera drawer to consume
     try {
-      const isMock = sessionStorage.getItem("mock") === "true";
-
-      if (isMock) {
-        setTimeout(async () => {
-          await updateUserData({
-            kycStatus: "VERIFIED",
-            bvn: kycType === "bvn" ? idNumber : null,
-            nin: kycType === "nin" ? idNumber : null,
-          });
-          toast.dismiss();
-          toast.success("Identity verified successfully (MOCK)!");
-          setStaticAccount({
-            bankName: "Wema Bank",
-            accountNumber: "9921473281",
-            accountName: `${userName.toUpperCase()}`,
-          });
-          setVerifyingKyc(false);
-        }, 1500);
-        return;
-      }
-
       const idToken = await user?.getIdToken();
-      const res = await fetch("/api/profile/verify-kyc", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          idNumber: idNumber.trim(),
-          type: kycType,
-        }),
-      });
-
-      const data = await res.json();
-      toast.dismiss();
-
-      if (res.ok && data.success) {
-        toast.success("Identity verified successfully! Static account number allocated.");
-
-        let bankName = "";
-        let accountNumber = "";
-        let accountName = "";
-
-        if (data.account) {
-          bankName = data.account.bankName || data.account.bank_name || "";
-          accountNumber = data.account.accountNumber || data.account.account_number || "";
-          accountName = data.account.accountName || data.account.account_name || "";
-        } else if (data.data) {
-          bankName = data.data.bankName || data.data.bank_name || "";
-          accountNumber = data.data.accountNumber || data.data.account_number || "";
-          accountName = data.data.accountName || data.data.account_name || "";
-        } else {
-          bankName = data.bankName || data.bank_name || "";
-          accountNumber = data.accountNumber || data.account_number || "";
-          accountName = data.accountName || data.account_name || "";
-        }
-
-        const parsedAccount = {
-          bankName: String(bankName || "").trim(),
-          accountNumber: String(accountNumber || "").trim(),
-          accountName: String(accountName || "").trim()
-        };
-
-        if (parsedAccount.accountNumber) {
-          setStaticAccount(parsedAccount);
-        }
-
-        // Force state reload
-        window.location.reload();
-      } else {
-        toast.error(data.error || "Identity verification failed. Please try again.");
-      }
-    } catch {
-      toast.dismiss();
-      toast.error("Internal connection error while communicating with verification gateway.");
-    } finally {
-      setVerifyingKyc(false);
+      (window as any).firebaseUserToken = idToken;
+    } catch (err) {
+      console.error("Token cache failed:", err);
     }
+
+    // Toggle camera Face Verification Drawer
+    setIsFaceVerificationOpen(true);
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -1268,6 +1197,20 @@ export default function ProfilePage() {
           </>
         )}
       </AnimatePresence>
+
+      <FaceVerificationDrawer
+        isOpen={isFaceVerificationOpen}
+        onClose={() => setIsFaceVerificationOpen(false)}
+        idNumber={idNumber}
+        kycType={kycType}
+        onSuccess={(accountData) => {
+          setIsFaceVerificationOpen(false);
+          if (accountData) {
+            setStaticAccount(accountData);
+          }
+          window.location.reload();
+        }}
+      />
 
       <LogoutDrawer
         isOpen={isLogoutOpen}

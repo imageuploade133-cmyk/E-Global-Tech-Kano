@@ -20,19 +20,11 @@ def run_verification():
         page.goto("http://localhost:3002/auth/signup")
         page.wait_for_timeout(1000)
 
-        # Step 2: Fill in Stage 1 details
+        # Step 2: Fill in Stage 1 details (First and Last Name only - BVN/NIN removed)
         print("Filling in Stage 1 details...")
         page.locator("#firstName").fill("Abdulkadir")
         page.wait_for_timeout(300)
         page.locator("#lastName").fill("Shaba")
-        page.wait_for_timeout(300)
-
-        # Enter a unique 11-digit BVN/NIN so it doesn't conflict
-        unique_bvn = str(int(time.time()))[:11]
-        if len(unique_bvn) < 11:
-            unique_bvn = unique_bvn + "0" * (11 - len(unique_bvn))
-        print(f"Entering unique BVN: {unique_bvn}")
-        page.locator("#bvnNinInput").fill(unique_bvn)
         page.wait_for_timeout(500)
 
         # Take screenshot of Stage 1
