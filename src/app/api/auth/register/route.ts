@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isRateLimited } from "@/lib/rate-limiter";
-import { OtpStoreService } from "@/lib/otp-store";
+import { WhatsAppOtpService } from "@/services/whatsapp-otp-service";
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
@@ -89,19 +89,10 @@ export async function POST(req: Request) {
     }
 
     // Enforce WhatsApp OTP Verification
-    const otpData = await OtpStoreService.getOtp(fullPhone);
-    if (!otpData) {
-      return NextResponse.json({ error: "WhatsApp number verification is required. Please request and verify the OTP." }, { status: 400 });
-    }
-
-    if (!otpData.verified) {
-      return NextResponse.json({ error: "WhatsApp number has not been verified. Please enter the verification OTP." }, { status: 400 });
-    }
-
-    const verifiedAt = otpData.verifiedAt ? new Date(otpData.verifiedAt).getTime() : 0;
-    const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000;
-    if (verifiedAt < fifteenMinutesAgo) {
-      return NextResponse.json({ error: "WhatsApp verification session has expired. Please verify again." }, { status: 400 });
+    try {
+      await WhatsAppOtpService.validateVerifiedSession(fullPhone);
+    } catch (otpErr: any) {
+      return NextResponse.json({ error: otpErr.message || "WhatsApp verification failed." }, { status: 400 });
     }
 
     // Email format validation

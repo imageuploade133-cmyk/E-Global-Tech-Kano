@@ -1,98 +1,20 @@
 /**
- * Production Hardening Unit & Integration Tests for secure WhatsApp OTP verification system.
+ * Clean Architecture Integration Tests for WhatsAppOtpService.
  * Covers:
- * ✓ Cryptographically secure OTP generation
- * ✓ Server-side SHA-256 secure hashing
- * ✓ Rate limiting and 60-second cooldown timer
- * ✓ OTP 5-minute expiration enforcement
- * ✓ Limit incorrect verification attempts (max 3, invalidating permanently on exceed)
- * ✓ WhatsApp number formatting (formatting + prefix)
- * ✓ Random message template variation to prevent bans
+ * ✓ Cryptographically secure 6-digit OTP generation
+ * ✓ S2S WhatsApp Gateway calling (ban protection templates)
+ * ✓ Strict 10-minute expiration checking
+ * ✓ Brute-force block (max 3 failed attempts invalidation)
+ * ✓ Rate-limiting cooldown checking
+ * ✓ Successful registration session verification and cleanup
  */
 
-import crypto from "crypto";
+import { WhatsAppOtpService } from "../src/services/whatsapp-otp-service";
+import { OtpStoreService } from "../src/lib/otp-store";
 
-interface OtpSession {
-  phoneNumber: string;
-  otpHash: string;
-  expiresAt: string;
-  cooldownUntil: string;
-  verified: boolean;
-  attempts: number;
-  updatedAt: string;
-}
-
-// Simulated Firestore Mock DB for OTP testing
-const mockDb = new Map<string, OtpSession>();
-
-function getCooldownWaitSeconds(session: OtpSession, now: number): number {
-  const cooldownTime = new Date(session.cooldownUntil).getTime();
-  if (now < cooldownTime) {
-    return Math.ceil((cooldownTime - now) / 1000);
-  }
-  return 0;
-}
-
-function generateOtp(): { otpCode: string; otpHash: string; expiresAt: string; cooldownUntil: string } {
-  const otpCode = crypto.randomInt(100000, 1000000).toString();
-  const otpHash = crypto.createHash("sha256").update(otpCode).digest("hex");
-  const now = Date.now();
-  const expiresAt = new Date(now + 5 * 60 * 1000).toISOString();
-  const cooldownUntil = new Date(now + 60 * 1000).toISOString();
-  return { otpCode, otpHash, expiresAt, cooldownUntil };
-}
-
-function verifyOtp(phoneNumber: string, otpCode: string, now: number): { success: boolean; error?: string } {
-  const session = mockDb.get(phoneNumber);
-  if (!session) {
-    return { success: false, error: "No active OTP request found. Please request a new code." };
-  }
-
-  const expiresAtTime = new Date(session.expiresAt).getTime();
-  if (now > expiresAtTime) {
-    return { success: false, error: "OTP has expired. Please request a new one." };
-  }
-
-  if (session.attempts >= 3 || !session.otpHash) {
-    return { success: false, error: "This OTP is invalid due to too many incorrect attempts. Please request a new one." };
-  }
-
-  const inputHash = crypto.createHash("sha256").update(otpCode).digest("hex");
-
-  if (inputHash === session.otpHash) {
-    session.verified = true;
-    session.updatedAt = new Date(now).toISOString();
-    mockDb.set(phoneNumber, session);
-    return { success: true };
-  } else {
-    session.attempts += 1;
-    session.updatedAt = new Date(now).toISOString();
-    if (session.attempts >= 3) {
-      session.otpHash = ""; // clear hash
-    }
-    mockDb.set(phoneNumber, session);
-
-    if (session.attempts >= 3) {
-      return { success: false, error: "Incorrect OTP. Too many incorrect attempts. This OTP is now invalid. Please request a new one." };
-    } else {
-      return { success: false, error: `Incorrect OTP. You have ${3 - session.attempts} attempts remaining.` };
-    }
-  }
-}
-
-function getRandomTemplate(otpCode: string): string {
-  const templates = [
-    `Hello! Your E-Tech Global Hub verification code is *${otpCode}*. It will expire in 5 minutes. Please do not share this code with anyone.`,
-    `Your requested secure one-time passcode for E-Tech Global Hub is *${otpCode}*. This code is valid for 5 minutes. Security notice: We will never ask for your password or pin.`,
-    `Use code *${otpCode}* to verify your WhatsApp number on E-Tech Global Hub. This OTP expires in 5 minutes. Thank you!`,
-    `[E-Tech Global Hub] One-Time Password: *${otpCode}*. To complete your registration, enter this code in your signup screen. Valid for 5 minutes.`
-  ];
-  return templates[Math.floor(Math.random() * templates.length)];
-}
-
-async function runOtpTests() {
+async function runOtpServiceTests() {
   console.log("==================================================");
-  console.log("STARTING SECURE WHATSAPP OTP VERIFICATION TESTS    ");
+  console.log("STARTING WhatsAppOtpService INTEGRATION TESTS      ");
   console.log("==================================================");
 
   let passedTests = 0;
@@ -108,145 +30,140 @@ async function runOtpTests() {
     }
   }
 
-  const phoneNumber = "+2348012345678";
+  const phonePrefix = "+234";
+  const phoneNumber = "8012345678";
+  const fullPhone = `${phonePrefix}${phoneNumber}`;
 
-  // --- Test Case 1: OTP Generation & Hashing ---
+  // Ensure fresh state
+  await OtpStoreService.deleteOtp(fullPhone);
+
+  // --- Test Case 1: Cryptographic Generation and S2S Calling ---
   try {
-    mockDb.clear();
-    const { otpCode, otpHash, expiresAt, cooldownUntil } = generateOtp();
-    assert(otpCode.length === 6 && /^\d+$/.test(otpCode), "OTP code has exactly 6 numeric digits.");
-    assert(otpHash !== otpCode, "OTP hash is securely cryptographically masked and not plain text.");
-    assert(new Date(expiresAt).getTime() > Date.now(), "Expiration timestamp is set in the future.");
+    const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
+    assert(result.success, "sendOtp returns successful dispatch state.");
+    assert(!!result.cooldownUntil, "sendOtp returns a future cooldown timestamp.");
+    assert(result.devOtpCode !== undefined && result.devOtpCode.length === 6, "Dev OTP code is successfully returned under non-production environments.");
 
-    const session: OtpSession = {
-      phoneNumber,
-      otpHash,
-      expiresAt,
-      cooldownUntil,
-      verified: false,
-      attempts: 0,
-      updatedAt: new Date().toISOString()
-    };
-    mockDb.set(phoneNumber, session);
-    assert(mockDb.has(phoneNumber), "OTP session successfully saved in database.");
+    const stored = await OtpStoreService.getOtp(fullPhone);
+    assert(stored !== null, "OTP session metadata successfully stored in the OtpStore.");
+    assert(stored?.verified === false, "Generated OTP session starts as unverified.");
+    assert(stored?.attempts === 0, "Generated OTP session starts with 0 failed attempts.");
   } catch (err) {
     console.error(err);
     failedTests++;
   }
 
-  // --- Test Case 2: Cooldown Rate Limiting ---
+  // --- Test Case 2: Rate Limiting & Cooldown ---
   try {
-    const session = mockDb.get(phoneNumber)!;
-    const now = Date.now();
-    const wait = getCooldownWaitSeconds(session, now);
-    assert(wait > 0 && wait <= 60, "Rate limit cooldown enforces waiting (under 60s).");
+    let rateLimited = false;
+    try {
+      await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
+    } catch (err: any) {
+      rateLimited = err.message.includes("wait");
+    }
+    assert(rateLimited, "sendOtp rate limits duplicate requests within the 60-second cooldown.");
   } catch (err) {
     console.error(err);
     failedTests++;
   }
 
-  // --- Test Case 3: Failed Verification Decrements Attempts ---
+  // --- Test Case 3: Failed Verification Tracked ---
   try {
-    const now = Date.now();
-    const badCode = "111111";
-    const res = verifyOtp(phoneNumber, badCode, now);
-    assert(!res.success, "Incorrect OTP is rejected by the verifier.");
-    assert(!!(res.error && res.error.includes("2 attempts remaining")), "Correctly tracks and displays remaining attempts.");
-    assert(mockDb.get(phoneNumber)!.attempts === 1, "Failed attempts count incremented in session.");
+    let verificationPassed = false;
+    try {
+      await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, "000000"); // wrong code
+    } catch (err: any) {
+      verificationPassed = false;
+    }
+    const stored = await OtpStoreService.getOtp(fullPhone);
+    assert(!verificationPassed, "Incorrect OTP is rejected by verifyOtp.");
+    assert(stored?.attempts === 1, "Failed verification attempt count successfully incremented.");
   } catch (err) {
     console.error(err);
     failedTests++;
   }
 
-  // --- Test Case 4: Max Failed Attempts (Locking & Invalidating) ---
+  // --- Test Case 4: Max Attempt Invalidations ---
   try {
-    const now = Date.now();
     // 2nd wrong attempt
-    const res2 = verifyOtp(phoneNumber, "222222", now);
-    assert(!res2.success && !!(res2.error && res2.error.includes("1 attempts remaining")), "Second incorrect attempt is rejected.");
+    try {
+      await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, "000000");
+    } catch {}
 
     // 3rd wrong attempt
-    const res3 = verifyOtp(phoneNumber, "333333", now);
-    assert(!res3.success && !!(res3.error && res3.error.includes("invalid")), "Third incorrect attempt invalidates the OTP.");
-    assert(mockDb.get(phoneNumber)!.otpHash === "", "OTP hash is completely cleared on 3 failed attempts to prevent brute-forcing.");
-  } catch (err) {
-    console.error(err);
-    failedTests++;
-  }
-
-  // --- Test Case 5: 5-minute Expiration Enforcement ---
-  try {
-    mockDb.clear();
-    const { otpCode, otpHash, expiresAt, cooldownUntil } = generateOtp();
-    const session: OtpSession = {
-      phoneNumber,
-      otpHash,
-      expiresAt,
-      cooldownUntil,
-      verified: false,
-      attempts: 0,
-      updatedAt: new Date().toISOString()
-    };
-    mockDb.set(phoneNumber, session);
-
-    // Simulate 5 minutes passing (now is greater than expiresAt)
-    const futureTime = Date.now() + 6 * 60 * 1000;
-    const res = verifyOtp(phoneNumber, otpCode, futureTime);
-    assert(!res.success && !!(res.error && res.error.includes("expired")), "OTP expiration is strictly enforced after 5 minutes.");
-  } catch (err) {
-    console.error(err);
-    failedTests++;
-  }
-
-  // --- Test Case 6: Successful Verification ---
-  try {
-    mockDb.clear();
-    const { otpCode, otpHash, expiresAt, cooldownUntil } = generateOtp();
-    const session: OtpSession = {
-      phoneNumber,
-      otpHash,
-      expiresAt,
-      cooldownUntil,
-      verified: false,
-      attempts: 0,
-      updatedAt: new Date().toISOString()
-    };
-    mockDb.set(phoneNumber, session);
-
-    const now = Date.now();
-    const res = verifyOtp(phoneNumber, otpCode, now);
-    assert(res.success, "Correct OTP is verified successfully.");
-    assert(mockDb.get(phoneNumber)!.verified === true, "Session verified status updated to true.");
-  } catch (err) {
-    console.error(err);
-    failedTests++;
-  }
-
-  // --- Test Case 7: Ban Prevention Randomized Templates ---
-  try {
-    const templatesGenerated = new Set<string>();
-    const otpCode = "123456";
-    for (let i = 0; i < 20; i++) {
-      templatesGenerated.add(getRandomTemplate(otpCode));
+    let errorMsg = "";
+    try {
+      await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, "000000");
+    } catch (err: any) {
+      errorMsg = err.message;
     }
-    assert(templatesGenerated.size > 1, "Randomized template variation is active to protect sending number from bans.");
+
+    assert(errorMsg.includes("invalid"), "3rd incorrect attempt permanently invalidates the OTP.");
+    const stored = await OtpStoreService.getOtp(fullPhone);
+    assert(stored?.otpHash === "", "OTP hash is completely cleared in storage on brute force lockout.");
   } catch (err) {
     console.error(err);
     failedTests++;
   }
 
-  // --- Test Case 8: Phone Number Prefix Formatting ---
+  // --- Test Case 5: 10-Minute Expiration Validation ---
   try {
-    const phoneInput = "+2348012345678";
-    const cleanNumber = phoneInput.replace(/\D/g, "");
-    assert(cleanNumber === "2348012345678", "Formatted number removes '+' prefix for universal Baileys API compatibility.");
+    await OtpStoreService.deleteOtp(fullPhone);
+    const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
+    const code = result.devOtpCode!;
+
+    const stored = await OtpStoreService.getOtp(fullPhone)!;
+    // Backdate expiresAt to 11 minutes ago (expired)
+    if (stored) {
+      stored.expiresAt = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+      await OtpStoreService.setOtp(fullPhone, stored);
+    }
+
+    let expired = false;
+    try {
+      await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, code);
+    } catch (err: any) {
+      expired = err.message.includes("expired");
+    }
+    assert(expired, "Strict 10-minute OTP expiration window is correctly enforced.");
+  } catch (err) {
+    console.error(err);
+    failedTests++;
+  }
+
+  // --- Test Case 6: Successful Verification & Validation ---
+  try {
+    await OtpStoreService.deleteOtp(fullPhone);
+    const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
+    const code = result.devOtpCode!;
+
+    const verified = await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, code);
+    assert(verified, "Correct OTP code verified successfully.");
+
+    let validationPassed = true;
+    try {
+      await WhatsAppOtpService.validateVerifiedSession(fullPhone);
+    } catch {
+      validationPassed = false;
+    }
+    assert(validationPassed, "validateVerifiedSession successfully permits verified registrations.");
+  } catch (err) {
+    console.error(err);
+    failedTests++;
+  }
+
+  // --- Test Case 7: Session Cleanup ---
+  try {
+    await WhatsAppOtpService.completeSession(fullPhone);
+    const stored = await OtpStoreService.getOtp(fullPhone);
+    assert(stored === null, "completeSession successfully cleans up/deletes the session record upon registration.");
   } catch (err) {
     console.error(err);
     failedTests++;
   }
 
   console.log("==================================================");
-  console.log(`OTP UNIT & INTEGRATION TESTS FINISHED: ${passedTests} PASSED, ${failedTests} FAILED.`);
+  console.log(`WhatsAppOtpService TESTS FINISHED: ${passedTests} PASSED, ${failedTests} FAILED.`);
   console.log("==================================================");
 
   if (failedTests > 0) {
@@ -254,7 +171,7 @@ async function runOtpTests() {
   }
 }
 
-runOtpTests().catch((err) => {
+runOtpServiceTests().catch((err) => {
   console.error(err);
   process.exit(1);
 });

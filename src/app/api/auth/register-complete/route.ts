@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { ReferralService } from "@/services/referral-service";
-import { OtpStoreService } from "@/lib/otp-store";
+import { WhatsAppOtpService } from "@/services/whatsapp-otp-service";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -47,19 +47,10 @@ export async function POST(req: Request) {
     const fullPhoneNumber = `${cleanPhonePrefix}${cleanPhoneNum}`;
 
     // Enforce WhatsApp OTP Verification
-    const otpData = await OtpStoreService.getOtp(fullPhoneNumber);
-    if (!otpData) {
-      return NextResponse.json({ error: "WhatsApp number verification is required. Please request and verify the OTP." }, { status: 400 });
-    }
-
-    if (!otpData.verified) {
-      return NextResponse.json({ error: "WhatsApp number has not been verified. Please enter the verification OTP." }, { status: 400 });
-    }
-
-    const verifiedAt = otpData.verifiedAt ? new Date(otpData.verifiedAt).getTime() : 0;
-    const fifteenMinutesAgo = Date.now() - 15 * 60 * 1000;
-    if (verifiedAt < fifteenMinutesAgo) {
-      return NextResponse.json({ error: "WhatsApp verification session has expired. Please verify again." }, { status: 400 });
+    try {
+      await WhatsAppOtpService.validateVerifiedSession(fullPhoneNumber);
+    } catch (otpErr: any) {
+      return NextResponse.json({ error: otpErr.message || "WhatsApp verification failed." }, { status: 400 });
     }
 
     // For backward-compatibility, store full residential address as well
@@ -175,7 +166,7 @@ export async function POST(req: Request) {
     }
 
     // Invalidate the verification session upon successful database save to prevent replay attacks
-    await OtpStoreService.deleteOtp(fullPhoneNumber);
+    await WhatsAppOtpService.completeSession(fullPhoneNumber);
 
     return NextResponse.json({ success: true, message: "User document stored successfully, multi-currency wallets initialized, and WhatsApp session completed." });
   } catch (err: unknown) {
