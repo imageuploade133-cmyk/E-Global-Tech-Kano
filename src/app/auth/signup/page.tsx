@@ -868,44 +868,52 @@ export default function SignUpPage() {
           )}
         </AnimatePresence>
 
-        {/* Account Already Exists Premium Warning Dialog */}
+        {/* Account Already Exists Full Screen Premium Warning Overlay */}
         <AnimatePresence>
           {accountExistsError && (
-            <>
-              {/* Overlay Backdrop */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
-              />
-
-              {/* Center Modal Dialog */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="fixed inset-x-4 inset-y-auto my-auto m-auto max-w-sm h-fit bg-white rounded-[32px] p-6 z-[99999] flex flex-col items-center border border-gray-150 shadow-2xl text-black"
-              >
-                <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center text-[#FC7A00] mb-4 border border-amber-200">
-                  <span className="material-symbols-outlined text-[32px] font-bold">warning</span>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 30 }}
+              transition={{ type: "spring", damping: 28, stiffness: 350 }}
+              className="fixed inset-0 bg-white z-[99999] flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto text-black"
+            >
+              <div className="max-w-md w-full flex flex-col items-center text-center space-y-6">
+                {/* Brand Logo */}
+                <div className="relative w-16 h-14 mb-2">
+                  <Image
+                    src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+                    alt="E-Tech Logo"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
                 </div>
 
-                <h3 className="font-hanken font-bold text-base text-black text-center mb-2">Account Already Exists</h3>
+                {/* Warning Icon */}
+                <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-[#FC7A00] border border-amber-200 shadow-sm animate-bounce">
+                  <span className="material-symbols-outlined text-[36px] font-bold">warning</span>
+                </div>
 
-                <p className="font-hanken text-[11px] text-gray-500 text-center leading-relaxed mb-6">
-                  {accountExistsError}
-                </p>
+                <div className="space-y-1">
+                  <h3 className="font-hanken font-extrabold text-lg tracking-tight text-black uppercase">Account Already Exists</h3>
+                  <p className="text-gray-500 font-hanken text-[10px] font-bold uppercase tracking-wider">Stage-by-Stage Security Validation</p>
+                </div>
 
-                <div className="flex flex-col gap-2.5 w-full">
+                <div className="w-full bg-gray-50 border border-gray-150 p-5 rounded-[24px] text-left">
+                  <p className="font-hanken text-xs text-gray-700 leading-relaxed font-semibold">
+                    {accountExistsError}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 w-full pt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setAccountExistsError(null);
                       router.push("/auth/login");
                     }}
-                    className="w-full py-3.5 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
+                    className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer shadow-sm text-center"
                   >
                     Login to your Account
                   </button>
@@ -916,7 +924,7 @@ export default function SignUpPage() {
                       setAccountExistsError(null);
                       router.push("/auth/login?forgot=true");
                     }}
-                    className="w-full py-3.5 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
+                    className="w-full py-4 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer shadow-sm text-center"
                   >
                     Reset Password or PIN
                   </button>
@@ -924,13 +932,13 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={() => setAccountExistsError(null)}
-                    className="w-full py-3.5 bg-white hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer border border-gray-200"
+                    className="w-full py-4 bg-white hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl transition-all cursor-pointer border border-black/15 shadow-xs text-center"
                   >
                     Use Different Details
                   </button>
                 </div>
-              </motion.div>
-            </>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
 
