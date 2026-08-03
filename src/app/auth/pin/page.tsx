@@ -30,6 +30,107 @@ export default function PinPage() {
   const [resetOption, setResetOption] = useState<"email" | "otp">("email");
   const hasPushedState = useRef(false);
 
+  // PIN reset via WhatsApp flow states
+  const [resetStage, setResetStage] = useState(1);
+  const [otpCode, setOtpCode] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmNewPin, setConfirmNewPin] = useState("");
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isSavingNewPin, setIsSavingNewPin] = useState(false);
+
+  // Cooldown countdown timer for OTP
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCooldown]);
+
+  // Reset stages when drawer is closed or opened
+  useEffect(() => {
+    if (!showForgotPin) {
+      setResetStage(1);
+      setOtpCode("");
+      setNewPin("");
+      setConfirmNewPin("");
+      setOtpCooldown(0);
+    }
+  }, [showForgotPin]);
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6) {
+      toast.error("Please enter a valid 6-digit OTP code.");
+      return;
+    }
+    setIsVerifyingOtp(true);
+    try {
+      const idToken = await user?.getIdToken();
+      const res = await fetch("/api/auth/pin-verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ otpCode })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Incorrect OTP code.");
+      } else {
+        toast.success("WhatsApp number verified successfully!");
+        setResetStage(3); // Go to Set New PIN stage
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to verify OTP code.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleSaveNewPin = async () => {
+    if (newPin.length !== 4 || isNaN(Number(newPin))) {
+      toast.error("PIN must be a valid 4-digit numeric code.");
+      return;
+    }
+    if (newPin !== confirmNewPin) {
+      toast.error("PINs do not match.");
+      return;
+    }
+    setIsSavingNewPin(true);
+    try {
+      const idToken = await user?.getIdToken();
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          action: "reset",
+          pin: newPin
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to reset PIN on server.");
+      } else {
+        toast.success("Access PIN updated securely!");
+        // Verify PIN in state to log them in automatically
+        setPinVerified(true);
+        setShowForgotPin(false);
+        router.push("/");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update Access PIN.");
+    } finally {
+      setIsSavingNewPin(false);
+    }
+  };
+
   const shuffleKeypad = () => {
     const numbers = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
     for (let i = numbers.length - 1; i > 0; i--) {
@@ -95,17 +196,45 @@ export default function PinPage() {
     }
   };
 
-  const handleRequestResetLink = () => {
-    setIsRequestingReset(true);
-    setTimeout(() => {
-      setIsRequestingReset(false);
-      setShowForgotPin(false);
-      if (resetOption === "email") {
+  const handleRequestResetLink = async () => {
+    if (resetOption === "email") {
+      setIsRequestingReset(true);
+      setTimeout(() => {
+        setIsRequestingReset(false);
+        setShowForgotPin(false);
         toast.success("A secure verification link has been dispatched to your email address.");
+      }, 1200);
+      return;
+    }
+
+    // Call serverless endpoint to dispatch OTP to registered WhatsApp number
+    setIsRequestingReset(true);
+    try {
+      const idToken = await user?.getIdToken();
+      const res = await fetch("/api/auth/pin-reset-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to send WhatsApp OTP.");
       } else {
-        toast.success("A 6-digit One-Time Passcode has been sent to your registered mobile number.");
+        toast.success("Verification code sent to WhatsApp registered number!");
+        setResetStage(2); // Transition to Stage 2: OTP Entry
+        setOtpCooldown(60);
+        if (data.devOtpCode) {
+          toast.info(`Local Test Mode: OTP is ${data.devOtpCode}`);
+        }
       }
-    }, 1200);
+    } catch (err) {
+      console.error("PIN reset send-otp error:", err);
+      toast.error("Failed to connect to verification server.");
+    } finally {
+      setIsRequestingReset(false);
+    }
   };
 
   const handleForgotPinDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -377,89 +506,213 @@ export default function PinPage() {
                 </button>
               </div>
 
-              {/* Content body with selection options */}
+              {/* Content body with dynamic reset stage rendering */}
               <div className="flex-grow flex flex-col justify-start items-center px-4 text-center w-full overflow-y-auto">
-                <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4">
-                  <span className="material-symbols-outlined text-[24px] font-bold">lock_reset</span>
-                </div>
-                <h4 className="font-hanken font-bold text-base text-black mb-1">Verify Identity to Reset PIN</h4>
-                <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed mb-6">
-                  Select your preferred high-security verification method to recover your secure 4-digit Access PIN.
-                </p>
+                {resetStage === 1 && (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4">
+                      <span className="material-symbols-outlined text-[24px] font-bold">lock_reset</span>
+                    </div>
+                    <h4 className="font-hanken font-bold text-base text-black mb-1">Verify Identity to Reset PIN</h4>
+                    <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed mb-6">
+                      Select your preferred high-security verification method to recover your secure 4-digit Access PIN.
+                    </p>
 
-                {/* Reset options interactive selector list */}
-                <div className="w-full flex flex-col gap-3 mb-6">
-                  {/* Email option card */}
-                  <button
-                    type="button"
-                    onClick={() => setResetOption("email")}
-                    className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                      resetOption === "email"
-                        ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                        : "border-gray-200 bg-white hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      resetOption === "email" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
-                    }`}>
-                      <span className="material-symbols-outlined text-[20px]">mail</span>
-                    </div>
-                    <div className="flex-grow">
-                      <p className="font-hanken font-bold text-xs text-black">Email Verification</p>
-                      <p className="font-hanken text-[11px] text-gray-400">Send recovery link to registered email</p>
-                    </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      resetOption === "email" ? "border-[#FC7A00]" : "border-gray-300"
-                    }`}>
-                      {resetOption === "email" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
-                    </div>
-                  </button>
+                    {/* Reset options list */}
+                    <div className="w-full flex flex-col gap-3 mb-6">
+                      {/* Email option card */}
+                      <button
+                        type="button"
+                        onClick={() => setResetOption("email")}
+                        className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                          resetOption === "email"
+                            ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                          resetOption === "email" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          <span className="material-symbols-outlined text-[20px]">mail</span>
+                        </div>
+                        <div className="flex-grow">
+                          <p className="font-hanken font-bold text-xs text-black">Email Verification</p>
+                          <p className="font-hanken text-[11px] text-gray-400">Send recovery link to registered email</p>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          resetOption === "email" ? "border-[#FC7A00]" : "border-gray-300"
+                        }`}>
+                          {resetOption === "email" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
+                        </div>
+                      </button>
 
-                  {/* SMS OTP option card */}
-                  <button
-                    type="button"
-                    onClick={() => setResetOption("otp")}
-                    className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                      resetOption === "otp"
-                        ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                        : "border-gray-200 bg-white hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      resetOption === "otp" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
-                    }`}>
-                      <span className="material-symbols-outlined text-[20px]">sms</span>
+                      {/* WhatsApp OTP option card */}
+                      <button
+                        type="button"
+                        onClick={() => setResetOption("otp")}
+                        className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                          resetOption === "otp"
+                            ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                          resetOption === "otp" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          <span className="material-symbols-outlined text-[20px]">chat</span>
+                        </div>
+                        <div className="flex-grow">
+                          <p className="font-hanken font-bold text-xs text-black">WhatsApp OTP Code</p>
+                          <p className="font-hanken text-[11px] text-gray-400">Send 6-digit secure code on WhatsApp</p>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          resetOption === "otp" ? "border-[#FC7A00]" : "border-gray-300"
+                        }`}>
+                          {resetOption === "otp" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
+                        </div>
+                      </button>
                     </div>
-                    <div className="flex-grow">
-                      <p className="font-hanken font-bold text-xs text-black">SMS One-Time Passcode (OTP)</p>
-                      <p className="font-hanken text-[11px] text-gray-400">Send 6-digit secure code to phone</p>
+                  </>
+                )}
+
+                {resetStage === 2 && (
+                  <div className="w-full flex flex-col items-center space-y-5">
+                    <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
+                      <span className="material-symbols-outlined text-[24px] font-bold">sms</span>
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                      resetOption === "otp" ? "border-[#FC7A00]" : "border-gray-300"
-                    }`}>
-                      {resetOption === "otp" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
+                    <div className="space-y-1">
+                      <h4 className="font-hanken font-bold text-base text-black">Enter WhatsApp OTP</h4>
+                      <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed">
+                        Please enter the secure 6-digit verification code sent to your registered WhatsApp number.
+                      </p>
                     </div>
-                  </button>
-                </div>
+
+                    <input
+                      type="tel"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="w-full max-w-[240px] bg-white border border-black rounded-2xl px-4 py-3 text-sm font-bold tracking-widest text-black placeholder-gray-400 outline-none text-center font-mono shadow-sm"
+                      placeholder="••••••"
+                    />
+
+                    {otpCooldown > 0 ? (
+                      <p className="text-[11px] text-gray-400 font-bold">Resend code on WhatsApp in {otpCooldown}s</p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleRequestResetLink}
+                        className="text-[11px] text-[#FC7A00] font-bold hover:underline cursor-pointer"
+                      >
+                        Resend Code
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {resetStage === 3 && (
+                  <div className="w-full flex flex-col items-center space-y-4">
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                      <span className="material-symbols-outlined text-[24px] font-bold">security</span>
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-hanken font-bold text-base text-black">Setup New PIN</h4>
+                      <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed">
+                        Your WhatsApp number is successfully verified. Create a new secure 4-digit Access PIN.
+                      </p>
+                    </div>
+
+                    <div className="w-full space-y-3.5 pt-2">
+                      <div className="space-y-1 text-left">
+                        <label htmlFor="newPinInput" className="text-[10px] font-black uppercase tracking-widest text-gray-400">New 4-Digit PIN</label>
+                        <input
+                          id="newPinInput"
+                          type="password"
+                          pattern="[0-9]*"
+                          inputMode="numeric"
+                          maxLength={4}
+                          value={newPin}
+                          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-center text-xs font-extrabold tracking-widest text-black placeholder-gray-400 outline-none shadow-sm"
+                          placeholder="••••"
+                        />
+                      </div>
+
+                      <div className="space-y-1 text-left">
+                        <label htmlFor="confirmNewPinInput" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm New PIN</label>
+                        <input
+                          id="confirmNewPinInput"
+                          type="password"
+                          pattern="[0-9]*"
+                          inputMode="numeric"
+                          maxLength={4}
+                          value={confirmNewPin}
+                          onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-center text-xs font-extrabold tracking-widest text-black placeholder-gray-400 outline-none shadow-sm"
+                          placeholder="••••"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Bottom Buttons with high-fidelity loading visual feedback */}
-              <div className="w-full flex flex-col gap-3">
-                <button
-                  type="button"
-                  disabled={isRequestingReset}
-                  onClick={handleRequestResetLink}
-                  className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {isRequestingReset ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {resetOption === "email" ? "Dispatching Reset..." : "Generating OTP..."}
-                    </>
-                  ) : (
-                    resetOption === "email" ? "Request Secure Reset Link" : "Generate Secure OTP Code"
-                  )}
-                </button>
+              {/* Bottom Buttons depending on resetStage */}
+              <div className="w-full flex flex-col gap-3 pt-4">
+                {resetStage === 1 && (
+                  <button
+                    type="button"
+                    disabled={isRequestingReset}
+                    onClick={handleRequestResetLink}
+                    className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isRequestingReset ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        {resetOption === "email" ? "Dispatching Reset..." : "Generating OTP..."}
+                      </>
+                    ) : (
+                      resetOption === "email" ? "Request Secure Reset Link" : "Generate Secure OTP Code"
+                    )}
+                  </button>
+                )}
+
+                {resetStage === 2 && (
+                  <button
+                    type="button"
+                    disabled={isVerifyingOtp || otpCode.length !== 6}
+                    onClick={handleVerifyOtp}
+                    className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isVerifyingOtp ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Verifying Code...
+                      </>
+                    ) : (
+                      "Verify OTP Code"
+                    )}
+                  </button>
+                )}
+
+                {resetStage === 3 && (
+                  <button
+                    type="button"
+                    disabled={isSavingNewPin || newPin.length !== 4 || confirmNewPin.length !== 4}
+                    onClick={handleSaveNewPin}
+                    className="w-full py-4 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingNewPin ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Updating PIN...
+                      </>
+                    ) : (
+                      "Save and Use New PIN"
+                    )}
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setShowForgotPin(false)}
