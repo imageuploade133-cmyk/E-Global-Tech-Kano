@@ -245,14 +245,6 @@ export default function SignUpPage() {
         toast.error("Last name must be at least 2 characters.");
         return;
       }
-      if (!bvnNin || bvnNin.trim().length !== 11 || !/^\d+$/.test(bvnNin.trim())) {
-        toast.error("BVN or NIN must be exactly 11 digits.");
-        return;
-      }
-
-      // Check if this BVN/NIN already exists!
-      const alreadyExists = await checkAccountExists("", bvnNin);
-      if (alreadyExists) return;
 
       setCurrentStep(2);
     } else if (currentStep === 2) {
@@ -332,7 +324,6 @@ export default function SignUpPage() {
           acceptedPrivacy,
           acceptedTermsVersion: "v1.0.0",
           acceptedPrivacyVersion: "v1.0.0",
-          bvnNin,
         }),
       });
 
@@ -372,8 +363,6 @@ export default function SignUpPage() {
           phoneNumber,
           email,
           referralCode,
-          bvn: bvnNin,
-          nin: bvnNin,
         }),
       });
 
@@ -502,27 +491,6 @@ export default function SignUpPage() {
                   </div>
                 </div>
 
-                {/* BVN/NIN Input */}
-                <div className="space-y-3 text-left">
-                  <label htmlFor="bvnNinInput" className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    BVN or NIN (11 Digits) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="bvnNinInput"
-                      type="tel"
-                      required
-                      value={bvnNin}
-                      onChange={(e) => setBvnNin(e.target.value.replace(/\D/g, "").slice(0, 11))}
-                      placeholder="Enter your 11-digit BVN or NIN"
-                      maxLength={11}
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all font-mono"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-[18px] text-gray-400 pointer-events-none">
-                      fingerprint
-                    </span>
-                  </div>
-                </div>
               </motion.div>
             )}
 

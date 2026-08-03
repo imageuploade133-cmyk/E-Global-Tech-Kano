@@ -1,4 +1,5 @@
-// KYC Validation and Endpoint Verification Tests
+import { FraudDetectionService, MockKYCProvider, KYCService } from "../src/services/kyc-service";
+import crypto from "crypto";
 
 async function runKycTests() {
   console.log("==================================================");
@@ -18,61 +19,61 @@ async function runKycTests() {
     }
   }
 
-  // Helper function to mock request validation rules
-  function validateKycBody(body: any): string[] {
-    const { idNumber, type } = body;
-    const errors: string[] = [];
-
-    if (!idNumber) {
-      errors.push("Identity number (idNumber) is missing.");
-    } else if (typeof idNumber !== "string") {
-      errors.push("Identity number must be a string.");
-    } else if (!/^\d{11}$/.test(idNumber.trim())) {
-      errors.push(`Identity number '${idNumber}' is invalid. It must be exactly 11 digits.`);
-    }
-
-    if (!type) {
-      errors.push("Identity type (type) is missing.");
-    } else if (type !== "bvn" && type !== "nin") {
-      errors.push(`Identity type '${type}' is invalid. It must be either 'bvn' or 'nin'.`);
-    }
-
-    return errors;
-  }
-
-  // Test Case 1: Valid BVN 11-digit
+  // --- Test Case 1: Name Normalization ---
   try {
-    const errors = validateKycBody({ idNumber: "22222222222", type: "bvn" });
-    assert(errors.length === 0, "Valid BVN returns no validation errors.");
+    const rawName = "  Abdulkadir, Shaba.  ";
+    const cleaned = FraudDetectionService.normalizeName(rawName);
+    assert(cleaned === "abdulkadir shaba", "normalizeName handles padding, casing, and punctuation correctly.");
   } catch (err: any) {
-    console.error("Test Case 1 failed:", err.message);
+    console.error(err);
     failed++;
   }
 
-  // Test Case 2: Missing idNumber
+  // --- Test Case 2: Name Matching Rules ---
   try {
-    const errors = validateKycBody({ type: "bvn" });
-    assert(errors.includes("Identity number (idNumber) is missing."), "Missing idNumber is correctly identified.");
+    const registeredName = "Abdulkadir Shaba";
+    const providerNameMatch1 = "Abdulkadir Shaba";
+    const providerNameMatch2 = "Abdulkadir Yusuf Shaba";
+    const providerNameMatch3 = "ABDULKADIR SHABA.";
+    const providerMismatch = "John Doe";
+
+    assert(FraudDetectionService.doesNameMatch(registeredName, providerNameMatch1), "Exact name match passes.");
+    assert(FraudDetectionService.doesNameMatch(registeredName, providerNameMatch2), "Fuzzy overlapping match (with middle name) passes.");
+    assert(FraudDetectionService.doesNameMatch(registeredName, providerNameMatch3), "Fuzzy match ignoring casing and punctuation passes.");
+    assert(!FraudDetectionService.doesNameMatch(registeredName, providerMismatch), "Mismatching names are correctly rejected.");
   } catch (err: any) {
-    console.error("Test Case 2 failed:", err.message);
+    console.error(err);
     failed++;
   }
 
-  // Test Case 3: Invalid digit length
+  // --- Test Case 3: Cryptographic ID Hashing ---
   try {
-    const errors = validateKycBody({ idNumber: "12345", type: "nin" });
-    assert(errors.some(e => e.includes("is invalid. It must be exactly 11 digits.")), "Short ID numbers are rejected with descriptive message.");
+    const id = "12345678901";
+    const hash = FraudDetectionService.hashId(id);
+    const expectedHash = crypto.createHash("sha256").update(id).digest("hex");
+    assert(hash === expectedHash, "hashId produces secure, irreversible SHA-256 hashes.");
   } catch (err: any) {
-    console.error("Test Case 3 failed:", err.message);
+    console.error(err);
     failed++;
   }
 
-  // Test Case 4: Invalid type
+  // --- Test Case 4: Mock Provider Resolving ---
   try {
-    const errors = validateKycBody({ idNumber: "12345678901", type: "passport" });
-    assert(errors.some(e => e.includes("is invalid. It must be either 'bvn' or 'nin'.")), "Unsupported types are rejected with descriptive message.");
+    const provider = new MockKYCProvider();
+
+    // Normal resolve
+    const res1 = await provider.resolveIdentity("11111111111", "bvn");
+    assert(res1.success && res1.fullName === "Abdulkadir Shaba", "Mock provider successfully resolves sample BVN.");
+
+    // Fraud resolve
+    const res2 = await provider.resolveIdentity("22222222222", "bvn");
+    assert(res2.success && res2.fullName === "John Fraudulent Doe", "Mock provider resolves fraudulent John Doe details.");
+
+    // Inactive resolve
+    const res3 = await provider.resolveIdentity("44444444444", "bvn");
+    assert(!res3.success && !!res3.message?.includes("inactive"), "Mock provider correctly rejects inactive/invalid credentials.");
   } catch (err: any) {
-    console.error("Test Case 4 failed:", err.message);
+    console.error(err);
     failed++;
   }
 

@@ -28,8 +28,6 @@ export async function POST(req: Request) {
       phonePrefix,
       phoneNumber,
       photoURL,
-      bvn,
-      nin,
     } = body;
 
     // Sanitize values
@@ -84,9 +82,6 @@ export async function POST(req: Request) {
       // Phone
       phonePrefix: cleanPhonePrefix,
       phoneNumber: fullPhoneNumber,
-      // BVN/NIN optionally captured at signup
-      bvn: bvn || existingData?.bvn || null,
-      nin: nin || existingData?.nin || null,
       // Photo
       photoURL: photoURL || existingData?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M",
       // Versioned Terms & Privacy Policy
@@ -122,36 +117,6 @@ export async function POST(req: Request) {
       userId: uid,
       currency: "USD",
       balance: 0.00,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-
-    // Initialize default/pending virtual accounts in Firestore
-    const ngnAccountRef = adminDb.collection("wallet_accounts").doc(uid);
-    const usdAccountRef = adminDb.collection("wallet_accounts").doc(`${uid}_USD`);
-
-    await ngnAccountRef.set({
-      userId: uid,
-      accountNumber: "9921473281",
-      bankName: "Wema Bank",
-      accountName: `${cleanFirstName} ${cleanLastName}`,
-      currency: "NGN",
-      isPermanent: true,
-      status: "pending", // starts as pending until verified
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-
-    await usdAccountRef.set({
-      userId: uid,
-      accountNumber: "2209418374",
-      bankName: "Silicon Valley Bank",
-      accountName: `${cleanFirstName} ${cleanLastName}`,
-      routingNumber: "021000021",
-      swiftCode: "SVBKNM2E",
-      currency: "USD",
-      isPermanent: true,
-      status: "pending", // starts as pending until verified
-      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { merge: true });
 

@@ -40,30 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Last Name must be at least 2 characters." }, { status: 400 });
     }
 
-    const { bvnNin } = body;
-    if (!bvnNin || bvnNin.trim().length !== 11 || !/^\d+$/.test(bvnNin.trim())) {
-      return NextResponse.json({ error: "A valid 11-digit BVN or NIN is required." }, { status: 400 });
-    }
-
-    // Server-side active database lookup to prevent duplicate linking of BVN/NIN
     const { adminDb } = await import("@/lib/firebase-admin");
-    const cleanBvnNin = bvnNin.trim();
-
-    const bvnQuery = await adminDb.collection("users")
-      .where("bvn", "==", cleanBvnNin)
-      .limit(1)
-      .get();
-
-    const ninQuery = await adminDb.collection("users")
-      .where("nin", "==", cleanBvnNin)
-      .limit(1)
-      .get();
-
-    if (!bvnQuery.empty || !ninQuery.empty) {
-      return NextResponse.json({
-        error: "This BVN/NIN is already linked to another active account. Please login to your existing account."
-      }, { status: 400 });
-    }
 
     // Phone Prefix Validation
     const validPrefixes = ["+234", "+227"];
