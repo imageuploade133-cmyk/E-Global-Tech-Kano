@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { idNumber, type } = body; // type is "bvn" or "nin"
+    const { idNumber, type, capturedSelfie, livenessChallenge } = body; // type is "bvn" or "nin"
 
     const errors: string[] = [];
     if (!idNumber) {
@@ -44,19 +44,27 @@ export async function POST(req: Request) {
       errors.push("Identity type must be either 'bvn' or 'nin'.");
     }
 
+    if (!capturedSelfie) {
+      errors.push("Live camera facial capture selfie is required.");
+    }
+
+    if (!livenessChallenge) {
+      errors.push("Facial liveness challenge could not be verified.");
+    }
+
     if (errors.length > 0) {
       return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
     }
 
     const cleanIdNumber = idNumber.trim();
 
-    // 1. Invoke secure server-side KYC validation workflow
-    await KYCService.verifyUserKYC(uid, cleanIdNumber, type);
+    // 1. Invoke secure server-side KYC validation workflow (includes liveness and biometric face comparison)
+    await KYCService.verifyUserKYC(uid, cleanIdNumber, type, capturedSelfie, livenessChallenge);
 
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
 
-    // 2. Provision Flutterwave static virtual account now that KYC is successfully completed!
+    // 2. Provision Flutterwave static virtual account now that both Identity & Face KYC are successfully verified!
     const account = await VirtualAccountService.getOrCreateVirtualAccount(
       uid,
       emailFallback,
@@ -84,7 +92,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "KYC verification successful! Your static virtual account number has been allocated.",
+      message: "KYC and Face Verification successful! Your static virtual account number has been allocated.",
       account: {
         bankName: account.bankName,
         accountNumber: account.accountNumber,

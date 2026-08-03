@@ -77,6 +77,30 @@ async function runKycTests() {
     failed++;
   }
 
+  // --- Test Case 5: Face Liveness Validation ---
+  try {
+    let selfieThrew = false;
+    try {
+      // Simulate verifying without selfie
+      await KYCService.verifyUserKYC("mock-uid", "11111111111", "bvn", "", "Smile");
+    } catch (err: any) {
+      selfieThrew = err.message.includes("selfie");
+    }
+    assert(selfieThrew, "KYCService strictly rejects verification requests missing a live face capture selfie.");
+
+    let challengeThrew = false;
+    try {
+      // Simulate verifying with invalid challenge
+      await KYCService.verifyUserKYC("mock-uid", "11111111111", "bvn", "base64_selfie_data", "InvalidChallenge");
+    } catch (err: any) {
+      challengeThrew = err.message.includes("challenge");
+    }
+    assert(challengeThrew, "KYCService strictly rejects verification requests with invalid or missing liveness challenges.");
+  } catch (err: any) {
+    console.error(err);
+    failed++;
+  }
+
   console.log("==================================================");
   console.log(`KYC UNIT TESTS FINISHED: ${passed} PASSED, ${failed} FAILED.`);
   console.log("==================================================");
