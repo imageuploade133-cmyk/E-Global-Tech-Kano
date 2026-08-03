@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import bcrypt from "bcryptjs";
+import { WhatsAppOtpService } from "@/services/whatsapp-otp-service";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -164,6 +165,25 @@ export async function POST(req: Request) {
     if (action === "reset") {
       console.log(`[PIN API - Reset] Resetting PIN for user: ${uid}`);
 
+      // Retrieve registered phone number from Firestore user profile
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        return NextResponse.json({ error: "User profile not found." }, { status: 404 });
+      }
+
+      const userData = userSnap.data();
+      const fullPhone = userData?.phoneNumber;
+      if (!fullPhone) {
+        return NextResponse.json({ error: "No registered phone number found on this profile." }, { status: 400 });
+      }
+
+      // Secure OTP validation check
+      try {
+        await WhatsAppOtpService.validateVerifiedSession(fullPhone);
+      } catch (otpErr: any) {
+        return NextResponse.json({ error: otpErr.message || "WhatsApp verification required to reset PIN." }, { status: 400 });
+      }
+
       const salt = bcrypt.genSaltSync(10);
       const pinHash = bcrypt.hashSync(pin, salt);
 
@@ -175,6 +195,13 @@ export async function POST(req: Request) {
           pin: null, // Clear legacy plain PIN
         });
       });
+
+      // Clear the WhatsApp session on success
+      try {
+        await WhatsAppOtpService.completeSession(fullPhone);
+      } catch (cleanupErr) {
+        console.error("[PIN Reset Cleanup] Error clearing session:", cleanupErr);
+      }
 
       logPaymentEvent({
         category: "PIN Verification",
