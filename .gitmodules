@@ -1,3 +1,0 @@
-[submodule "payment-gateway"]
-	path = payment-gateway
-	url = https://github.com/imageuploade133-cmyk/payment-gateway.git

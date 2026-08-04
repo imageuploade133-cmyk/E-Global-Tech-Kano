@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
-import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
@@ -23,17 +22,17 @@ export async function POST(req: Request) {
 
     if (!uid) {
       console.error("[KYC Proxy Auth Error] Decoded token is missing uid.");
-      return NextResponse.json({ error: "Unauthorized: Firebase user UID is missing in the decoded token." }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized: Firebase user UID is missing." }, { status: 401 });
     }
   } catch (authErr: unknown) {
     const error = authErr as Error;
     console.error("[KYC Proxy Auth Error] Authentication failed:", error.message);
-    return NextResponse.json({ error: `Unauthorized: ${error.message || "Invalid or missing authentication token."}` }, { status: 401 });
+    return NextResponse.json({ error: `Unauthorized: ${error.message || "Invalid or missing token."}` }, { status: 401 });
   }
 
   try {
     const body = await req.json();
-    const { idNumber, type, capturedSelfie, livenessChallenge } = body; // type is "bvn" or "nin"
+    const { idNumber, type, capturedSelfie, livenessChallenge } = body;
 
     const errors: string[] = [];
     if (!idNumber) {
@@ -62,20 +61,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
     }
 
-    const cleanIdNumber = idNumber.trim();
-
-    // Fetch user details from Firestore to provide to payment-gateway KYC service
-    const userSnap = await adminDb.collection("users").doc(uid).get();
-    if (!userSnap.exists) {
-      return NextResponse.json({ error: "User profile not found." }, { status: 404 });
-    }
-
-    const userData = userSnap.data() || {};
-    const firstName = userData.firstName || nameFallback.split(" ")[0] || "User";
-    const lastName = userData.lastName || nameFallback.split(" ").slice(1).join(" ") || "User";
-    const email = userData.email || emailFallback;
-    const phone = userData.phoneNumber || "";
-
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
 
     // Forward the KYC request to the payment-gateway
@@ -88,44 +73,25 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         userId: uid,
-        firstName,
-        lastName,
+        firstName: nameFallback.split(" ")[0] || "User",
+        lastName: nameFallback.split(" ").slice(1).join(" ") || "User",
         documentType: type,
-        documentNumber: cleanIdNumber,
-        faceConfidence: 0.95, // Simulated face liveness confidence metric
-        email,
-        phone,
+        documentNumber: idNumber.trim(),
+        faceConfidence: 0.95,
+        email: emailFallback,
+        phone: "", // Will be resolved natively inside gateway
+        capturedSelfie,
+        livenessChallenge,
       }),
     });
 
     const result = await response.json();
 
     if (!response.ok) {
-      // Mark KYC as failed
-      await adminDb.collection("users").doc(uid).set({
-        kycStatus: "FAILED",
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
-
       return NextResponse.json({ error: result.message || "Identity verification failed." }, { status: response.status });
     }
 
-    // Initialize USD account details in Firestore securely on success
     const account = result.data || {};
-    const usdAccountRef = adminDb.collection("wallet_accounts").doc(`${uid}_USD`);
-    await usdAccountRef.set({
-      userId: uid,
-      accountNumber: "2209418374",
-      bankName: "Silicon Valley Bank",
-      accountName: account.account_name || `${firstName} ${lastName}`,
-      routingNumber: "021000021",
-      swiftCode: "SVBKNM2E",
-      currency: "USD",
-      isPermanent: true,
-      status: "active",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
 
     return NextResponse.json({
       success: true,
@@ -133,24 +99,13 @@ export async function POST(req: Request) {
       account: {
         bankName: account.bank_name || "Wema Bank",
         accountNumber: account.account_number || "2345678901",
-        accountName: account.account_name || `${firstName} ${lastName}`,
+        accountName: account.account_name || `${nameFallback}`,
       }
     });
 
   } catch (err: unknown) {
     const error = err as Error;
     console.error(`[KYC Proxy Failure] User: ${uid}, Error: ${error.message}`);
-
-    // Mark KYC status as FAILED in Firestore
-    try {
-      await adminDb.collection("users").doc(uid).set({
-        kycStatus: "FAILED",
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
-    } catch (saveErr) {
-      console.error("Failed to update kycStatus to FAILED:", saveErr);
-    }
-
     return NextResponse.json({
       error: "Identity verification failed. Please ensure your information matches your registered account."
     }, { status: 400 });
