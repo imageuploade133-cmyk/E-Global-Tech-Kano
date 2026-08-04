@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
-import { WhatsAppOtpService } from "@/services/whatsapp-otp-service";
+
+const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -31,26 +32,35 @@ export async function POST(req: Request) {
     }
 
     const fullPhone = userData.phoneNumber;
-    let phonePrefix = "+234";
-    let phoneNumber = fullPhone;
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
 
-    if (fullPhone.startsWith("+227")) {
-      phonePrefix = "+227";
-      phoneNumber = fullPhone.slice(4);
-    } else if (fullPhone.startsWith("+234")) {
-      phonePrefix = "+234";
-      phoneNumber = fullPhone.slice(4);
+    const response = await fetch(`${GATEWAY_URL}/api/auth/verify-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": gatewayApiKey,
+      },
+      body: JSON.stringify({
+        phoneNumber: fullPhone,
+        otp: otpCode,
+        type: "pin_reset"
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: result.message || "Failed to verify OTP." }, { status: response.status });
     }
-
-    await WhatsAppOtpService.verifyOtp(phonePrefix, phoneNumber, otpCode);
 
     return NextResponse.json({
       success: true,
-      message: "WhatsApp OTP verified successfully. Proceed to reset PIN."
+      message: result.message || "WhatsApp OTP verified successfully. Proceed to reset PIN."
     });
+
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[PIN Reset Verify OTP] Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to verify OTP." }, { status: 400 });
+    console.error("[PIN Reset Verify OTP Proxy] Error:", error);
+    return NextResponse.json({ error: error.message || "Failed to verify OTP." }, { status: 500 });
   }
 }

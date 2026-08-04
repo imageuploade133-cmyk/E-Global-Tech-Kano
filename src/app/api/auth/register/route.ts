@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { isRateLimited } from "@/lib/rate-limiter";
-import { WhatsAppOtpService } from "@/services/whatsapp-otp-service";
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
@@ -65,11 +64,17 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Enforce WhatsApp OTP Verification
-    try {
-      await WhatsAppOtpService.validateVerifiedSession(fullPhone);
-    } catch (otpErr: any) {
-      return NextResponse.json({ error: otpErr.message || "WhatsApp verification failed." }, { status: 400 });
+    // Active check on the Firestore otp_sessions collection for verified WhatsApp OTP state
+    const otpQuery = await adminDb.collection("otp_sessions")
+      .where("phoneNumber", "==", fullPhone)
+      .where("type", "==", "signup")
+      .where("verified", "==", true)
+      .get();
+
+    if (otpQuery.empty) {
+      return NextResponse.json({
+        error: "Your WhatsApp phone number has not been verified yet. Please verify it before proceeding."
+      }, { status: 400 });
     }
 
     // Email format validation
