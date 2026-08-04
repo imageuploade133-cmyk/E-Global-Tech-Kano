@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "admin:set": "ts-node -r tsconfig-paths/register scripts/setAdmin.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
