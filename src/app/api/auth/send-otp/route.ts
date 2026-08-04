@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { WhatsAppOtpService } from "@/services/whatsapp-otp-service";
+
+const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
 export async function POST(req: Request) {
   try {
@@ -10,17 +11,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Phone prefix and phone number are required." }, { status: 400 });
     }
 
-    // Delegate to clean WhatsApp OTP Service layer
-    const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
+    const cleanPrefix = phonePrefix.trim().replace(/\D/g, "");
+    const cleanNum = phoneNumber.trim().replace(/\D/g, "");
+    const fullPhoneNumber = `${cleanPrefix}${cleanNum}`;
+
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
+
+    const response = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": gatewayApiKey,
+      },
+      body: JSON.stringify({
+        phoneNumber: fullPhoneNumber,
+        type: "signup"
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: result.message || "Failed to send WhatsApp OTP." }, { status: response.status });
+    }
 
     return NextResponse.json({
       success: true,
-      message: "OTP sent successfully to WhatsApp.",
-      cooldownUntil: result.cooldownUntil,
+      message: result.message || "OTP sent successfully to WhatsApp.",
     });
+
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[WhatsApp OTP] Send OTP route error:", error);
+    console.error("[WhatsApp OTP Proxy] Send OTP route error:", error);
     return NextResponse.json({ error: error.message || "Failed to send WhatsApp OTP." }, { status: 500 });
   }
 }

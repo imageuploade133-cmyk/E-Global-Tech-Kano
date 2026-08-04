@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
-import { WhatsAppOtpService } from "@/services/whatsapp-otp-service";
+
+const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -24,36 +25,34 @@ export async function POST(req: Request) {
     }
 
     const fullPhone = userData.phoneNumber;
-    // Extract phonePrefix and phoneNumber from the registered full phoneNumber field
-    // Standard format is +23480... or +227...
-    let phonePrefix = "+234";
-    let phoneNumber = fullPhone;
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
 
-    if (fullPhone.startsWith("+227")) {
-      phonePrefix = "+227";
-      phoneNumber = fullPhone.slice(4);
-    } else if (fullPhone.startsWith("+234")) {
-      phonePrefix = "+234";
-      phoneNumber = fullPhone.slice(4);
-    } else if (fullPhone.startsWith("+")) {
-      // General fallback extraction
-      const parts = fullPhone.split(/(\d+)/);
-      if (parts.length > 1) {
-        phonePrefix = "+" + parts[1];
-        phoneNumber = fullPhone.slice(phonePrefix.length);
-      }
+    const response = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": gatewayApiKey,
+      },
+      body: JSON.stringify({
+        phoneNumber: fullPhone,
+        type: "pin_reset"
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: result.message || "Failed to dispatch PIN reset OTP." }, { status: response.status });
     }
-
-    const result = await WhatsAppOtpService.sendOtp(phonePrefix, phoneNumber);
 
     return NextResponse.json({
       success: true,
-      message: "PIN reset OTP sent to registered WhatsApp number.",
-      cooldownUntil: result.cooldownUntil,
+      message: result.message || "PIN reset OTP sent to registered WhatsApp number.",
     });
+
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[PIN Reset OTP] Error:", error);
+    console.error("[PIN Reset OTP Proxy] Error:", error);
     return NextResponse.json({ error: error.message || "Failed to dispatch PIN reset OTP." }, { status: 500 });
   }
 }
