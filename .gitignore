@@ -54,3 +54,6 @@ verification/screenshots/5_post_swap.png
 verification/screenshots/6_history.png
 verification/screenshots/7_history_filtered_usd.png
 verification/screenshots/error.png
+
+# Standalone payment gateway repository
+/payment-gateway/

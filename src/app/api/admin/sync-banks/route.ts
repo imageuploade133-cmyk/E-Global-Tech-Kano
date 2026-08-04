@@ -1,25 +1,28 @@
 import { NextResponse } from "next/server";
-import { BankService } from "@/services/bank-service";
-import { verifyAdminAuth } from "@/lib/admin-auth";
+
+const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
 export async function POST(req: Request) {
   try {
-    // 1. Verify admin privilege securely
-    await verifyAdminAuth(req);
-
-    console.log("[Admin Sync Banks] Manual bank synchronization triggered by administrator...");
-
     const authHeader = req.headers.get("Authorization") || "";
-    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
 
-    // 2. Perform sync from VM Payment Gateway
-    const result = await BankService.syncBanks(idToken);
-
-    return NextResponse.json({
-      success: true,
-      message: "Bank codes successfully synchronized from Flutterwave.",
-      count: result.count,
+    const response = await fetch(`${GATEWAY_URL}/api/admin/sync-banks`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": authHeader,
+        "x-api-key": gatewayApiKey,
+      },
     });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: result.message || "Bank synchronization failed." }, { status: response.status });
+    }
+
+    return NextResponse.json(result);
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Admin Sync Banks Exception] Failed to sync banks:", error.message);

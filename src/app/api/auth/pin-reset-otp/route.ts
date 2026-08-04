@@ -1,42 +1,20 @@
 import { NextResponse } from "next/server";
-import { authenticateUserRequest } from "@/lib/auth-util";
-import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
 export async function POST(req: Request) {
-  let uid = "";
   try {
-    const authResult = await authenticateUserRequest(req);
-    uid = authResult.uid;
-  } catch {
-    return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
-  }
-
-  try {
-    const userSnap = await adminDb.collection("users").doc(uid).get();
-    if (!userSnap.exists) {
-      return NextResponse.json({ error: "User profile not found." }, { status: 404 });
-    }
-
-    const userData = userSnap.data();
-    if (!userData || !userData.phoneNumber) {
-      return NextResponse.json({ error: "No registered phone number found on this profile." }, { status: 400 });
-    }
-
-    const fullPhone = userData.phoneNumber;
+    const authHeader = req.headers.get("Authorization") || "";
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
 
-    const response = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
+    // Forward Bearer token and secure S2S Api Key to payment gateway
+    const response = await fetch(`${GATEWAY_URL}/api/auth/pin-reset-otp`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": authHeader,
         "x-api-key": gatewayApiKey,
       },
-      body: JSON.stringify({
-        phoneNumber: fullPhone,
-        type: "pin_reset"
-      }),
     });
 
     const result = await response.json();
@@ -48,6 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: result.message || "PIN reset OTP sent to registered WhatsApp number.",
+      ...(result.devOtpCode ? { devOtpCode: result.devOtpCode } : {}),
     });
 
   } catch (err: unknown) {
