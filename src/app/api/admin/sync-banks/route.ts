@@ -5,7 +5,7 @@ const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.d
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get("Authorization") || "";
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     const response = await fetch(`${GATEWAY_URL}/api/admin/sync-banks`, {
       method: "POST",
