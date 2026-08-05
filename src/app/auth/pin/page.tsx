@@ -117,11 +117,10 @@ export default function PinPage() {
       if (!res.ok) {
         toast.error(data.error || "Failed to reset PIN on server.");
       } else {
-        toast.success("Access PIN updated securely!");
-        // Verify PIN in state to log them in automatically
-        setPinVerified(true);
-        setShowForgotPin(false);
-        router.push("/");
+        toast.success("Access PIN updated securely! Reloading to apply changes...");
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       }
     } catch (err) {
       console.error(err);
@@ -601,10 +600,11 @@ export default function PinPage() {
                     ) : (
                       <button
                         type="button"
+                        disabled={isRequestingReset}
                         onClick={handleRequestResetLink}
-                        className="text-[11px] text-[#FC7A00] font-bold hover:underline cursor-pointer"
+                        className="text-[11px] text-[#FC7A00] font-bold hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Resend Code
+                        {isRequestingReset ? "Sending..." : "Resend Code"}
                       </button>
                     )}
                   </div>
