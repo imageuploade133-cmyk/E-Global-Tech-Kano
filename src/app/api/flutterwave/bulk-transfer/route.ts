@@ -214,7 +214,7 @@ export async function POST(req: Request) {
       };
     });
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
     // 5. Call Google Cloud Payment Gateway S2S Bulk Transfer API
     try {

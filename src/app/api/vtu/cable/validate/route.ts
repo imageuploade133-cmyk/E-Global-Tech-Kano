@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     const provider = searchParams.get("provider") || "";
     const smartCardNo = searchParams.get("smartCardNo") || "";
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
     const apiKey = process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     const gatewayRes = await fetch(`${gatewayUrl}/api/vtu/cable/validate?provider=${provider}&smartCardNo=${smartCardNo}`, {

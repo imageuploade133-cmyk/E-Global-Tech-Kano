@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 
     const idToken = req.headers.get("Authorization")?.split("Bearer ")[1] || "mock-token";
 
-    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+    const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
     const apiKey = process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     const gatewayRes = await fetch(`${gatewayUrl}/api/vtu/waec/products`, {

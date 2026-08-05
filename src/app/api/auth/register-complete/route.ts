@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
 export async function POST(req: Request) {
   let uid = "";

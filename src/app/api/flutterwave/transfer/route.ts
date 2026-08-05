@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const startTime = Date.now();
   let uid = "";
   let requestBody: Record<string, unknown> | null = null;
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
+  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
   console.log("STEP 1 - Request received");
 
