@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     // Include uid and authenticate request to payment-gateway using Bearer and API keys
     const response = await fetch(`${GATEWAY_URL}/api/auth/register-complete`, {
