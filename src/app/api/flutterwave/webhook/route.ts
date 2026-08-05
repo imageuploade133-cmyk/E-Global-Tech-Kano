@@ -14,8 +14,11 @@ export async function POST(req: Request) {
     const rawBody = await req.text();
     console.log(`[Webhook Proxy] [${reqId}] Signature: "${signature}" | Body Length: ${rawBody.length}`);
 
+    // Trim trailing slash to prevent double-slash (//) routing issues on certain Nginx configurations
+    const cleanGatewayUrl = GATEWAY_URL.endsWith("/") ? GATEWAY_URL.slice(0, -1) : GATEWAY_URL;
+
     // Forward immediately S2S to payment-gateway backend
-    const response = await fetch(`${GATEWAY_URL}/api/flutterwave/webhook`, {
+    const response = await fetch(`${cleanGatewayUrl}/api/flutterwave/webhook`, {
       method: "POST",
       headers: {
         "Content-Type": contentType,
