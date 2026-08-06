@@ -51,7 +51,8 @@ export const OfflineDrawer: React.FC = () => {
           animate={{ y: 0, x: "-50%", opacity: 1 }}
           exit={{ y: -60, x: "-50%", opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 350 }}
-          className="fixed top-4 left-1/2 z-[9999999] w-[90%] max-w-sm bg-gradient-to-r from-[#0c1324] to-[#141d30] border border-[#FC7A00]/40 rounded-2xl p-3.5 shadow-xl flex items-center justify-between gap-3 text-white backdrop-blur-md"
+          className="fixed left-1/2 z-[9999999] w-[90%] max-w-sm bg-gradient-to-r from-[#0c1324] to-[#141d30] border border-[#FC7A00]/40 rounded-2xl p-3.5 shadow-xl flex items-center justify-between gap-3 text-white backdrop-blur-md"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
         >
           {/* Status Details */}
           <div className="flex items-center gap-3">
