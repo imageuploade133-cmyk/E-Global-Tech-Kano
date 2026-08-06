@@ -5,10 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { NotificationTray, Notification } from "./NotificationTray";
 import { LogoutDrawer } from "./LogoutDrawer";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { useRouter } from "next/navigation";
+import { handleAppSignOut } from "@/lib/logout-util";
+import { useAuth } from "@/lib/AuthContext";
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, limit } from "firebase/firestore";
+import { useEffect } from "react";
 
 interface HeaderProps {
   userName: string;
@@ -49,41 +53,157 @@ const isCustomAvatar = (url?: string) => {
   return url.includes("i.ibb.co") || url.includes("ibb.co") || url.includes("images.unsplash.com");
 };
 
+function formatNotificationTime(createdAtStr?: string): string {
+  if (!createdAtStr) return "Just now";
+  try {
+    const date = new Date(createdAtStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (isNaN(diffMs) || diffMs < 0) return "Just now";
+
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+  } catch {
+    return "Just now";
+  }
+}
+
 export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoading }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const { config } = useAppConfig();
-  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [imgError, setImgError] = useState(false);
+  const router = useRouter();
+  const { user } = useAuth();
+
+  // Load and listen to notifications in real-time from Firestore subcollection
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("mock") === "true") {
+      setNotifications(INITIAL_NOTIFICATIONS);
+      return;
+    }
+
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "users", user.uid, "notifications"),
+      orderBy("createdAt", "desc"),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: Notification[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            title: data.title || "Notification",
+            message: data.body || data.message || "",
+            time: formatNotificationTime(data.createdAt),
+            type: (data.type || "transaction") as "transaction" | "security" | "promo",
+            read: !!data.read,
+          });
+        });
+        setNotifications(list);
+      },
+      (error) => {
+        console.error("[Header Notifications Listener Exception]:", error.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const hasCustomPhoto = isCustomAvatar(profileImage) && !imgError;
 
   const handleSignOut = async () => {
     setIsLogoutOpen(false);
+    await handleAppSignOut(router);
+  };
+
+  // Production-grade action handlers with live Firestore synchronization
+  const handleMarkAllRead = async () => {
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (isMock) {
+      setNotifications([]);
+      toast.success("Notifications cleared");
+      return;
+    }
+
+    if (!user) return;
+
     try {
-      await signOut(auth);
-      toast.success("Logged out successfully");
-    } catch {
-      toast.error("Failed to logout");
+      const unreadNotifications = notifications.filter((n) => !n.read);
+      if (unreadNotifications.length === 0) return;
+
+      const batch = writeBatch(db);
+      unreadNotifications.forEach((n) => {
+        const ref = doc(db, "users", user.uid, "notifications", n.id);
+        batch.update(ref, { read: true });
+      });
+
+      await batch.commit();
+      toast.success("All notifications marked as read");
+    } catch (err: any) {
+      console.error("[Header] Mark all read failed:", err.message);
+      toast.error("Failed to mark notifications as read.");
     }
   };
 
-  // Production-grade action handlers
-  const handleMarkAllRead = () => {
-    setNotifications([]);
-    toast.success("Notifications cleared");
+  const handleDeleteNotification = async (id: string) => {
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (isMock) {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      toast.success("Alert cleared");
+      return;
+    }
+
+    if (!user) return;
+
+    try {
+      await deleteDoc(doc(db, "users", user.uid, "notifications", id));
+      toast.success("Alert cleared");
+    } catch (err: any) {
+      console.error("[Header] Delete notification failed:", err.message);
+      toast.error("Failed to delete notification.");
+    }
   };
 
-  const handleDeleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-    toast.success("Alert cleared");
-  };
+  const handleToggleRead = async (id: string) => {
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (isMock) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+      return;
+    }
 
-  const handleToggleRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
+    if (!user) return;
+
+    try {
+      await updateDoc(doc(db, "users", user.uid, "notifications", id), {
+        read: true,
+      });
+    } catch (err: any) {
+      console.error("[Header] Update read status failed:", err.message);
+    }
   };
 
   return (

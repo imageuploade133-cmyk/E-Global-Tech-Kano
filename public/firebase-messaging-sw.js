@@ -28,3 +28,28 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
+
+// Handle background notification clicks and routing
+self.addEventListener("notificationclick", (event) => {
+  console.log("[Service Worker] Notification clicked:", event);
+  event.notification.close();
+
+  // Extract navigation URL from FCM payload data
+  const targetUrl = event.notification.data?.url || event.notification.data?.click_action || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // If there's an existing window open on the domain, focus it and navigate
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return client.navigate(targetUrl).then((navigatedClient) => navigatedClient.focus());
+        }
+      }
+      // Otherwise, open a brand new window to the target URL
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

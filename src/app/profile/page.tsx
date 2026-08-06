@@ -14,6 +14,7 @@ import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { useRouter } from "next/navigation";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { FaceVerificationDrawer } from "@/components/profile/FaceVerificationDrawer";
+import { handleAppSignOut } from "@/lib/logout-util";
 
 const LIMIT_CATEGORIES = [
   {
@@ -574,13 +575,7 @@ export default function ProfilePage() {
 
   const handleLogoutConfirm = async () => {
     setIsLogoutOpen(false);
-    try {
-      await auth.signOut();
-      toast.success("Logged out successfully");
-      router.push("/auth/login");
-    } catch {
-      toast.error("Failed to logout");
-    }
+    await handleAppSignOut(router);
   };
 
   return (
