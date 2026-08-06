@@ -602,9 +602,16 @@ export default function PinPage() {
                         type="button"
                         disabled={isRequestingReset}
                         onClick={handleRequestResetLink}
-                        className="text-[11px] text-[#FC7A00] font-bold hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-[11px] text-[#FC7A00] font-bold hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 justify-center"
                       >
-                        {isRequestingReset ? "Sending..." : "Resend Code"}
+                        {isRequestingReset ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          "Resend Code"
+                        )}
                       </button>
                     )}
                   </div>
