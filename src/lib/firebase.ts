@@ -17,4 +17,20 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Dynamic, safe messaging initialization for SSR environments
+export const getClientMessaging = async () => {
+  if (typeof window !== "undefined") {
+    try {
+      const { getMessaging, isSupported } = await import("firebase/messaging");
+      const supported = await isSupported();
+      if (supported) {
+        return getMessaging(app);
+      }
+    } catch (err) {
+      console.warn("[Firebase Client] Messaging support check failed:", err);
+    }
+  }
+  return null;
+};
+
 export { app, auth, db };
