@@ -26,26 +26,44 @@ export async function handleAppSignOut(router: any) {
       return;
     }
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("active_fcm_token") : null;
     const user = auth.currentUser;
+    const tokensToUnregister: string[] = [];
 
-    if (token && user) {
+    const browserToken = typeof window !== "undefined" ? localStorage.getItem("active_fcm_token") : null;
+    if (browserToken) {
+      tokensToUnregister.push(browserToken);
+    }
+
+    if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
+      try {
+        const flutterToken = await (window as any).flutter_inappwebview.callHandler("getFcmToken");
+        if (flutterToken && !tokensToUnregister.includes(flutterToken)) {
+          tokensToUnregister.push(flutterToken);
+        }
+      } catch (err: any) {
+        console.warn("[SignOut Warning] Failed to get Flutter token for unregistering:", err.message);
+      }
+    }
+
+    if (user && tokensToUnregister.length > 0) {
       try {
         const idToken = await user.getIdToken();
-        const res = await fetch("/api/fcm/unregister", {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ token }),
-        });
+        for (const tokenToDel of tokensToUnregister) {
+          const res = await fetch("/api/fcm/unregister", {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ token: tokenToDel }),
+          });
 
-        if (res.ok) {
-          console.log("[SignOut] FCM token unregistered successfully.");
-        } else {
-          const data = await res.json().catch(() => ({}));
-          console.warn("[SignOut Warning] FCM token unregistration returned failure status:", data.error || data.message);
+          if (res.ok) {
+            console.log(`[SignOut] FCM token ${tokenToDel.slice(0, 10)}... unregistered successfully.`);
+          } else {
+            const data = await res.json().catch(() => ({}));
+            console.warn("[SignOut Warning] FCM token unregistration failed:", data.error || data.message);
+          }
         }
       } catch (err: any) {
         console.error("[SignOut Exception] Failed to unregister FCM token:", err.message);

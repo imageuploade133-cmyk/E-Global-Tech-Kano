@@ -39,7 +39,28 @@ export function useFcm() {
   }, [user]);
 
   const requestPermissionAndGetToken = useCallback(async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
+    if (typeof window === "undefined") return null;
+
+    // Check if running inside Flutter InAppWebView first
+    if ((window as any).flutter_inappwebview) {
+      console.log("[FCM Hook] Flutter InAppWebView detected. Fetching token via JS Bridge...");
+      try {
+        const token = await (window as any).flutter_inappwebview.callHandler("getFcmToken");
+        if (token) {
+          setFcmToken(token);
+          localStorage.setItem("active_fcm_token", token);
+          console.log("[FCM Hook] Retrieved Flutter FCM token via JS Bridge successfully:", token);
+          await syncTokenWithBackend(token, "register");
+          return token;
+        } else {
+          console.warn("[FCM Hook Warning] Flutter getFcmToken handler returned empty token.");
+        }
+      } catch (err: any) {
+        console.error("[FCM Hook Error] Failed to retrieve token via Flutter JS Bridge:", err.message);
+      }
+    }
+
+    if (!("Notification" in window)) {
       console.warn("[FCM Hook] Browser does not support push notifications.");
       return null;
     }
@@ -90,6 +111,18 @@ export function useFcm() {
   }, [syncTokenWithBackend]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Expose global token syncing function for native callbacks (automatic token changes)
+      (window as any).__syncFcmToken = async (newToken: string) => {
+        console.log("[FCM Bridge] Sync request received from Flutter container:", newToken);
+        setFcmToken(newToken);
+        localStorage.setItem("active_fcm_token", newToken);
+        if (user) {
+          await syncTokenWithBackend(newToken, "register");
+        }
+      };
+    }
+
     if (!user) {
       setFcmToken(null);
       return;

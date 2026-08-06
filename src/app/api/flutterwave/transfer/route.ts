@@ -3,6 +3,7 @@ import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { NotificationService } from "@/services/notification-service";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
@@ -228,6 +229,18 @@ export async function POST(req: Request) {
         processingTimeMs: Date.now() - startTime,
       });
 
+      // Send Notification
+      try {
+        NotificationService.sendPushNotification(uid, {
+          title: "💸 Bank Transfer Sent",
+          body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
+          type: "transaction",
+          url: "/history",
+        });
+      } catch (notifErr: any) {
+        console.error("[Notification Warning] Failed to dispatch mock transfer notification:", notifErr.message);
+      }
+
       return NextResponse.json({
         success: true,
         reference: trfReference,
@@ -274,6 +287,18 @@ export async function POST(req: Request) {
           message: `Successfully processed real transfer via Gateway: ${description}`,
           processingTimeMs: Date.now() - startTime,
         });
+
+        // Send Notification
+        try {
+          NotificationService.sendPushNotification(uid, {
+            title: "💸 Bank Transfer Sent",
+            body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
+            type: "transaction",
+            url: "/history",
+          });
+        } catch (notifErr: any) {
+          console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);
+        }
 
         return NextResponse.json({
           success: true,
