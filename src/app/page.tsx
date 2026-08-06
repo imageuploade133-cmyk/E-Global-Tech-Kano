@@ -11,9 +11,11 @@ import { useAuth } from "@/lib/AuthContext";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { useFcm } from "@/hooks/useFcm";
 
 export default function Home() {
   const { userData, user, loading, updateUserData } = useAuth();
+  useFcm(); // Initialize FCM Web Push notifications and foreground listener
   const searchParams = useSearchParams();
   const router = useRouter();
 
