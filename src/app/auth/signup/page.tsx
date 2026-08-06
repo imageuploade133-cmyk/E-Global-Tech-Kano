@@ -545,9 +545,16 @@ export default function SignUpPage() {
                           type="button"
                           disabled={isSendingOtp || !phoneNumber}
                           onClick={handleRequestOtp}
-                          className="bg-black text-white hover:bg-gray-900 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all whitespace-nowrap cursor-pointer"
+                          className="bg-black text-white hover:bg-gray-900 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5"
                         >
-                          {isSendingOtp ? "Sending..." : "Send OTP"}
+                          {isSendingOtp ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Sending...</span>
+                            </>
+                          ) : (
+                            "Send OTP"
+                          )}
                         </button>
                       </div>
                     ) : (
@@ -559,10 +566,18 @@ export default function SignUpPage() {
                           ) : (
                             <button
                               type="button"
+                              disabled={isSendingOtp}
                               onClick={handleRequestOtp}
-                              className="text-[9px] text-[#FC7A00] hover:underline font-bold cursor-pointer"
+                              className="text-[9px] text-[#FC7A00] hover:underline font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                             >
-                              Resend Code
+                              {isSendingOtp ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
+                                  <span>Sending...</span>
+                                </>
+                              ) : (
+                                "Resend Code"
+                              )}
                             </button>
                           )}
                         </div>
@@ -572,20 +587,28 @@ export default function SignUpPage() {
                             type="tel"
                             maxLength={6}
                             value={otpCode}
+                            disabled={isVerifyingOtp}
                             onChange={(e) => {
                               setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
                               setOtpError("");
                             }}
-                            className="flex-grow bg-white border border-black rounded-2xl px-4 py-3 text-xs font-bold tracking-widest text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono text-center"
+                            className="flex-grow bg-white border border-black rounded-2xl px-4 py-3 text-xs font-bold tracking-widest text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono text-center disabled:bg-gray-50 disabled:text-gray-400"
                             placeholder="••••••"
                           />
                           <button
                             type="button"
                             disabled={isVerifyingOtp || otpCode.length !== 6}
                             onClick={handleVerifyOtp}
-                            className="bg-[#FC7A00] text-white hover:brightness-105 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer"
+                            className="bg-[#FC7A00] text-white hover:brightness-105 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                           >
-                            {isVerifyingOtp ? "Verifying..." : "Verify"}
+                            {isVerifyingOtp ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Verifying...</span>
+                              </>
+                            ) : (
+                              "Verify"
+                            )}
                           </button>
                         </div>
 
