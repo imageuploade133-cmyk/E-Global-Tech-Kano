@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { cn } from "@/lib/utils";
+import { useAppConfig } from "@/lib/ConfigContext";
 
 // Persistently identify the device using localStorage
 const getOrCreateDeviceId = (): string => {
@@ -22,6 +23,7 @@ const getOrCreateDeviceId = (): string => {
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, isPinVerified, userData, updateUserData } = useAuth();
+  const { config } = useAppConfig();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -35,8 +37,45 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
 
+  // System-wide update states for real-time versions
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const initializingDeviceRef = useRef(false);
+
+  // Real-time server-side version mismatch update controller
+  useEffect(() => {
+    if (typeof window === "undefined" || !config?.appVersion) return;
+
+    const serverVersion = config.appVersion;
+    const cachedVersion = localStorage.getItem("cached_app_version");
+
+    if (cachedVersion === null) {
+      // Brand new user: record version silently without showing any update screen
+      localStorage.setItem("cached_app_version", serverVersion);
+    } else if (cachedVersion !== serverVersion) {
+      // Existing user: show beautiful full-screen update loader and clear localStorage
+      setIsUpdating(true);
+      setUpdateProgress(0);
+
+      const interval = setInterval(() => {
+        setUpdateProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            // Progress completed: clear localStorage, save new version, force reload
+            localStorage.clear();
+            localStorage.setItem("cached_app_version", serverVersion);
+            window.location.reload();
+            return 100;
+          }
+          return prev + 4; // increment towards 100 over ~3.75s
+        });
+      }, 150);
+
+      return () => clearInterval(interval);
+    }
+  }, [config?.appVersion]);
 
   // Detect and verify Flutterwave redirects globally on app startup
   useEffect(() => {
@@ -380,6 +419,54 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     setIsNewDeviceBlocked(false);
     await handleAppSignOut(router);
   };
+
+  // Render high-fidelity professional system update overlay
+  if (isUpdating) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6 z-[9999999] relative">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-sm bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-800/10 shadow-2xl"
+        >
+          {/* Logo Brand and Spinning Gradient update wheels */}
+          <div className="space-y-4">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#FC7A00] border-r-emerald-500"
+              />
+              <span className="material-symbols-outlined text-[28px] text-[#FC7A00] animate-bounce">sync</span>
+            </div>
+            <h2 className="font-hanken font-black text-lg text-black uppercase tracking-wider leading-none">
+              SYSTEM UPGRADE IN PROGRESS
+            </h2>
+            <p className="font-hanken text-[11px] text-[#FC7A00] font-extrabold uppercase tracking-widest mt-1">
+              Optimizing application files
+            </p>
+            <p className="font-hanken text-xs text-gray-500 leading-relaxed font-semibold">
+              We are applying a direct system-wide update to your application. Caches are being synchronized for instant launch.
+            </p>
+          </div>
+
+          {/* Progress Percent counter dial & track */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+              <span>Memory Clearance</span>
+              <span className="font-mono text-black font-extrabold">{updateProgress}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-[#FC7A00] to-emerald-500 rounded-full"
+                style={{ width: `${updateProgress}%` }}
+              />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (flwVerifying) {
     return (
