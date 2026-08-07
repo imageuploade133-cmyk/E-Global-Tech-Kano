@@ -20,6 +20,8 @@ interface NotificationTrayProps {
   onMarkAllRead: () => void;
   onDeleteNotification: (id: string) => void;
   onToggleRead: (id: string) => void;
+  onLoadMore: () => void;
+  hasMore: boolean;
 }
 
 export const NotificationTray: React.FC<NotificationTrayProps> = ({
@@ -29,9 +31,12 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
   onMarkAllRead,
   onDeleteNotification,
   onToggleRead,
+  onLoadMore,
+  hasMore,
 }) => {
   const [trayLoading, setTrayLoading] = useState(true);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [isPageLoadingMore, setIsPageLoadingMore] = useState(false);
 
   // Use refs to avoid effect-cleanup loops when states transition
   const selectedRef = useRef<Notification | null>(null);
@@ -76,6 +81,11 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
     }
   }, [isOpen]);
 
+  // Turn off page loading spinner when notifications list size changes
+  useEffect(() => {
+    setIsPageLoadingMore(false);
+  }, [notifications.length]);
+
   // Prevent background scrolling while tray or detail is open
   useEffect(() => {
     if (isOpen || selectedNotification) {
@@ -107,6 +117,24 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
   const handleDetailDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.y > 100 || info.velocity.y > 500) {
       handleCloseDetail();
+    }
+  };
+
+  // Unified handler to invoke onLoadMore smoothly
+  const handleLoadMoreTrigger = () => {
+    if (hasMore && !isPageLoadingMore) {
+      setIsPageLoadingMore(true);
+      onLoadMore();
+    }
+  };
+
+  // Scroll detection logic to trigger next page load near bottom
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const threshold = 10; // pixels from the bottom
+    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= threshold;
+    if (isNearBottom) {
+      handleLoadMoreTrigger();
     }
   };
 
@@ -146,7 +174,10 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
           </div>
 
           {/* Scrollable Notifications Area */}
-          <div className="flex-grow overflow-y-auto p-margin-mobile space-y-4 custom-scrollbar bg-gray-50/50">
+          <div
+            onScroll={handleScroll}
+            className="flex-grow overflow-y-auto p-margin-mobile space-y-4 custom-scrollbar bg-gray-50/50"
+          >
             {trayLoading ? (
               /* High-fidelity Skeleton Loading */
               <div className="space-y-3">
@@ -245,6 +276,27 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                     </div>
                   </motion.div>
                 ))}
+
+                {/* Highly intuitive pagination footer controls */}
+                {hasMore && (
+                  <div className="pt-4 pb-6 flex flex-col items-center justify-center">
+                    {isPageLoadingMore ? (
+                      <div className="flex items-center gap-2 text-[#FC7A00] font-medium text-sm">
+                        <div className="w-4 h-4 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
+                        <span>Loading more notifications...</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleLoadMoreTrigger}
+                        className="px-6 py-2.5 rounded-full border border-[#FC7A00]/30 hover:border-[#FC7A00] bg-white text-[#FC7A00] text-xs font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">expand_more</span>
+                        Load More
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
