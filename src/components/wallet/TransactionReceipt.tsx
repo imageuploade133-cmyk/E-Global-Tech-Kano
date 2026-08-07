@@ -256,7 +256,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           {/* Printable Receipt Card Ref */}
           <div
             ref={receiptRef}
-            className="w-full max-w-sm bg-white rounded-3xl p-6 border border-gray-150/60 shadow-sm flex flex-col space-y-5 text-black"
+            className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-sm flex flex-col space-y-5 text-black"
           >
             {/* Top Logo & Title segment */}
             <div className="text-center border-b border-dashed border-gray-200 pb-5 space-y-4">
@@ -437,37 +437,34 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           </div>
         </div>
 
-        {/* Floating, Sticky bottom action drawer panel with share and download triggers */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-100 flex flex-col gap-3 shadow-lg z-10">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              disabled={generating}
-              onClick={handleDownloadPDF}
-              className="flex-1 py-3.5 bg-red-50 hover:bg-red-100 text-red-600 text-[10.5px] font-black uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-red-200/50 disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-sm font-bold">picture_as_pdf</span>
-              Download PDF
-            </button>
-            <button
-              type="button"
-              disabled={generating}
-              onClick={handleDownloadImage}
-              className="flex-1 py-3.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-[10.5px] font-black uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-blue-200/50 disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-sm font-bold">image</span>
-              Download Image
-            </button>
-          </div>
-
+        {/* Floating, Sticky bottom action drawer panel with 3 small side-by-side buttons */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex gap-2 shadow-lg z-10">
+          <button
+            type="button"
+            disabled={generating}
+            onClick={handleDownloadPDF}
+            className="flex-1 py-2.5 bg-red-50/50 hover:bg-red-100 text-red-600 text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 border border-red-200/40 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-xs font-bold">picture_as_pdf</span>
+            PDF
+          </button>
+          <button
+            type="button"
+            disabled={generating}
+            onClick={handleDownloadImage}
+            className="flex-1 py-2.5 bg-blue-50/50 hover:bg-blue-100 text-blue-600 text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 border border-blue-200/40 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-xs font-bold">image</span>
+            PNG
+          </button>
           <button
             type="button"
             disabled={generating}
             onClick={handleShareReceipt}
-            className="w-full py-4 bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+            className="flex-1 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white text-[10px] font-bold uppercase tracking-wider rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-base font-bold">share</span>
-            Share Receipt
+            <span className="material-symbols-outlined text-xs font-bold">share</span>
+            Share
           </button>
         </div>
       </motion.div>

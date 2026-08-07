@@ -413,8 +413,23 @@ export default function HistoryPage() {
                     <button
                       key={tx.id}
                       onClick={() => setSelectedTx(tx)}
-                      className="w-full text-left bg-white border border-gray-200 p-4 rounded-2xl flex items-center justify-between gap-3 active:scale-[0.99] hover:border-gray-300 transition-all cursor-pointer shadow-sm"
+                      className={cn(
+                        "w-full text-left relative overflow-hidden bg-white border rounded-2xl p-4 pl-5 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-3xs",
+                        isCredit
+                          ? "bg-gradient-to-r from-emerald-500/[0.03] via-emerald-500/[0.005] to-white border-emerald-500/15 hover:border-emerald-500/35"
+                          : "bg-gradient-to-r from-[#FC7A00]/[0.03] via-[#FC7A00]/[0.005] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35"
+                      )}
                     >
+                      {/* Premium Side Accent Strip */}
+                      <div
+                        className={cn(
+                          "absolute left-0 top-0 bottom-0 w-[4px]",
+                          isCredit
+                            ? "bg-gradient-to-b from-emerald-400 to-emerald-600"
+                            : "bg-gradient-to-b from-[#FC7A00] to-[#FF9022]"
+                        )}
+                      />
+
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Interactive type indicator badge icons */}
                         <div
