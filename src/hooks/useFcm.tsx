@@ -4,14 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import { getClientMessaging } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
-// Use public VAPID key from environment or standard secure fallback
-const VAPID_KEY = process.env.NEXT_PUBLIC_FCM_VAPID_KEY || "BH66pX1fTOnB0K7K6mI3bI_R7pW4-lFzD9k397O05B853VMy9g";
+// Use public VAPID key from environment exclusively (no hardcoded fallback)
+const VAPID_KEY = process.env.NEXT_PUBLIC_FCM_VAPID_KEY || "";
 
 export function useFcm() {
   const { user, userData } = useAuth();
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [permission, setPermission] = useState<NotificationPermission>("default");
+  const router = useRouter();
 
   const syncTokenWithBackend = useCallback(async (token: string, action: "register" | "unregister") => {
     if (!user) return;
@@ -37,7 +39,28 @@ export function useFcm() {
   }, [user]);
 
   const requestPermissionAndGetToken = useCallback(async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
+    if (typeof window === "undefined") return null;
+
+    // Check if running inside Flutter InAppWebView first
+    if ((window as any).flutter_inappwebview) {
+      console.log("[FCM Hook] Flutter InAppWebView detected. Fetching token via JS Bridge...");
+      try {
+        const token = await (window as any).flutter_inappwebview.callHandler("getFcmToken");
+        if (token) {
+          setFcmToken(token);
+          localStorage.setItem("active_fcm_token", token);
+          console.log("[FCM Hook] Retrieved Flutter FCM token via JS Bridge successfully:", token);
+          await syncTokenWithBackend(token, "register");
+          return token;
+        } else {
+          console.warn("[FCM Hook Warning] Flutter getFcmToken handler returned empty token.");
+        }
+      } catch (err: any) {
+        console.error("[FCM Hook Error] Failed to retrieve token via Flutter JS Bridge:", err.message);
+      }
+    }
+
+    if (!("Notification" in window)) {
       console.warn("[FCM Hook] Browser does not support push notifications.");
       return null;
     }
@@ -58,6 +81,12 @@ export function useFcm() {
         return null;
       }
 
+      // Ensure VAPID key is loaded
+      if (!VAPID_KEY) {
+        console.warn("[FCM Hook] VAPID key is missing. Please set NEXT_PUBLIC_FCM_VAPID_KEY in your environment.");
+        return null;
+      }
+
       // Fetch FCM Token from Firebase messaging server using the public VAPID key
       const { getToken } = await import("firebase/messaging");
       const token = await getToken(messaging, {
@@ -66,6 +95,9 @@ export function useFcm() {
 
       if (token) {
         setFcmToken(token);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("active_fcm_token", token);
+        }
         console.log("[FCM Hook] Generated secure FCM token successfully:", token);
         await syncTokenWithBackend(token, "register");
         return token;
@@ -79,6 +111,18 @@ export function useFcm() {
   }, [syncTokenWithBackend]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Expose global token syncing function for native callbacks (automatic token changes)
+      (window as any).__syncFcmToken = async (newToken: string) => {
+        console.log("[FCM Bridge] Sync request received from Flutter container:", newToken);
+        setFcmToken(newToken);
+        localStorage.setItem("active_fcm_token", newToken);
+        if (user) {
+          await syncTokenWithBackend(newToken, "register");
+        }
+      };
+    }
+
     if (!user) {
       setFcmToken(null);
       return;
@@ -100,12 +144,16 @@ export function useFcm() {
 
         const title = payload.notification?.title || payload.data?.title || "New Wallet Update";
         const body = payload.notification?.body || payload.data?.body || "You have a new transaction alert.";
-        const type = payload.data?.type || "alert";
+        const targetUrl = payload.data?.url || payload.data?.click_action || "";
 
         // Display a high-fidelity, customized Sonner toast with a progress activity indicator
         toast.info(title, {
           description: body,
           duration: 6000,
+          action: targetUrl ? {
+            label: "View",
+            onClick: () => router.push(targetUrl),
+          } : undefined,
           icon: (
             <span className="material-symbols-outlined text-[#FC7A00] text-[20px] font-bold animate-bounce">
               notifications_active

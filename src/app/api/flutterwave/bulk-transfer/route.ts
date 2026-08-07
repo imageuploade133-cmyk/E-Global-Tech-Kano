@@ -3,6 +3,7 @@ import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { NotificationService } from "@/services/notification-service";
 import bcrypt from "bcryptjs";
 
 interface BulkRecipient {
@@ -186,6 +187,18 @@ export async function POST(req: Request) {
         processingTimeMs: Date.now() - startTime,
       });
 
+      // Send Notification
+      try {
+        NotificationService.sendPushNotification(uid, {
+          title: "💸 Bulk Transfer Sent",
+          body: `Your bulk transfer of ₦${totalAmt.toLocaleString()} for ${trfRecipients.length} recipients is successful.`,
+          type: "transaction",
+          url: "/history",
+        });
+      } catch (notifErr: any) {
+        console.error("[Notification Warning] Failed to dispatch mock bulk transfer notification:", notifErr.message);
+      }
+
       return NextResponse.json({
         success: true,
         reference: trfReference,
@@ -244,6 +257,18 @@ export async function POST(req: Request) {
           message: `Successfully processed real bulk transfer via Gateway: ${description}`,
           processingTimeMs: Date.now() - startTime,
         });
+
+        // Send Notification
+        try {
+          NotificationService.sendPushNotification(uid, {
+            title: "💸 Bulk Transfer Queued",
+            body: `Your bulk transfer of ₦${totalAmt.toLocaleString()} for ${trfRecipients.length} recipients has been successfully queued.`,
+            type: "transaction",
+            url: "/history",
+          });
+        } catch (notifErr: any) {
+          console.error("[Notification Warning] Failed to dispatch real bulk transfer notification:", notifErr.message);
+        }
 
         return NextResponse.json({
           success: true,

@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { PaymentGatewayManager } from "@/lib/payment/PaymentGatewayManager";
+import { NotificationService } from "@/services/notification-service";
 import bcrypt from "bcryptjs";
 import { MOCK_ITEMS } from "../items/config";
 
@@ -300,6 +301,46 @@ export async function POST(req: Request) {
 
     const isSandbox = uid === "mock-uid";
 
+    const getNotificationPayload = () => {
+      const desc = (description || "").toLowerCase();
+      const bType = (biller_type || "").toLowerCase();
+      const bName = (biller_name || "").toLowerCase();
+
+      if (desc.includes("airtime") || bType.includes("airtime")) {
+        return {
+          title: "📱 Airtime Purchase Success",
+          body: `Your airtime purchase of ₦${numAmount.toLocaleString()} to ${customer_id} is successful.`,
+          type: "transaction" as const,
+        };
+      }
+      if (desc.includes("data") || bType.includes("data") || bName.includes("data")) {
+        return {
+          title: "📶 Data Purchase Success",
+          body: `Your data purchase of ₦${numAmount.toLocaleString()} to ${customer_id} is successful.`,
+          type: "transaction" as const,
+        };
+      }
+      if (desc.includes("electricity") || bType.includes("electricity") || bName.includes("electricity") || bType.includes("utility")) {
+        return {
+          title: "💡 Electricity Bill Payment",
+          body: `Your electricity bill payment of ₦${numAmount.toLocaleString()} for meter ${customer_id} is successful.`,
+          type: "transaction" as const,
+        };
+      }
+      if (desc.includes("cable") || bType.includes("cable") || bName.includes("cable") || bName.includes("dstv") || bName.includes("gotv") || bName.includes("startimes")) {
+        return {
+          title: "📺 Cable TV Payment",
+          body: `Your Cable TV subscription payment of ₦${numAmount.toLocaleString()} for account ${customer_id} is successful.`,
+          type: "transaction" as const,
+        };
+      }
+      return {
+        title: "🧾 Payment Successful",
+        body: `Your payment of ₦${numAmount.toLocaleString()} for ${biller_name || "utilities"} is successful.`,
+        type: "transaction" as const,
+      };
+    };
+
     if (isSandbox) {
       logPaymentEvent({
         category: "Wallet Debited",
@@ -307,6 +348,17 @@ export async function POST(req: Request) {
         message: `Successfully processed mock bill payment: ${description} (Ref: ${reference})`,
         processingTimeMs: Date.now() - startTime,
       });
+
+      // Send Notification
+      try {
+        const payload = getNotificationPayload();
+        NotificationService.sendPushNotification(uid, {
+          ...payload,
+          url: "/history",
+        });
+      } catch (notifErr: any) {
+        console.error("[Notification Warning] Failed to dispatch mock bill payment notification:", notifErr.message);
+      }
 
       return NextResponse.json({
         success: true,
@@ -341,6 +393,17 @@ export async function POST(req: Request) {
           message: `Successfully processed bill payment [${gateway.name}]: ${description} (Ref: ${reference})`,
           processingTimeMs: Date.now() - startTime,
         });
+
+        // Send Notification
+        try {
+          const payload = getNotificationPayload();
+          NotificationService.sendPushNotification(uid, {
+            ...payload,
+            url: "/history",
+          });
+        } catch (notifErr: any) {
+          console.error("[Notification Warning] Failed to dispatch real bill payment notification:", notifErr.message);
+        }
 
         return NextResponse.json({
           success: true,

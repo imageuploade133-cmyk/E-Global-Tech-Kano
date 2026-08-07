@@ -8,8 +8,8 @@ import Image from "next/image";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 
 import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
+import { handleAppSignOut } from "@/lib/logout-util";
 
 export default function PinPage() {
   const [pin, setPin] = useState("");
@@ -186,13 +186,7 @@ export default function PinPage() {
 
   const handleLogOutFromPin = async () => {
     setIsLogoutDrawerOpen(false);
-    try {
-      await signOut(auth);
-      toast.success("Logged out successfully");
-      router.push("/auth/login");
-    } catch {
-      toast.error("Failed to sign out");
-    }
+    await handleAppSignOut(router);
   };
 
   const handleRequestResetLink = async () => {
