@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function PinSetupPage() {
   const [pin, setPin] = useState("");
@@ -121,8 +122,11 @@ export default function PinSetupPage() {
           />
         </div>
         <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
-        <p className="text-gray-500 font-hanken tracking-widest uppercase text-xs">
-          {step === 1 ? "Set 4-digit Access PIN" : "Confirm Access PIN"}
+        <p className={cn(
+          "font-hanken tracking-widest uppercase text-xs font-bold",
+          step === 1 ? "text-red-500 font-extrabold animate-pulse" : "text-gray-500"
+        )}>
+          {step === 1 ? "SET YOUR ACCESS PIN (4-Digits)" : "Confirm Access PIN"}
         </p>
       </div>
 

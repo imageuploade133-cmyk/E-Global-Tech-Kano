@@ -582,7 +582,7 @@ export default function SignUpPage() {
                           )}
                         </div>
 
-                        <div className="flex gap-2.5">
+                        <div className="space-y-2.5">
                           <input
                             type="tel"
                             maxLength={6}
@@ -592,14 +592,14 @@ export default function SignUpPage() {
                               setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
                               setOtpError("");
                             }}
-                            className="flex-grow bg-white border border-black rounded-2xl px-4 py-3 text-xs font-bold tracking-widest text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono text-center disabled:bg-gray-50 disabled:text-gray-400"
+                            className="w-full bg-white border border-black rounded-2xl px-4 py-3 text-xs font-bold tracking-widest text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono text-center disabled:bg-gray-50 disabled:text-gray-400"
                             placeholder="••••••"
                           />
                           <button
                             type="button"
                             disabled={isVerifyingOtp || otpCode.length !== 6}
                             onClick={handleVerifyOtp}
-                            className="bg-[#FC7A00] text-white hover:brightness-105 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            className="w-full bg-[#FC7A00] text-white hover:brightness-105 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                           >
                             {isVerifyingOtp ? (
                               <>
@@ -607,7 +607,7 @@ export default function SignUpPage() {
                                 <span>Verifying...</span>
                               </>
                             ) : (
-                              "Verify"
+                              "Verify OTP"
                             )}
                           </button>
                         </div>
