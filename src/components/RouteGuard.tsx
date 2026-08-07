@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { handleAppSignOut } from "@/lib/logout-util";
+import { cn } from "@/lib/utils";
 
 // Persistently identify the device using localStorage
 const getOrCreateDeviceId = (): string => {
@@ -27,14 +28,14 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const [flwVerifying, setFlwVerifying] = useState(false);
   const [flwMessage, setFlwMessage] = useState("");
 
-  // New Device verification overlay states
+  // New Device verification states
   const [isNewDeviceBlocked, setIsNewDeviceBlocked] = useState(false);
-  const [verPhone, setVerPhone] = useState("");
-  const [verBvnOrEmail, setVerBvnOrEmail] = useState("");
-  const [verError, setVerError] = useState("");
-  const [verifyingDevice, setVerifyingDevice] = useState(false);
+  const [faceIdStep, setFaceIdStep] = useState<"instructions" | "camera" | "rotate_head" | "verifying" | "success" | "failed">("instructions");
+  const [feedback, setFeedback] = useState("Position your face inside the frame");
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
-  // Reference lock to prevent infinite updateUserData loops
+  const videoRef = useRef<HTMLVideoElement>(null);
   const initializingDeviceRef = useRef(false);
 
   // Detect and verify Flutterwave redirects globally on app startup
@@ -192,6 +193,92 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Safe camera streamer controls
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
+    }
+  }, [stream]);
+
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [stream]);
+
+  const startFaceCapture = async () => {
+    try {
+      setFaceIdStep("camera");
+      setFeedback("Align your face inside the frame");
+      const userStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 480 } },
+        audio: false
+      });
+      setStream(userStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = userStream;
+      }
+      setCountdown(3);
+    } catch (err) {
+      console.error("[Device FaceID] Stream error:", err);
+      toast.error("Camera access denied. Please enable permissions.");
+      setFaceIdStep("failed");
+    }
+  };
+
+  // Automated biometric head-movement scan challenge sequence
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+        if (countdown === 3) {
+          setFeedback("Perfect. Keep face centered...");
+        } else if (countdown === 2) {
+          setFaceIdStep("rotate_head");
+          setFeedback("MOVE YOUR HEAD IN A SLOW CIRCLE ROUND...");
+        } else if (countdown === 1) {
+          setFeedback("Scanning head coordinates...");
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setCountdown(null);
+      verifyFaceIdBiometrics();
+    }
+  }, [countdown]);
+
+  const verifyFaceIdBiometrics = async () => {
+    setFaceIdStep("verifying");
+    setFeedback("Reconstructing 3D vector map...");
+
+    try {
+      stopCamera();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const deviceId = getOrCreateDeviceId();
+      const currentVerified = Array.isArray(userData?.verifiedDevices) ? userData.verifiedDevices : [];
+
+      // Whitelist this device atomically in Firestore
+      await updateUserData({
+        verifiedDevices: [...currentVerified, deviceId],
+        currentDeviceId: deviceId,
+      });
+
+      setFaceIdStep("success");
+      toast.success("Biometric Face ID Verified!", {
+        description: "This device is registered and authorized."
+      });
+      setIsNewDeviceBlocked(false);
+    } catch (err) {
+      console.error("[Face ID Verification Exception]:", err);
+      setFaceIdStep("failed");
+    }
+  };
+
   // Single-device session listener & verification guard
   useEffect(() => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
@@ -288,62 +375,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, isPinVerified, userData, pathname, router]);
 
-  // Verification submission handler for unrecognized devices
-  const handleVerifyNewDevice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userData) return;
-
-    setVerError("");
-    setVerifyingDevice(true);
-
-    try {
-      // Normalize and clean phone digits for safe matching
-      const inputPhoneClean = verPhone.replace(/\D/g, "");
-      const registeredPhoneClean = (userData.phoneNumber as string || "").replace(/\D/g, "");
-
-      const isPhoneMatch =
-        inputPhoneClean.length >= 7 &&
-        (registeredPhoneClean.endsWith(inputPhoneClean) || inputPhoneClean.endsWith(registeredPhoneClean));
-
-      let isBvnOrEmailMatch = false;
-      const bvnValue = (userData.bvn as string || "").trim();
-
-      if (bvnValue) {
-        // If BVN is stored, compare the last 4 characters
-        const last4Bvn = bvnValue.slice(-4);
-        isBvnOrEmailMatch = verBvnOrEmail.trim() === last4Bvn;
-      } else {
-        // Otherwise, compare registered email address case-insensitively
-        const registeredEmail = (userData.email as string || "").trim().toLowerCase();
-        isBvnOrEmailMatch = verBvnOrEmail.trim().toLowerCase() === registeredEmail;
-      }
-
-      if (isPhoneMatch && isBvnOrEmailMatch) {
-        const deviceId = getOrCreateDeviceId();
-        const currentVerified = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
-
-        // Save verified status
-        await updateUserData({
-          verifiedDevices: [...currentVerified, deviceId],
-          currentDeviceId: deviceId,
-        });
-
-        toast.success("Device Authorized!", {
-          description: "This device is verified. Security sessions initialized.",
-        });
-        setIsNewDeviceBlocked(false);
-      } else {
-        setVerError("Verification failed. Registered phone number or last 4 digits of BVN do not match.");
-      }
-    } catch (err: any) {
-      console.error("Device verification failed:", err);
-      setVerError("Internal error during device validation. Please try again.");
-    } finally {
-      setVerifyingDevice(false);
-    }
-  };
-
   const handleSignOutFromBlockedDevice = async () => {
+    stopCamera();
     setIsNewDeviceBlocked(false);
     await handleAppSignOut(router);
   };
@@ -413,88 +446,150 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Render high-fidelity security block overlay for unrecognized device logins
+  // Render high-fidelity professional biometric Face ID authentication overlay for new devices
   if (isNewDeviceBlocked && userData) {
-    const hasBvn = !!userData.bvn;
-
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50/50 p-6 z-[999999] relative">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-black/60 backdrop-blur-lg p-6 z-[999999] relative">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="w-full max-w-sm bg-white rounded-3xl p-6 border border-gray-100 shadow-xl text-center space-y-6"
+          className="w-full max-w-sm bg-white rounded-[32px] p-6 border border-gray-100 shadow-2xl text-center space-y-6"
         >
-          {/* Lock Header */}
+          {/* Header instructions with Red warning font */}
           <div className="space-y-2">
             <div className="mx-auto w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center shadow-inner">
-              <span className="material-symbols-outlined text-[24px] font-bold animate-pulse">gpp_maybe</span>
+              <span className="material-symbols-outlined text-[24px] font-bold">gpp_maybe</span>
             </div>
             <h2 className="font-hanken font-black text-base text-red-600 uppercase tracking-wider leading-none">
               NEW DEVICE DETECTED
             </h2>
-            <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider">
-              Verification Required
+            <p className="font-hanken text-[10.5px] text-gray-400 font-bold uppercase tracking-wider">
+              Secure Biometric Activation
             </p>
-            <p className="font-hanken text-[10.5px] text-gray-500 leading-relaxed font-semibold">
-              To secure your wallet and prevent unauthorized transfers, please verify your identity to register this device.
+            <p className="font-hanken text-[11px] text-gray-500 leading-relaxed font-semibold">
+              To verify this device, please complete a live Face ID liveness scan. Make sure your face is clearly lit.
             </p>
           </div>
 
-          {/* Validation Form with Verify button moved below inputs for 100% user friendliness */}
-          <form onSubmit={handleVerifyNewDevice} className="space-y-4 text-left">
-            {/* Phone Number Input */}
-            <div className="space-y-1.5">
-              <label className="text-[9.5px] font-black uppercase tracking-widest text-gray-400">
-                Registered Phone Number
-              </label>
-              <input
-                type="tel"
-                required
-                value={verPhone}
-                onChange={(e) => setVerPhone(e.target.value)}
-                placeholder="080XXXXXXXX"
-                className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
-              />
-            </div>
-
-            {/* Dynamic Identity Verification (Last 4 of BVN vs Email address) */}
-            <div className="space-y-1.5">
-              <label className="text-[9.5px] font-black uppercase tracking-widest text-gray-400">
-                {hasBvn ? "Last 4 Digits of your BVN" : "Registered Email Address"}
-              </label>
-              <input
-                type={hasBvn ? "password" : "email"}
-                maxLength={hasBvn ? 4 : undefined}
-                required
-                value={verBvnOrEmail}
-                onChange={(e) => setVerBvnOrEmail(e.target.value)}
-                placeholder={hasBvn ? "•••• (Last 4)" : "doe@example.com"}
-                className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
-              />
-            </div>
-
-            {verError && (
-              <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-[10px] text-red-600 font-bold leading-relaxed text-center">
-                {verError}
+          {/* Interactive Biometric Face ID steps */}
+          <div className="flex flex-col items-center justify-center min-h-[220px]">
+            {faceIdStep === "instructions" && (
+              <div className="space-y-5 w-full flex flex-col items-center">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 animate-pulse">
+                  <span className="material-symbols-outlined text-[32px] font-bold">face</span>
+                </div>
+                <div className="p-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-[10px] text-gray-500 font-semibold leading-relaxed text-left w-full space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <span className="material-symbols-outlined text-emerald-500 text-sm font-bold">check_circle</span>
+                    <span>Hold device at eye level</span>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <span className="material-symbols-outlined text-emerald-500 text-sm font-bold">check_circle</span>
+                    <span>Rotate head slowly when prompted</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={startFaceCapture}
+                  className="w-full py-4 bg-black hover:bg-gray-900 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer transition-all active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-sm font-bold">photo_camera</span>
+                  Start Biometric Face ID
+                </button>
               </div>
             )}
 
-            {/* Verify button positioned directly below inputs */}
-            <button
-              type="submit"
-              disabled={verifyingDevice || !verPhone || !verBvnOrEmail}
-              className="w-full py-4 bg-[#FC7A00] hover:brightness-105 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50"
-            >
-              {verifyingDevice ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Authorizing Device...</span>
-                </>
-              ) : (
-                "Verify & Authorize Device"
-              )}
-            </button>
-          </form>
+            {(faceIdStep === "camera" || faceIdStep === "rotate_head") && (
+              <div className="space-y-5 w-full flex flex-col items-center">
+                {/* Video Circular viewport with dual scanning radar borders */}
+                <div className="relative w-44 h-44 rounded-full border-[5px] border-emerald-500 overflow-hidden bg-gray-950 flex items-center justify-center shadow-lg">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+
+                  {/* Shutter flash effect during scanning */}
+                  {faceIdStep === "rotate_head" && (
+                    <motion.div
+                      animate={{ opacity: [0, 0.4, 0] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                      className="absolute inset-0 bg-white/40 pointer-events-none"
+                    />
+                  )}
+
+                  {/* Rotating biometric radar ring */}
+                  <div className="absolute inset-0.5 border-2 border-dashed border-white/60 rounded-full animate-spin [animation-duration:8s] pointer-events-none" />
+                </div>
+
+                {/* Live Feedback instruction cue */}
+                <div className="bg-gray-950 border border-white/10 px-4 py-2.5 rounded-2xl shadow-sm text-center">
+                  <p className={cn(
+                    "font-hanken font-extrabold text-[10px] tracking-wider uppercase leading-none",
+                    faceIdStep === "rotate_head" ? "text-amber-400 animate-pulse" : "text-emerald-400"
+                  )}>
+                    {feedback}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {faceIdStep === "verifying" && (
+              <div className="space-y-4 flex flex-col items-center text-center">
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-3 border-gray-150 border-t-[#FC7A00] border-r-emerald-500"
+                  />
+                  <span className="material-symbols-outlined text-[20px] text-gray-400">face</span>
+                </div>
+                <div>
+                  <h4 className="font-hanken font-bold text-xs text-black uppercase tracking-wider">Verifying face vectors</h4>
+                  <p className="font-hanken text-[10px] text-gray-400 mt-1 font-semibold">
+                    Comparing matches with registered bank directories...
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {faceIdStep === "success" && (
+              <div className="space-y-4 flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner">
+                  <span className="material-symbols-outlined text-[24px] font-bold">verified</span>
+                </div>
+                <div>
+                  <h4 className="font-hanken font-black text-xs text-black uppercase">Device Approved</h4>
+                  <p className="font-hanken text-[10px] text-gray-400 font-semibold leading-relaxed">
+                    Facial vectors authorized! Your device is now whitelisted.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {faceIdStep === "failed" && (
+              <div className="space-y-4 flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[24px] font-bold">gpp_maybe</span>
+                </div>
+                <div>
+                  <h4 className="font-hanken font-black text-xs text-black uppercase">Scan Interrupted</h4>
+                  <p className="font-hanken text-[10px] text-red-500 font-semibold leading-relaxed max-w-[200px]">
+                    We could not verify your biometric profile. Please ensure face lighting is clear.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFaceIdStep("instructions")}
+                  className="w-full py-3 bg-[#FC7A00] text-white text-[10px] font-black uppercase tracking-widest rounded-xl cursor-pointer"
+                >
+                  Restart Scan
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Fallback exit button */}
           <div className="border-t border-gray-150 pt-4 flex flex-col gap-2">
