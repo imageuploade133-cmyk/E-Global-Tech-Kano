@@ -511,101 +511,106 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Render high-fidelity professional BVN/NIN/Email authentication overlay for new devices
+  // Render high-fidelity professional full-screen BVN/NIN/Email authentication page for new devices
   if (isNewDeviceBlocked && userData) {
     const bvnValue = (userData.bvn as string || "").trim();
     const ninValue = (userData.nin as string || "").trim();
     const hasKyc = !!(bvnValue || ninValue);
 
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-black/60 backdrop-blur-lg p-6 z-[999999] relative">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="w-full max-w-sm bg-white rounded-[32px] p-6 border border-gray-100 shadow-2xl text-center space-y-6"
-        >
-          {/* Header instructions with Red warning font */}
-          <div className="space-y-2">
-            <div className="mx-auto w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center shadow-inner">
-              <span className="material-symbols-outlined text-[24px] font-bold">gpp_maybe</span>
-            </div>
-            <h2 className="font-hanken font-black text-base text-red-600 uppercase tracking-wider leading-none">
+      <div className="flex min-h-screen flex-col bg-white p-8 items-center justify-between z-[999999] fixed inset-0 overflow-y-auto">
+        {/* Brand Header */}
+        <div className="w-full flex flex-col items-center text-center mt-6 shrink-0">
+          <div className="relative w-16 h-16 mb-4">
+            <Image
+              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+              alt="E-Tech Logo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+          <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
+
+          <div className="space-y-1 mt-3">
+            <h2 className="font-hanken font-black text-sm text-red-600 uppercase tracking-wider leading-none">
               NEW DEVICE DETECTED
             </h2>
-            <p className="font-hanken text-[10.5px] text-gray-400 font-bold uppercase tracking-wider">
-              Verification Required
+            <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-none mt-1">
+              Security Verification Required
             </p>
-            <p className="font-hanken text-[11px] text-gray-500 leading-relaxed font-semibold">
-              To secure your wallet and enable transactions, please verify your identity to register this device.
+            <p className="font-hanken text-xs text-gray-500 max-w-xs mt-2.5 leading-relaxed font-semibold px-4">
+              To secure your wallet and complete transactions, please authorize this device by confirming your registration credentials.
             </p>
           </div>
+        </div>
 
-          <form onSubmit={handleVerifyNewDevice} className="space-y-4 text-left">
-            {/* Phone Number Input */}
-            <div className="space-y-1.5">
-              <label className="text-[9.5px] font-black uppercase tracking-widest text-gray-400">
-                Registered Phone Number
-              </label>
-              <input
-                type="tel"
-                required
-                value={verPhone}
-                onChange={(e) => setVerPhone(e.target.value)}
-                placeholder="080XXXXXXXX"
-                className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
-              />
+        {/* Dynamic Verification Form */}
+        <form onSubmit={handleVerifyNewDevice} className="w-full max-w-xs space-y-4 my-10 flex-grow flex flex-col justify-center text-left">
+          {/* Phone Number Input */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Registered Phone Number
+            </label>
+            <input
+              type="tel"
+              required
+              value={verPhone}
+              onChange={(e) => setVerPhone(e.target.value)}
+              placeholder="080XXXXXXXX"
+              className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
+            />
+          </div>
+
+          {/* Dynamic Identity Verification (Last 4 of BVN/NIN vs Email address) */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              {hasKyc ? "Last 4 Digits of your BVN or NIN" : "Registered Email Address"}
+            </label>
+            <input
+              type={hasKyc ? "password" : "email"}
+              maxLength={hasKyc ? 4 : undefined}
+              required
+              value={verBvnOrNinOrEmail}
+              onChange={(e) => setVerBvnOrNinOrEmail(e.target.value)}
+              placeholder={hasKyc ? "•••• (Last 4)" : "doe@example.com"}
+              className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
+            />
+          </div>
+
+          {verError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-[10px] text-red-600 font-bold leading-relaxed text-center">
+              {verError}
             </div>
+          )}
 
-            {/* Dynamic Identity Verification (Last 4 of BVN/NIN vs Email address) */}
-            <div className="space-y-1.5">
-              <label className="text-[9.5px] font-black uppercase tracking-widest text-gray-400">
-                {hasKyc ? "Last 4 Digits of your BVN or NIN" : "Registered Email Address"}
-              </label>
-              <input
-                type={hasKyc ? "password" : "email"}
-                maxLength={hasKyc ? 4 : undefined}
-                required
-                value={verBvnOrNinOrEmail}
-                onChange={(e) => setVerBvnOrNinOrEmail(e.target.value)}
-                placeholder={hasKyc ? "•••• (Last 4)" : "doe@example.com"}
-                className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
-              />
-            </div>
-
-            {verError && (
-              <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-[10px] text-red-600 font-bold leading-relaxed text-center">
-                {verError}
-              </div>
+          {/* Verify button positioned directly below inputs */}
+          <button
+            type="submit"
+            disabled={verifyingDevice || !verPhone || !verBvnOrNinOrEmail}
+            className="w-full py-4 bg-[#FC7A00] hover:brightness-105 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50"
+          >
+            {verifyingDevice ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Authorizing Device...</span>
+              </>
+            ) : (
+              "Verify & Authorize Device"
             )}
+          </button>
+        </form>
 
-            {/* Verify button positioned directly below inputs */}
-            <button
-              type="submit"
-              disabled={verifyingDevice || !verPhone || !verBvnOrNinOrEmail}
-              className="w-full py-4 bg-[#FC7A00] hover:brightness-105 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50"
-            >
-              {verifyingDevice ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Authorizing Device...</span>
-                </>
-              ) : (
-                "Verify & Authorize Device"
-              )}
-            </button>
-          </form>
-
-          {/* Fallback exit button */}
-          <div className="border-t border-gray-150 pt-4 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleSignOutFromBlockedDevice}
-              className="text-[10px] font-black text-gray-400 uppercase tracking-wider hover:text-black py-1 cursor-pointer transition-colors"
-            >
-              Sign Out from Account
-            </button>
-          </div>
-        </motion.div>
+        {/* Fallback exit button with Sign Out in bold RED color at bottom */}
+        <div className="w-full text-center border-t border-gray-150 pt-4 pb-4 shrink-0 max-w-xs">
+          <button
+            type="button"
+            onClick={handleSignOutFromBlockedDevice}
+            className="text-[11px] font-extrabold text-red-600 uppercase tracking-widest hover:text-red-700 hover:underline py-2.5 cursor-pointer transition-colors"
+          >
+            Sign Out from Account
+          </button>
+        </div>
       </div>
     );
   }
