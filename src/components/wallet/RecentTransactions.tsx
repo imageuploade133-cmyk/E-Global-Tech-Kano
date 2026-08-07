@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { TransactionReceipt, Transaction } from "./TransactionReceipt";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/AuthContext";
+import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
 
 const RECENT_ITEMS: Transaction[] = [
   {
@@ -39,9 +42,75 @@ interface RecentTransactionsProps {
   isLoading?: boolean;
 }
 
-export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoading }) => {
+export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoading: propIsLoading }) => {
+  const { user } = useAuth();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const hasPushedState = React.useRef(false);
+
+  // Fetch live user transactions, filtering for DEPOSIT and TRANSFER only (2 items)
+  useEffect(() => {
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (isMock || !user) {
+      setTransactions(RECENT_ITEMS);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    // Fetch top 30 transactions to ensure we have enough to find 2 deposits/transfers
+    const q = query(
+      collection(db, "transactions"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(30)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: Transaction[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            reference: data.reference || docSnap.id,
+            type: data.type || "DEPOSIT",
+            amount: Number(data.amount) || 0,
+            currency: data.currency || "NGN",
+            description: data.description || "",
+            recipientName: data.recipientName || "",
+            bankName: data.bankName || "",
+            status: data.status || "SUCCESS",
+            date: data.date || "",
+            time: data.time || "",
+            fee: Number(data.fee) || 0,
+          });
+        });
+
+        // Filter for Deposit and Transfer transactions, then limit to exactly 2
+        const filtered = list.filter(
+          (tx) => tx.type === "DEPOSIT" || tx.type === "TRANSFER" || tx.type === "CASHOUT"
+        ).slice(0, 2);
+
+        // Fallback to mock data if there are no real transactions yet
+        if (filtered.length === 0) {
+          setTransactions(RECENT_ITEMS);
+        } else {
+          setTransactions(filtered);
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error("[RecentTransactions Listener Error]:", error);
+        setTransactions(RECENT_ITEMS);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
 
   // Sync state with browser back history for swipe-to-dismiss behavior
   React.useEffect(() => {
@@ -88,7 +157,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
 
       {/* Glossy Tri-Gradient Transaction Cards */}
       <div className="space-y-3">
-        {isLoading ? (
+        {(propIsLoading || loading) ? (
           // Shimmer placeholders for transactions - exact layout matching live rows
           [1, 2].map((i) => (
             <div
@@ -110,8 +179,8 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
             </div>
           ))
         ) : (
-          RECENT_ITEMS.map((tx) => {
-            const isDeposit = tx.type === "DEPOSIT";
+          transactions.map((tx) => {
+            const isDeposit = tx.type === "DEPOSIT" || tx.type === "CASHOUT";
 
             return (
               <motion.button
