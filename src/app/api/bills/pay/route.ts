@@ -422,6 +422,10 @@ export async function POST(req: Request) {
       await adminDb.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
         if (userDoc.exists) {
+          // Update the original transaction document to FAILED
+          const origTxRef = adminDb.collection("transactions").doc(`tx-${reference}`);
+          transaction.update(origTxRef, { status: "FAILED" });
+
           await WalletService.creditWallet(transaction, {
             userId: uid,
             amount: numAmount,

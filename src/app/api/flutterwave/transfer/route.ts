@@ -325,6 +325,10 @@ export async function POST(req: Request) {
         const userDoc = await rollbackTx.get(userRef);
         const walletDoc = await rollbackTx.get(walletRef);
         if (userDoc.exists) {
+          // Update the original transaction document to FAILED
+          const origTxRef = adminDb.collection("transactions").doc(`tx-${trfReference}`);
+          rollbackTx.update(origTxRef, { status: "FAILED" });
+
           const uData = userDoc.data() || {};
           const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
           await WalletService.creditWallet(rollbackTx, {

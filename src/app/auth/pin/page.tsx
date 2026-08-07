@@ -386,7 +386,7 @@ export default function PinPage() {
             className="object-contain"
           />
         </div>
-        <h1 className="font-hanken font-bold text-lg min-[375px]:text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
+        <h1 className="font-hanken font-bold text-lg min-[375px]:text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
         <p className="text-gray-500 font-hanken tracking-widest uppercase text-[10px] min-[375px]:text-xs">Enter Access PIN</p>
       </div>
 
