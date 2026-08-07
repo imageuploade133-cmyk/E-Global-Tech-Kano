@@ -13,6 +13,7 @@ export interface AppConfig {
   globalNgnBalance: number;
   globalUsdBalance: number;
   imgbbApiKey: string;
+  appVersion?: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -24,6 +25,7 @@ const DEFAULT_CONFIG: AppConfig = {
   globalNgnBalance: 312500450.75,
   globalUsdBalance: 148900.50,
   imgbbApiKey: "0d1a390cb385b632d952db08a3479005",
+  appVersion: "1.0.0",
 };
 
 interface ConfigContextProps {
