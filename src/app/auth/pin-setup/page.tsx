@@ -121,7 +121,7 @@ export default function PinSetupPage() {
             className="object-contain"
           />
         </div>
-        <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
+        <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
         <p className={cn(
           "font-hanken tracking-widest uppercase text-xs font-bold",
           step === 1 ? "text-red-500 font-extrabold animate-pulse" : "text-gray-500"

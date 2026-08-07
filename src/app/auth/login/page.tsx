@@ -74,7 +74,7 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <h1 className="font-hanken font-bold text-2xl tracking-tight text-black">E-TECH GLOBAL HUB</h1>
+          <h1 className="font-hanken font-bold text-2xl tracking-tight text-black">E-Global Pay</h1>
           <p className="text-gray-500 font-hanken mt-1 text-xs font-semibold">Welcome back to your secure hub</p>
         </div>
 

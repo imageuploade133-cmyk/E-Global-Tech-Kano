@@ -21,7 +21,7 @@ const hankenGrotesk = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "E-Tech Global Hub | Secure Digital Wallet",
+  title: "E-Global Pay | Secure Digital Wallet",
   description: "Next-generation financial technology and secure digital banking.",
   icons: {
     icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",

@@ -530,7 +530,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               priority
             />
           </div>
-          <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-TECH GLOBAL HUB</h1>
+          <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
 
           <div className="space-y-1 mt-3">
             <h2 className="font-hanken font-black text-sm text-red-600 uppercase tracking-wider leading-none">

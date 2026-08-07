@@ -132,6 +132,10 @@ export class CardService {
           const walletDoc = await rollbackTx.get(walletRef);
           const currentBal = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
 
+          // Update the original transaction document to FAILED
+          const origTxRef = adminDb.collection("transactions").doc(`tx-${txRef}`);
+          rollbackTx.update(origTxRef, { status: "FAILED" });
+
           await WalletService.creditWallet(rollbackTx, {
             userId,
             amount: totalDeduction,
@@ -324,6 +328,10 @@ export class CardService {
           const userDoc = await rollbackTx.get(userRef);
           const walletDoc = await rollbackTx.get(walletRef);
           const currentBal = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
+          // Update the original transaction document to FAILED
+          const origTxRef = adminDb.collection("transactions").doc(`tx-${txRef}`);
+          rollbackTx.update(origTxRef, { status: "FAILED" });
 
           await WalletService.creditWallet(rollbackTx, {
             userId,
