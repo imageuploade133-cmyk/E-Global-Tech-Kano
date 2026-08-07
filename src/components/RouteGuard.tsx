@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { cn } from "@/lib/utils";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // Persistently identify the device using localStorage
 const getOrCreateDeviceId = (): string => {
@@ -54,7 +56,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       // Brand new user: record version silently without showing any update screen
       localStorage.setItem("cached_app_version", serverVersion);
     } else if (cachedVersion !== serverVersion) {
-      // Existing user: show beautiful full-screen update loader and clear localStorage
+      // Existing user: show beautiful full-screen update loader and clear localStorage & service caches
       setIsUpdating(true);
       setUpdateProgress(0);
 
@@ -62,13 +64,24 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         setUpdateProgress((prev) => {
           if (prev >= 100) {
             clearInterval(interval);
-            // Progress completed: clear localStorage, save new version, force reload
+
+            // Programmatically purge all Cache Storage and Service Worker cached files instantly
+            if ("caches" in window) {
+              caches.keys().then((keys) => {
+                Promise.all(keys.map((key) => caches.delete(key)));
+              });
+            }
+
+            // Clear localStorage & sessionStorage completely
             localStorage.clear();
+            sessionStorage.clear();
+
+            // Set new app version cache and force reload
             localStorage.setItem("cached_app_version", serverVersion);
             window.location.reload();
             return 100;
           }
-          return prev + 4; // increment towards 100 over ~3.75s
+          return prev + 5; // increment towards 100 over ~3s
         });
       }, 150);
 
@@ -273,6 +286,16 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         toast.error("Session Expired", {
           description: "Your account was logged in on another device. Logging out...",
         });
+
+        // Clear all device caches instantly upon multi-device logout trigger
+        if ("caches" in window) {
+          caches.keys().then((keys) => {
+            Promise.all(keys.map((key) => caches.delete(key)));
+          });
+        }
+        localStorage.clear();
+        sessionStorage.clear();
+
         handleAppSignOut(router);
         return;
       }
@@ -294,6 +317,58 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       setIsNewDeviceBlocked(true);
     }
   }, [user, loading, userData, pathname, router, updateUserData]);
+
+  // Instant verification check: triggered when user focuses the tab or tab becomes visible again
+  useEffect(() => {
+    if (typeof window === "undefined" || !user || !userData) return;
+
+    const performInstantSessionCheck = async () => {
+      try {
+        const deviceId = getOrCreateDeviceId();
+        const userDocRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userDocRef);
+
+        if (userSnap.exists()) {
+          const freshData = userSnap.data();
+          const verifiedList = Array.isArray(freshData.verifiedDevices) ? freshData.verifiedDevices : [];
+          const isVerifiedOnThisDevice = freshData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
+
+          if (isVerifiedOnThisDevice && freshData.currentDeviceId && freshData.currentDeviceId !== deviceId) {
+            console.warn("[Instant Session Check] Active session has been taken by another device. Logging out.");
+            toast.error("Session Terminated", {
+              description: "You have logged in from another device. Clearing cache and logging out..."
+            });
+
+            // Instant clear caches and logout
+            if ("caches" in window) {
+              caches.keys().then((keys) => {
+                Promise.all(keys.map((key) => caches.delete(key)));
+              });
+            }
+            localStorage.clear();
+            sessionStorage.clear();
+
+            handleAppSignOut(router);
+          }
+        }
+      } catch (err) {
+        console.warn("[Instant Session Check Failed]:", err);
+      }
+    };
+
+    // Attach listeners on focus and visibilitychange to check instantly on any user return
+    const handleFocusCheck = () => {
+      performInstantSessionCheck();
+    };
+
+    window.addEventListener("focus", handleFocusCheck);
+    document.addEventListener("visibilitychange", handleFocusCheck);
+
+    return () => {
+      window.removeEventListener("focus", handleFocusCheck);
+      document.removeEventListener("visibilitychange", handleFocusCheck);
+    };
+  }, [user, userData, router]);
 
   // Route protection rules for standard login status
   useEffect(() => {
