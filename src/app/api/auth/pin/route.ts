@@ -176,9 +176,30 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "No registered phone number found on this profile." }, { status: 400 });
       }
 
+      // Format potential phone number variations to search for the OTP reset session robustly
+      const cleanPhoneDigits = fullPhone.trim().replace(/\D/g, "");
+      let cleanNumNoZero = cleanPhoneDigits;
+      if (cleanPhoneDigits.startsWith("234") && cleanPhoneDigits.length > 3) {
+        const sub = cleanPhoneDigits.slice(3);
+        cleanNumNoZero = "234" + (sub.startsWith("0") ? sub.slice(1) : sub);
+      } else if (cleanPhoneDigits.startsWith("227") && cleanPhoneDigits.length > 3) {
+        const sub = cleanPhoneDigits.slice(3);
+        cleanNumNoZero = "227" + (sub.startsWith("0") ? sub.slice(1) : sub);
+      }
+
+      const possiblePhones = Array.from(new Set([
+        fullPhone.trim(),
+        cleanPhoneDigits,
+        cleanNumNoZero,
+        `+${cleanPhoneDigits}`,
+        `+${cleanNumNoZero}`
+      ])).filter(Boolean);
+
+      console.log("[PIN Reset API] Searching for verified OTP session with possible phone formats:", possiblePhones);
+
       // Secure OTP validation check directly in Firestore
       const otpQuery = await adminDb.collection("otp_sessions")
-        .where("phoneNumber", "==", fullPhone)
+        .where("phoneNumber", "in", possiblePhones)
         .where("type", "==", "pin_reset")
         .where("verified", "==", true)
         .get();

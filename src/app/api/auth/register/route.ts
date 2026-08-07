@@ -51,10 +51,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid phone number length." }, { status: 400 });
     }
 
-    // Active database lookup to prevent duplicate linking of Phone Numbers
-    const fullPhone = `${phonePrefix}${phoneNumber.trim()}`;
+    // Active database lookup to prevent duplicate linking of Phone Numbers (checking all likely formats)
+    const cleanPhone = `${phonePrefix}${phoneNumber.trim()}`;
+    let normPhone = cleanPhone;
+    if (normPhone.startsWith("0")) {
+      normPhone = "+234" + normPhone.slice(1);
+    } else if (!normPhone.startsWith("+") && normPhone.length === 10) {
+      normPhone = "+234" + normPhone;
+    }
+
+    let cleanPhoneNoZero = cleanPhone;
+    if (cleanPhone.startsWith("+2340")) {
+      cleanPhoneNoZero = "+234" + cleanPhone.slice(5);
+    } else if (cleanPhone.startsWith("+2270")) {
+      cleanPhoneNoZero = "+227" + cleanPhone.slice(5);
+    }
+
+    const possibleDuplicatePhones = Array.from(new Set([
+      cleanPhone,
+      normPhone,
+      cleanPhoneNoZero,
+      phoneNumber.trim(),
+    ])).filter(Boolean);
+
     const phoneQuery = await adminDb.collection("users")
-      .where("phoneNumber", "==", fullPhone)
+      .where("phoneNumber", "in", possibleDuplicatePhones)
       .limit(1)
       .get();
 
@@ -65,8 +86,25 @@ export async function POST(req: Request) {
     }
 
     // Active check on the Firestore otp_sessions collection for verified WhatsApp OTP state
+    // Generate all potential phone number format variations to match the verified session robustly
+    const cleanPrefix = phonePrefix.trim().replace(/\D/g, "");
+    const cleanNum = phoneNumber.trim().replace(/\D/g, "");
+    const cleanNumNoZero = cleanNum.startsWith("0") ? cleanNum.slice(1) : cleanNum;
+
+    const possiblePhones = Array.from(new Set([
+      `${cleanPrefix}${cleanNum}`,
+      `${cleanPrefix}${cleanNumNoZero}`,
+      `+${cleanPrefix}${cleanNum}`,
+      `+${cleanPrefix}${cleanNumNoZero}`,
+      `${phonePrefix}${phoneNumber.trim()}`,
+      cleanNum,
+      cleanNumNoZero
+    ])).filter(Boolean);
+
+    console.log("[Register API] Checking verified WhatsApp OTP with potential formats:", possiblePhones);
+
     const otpQuery = await adminDb.collection("otp_sessions")
-      .where("phoneNumber", "==", fullPhone)
+      .where("phoneNumber", "in", possiblePhones)
       .where("type", "==", "signup")
       .where("verified", "==", true)
       .get();
