@@ -369,6 +369,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   const [recents, setRecents] = useState<SavedRecipientItem[]>([]);
   const [beneficiaries, setBeneficiaries] = useState<SavedRecipientItem[]>([]);
+  const [recentsLoading, setRecentsLoading] = useState(false);
   const [recentsLimit, setRecentsLimit] = useState(5);
   const [beneficiariesLimit, setBeneficiariesLimit] = useState(5);
   const [listTab, setListTab] = useState<"recents" | "beneficiaries">("recents");
@@ -394,6 +395,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   const loadRecentsAndBeneficiaries = async () => {
     if (!user) return;
+    setRecentsLoading(true);
     try {
       // Fetch Recents
       const recentsQuery = query(
@@ -424,6 +426,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setBeneficiaries(benList);
     } catch (err) {
       console.error("Failed to load recents and beneficiaries:", err);
+    } finally {
+      setRecentsLoading(false);
     }
   };
 
@@ -2132,7 +2136,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         >
           <span className="material-symbols-outlined text-white text-[14px] min-[360px]:text-[16px] font-bold block leading-none group-hover:scale-110 transition-transform duration-300 flex-shrink-0">send</span>
           <span className="font-label-sm text-[9px] min-[360px]:text-[11px] text-white tracking-wide uppercase font-bold truncate">
-            Withdraw
+            Transfer
           </span>
         </motion.button>
       </div>
@@ -2903,7 +2907,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                           {listTab === "recents" ? (
                             <div className="space-y-2">
-                              {recents.length === 0 ? (
+                              {recentsLoading ? (
+                                <div className="space-y-1.5">
+                                  {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="w-full p-2.5 bg-gray-50/50 border border-gray-100 rounded-xl flex items-center justify-between animate-pulse">
+                                      <div className="flex-grow space-y-1.5 min-w-0">
+                                        <div className="h-3 bg-gray-200 rounded w-1/3" />
+                                        <div className="h-2 bg-gray-150 rounded w-1/2" />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : recents.length === 0 ? (
                                 <p className="text-[10px] text-gray-400 font-semibold text-center py-4">No recent recipients found.</p>
                               ) : (
                                 <>
@@ -2937,7 +2952,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             </div>
                           ) : (
                             <div className="space-y-2">
-                              {beneficiaries.length === 0 ? (
+                              {recentsLoading ? (
+                                <div className="space-y-1.5">
+                                  {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="w-full p-2.5 bg-gray-50/50 border border-gray-100 rounded-xl flex items-center justify-between animate-pulse">
+                                      <div className="flex-grow space-y-1.5 min-w-0">
+                                        <div className="h-3 bg-gray-200 rounded w-1/3" />
+                                        <div className="h-2 bg-gray-150 rounded w-1/2" />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : beneficiaries.length === 0 ? (
                                 <p className="text-[10px] text-gray-400 font-semibold text-center py-4">No saved beneficiaries found.</p>
                               ) : (
                                 <>

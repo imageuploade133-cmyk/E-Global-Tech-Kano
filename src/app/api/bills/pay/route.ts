@@ -179,7 +179,7 @@ export async function POST(req: Request) {
 
       const isBonus = walletType === "BONUS";
       const walletBalance = isBonus
-        ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 1000.00)
+        ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 0.00)
         : (wData.balance !== undefined ? Number(wData.balance) : 0);
 
       const userData = userDoc.data() || {};

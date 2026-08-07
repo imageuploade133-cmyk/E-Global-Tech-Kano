@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 import { TransactionReceipt, Transaction } from "@/components/wallet/TransactionReceipt";
+import { db } from "@/lib/firebase";
+import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 
 const HISTORICAL_TRANSACTIONS: Transaction[] = [
   {
@@ -116,6 +118,13 @@ export default function HistoryPage() {
   const [selectedCurrencyFilter, setSelectedCurrencyFilter] = useState<"ALL" | "NGN" | "USD">("ALL");
   const hasPushedState = React.useRef(false);
 
+  // Pagination states for production-grade low read operations
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastVisibleDoc, setLastVisibleDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+
   // Sync state with browser back history (device physical/swipe back button support)
   React.useEffect(() => {
     if (selectedTx) {
@@ -139,6 +148,116 @@ export default function HistoryPage() {
     }
   }, [selectedTx]);
 
+  // Initial secure paginated loading of transactions
+  useEffect(() => {
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (isMock || !user) {
+      setTransactions(HISTORICAL_TRANSACTIONS);
+      setLoading(false);
+      setHasMore(false);
+      return;
+    }
+
+    const fetchInitialTransactions = async () => {
+      try {
+        setLoading(true);
+        const q = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(15)
+        );
+
+        const snap = await getDocs(q);
+        const list: Transaction[] = [];
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            id: docSnap.id,
+            reference: data.reference || docSnap.id,
+            type: data.type || "DEPOSIT",
+            amount: Number(data.amount) || 0,
+            currency: data.currency || "NGN",
+            description: data.description || "",
+            recipientName: data.recipientName || "",
+            bankName: data.bankName || "",
+            status: data.status || "SUCCESS",
+            date: data.date || "",
+            time: data.time || "",
+            fee: Number(data.fee) || 0,
+          });
+        });
+
+        setTransactions(list);
+        if (snap.docs.length < 15) {
+          setHasMore(false);
+        } else {
+          setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
+          setHasMore(true);
+        }
+      } catch (err) {
+        console.error("[HistoryPage Initial Load Exception]:", err);
+        // Fallback to mock gracefully on query error (e.g. index build in progress)
+        setTransactions(HISTORICAL_TRANSACTIONS);
+        setHasMore(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInitialTransactions();
+  }, [user]);
+
+  // Load more function with query cursors to save read budget
+  const handleLoadMore = async () => {
+    if (!user || loadingMore || !hasMore || !lastVisibleDoc) return;
+
+    try {
+      setLoadingMore(true);
+      const q = query(
+        collection(db, "transactions"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastVisibleDoc),
+        limit(15)
+      );
+
+      const snap = await getDocs(q);
+      const list: Transaction[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          reference: data.reference || docSnap.id,
+          type: data.type || "DEPOSIT",
+          amount: Number(data.amount) || 0,
+          currency: data.currency || "NGN",
+          description: data.description || "",
+          recipientName: data.recipientName || "",
+          bankName: data.bankName || "",
+          status: data.status || "SUCCESS",
+          date: data.date || "",
+          time: data.time || "",
+          fee: Number(data.fee) || 0,
+        });
+      });
+
+      setTransactions((prev) => [...prev, ...list]);
+      if (snap.docs.length < 15) {
+        setHasMore(false);
+        setLastVisibleDoc(null);
+      } else {
+        setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(true);
+      }
+    } catch (err) {
+      console.error("[HistoryPage Load More Exception]:", err);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
@@ -146,13 +265,13 @@ export default function HistoryPage() {
   const getCategoryFromTx = (tx: Transaction) => {
     if (tx.type === "DEPOSIT" || tx.type === "CASHOUT") return "deposit";
     if (tx.type === "TRANSFER") return "transfer";
-    if (tx.type === "BILL_PAYMENT") return "bills";
+    if (tx.type === "BILL_PAYMENT" || tx.type === "AIRTIME" || tx.type === "DATA" || tx.type === "BILLS") return "bills";
     if (tx.type === "CARD_FUND") return "card";
     return "all";
   };
 
   // Filter logic based on category buttons, currency, and search key characters
-  const filteredTransactions = HISTORICAL_TRANSACTIONS.filter((tx) => {
+  const filteredTransactions = transactions.filter((tx) => {
     const txCategory = getCategoryFromTx(tx);
     const matchesCategory = activeCategory === "all" || txCategory === activeCategory;
     const matchesCurrency = selectedCurrencyFilter === "ALL" || (tx.currency || "NGN") === selectedCurrencyFilter;
@@ -259,74 +378,117 @@ export default function HistoryPage() {
 
           {/* Transactions List */}
           <div className="space-y-2.5">
-            {filteredTransactions.length === 0 ? (
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-full h-[72px] bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between animate-pulse"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-100" />
+                      <div className="space-y-2">
+                        <div className="h-3 bg-gray-200 rounded w-28" />
+                        <div className="h-2 bg-gray-100 rounded w-16" />
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-right">
+                      <div className="h-3.5 bg-gray-200 rounded w-16 ml-auto" />
+                      <div className="h-2.5 bg-gray-100 rounded w-10 ml-auto" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredTransactions.length === 0 ? (
               <div className="text-center py-12 space-y-2">
                 <span className="material-symbols-outlined text-[48px] text-gray-300">receipt_long</span>
                 <p className="font-hanken font-bold text-xs text-gray-400 uppercase tracking-widest">No matching activities</p>
                 <p className="font-hanken text-[10px] text-gray-400">Refine search text or select another category filter.</p>
               </div>
             ) : (
-              filteredTransactions.map((tx) => {
-                const isCredit = tx.type === "DEPOSIT" || tx.type === "CASHOUT";
-                return (
-                  <button
-                    key={tx.id}
-                    onClick={() => setSelectedTx(tx)}
-                    className="w-full text-left bg-white border border-gray-200 p-4 rounded-2xl flex items-center justify-between gap-3 active:scale-[0.99] hover:border-gray-300 transition-all cursor-pointer shadow-sm"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Interactive type indicator badge icons */}
-                      <div
-                        className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                          isCredit ? "bg-emerald-50 text-emerald-600" : "bg-error/5 text-error"
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-[20px]">
-                          {tx.type === "DEPOSIT" && "south_west"}
-                          {tx.type === "TRANSFER" && "north_east"}
-                          {tx.type === "BILL_PAYMENT" && "receipt_long"}
-                          {tx.type === "CARD_FUND" && "credit_card"}
-                          {tx.type === "CASHOUT" && "atm"}
+              <>
+                {filteredTransactions.map((tx) => {
+                  const isCredit = tx.type === "DEPOSIT" || tx.type === "CASHOUT";
+                  return (
+                    <button
+                      key={tx.id}
+                      onClick={() => setSelectedTx(tx)}
+                      className="w-full text-left bg-white border border-gray-200 p-4 rounded-2xl flex items-center justify-between gap-3 active:scale-[0.99] hover:border-gray-300 transition-all cursor-pointer shadow-sm"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Interactive type indicator badge icons */}
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                            isCredit ? "bg-emerald-50 text-emerald-600" : "bg-error/5 text-error"
+                          )}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">
+                            {tx.type === "DEPOSIT" && "south_west"}
+                            {(tx.type === "TRANSFER" || tx.type === "WITHDRAWAL") && "north_east"}
+                            {(tx.type === "BILL_PAYMENT" || tx.type === "AIRTIME" || tx.type === "DATA" || tx.type === "BILLS") && "receipt_long"}
+                            {tx.type === "CARD_FUND" && "credit_card"}
+                            {tx.type === "CASHOUT" && "atm"}
+                          </span>
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="font-hanken font-extrabold text-xs text-black leading-tight truncate">
+                            {tx.description}
+                          </p>
+                          <p className="font-hanken text-[9px] text-gray-400 mt-1 font-semibold uppercase tracking-wider">
+                            {tx.date} • {tx.time}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <p
+                          className={cn(
+                            "font-mono text-xs min-[360px]:text-sm font-bold",
+                            isCredit ? "text-emerald-600" : "text-black"
+                          )}
+                        >
+                          {isCredit ? "+" : "-"}
+                          {tx.currency === "NGN" ? "₦" : "$"}
+                          {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+
+                        <span
+                          className={cn(
+                            "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase",
+                            tx.status === "SUCCESS" && "bg-emerald-50 text-emerald-600",
+                            tx.status === "PENDING" && "bg-amber-50 text-amber-600",
+                            tx.status === "FAILED" && "bg-error/5 text-error"
+                          )}
+                        >
+                          {tx.status}
                         </span>
                       </div>
+                    </button>
+                  );
+                })}
 
-                      <div className="min-w-0">
-                        <p className="font-hanken font-extrabold text-xs text-black leading-tight truncate">
-                          {tx.description}
-                        </p>
-                        <p className="font-hanken text-[9px] text-gray-400 mt-1 font-semibold uppercase tracking-wider">
-                          {tx.date} • {tx.time}
-                        </p>
+                {/* Highly intuitive production-ready pagination footer */}
+                {hasMore && (
+                  <div className="pt-4 flex justify-center">
+                    {loadingMore ? (
+                      <div className="flex items-center gap-2 text-[#FC7A00] font-bold text-xs uppercase tracking-wider">
+                        <div className="w-4 h-4 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
+                        <span>Loading more...</span>
                       </div>
-                    </div>
-
-                    <div className="text-right flex-shrink-0">
-                      <p
-                        className={cn(
-                          "font-mono text-xs min-[360px]:text-sm font-bold",
-                          isCredit ? "text-emerald-600" : "text-black"
-                        )}
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleLoadMore}
+                        className="px-6 py-3 rounded-xl border border-[#FC7A00]/30 hover:border-[#FC7A00] bg-white text-[#FC7A00] text-xs font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer flex items-center gap-2"
                       >
-                        {isCredit ? "+" : "-"}
-                        {tx.currency === "NGN" ? "₦" : "$"}
-                        {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-
-                      <span
-                        className={cn(
-                          "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase",
-                          tx.status === "SUCCESS" && "bg-emerald-50 text-emerald-600",
-                          tx.status === "PENDING" && "bg-amber-50 text-amber-600",
-                          tx.status === "FAILED" && "bg-error/5 text-error"
-                        )}
-                      >
-                        {tx.status}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
+                        Load More Activity
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </motion.div>

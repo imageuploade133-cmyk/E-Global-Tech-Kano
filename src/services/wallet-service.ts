@@ -115,14 +115,14 @@ export class WalletService {
     let currentBalance = 0;
     if (preLoadedWallet) {
       currentBalance = isBonus
-        ? (preLoadedWallet.data?.bonusBalance !== undefined ? Number(preLoadedWallet.data.bonusBalance) : 1000.00)
+        ? (preLoadedWallet.data?.bonusBalance !== undefined ? Number(preLoadedWallet.data.bonusBalance) : 0.00)
         : preLoadedWallet.balance;
     } else {
       const walletDoc = await transaction.get(walletRef);
       const wData = walletDoc.data() || {};
       currentBalance = walletDoc.exists
-        ? (isBonus ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 1000.00) : (Number(wData.balance) || 0))
-        : (isBonus ? 1000.00 : 0);
+        ? (isBonus ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 0.00) : (Number(wData.balance) || 0))
+        : (isBonus ? 0.00 : 0);
     }
 
     // Load user profile before executing any writes if currency is NGN
@@ -236,14 +236,14 @@ export class WalletService {
     let currentBalance = 0;
     if (preLoadedWallet) {
       currentBalance = isBonus
-        ? (preLoadedWallet.data?.bonusBalance !== undefined ? Number(preLoadedWallet.data.bonusBalance) : 1000.00)
+        ? (preLoadedWallet.data?.bonusBalance !== undefined ? Number(preLoadedWallet.data.bonusBalance) : 0.00)
         : preLoadedWallet.balance;
     } else {
       const walletDoc = await transaction.get(walletRef);
       const wData = walletDoc.data() || {};
       currentBalance = walletDoc.exists
-        ? (isBonus ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 1000.00) : (Number(wData.balance) || 0))
-        : (isBonus ? 1000.00 : 0);
+        ? (isBonus ? (wData.bonusBalance !== undefined ? Number(wData.bonusBalance) : 0.00) : (Number(wData.balance) || 0))
+        : (isBonus ? 0.00 : 0);
     }
 
     // Load user profile before executing any writes if currency is NGN
