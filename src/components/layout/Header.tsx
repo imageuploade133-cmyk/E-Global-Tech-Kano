@@ -87,22 +87,37 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
   const router = useRouter();
   const { user } = useAuth();
 
+  // Paginated listener variables to optimize database read performance
+  const [limitCount, setLimitCount] = useState(10);
+  const [hasMore, setHasMore] = useState(true);
+
+  // When the notifications tray is closed, reset limitCount back to 10
+  // to save Firestore read costs while idling on the home screen.
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      setLimitCount(10);
+    }
+  }, [isNotificationsOpen]);
+
   // Load and listen to notifications in real-time from Firestore subcollection
   useEffect(() => {
     if (typeof window !== "undefined" && sessionStorage.getItem("mock") === "true") {
       setNotifications(INITIAL_NOTIFICATIONS);
+      setHasMore(false);
       return;
     }
 
     if (!user) {
       setNotifications([]);
+      setHasMore(false);
       return;
     }
 
+    // Query 1 extra item to check if there are more remaining items for pagination
     const q = query(
       collection(db, "users", user.uid, "notifications"),
       orderBy("createdAt", "desc"),
-      limit(50)
+      limit(limitCount + 1)
     );
 
     const unsubscribe = onSnapshot(
@@ -120,7 +135,14 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
             read: !!data.read,
           });
         });
-        setNotifications(list);
+
+        if (list.length > limitCount) {
+          setHasMore(true);
+          setNotifications(list.slice(0, limitCount));
+        } else {
+          setHasMore(false);
+          setNotifications(list);
+        }
       },
       (error) => {
         console.error("[Header Notifications Listener Exception]:", error.message);
@@ -128,7 +150,13 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, limitCount]);
+
+  const handleLoadMore = () => {
+    if (hasMore) {
+      setLimitCount((prev) => prev + 10);
+    }
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const hasCustomPhoto = isCustomAvatar(profileImage) && !imgError;
@@ -293,6 +321,8 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
         onMarkAllRead={handleMarkAllRead}
         onDeleteNotification={handleDeleteNotification}
         onToggleRead={handleToggleRead}
+        onLoadMore={handleLoadMore}
+        hasMore={hasMore}
       />
 
       <LogoutDrawer

@@ -30,6 +30,15 @@ service cloud.firestore {
                         ])) || isAdmin());
 
       allow delete: if isAdmin();
+
+      // Secure notifications subcollection
+      match /notifications/{notificationId} {
+        allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+        allow create: if false; // strictly server/backend-only, client injection blocked
+        allow update: if ((request.auth != null && request.auth.uid == userId &&
+                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])) || isAdmin());
+        allow delete: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      }
     }
 
     // General ledger transactions: Read-only for resource owner, no client-side writes
