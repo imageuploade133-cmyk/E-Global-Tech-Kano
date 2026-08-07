@@ -83,7 +83,7 @@ export function useFcm() {
 
       // Ensure VAPID key is loaded
       if (!VAPID_KEY) {
-        console.warn("[FCM Hook] VAPID key is missing. Please set NEXT_PUBLIC_FCM_VAPID_KEY in your environment.");
+        console.log("[FCM Hook] VAPID key is not set. Skipping Web Push notification subscription.");
         return null;
       }
 
