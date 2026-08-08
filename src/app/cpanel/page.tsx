@@ -18,6 +18,17 @@ interface AdminUser {
   createdAt: string;
 }
 
+interface PendingKycUser {
+  uid: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  kycType: "bvn" | "nin";
+  kycNumber: string;
+  kycStatus: "PENDING";
+  submittedAt: string;
+}
+
 const PERMISSIONS_CATALOG = [
   { key: "can_transact", label: "Allow Transactions" },
   { key: "can_verify_kyc", label: "Verify KYC" },
@@ -51,21 +62,21 @@ export default function AdminPage() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "users">("dashboard");
-
-  // Eye View Feature (Masks balances, total users, and sensitive credentials)
-  const [showSensitive, setShowSensitive] = useState(false);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings">("dashboard");
 
   // Loading States for all buttons to provide real-time user feedback
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
   const [isSyncingFirebase, setIsSyncingFirebase] = useState(false);
-  const [isSavingMetrics, setIsSavingMetrics] = useState(false);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
 
   // User management loading states
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [isUpdatingUser, setIsUpdatingUser] = useState<string | null>(null);
+
+  // KYC verification loading states
+  const [isLoadingKyc, setIsLoadingKyc] = useState(false);
+  const [isProcessingKyc, setIsProcessingKyc] = useState<string | null>(null);
 
   // Sidebar minimize state
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
@@ -78,15 +89,14 @@ export default function AdminPage() {
   const [apiKeyInput, setApiKeyInput] = useState(config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005");
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
-  // Editable metrics states
-  const [usersCountInput, setUsersCountInput] = useState(config.totalUsers);
-  const [ngnBalanceInput, setNgnBalanceInput] = useState(config.globalNgnBalance);
-  const [usdBalanceInput, setUsdBalanceInput] = useState(config.globalUsdBalance);
-
-  // Users management states
+  // Users management states (LOW COST: Only load users on-demand when searching)
   const [usersList, setUsersList] = useState<AdminUser[]>([]);
   const [searchUserTerm, setSearchUserTerm] = useState("");
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+
+  // KYC pending users waiting for approval
+  const [pendingKycList, setPendingKycUser] = useState<PendingKycUser[]>([]);
+  const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
 
   // Add user form states
   const [newUserForm, setNewUserForm] = useState({
@@ -101,7 +111,13 @@ export default function AdminPage() {
     permissions: [] as string[]
   });
 
-  const fetchUsers = async () => {
+  const handleUserSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchUserTerm.trim()) {
+      toast.warning("Please enter a search term (email address or phone number) to save read costs.");
+      return;
+    }
+
     setIsLoadingUsers(true);
     try {
       let idToken = "mock-admin-token";
@@ -110,7 +126,8 @@ export default function AdminPage() {
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/admin/users", {
+      // LOW COST INDEXED EQUALITY LOOKUP
+      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(searchUserTerm.trim())}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`
         }
@@ -118,6 +135,11 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setUsersList(data.users || []);
+        if (data.users?.length === 0) {
+          toast.info("No matching records found. Double check email or complete phone number prefix.");
+        } else {
+          toast.success(`Found ${data.users.length} matching result(s)!`);
+        }
       } else {
         toast.error(data.error || "Failed to load system users securely.");
       }
@@ -125,6 +147,78 @@ export default function AdminPage() {
       toast.error("Internal network error loading system users.");
     } finally {
       setIsLoadingUsers(false);
+    }
+  };
+
+  const fetchPendingKyc = async () => {
+    setIsLoadingKyc(true);
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/kyc", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPendingKycUser(data.pendingUsers || []);
+      } else {
+        toast.error(data.error || "Failed to load waiting KYC approvals.");
+      }
+    } catch {
+      toast.error("Network communication failure loading waiting KYC approvals.");
+    } finally {
+      setIsLoadingKyc(false);
+    }
+  };
+
+  const handleProcessKyc = async (targetUid: string, action: "approve" | "reject") => {
+    setIsProcessingKyc(targetUid);
+    const reason = rejectionReason[targetUid] || "";
+
+    if (action === "reject" && !reason.trim()) {
+      toast.error("Please enter a rejection reason before rejecting identity verification.");
+      setIsProcessingKyc(null);
+      return;
+    }
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          action,
+          targetUid,
+          reason
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || `KYC successfully ${action === "approve" ? "approved" : "rejected"}!`);
+        // Remove processed user from the local view list instantly
+        setPendingKycUser(prev => prev.filter(u => u.uid !== targetUid));
+      } else {
+        toast.error(data.error || "Failed to process KYC verification.");
+      }
+    } catch {
+      toast.error("API connection error during verification processing.");
+    } finally {
+      setIsProcessingKyc(null);
     }
   };
 
@@ -140,22 +234,10 @@ export default function AdminPage() {
   }, [user]);
 
   useEffect(() => {
-    const fetchRealData = async () => {
-      if (!isAdminUnlocked) {
-        return;
-      }
-      await fetchUsers();
-    };
-
-    fetchRealData();
-
-    if (typeof window !== "undefined") {
-      const authorized = sessionStorage.getItem("admin_session_unlocked") === "true";
-      if (authorized) {
-        setIsAdminUnlocked(true);
-      }
+    if (isAdminUnlocked && activeTab === "kyc") {
+      fetchPendingKyc();
     }
-  }, [isAdminUnlocked]);
+  }, [isAdminUnlocked, activeTab]);
 
   // Update inputs when config context loads or resets
   useEffect(() => {
@@ -164,9 +246,6 @@ export default function AdminPage() {
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
     setApiKeyInput(config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005");
-    setUsersCountInput(config.totalUsers);
-    setNgnBalanceInput(config.globalNgnBalance);
-    setUsdBalanceInput(config.globalUsdBalance);
   }, [config]);
 
   const isActualAdminUser = userData?.role === "admin" || isEmailAdmin || sessionStorage.getItem("mock") === "true";
@@ -296,24 +375,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleSaveMetrics = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingMetrics(true);
-    try {
-      await updateConfig({
-        totalUsers: Number(usersCountInput),
-        globalNgnBalance: Number(ngnBalanceInput),
-        globalUsdBalance: Number(usdBalanceInput),
-      });
-      toast.success("Core metrics modified successfully!");
-    } catch {
-      toast.error("Failed to override metrics.");
-    } finally {
-      setIsSavingMetrics(false);
-    }
-  };
-
-  // User Administration Operations
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsCreatingUser(true);
@@ -351,7 +412,7 @@ export default function AdminPage() {
           role: "user",
           permissions: []
         });
-        fetchUsers();
+        setUsersList([]); // Reset list to save reads
       } else {
         toast.error(data.error || "Failed to create user securely.");
       }
@@ -389,7 +450,8 @@ export default function AdminPage() {
       if (res.ok && data.success) {
         toast.success(data.message || "Permissions updated successfully!");
         setEditingUser(null);
-        fetchUsers();
+        // Refresh local list state directly
+        setUsersList(prev => prev.map(u => u.uid === userToUpdate.uid ? { ...u, role: userToUpdate.role, permissions: userToUpdate.permissions } : u));
       } else {
         toast.error(data.error || "Failed to update permissions.");
       }
@@ -399,23 +461,6 @@ export default function AdminPage() {
       setIsUpdatingUser(null);
     }
   };
-
-  // Mask string/number if eye-view is closed
-  const maskText = (val: string | number, prefix = "") => {
-    if (!showSensitive) {
-      return `${prefix}••••••`;
-    }
-    if (typeof val === "number") {
-      return `${prefix}${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    }
-    return `${prefix}${val}`;
-  };
-
-  const filteredUsers = usersList.filter(u =>
-    u.name.toLowerCase().includes(searchUserTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchUserTerm.toLowerCase()) ||
-    u.phoneNumber.includes(searchUserTerm)
-  );
 
   if (!isAdminUnlocked) {
     return (
@@ -530,6 +575,19 @@ export default function AdminPage() {
             </button>
 
             <button
+              onClick={() => setActiveTab("kyc")}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                activeTab === "kyc"
+                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">verified_user</span>
+              {!isSidebarMinimized && <span>KYC Approvals</span>}
+            </button>
+
+            <button
               onClick={() => setActiveTab("settings")}
               className={cn(
                 "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
@@ -568,24 +626,11 @@ export default function AdminPage() {
             <h2 className="font-hanken font-extrabold text-lg text-gray-800">
               {activeTab === "dashboard" && "Platform Operations & Metrics"}
               {activeTab === "users" && "User & Permission Management Suite"}
+              {activeTab === "kyc" && "KYC Document Verification Queue"}
               {activeTab === "settings" && "Dynamic Visual Settings Manager"}
             </h2>
             <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider">Enterprise System Suite</p>
           </div>
-
-          {/* Secure Eye View Toggle Switch */}
-          <button
-            onClick={() => {
-              setShowSensitive(!showSensitive);
-              toast.success(showSensitive ? "Sensitive fields are now masked." : "Unmasked detail viewer active!");
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 hover:border-[#FC7A00] rounded-xl text-xs font-bold uppercase tracking-wider text-gray-600 hover:text-[#FC7A00] transition-all cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              {showSensitive ? "visibility" : "visibility_off"}
-            </span>
-            <span>{showSensitive ? "Mask Info" : "Reveal Info"}</span>
-          </button>
         </header>
 
         <div className="p-4 md:p-8 overflow-y-auto flex-1 max-w-5xl w-full mx-auto space-y-6 pb-24 md:pb-8">
@@ -614,22 +659,22 @@ export default function AdminPage() {
                   </button>
                 </div>
 
-                {/* Nice Dashboard with Nice Gradient colors (Flat layout, No Shadows) */}
+                {/* Dashboard with Nice Gradient colors (Flat layout, No Shadows) and full numbers */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Metric Card 1: Users */}
                   <div className="relative group overflow-hidden bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 border border-orange-400/30 text-white transition-all">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
                     <div className="flex justify-between items-start relative z-10">
-                      <div className="max-w-[70%]">
+                      <div className="max-w-[75%] min-w-0">
                         <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">Registered Users</p>
-                        {/* Keeps long numbers inside cards with break-all, truncate, font-mono */}
-                        <p className="font-mono text-xl sm:text-2xl lg:text-3xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden truncate">
-                          {maskText(config.totalUsers)}
+                        {/* Always displays full number clearly inside the cards with auto-wrap break-all */}
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          {config.totalUsers.toLocaleString()}
                         </p>
-                        <p className="text-[10px] text-orange-200 font-bold uppercase tracking-wider mt-2">Active Accounts</p>
+                        <p className="text-[10px] text-orange-200 font-bold uppercase tracking-wider mt-2.5">Active Accounts</p>
                       </div>
-                      <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white">
-                        <span className="material-symbols-outlined text-[24px]">face</span>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">face</span>
                       </div>
                     </div>
                   </div>
@@ -638,16 +683,16 @@ export default function AdminPage() {
                   <div className="relative group overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 border border-emerald-400/30 text-white transition-all">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl" />
                     <div className="flex justify-between items-start relative z-10">
-                      <div className="max-w-[70%]">
+                      <div className="max-w-[75%] min-w-0">
                         <p className="text-[10px] font-black uppercase text-emerald-100 tracking-wider">Pool NGN Balance</p>
-                        {/* Keeps long numbers inside cards with break-all, truncate, font-mono */}
-                        <p className="font-mono text-xl sm:text-2xl lg:text-3xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden truncate">
-                          {maskText(config.globalNgnBalance, "₦")}
+                        {/* Always displays full number clearly inside the cards with auto-wrap break-all */}
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{config.globalNgnBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
-                        <p className="text-[10px] text-emerald-200 font-bold uppercase tracking-wider mt-2">Naira Reserve Liquidity</p>
+                        <p className="text-[10px] text-emerald-200 font-bold uppercase tracking-wider mt-2.5">Naira Reserve Liquidity</p>
                       </div>
-                      <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white">
-                        <span className="material-symbols-outlined text-[24px]">payments</span>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">payments</span>
                       </div>
                     </div>
                   </div>
@@ -656,68 +701,24 @@ export default function AdminPage() {
                   <div className="relative group overflow-hidden bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl p-6 border border-indigo-400/30 text-white transition-all">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl" />
                     <div className="flex justify-between items-start relative z-10">
-                      <div className="max-w-[70%]">
+                      <div className="max-w-[75%] min-w-0">
                         <p className="text-[10px] font-black uppercase text-indigo-100 tracking-wider">Pool USD Reserves</p>
-                        {/* Keeps long numbers inside cards with break-all, truncate, font-mono */}
-                        <p className="font-mono text-xl sm:text-2xl lg:text-3xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden truncate">
-                          {maskText(config.globalUsdBalance, "$")}
+                        {/* Always displays full number clearly inside the cards with auto-wrap break-all */}
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ${config.globalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
-                        <p className="text-[10px] text-indigo-200 font-bold uppercase tracking-wider mt-2">Dollar Asset Pool</p>
+                        <p className="text-[10px] text-indigo-200 font-bold uppercase tracking-wider mt-2.5">Dollar Asset Pool</p>
                       </div>
-                      <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white">
-                        <span className="material-symbols-outlined text-[24px]">credit_card</span>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">credit_card</span>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <div className="bg-white border border-gray-200 rounded-2xl p-6 bg-gradient-to-br from-white via-gray-50/30 to-gray-50/50">
-                  <h3 className="font-hanken font-extrabold text-sm text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase tracking-wide">
-                    Override System Metrics
-                  </h3>
-                  <form onSubmit={handleSaveMetrics} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-gray-400">Total User Metrics</label>
-                      <input
-                        type="number"
-                        value={usersCountInput}
-                        onChange={(e) => setUsersCountInput(Number(e.target.value))}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-gray-400">NGN holdings (₦)</label>
-                      <input
-                        type="number"
-                        value={ngnBalanceInput}
-                        onChange={(e) => setNgnBalanceInput(Number(e.target.value))}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-gray-400">USD holdings ($)</label>
-                      <input
-                        type="number"
-                        value={usdBalanceInput}
-                        onChange={(e) => setUsdBalanceInput(Number(e.target.value))}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
-                      />
-                    </div>
-                    <div className="md:col-span-3 pt-3">
-                      <button
-                        type="submit"
-                        disabled={isSavingMetrics}
-                        className="px-6 py-3.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-98 transition-all"
-                      >
-                        {isSavingMetrics ? <><ButtonSpinner /> Saving Changes...</> : "Override System Metrics"}
-                      </button>
-                    </div>
-                  </form>
-                </div>
               </motion.div>
             )}
 
-            {/* Tab 2: Dedicated User Addition, Permissions & Role Management */}
+            {/* Tab 2: User & Permission Management (Low reads & Low Cost exact match search) */}
             {activeTab === "users" && (
               <motion.div
                 key="users-view"
@@ -867,161 +868,292 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Right Column: User list and interactive permissions editor */}
-                  <div className="bg-white border border-gray-200 rounded-2xl p-6 md:col-span-2 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-3">
-                      <div>
-                        <h3 className="font-hanken font-extrabold text-sm text-gray-900 uppercase">
-                          System Directory ({filteredUsers.length})
-                        </h3>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Secure Firestore user records and claim status</p>
+                  {/* Right Column: User directory with exact low-cost search indexing */}
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 md:col-span-2 space-y-5 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-3 gap-3">
+                        <div>
+                          <h3 className="font-hanken font-extrabold text-sm text-gray-900 uppercase">
+                            System Directory ({usersList.length})
+                          </h3>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">High volume, ultra low-read cost directory search</p>
+                        </div>
                       </div>
 
-                      <div className="relative max-w-xs w-full">
-                        <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[16px]">
-                          search
-                        </span>
-                        <input
-                          type="text"
-                          value={searchUserTerm}
-                          onChange={(e) => setSearchUserTerm(e.target.value)}
-                          placeholder="Search email, name or phone..."
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3.5 max-h-[500px] overflow-y-auto">
-                      {isLoadingUsers ? (
-                        <div className="text-center py-12 text-gray-400 uppercase tracking-widest font-bold text-xs">
-                          <ButtonSpinner /> Loading User Registry...
+                      {/* Precise Indexed search bar form to guarantee Low Low Reads */}
+                      <form onSubmit={handleUserSearchSubmit} className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+                            search
+                          </span>
+                          <input
+                            type="text"
+                            required
+                            value={searchUserTerm}
+                            onChange={(e) => setSearchUserTerm(e.target.value)}
+                            placeholder="Enter exact email address or complete phone prefix..."
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
+                          />
                         </div>
-                      ) : filteredUsers.length === 0 ? (
-                        <div className="text-center py-12 text-gray-400 uppercase tracking-widest font-bold text-xs">
-                          No registered users found
-                        </div>
-                      ) : (
-                        filteredUsers.map(u => {
-                          const isEditing = editingUser?.uid === u.uid;
-                          return (
-                            <div key={u.uid} className="p-4 border border-gray-150 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition-all space-y-3">
-                              <div className="flex justify-between items-start flex-wrap gap-2">
-                                <div>
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="font-extrabold text-sm text-gray-900 leading-none">{u.name}</h4>
-                                    <span className={cn(
-                                      "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
-                                      u.role === "admin" && "bg-rose-50 text-rose-600 border border-rose-100",
-                                      u.role === "agent" && "bg-indigo-50 text-indigo-600 border border-indigo-100",
-                                      u.role === "user" && "bg-gray-100 text-gray-600 border border-gray-200"
-                                    )}>
-                                      {u.role}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-gray-500 font-semibold mt-1 select-all">{maskText(u.email)}</p>
-                                  <p className="text-[10px] font-mono text-gray-400 mt-0.5">{maskText(u.phoneNumber)}</p>
-                                </div>
+                        <button
+                          type="submit"
+                          disabled={isLoadingUsers}
+                          className="px-5 py-3 bg-black hover:bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider active:scale-95 disabled:opacity-50 flex-shrink-0"
+                        >
+                          {isLoadingUsers ? <ButtonSpinner /> : "Search"}
+                        </button>
+                      </form>
 
-                                <div className="text-right">
-                                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Balance</p>
-                                  <p className="font-mono text-xs font-black text-emerald-600 mt-0.5">{maskText(u.balance, "₦")}</p>
-                                </div>
-                              </div>
-
-                              {/* Configured Permissions Badges */}
-                              {!isEditing && (
-                                <div className="flex flex-wrap gap-1">
-                                  {u.permissions.length === 0 ? (
-                                    <span className="text-[9px] text-gray-400 font-bold uppercase italic">No Special Security Permissions Assigned</span>
-                                  ) : (
-                                    u.permissions.map(p => (
-                                      <span key={p} className="px-2 py-0.5 rounded bg-orange-50 border border-orange-100 text-[#FC7A00] text-[8px] font-black uppercase tracking-wider">
-                                        {p.replace("can_", "").replace("_", " ")}
+                      {/* Search results catalog */}
+                      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                        {isLoadingUsers ? (
+                          <div className="text-center py-12 text-gray-400 uppercase tracking-widest font-bold text-xs">
+                            <ButtonSpinner /> Interrogating User Registry...
+                          </div>
+                        ) : usersList.length === 0 ? (
+                          <div className="border border-orange-100 bg-orange-50/30 rounded-xl p-6 text-center text-gray-500 space-y-1.5">
+                            <span className="material-symbols-outlined text-[32px] text-[#FC7A00]" style={{ fontVariationSettings: '"FILL" 1' }}>query_stats</span>
+                            <p className="font-black text-xs text-gray-800 uppercase">No Loaded Records</p>
+                            <p className="text-[11px] text-gray-400 leading-normal max-w-sm mx-auto font-medium">
+                              To keep cloud reads low-cost and handle large volumes of users safely, please enter an exact user email address or phone number in the search bar above to fetch.
+                            </p>
+                          </div>
+                        ) : (
+                          usersList.map(u => {
+                            const isEditing = editingUser?.uid === u.uid;
+                            return (
+                              <div key={u.uid} className="p-4 border border-gray-150 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition-all space-y-3">
+                                <div className="flex justify-between items-start flex-wrap gap-2">
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="font-extrabold text-sm text-gray-900 leading-none">{u.name}</h4>
+                                      <span className={cn(
+                                        "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                        u.role === "admin" && "bg-rose-50 text-rose-600 border border-rose-100",
+                                        u.role === "agent" && "bg-indigo-50 text-indigo-600 border border-indigo-100",
+                                        u.role === "user" && "bg-gray-100 text-gray-600 border border-gray-200"
+                                      )}>
+                                        {u.role}
                                       </span>
-                                    ))
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Edit Panel Drawer */}
-                              {isEditing && editingUser && (
-                                <div className="p-3 bg-white border border-gray-200 rounded-xl space-y-3">
-                                  <p className="text-[10px] font-black uppercase text-[#FC7A00]">Modify Privileges & Permissions</p>
-
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-black uppercase text-gray-400">Change Role</label>
-                                    <select
-                                      value={editingUser.role}
-                                      onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as "admin" | "agent" | "user" })}
-                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none"
-                                    >
-                                      <option value="user">USER</option>
-                                      <option value="agent">AGENT</option>
-                                      <option value="admin">ADMIN</option>
-                                    </select>
+                                    </div>
+                                    <p className="text-xs text-gray-500 font-semibold mt-1 select-all">{u.email}</p>
+                                    <p className="text-[10px] font-mono text-gray-400 mt-0.5">{u.phoneNumber}</p>
                                   </div>
 
-                                  <div className="space-y-2">
-                                    <label className="text-[9px] font-black uppercase text-gray-400 block">Manage Assigned Permissions</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {PERMISSIONS_CATALOG.map(p => {
-                                        const isChecked = editingUser.permissions.includes(p.key);
-                                        return (
-                                          <label key={p.key} className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-600">
-                                            <input
-                                              type="checkbox"
-                                              checked={isChecked}
-                                              onChange={() => {
-                                                const updated = isChecked
-                                                  ? editingUser.permissions.filter(k => k !== p.key)
-                                                  : [...editingUser.permissions, p.key];
-                                                setEditingUser({ ...editingUser, permissions: updated });
-                                              }}
-                                              className="rounded text-[#FC7A00] h-3 w-3 cursor-pointer"
-                                            />
-                                            <span>{p.label}</span>
-                                          </label>
-                                        );
-                                      })}
+                                  <div className="text-right">
+                                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Balance</p>
+                                    <p className="font-mono text-xs font-black text-emerald-600 mt-0.5">₦{u.balance.toLocaleString()}</p>
+                                  </div>
+                                </div>
+
+                                {/* Configured Permissions Badges */}
+                                {!isEditing && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {u.permissions.length === 0 ? (
+                                      <span className="text-[9px] text-gray-400 font-bold uppercase italic">No Special Security Permissions Assigned</span>
+                                    ) : (
+                                      u.permissions.map(p => (
+                                        <span key={p} className="px-2 py-0.5 rounded bg-orange-50 border border-orange-100 text-[#FC7A00] text-[8px] font-black uppercase tracking-wider">
+                                          {p.replace("can_", "").replace("_", " ")}
+                                        </span>
+                                      ))
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Edit Panel Drawer */}
+                                {isEditing && editingUser && (
+                                  <div className="p-3 bg-white border border-gray-200 rounded-xl space-y-3">
+                                    <p className="text-[10px] font-black uppercase text-[#FC7A00]">Modify Privileges & Permissions</p>
+
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-black uppercase text-gray-400">Change Role</label>
+                                      <select
+                                        value={editingUser.role}
+                                        onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as "admin" | "agent" | "user" })}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none"
+                                      >
+                                        <option value="user">USER</option>
+                                        <option value="agent">AGENT</option>
+                                        <option value="admin">ADMIN</option>
+                                      </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <label className="text-[9px] font-black uppercase text-gray-400 block">Manage Assigned Permissions</label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {PERMISSIONS_CATALOG.map(p => {
+                                          const isChecked = editingUser.permissions.includes(p.key);
+                                          return (
+                                            <label key={p.key} className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-600">
+                                              <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => {
+                                                  const updated = isChecked
+                                                    ? editingUser.permissions.filter(k => k !== p.key)
+                                                    : [...editingUser.permissions, p.key];
+                                                  setEditingUser({ ...editingUser, permissions: updated });
+                                                }}
+                                                className="rounded text-[#FC7A00] h-3 w-3 cursor-pointer"
+                                              />
+                                              <span>{p.label}</span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingUser(null)}
+                                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-black uppercase rounded-lg cursor-pointer"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isUpdatingUser === u.uid}
+                                        onClick={() => handleSaveUserPermissions(editingUser)}
+                                        className="px-3 py-1.5 bg-black hover:bg-gray-900 text-white text-[10px] font-black uppercase rounded-lg cursor-pointer disabled:opacity-50"
+                                      >
+                                        {isUpdatingUser === u.uid ? <><ButtonSpinner /> Saving...</> : "Apply Changes"}
+                                      </button>
                                     </div>
                                   </div>
+                                )}
 
-                                  <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                {/* Actions Toggle Buttons */}
+                                {!isEditing && (
+                                  <div className="flex justify-end pt-1.5 border-t border-gray-100">
                                     <button
-                                      type="button"
-                                      onClick={() => setEditingUser(null)}
-                                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-black uppercase rounded-lg cursor-pointer"
+                                      onClick={() => setEditingUser({ ...u })}
+                                      className="px-3 py-1 bg-white hover:bg-gray-100 text-gray-700 text-[9px] font-black uppercase rounded border border-gray-300 transition-colors cursor-pointer"
                                     >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={isUpdatingUser === u.uid}
-                                      onClick={() => handleSaveUserPermissions(editingUser)}
-                                      className="px-3 py-1.5 bg-black hover:bg-gray-900 text-white text-[10px] font-black uppercase rounded-lg cursor-pointer disabled:opacity-50"
-                                    >
-                                      {isUpdatingUser === u.uid ? <><ButtonSpinner /> Saving...</> : "Apply Changes"}
+                                      Edit Role & Access Toggles
                                     </button>
                                   </div>
-                                </div>
-                              )}
-
-                              {/* Actions Toggle Buttons */}
-                              {!isEditing && (
-                                <div className="flex justify-end pt-1.5 border-t border-gray-100">
-                                  <button
-                                    onClick={() => setEditingUser({ ...u })}
-                                    className="px-3 py-1 bg-white hover:bg-gray-100 text-gray-700 text-[9px] font-black uppercase rounded border border-gray-300 transition-colors cursor-pointer"
-                                  >
-                                    Edit Role & Access Toggles
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Tab 3: Dedicated KYC waiting for approvals queue (High scalability, Low Reads) */}
+            {activeTab === "kyc" && (
+              <motion.div
+                key="kyc-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6 animate-fadeIn"
+              >
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+                  <div className="border-b border-gray-100 pb-3 flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                      <h3 className="font-hanken font-extrabold text-sm text-gray-900 uppercase">
+                        KYC Pending Approvals Verification Desk
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Authorize or decline BVN/NIN identity submittals with immediate notification dispatch</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isLoadingKyc}
+                      onClick={fetchPendingKyc}
+                      className="px-4 py-2 border border-gray-200 hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all text-xs font-bold uppercase tracking-wider text-gray-600 rounded-xl cursor-pointer"
+                    >
+                      {isLoadingKyc ? <><ButtonSpinner /> Syncing Queue...</> : "Force Sync Queue"}
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 max-h-[550px] overflow-y-auto pr-1">
+                    {isLoadingKyc ? (
+                      <div className="text-center py-16 text-gray-400 uppercase tracking-widest font-bold text-xs">
+                        <ButtonSpinner /> Polling pending KYC documents...
+                      </div>
+                    ) : pendingKycList.length === 0 ? (
+                      <div className="border border-emerald-100 bg-emerald-50/20 rounded-2xl p-8 text-center text-emerald-800 space-y-2">
+                        <span className="material-symbols-outlined text-[36px] text-emerald-600" style={{ fontVariationSettings: '"FILL" 1' }}>verified</span>
+                        <p className="font-black text-xs uppercase">All Clear!</p>
+                        <p className="text-[11px] text-emerald-600/70 font-semibold max-w-md mx-auto leading-relaxed">
+                          There are currently no waiting verification documents in the queue. All submissions have been processed successfully.
+                        </p>
+                      </div>
+                    ) : (
+                      pendingKycList.map(u => {
+                        const processing = isProcessingKyc === u.uid;
+                        const reasonText = rejectionReason[u.uid] || "";
+                        return (
+                          <div key={u.uid} className="p-5 border border-gray-150 rounded-2xl bg-gray-50/50 hover:bg-gray-50/80 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+                            <div className="space-y-2 flex-1">
+                              <div>
+                                <h4 className="font-extrabold text-sm text-gray-900 flex items-center gap-2">
+                                  {u.name}
+                                  <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-orange-50 border border-orange-100 text-[#FC7A00] tracking-wider">
+                                    PENDING
+                                  </span>
+                                </h4>
+                                <p className="text-xs text-gray-500 font-semibold mt-1 select-all">{u.email}</p>
+                                <p className="text-[10px] font-mono text-gray-400 mt-0.5">Phone: {u.phoneNumber}</p>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3 max-w-sm p-3 bg-white border border-gray-200 rounded-xl text-xs">
+                                <div>
+                                  <p className="text-[10px] font-black uppercase text-gray-400">KYC Standard Type</p>
+                                  <p className="font-bold text-[#FC7A00] uppercase mt-0.5">{u.kycType}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-black uppercase text-gray-400">Submitted Number</p>
+                                  <p className="font-mono font-bold text-gray-800 mt-0.5 select-all">{u.kycNumber}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Verification actions & rejection feedback */}
+                            <div className="w-full md:w-auto space-y-3 text-right">
+                              <div className="flex gap-2 justify-end">
+                                {/* Accept Button */}
+                                <button
+                                  type="button"
+                                  disabled={!!isProcessingKyc}
+                                  onClick={() => handleProcessKyc(u.uid, "approve")}
+                                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center"
+                                >
+                                  {processing ? <ButtonSpinner /> : "Approve verification"}
+                                </button>
+                              </div>
+
+                              {/* Rejection input and trigger */}
+                              <div className="space-y-2 text-right">
+                                <input
+                                  type="text"
+                                  value={reasonText}
+                                  onChange={(e) => setRejectionReason({ ...rejectionReason, [u.uid]: e.target.value })}
+                                  placeholder="Reason if rejecting..."
+                                  className="w-full max-w-xs bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-[#FC7A00]"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!!isProcessingKyc}
+                                  onClick={() => handleProcessKyc(u.uid, "reject")}
+                                  className="px-4 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[9px] font-black uppercase rounded-xl border border-rose-200 transition-all disabled:opacity-50 cursor-pointer inline-block"
+                                >
+                                  Decline and Reject
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1044,7 +1176,7 @@ export default function AdminPage() {
                     <div className="space-y-1 bg-orange-50/50 p-4 rounded-xl border border-orange-100">
                       <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Imgbb API Key (Image Upload Rail)</label>
                       <input
-                        type={showSensitive ? "text" : "password"}
+                        type="text"
                         value={apiKeyInput}
                         onChange={(e) => setApiKeyInput(e.target.value)}
                         placeholder="Enter Imgbb v1 api key"

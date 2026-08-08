@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb, adminApp } from "@/lib/firebase-admin";
 
-// Ensure a safe list of permissible checkable flags
 const ALLOWED_PERMISSIONS = [
   "can_transact",
   "can_verify_kyc",
@@ -18,6 +17,9 @@ export async function GET(req: Request) {
     if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
     }
+
+    const { searchParams } = new URL(req.url);
+    const searchTerm = searchParams.get("search")?.trim().toLowerCase() || "";
 
     // Mock response for playtesting sessions
     if (uid === "mock-admin-uid") {
@@ -43,30 +45,91 @@ export async function GET(req: Request) {
           createdAt: new Date().toISOString()
         }
       ];
+
+      if (searchTerm) {
+        const filtered = mockUsers.filter(u =>
+          u.email.toLowerCase().includes(searchTerm) ||
+          u.phoneNumber.includes(searchTerm) ||
+          u.name.toLowerCase().includes(searchTerm)
+        );
+        return NextResponse.json({ success: true, users: filtered });
+      }
+
       return NextResponse.json({ success: true, users: mockUsers });
     }
 
-    // Fetch up to 100 users securely from Firestore
-    const usersSnap = await adminDb.collection("users")
-      .orderBy("createdAt", "desc")
-      .limit(100)
-      .get();
+    const users: any[] = [];
 
-    const users = usersSnap.docs.map(doc => {
-      const data = doc.data();
+    // LOW READ COST: Direct indexed equality search queries inside Firestore.
+    if (searchTerm) {
+      if (searchTerm.includes("@")) {
+        // Query exactly by email
+        const snap = await adminDb.collection("users")
+          .where("email", "==", searchTerm)
+          .limit(5)
+          .get();
+
+        snap.forEach(doc => {
+          const data = doc.data();
+          users.push({ uid: doc.id, ...data });
+        });
+      } else {
+        // Query exactly by phoneNumber
+        const snap = await adminDb.collection("users")
+          .where("phoneNumber", "==", searchTerm)
+          .limit(5)
+          .get();
+
+        snap.forEach(doc => {
+          const data = doc.data();
+          users.push({ uid: doc.id, ...data });
+        });
+
+        // Fallback: If phone prefix omitted or formatted differently, query by custom formats
+        if (users.length === 0) {
+          const variations = [
+            searchTerm,
+            `+234${searchTerm.startsWith("0") ? searchTerm.slice(1) : searchTerm}`,
+            `+227${searchTerm.startsWith("0") ? searchTerm.slice(1) : searchTerm}`,
+          ];
+          const querySnap = await adminDb.collection("users")
+            .where("phoneNumber", "in", variations)
+            .limit(5)
+            .get();
+
+          querySnap.forEach(doc => {
+            const data = doc.data();
+            users.push({ uid: doc.id, ...data });
+          });
+        }
+      }
+    } else {
+      // Default: Return only 5 users to keep database reads extremely low if no search term entered
+      const usersSnap = await adminDb.collection("users")
+        .orderBy("createdAt", "desc")
+        .limit(5)
+        .get();
+
+      usersSnap.forEach(doc => {
+        const data = doc.data();
+        users.push({ uid: doc.id, ...data });
+      });
+    }
+
+    const sanitizedUsers = users.map(u => {
       return {
-        uid: doc.id,
-        name: data.name || data.displayName || `${data.firstName || ""} ${data.lastName || ""}`.trim() || "USER",
-        email: data.email || "",
-        phoneNumber: data.phoneNumber || "",
-        role: data.role || "user",
-        permissions: data.permissions || [],
-        balance: data.balance || 0,
-        createdAt: data.createdAt || new Date().toISOString()
+        uid: u.uid || u.id,
+        name: u.name || u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || "USER",
+        email: u.email || "",
+        phoneNumber: u.phoneNumber || "",
+        role: u.role || "user",
+        permissions: u.permissions || [],
+        balance: u.balance || 0,
+        createdAt: u.createdAt || new Date().toISOString()
       };
     });
 
-    return NextResponse.json({ success: true, users });
+    return NextResponse.json({ success: true, users: sanitizedUsers });
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Admin Users API] Error:", error.message);
