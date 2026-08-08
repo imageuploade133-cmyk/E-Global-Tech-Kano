@@ -64,6 +64,9 @@ export default function AdminPage() {
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings">("dashboard");
 
+  // Mobile navigation drawer toggle (App-like slide menu)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Loading States for all buttons to provide real-time user feedback
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
   const [isSyncingFirebase, setIsSyncingFirebase] = useState(false);
@@ -78,7 +81,7 @@ export default function AdminPage() {
   const [isLoadingKyc, setIsLoadingKyc] = useState(false);
   const [isProcessingKyc, setIsProcessingKyc] = useState<string | null>(null);
 
-  // Sidebar minimize state
+  // Sidebar minimize state (Desktop only)
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
 
   // Editable settings states
@@ -210,7 +213,6 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success(data.message || `KYC successfully ${action === "approve" ? "approved" : "rejected"}!`);
-        // Remove processed user from the local view list instantly
         setPendingKycUser(prev => prev.filter(u => u.uid !== targetUid));
       } else {
         toast.error(data.error || "Failed to process KYC verification.");
@@ -450,7 +452,6 @@ export default function AdminPage() {
       if (res.ok && data.success) {
         toast.success(data.message || "Permissions updated successfully!");
         setEditingUser(null);
-        // Refresh local list state directly
         setUsersList(prev => prev.map(u => u.uid === userToUpdate.uid ? { ...u, role: userToUpdate.role, permissions: userToUpdate.permissions } : u));
       } else {
         toast.error(data.error || "Failed to update permissions.");
@@ -461,6 +462,19 @@ export default function AdminPage() {
       setIsUpdatingUser(null);
     }
   };
+
+  const filteredUsers = usersList.filter(u =>
+    u.name.toLowerCase().includes(searchUserTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchUserTerm.toLowerCase()) ||
+    u.phoneNumber.includes(searchUserTerm)
+  );
+
+  const sidebarNavItems = [
+    { id: "dashboard", label: "Metrics", icon: "cell_tower" },
+    { id: "users", label: "Users & Permissions", icon: "group" },
+    { id: "kyc", label: "KYC Approvals", icon: "verified_user" },
+    { id: "settings", label: "Branding", icon: "diamond" },
+  ];
 
   if (!isAdminUnlocked) {
     return (
@@ -509,13 +523,114 @@ export default function AdminPage() {
 
   return (
     <main
-      className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-hanken !mt-0"
+      className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-hanken !mt-0 relative"
       style={{ marginTop: 0 }}
     >
-      {/* Side Navigation */}
+      {/* Mobile Top Navigation Bar (Hamburger Menu) */}
+      <div className="md:hidden flex items-center justify-between px-5 py-4 bg-white border-b border-gray-200 w-full z-40 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded bg-gray-150 p-1 flex items-center justify-center">
+            <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
+          </div>
+          <span className="font-hanken font-black text-sm tracking-tight text-gray-900">E-TECH CP</span>
+        </div>
+
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-700 active:scale-90 transition-all cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-[24px]">
+            {isMobileMenuOpen ? "close" : "menu"}
+          </span>
+        </button>
+      </div>
+
+      {/* App-like Userfriendly Sidebar Slide Menu Drawer for Small Devices */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 md:hidden"
+            />
+
+            {/* Sliding Drawer */}
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              className="fixed top-0 bottom-0 left-0 w-[260px] bg-white border-r border-gray-200 z-50 flex flex-col justify-between md:hidden"
+            >
+              <div className="flex flex-col h-full">
+                {/* Brand header */}
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between min-h-[73px]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded bg-gray-100 p-1 flex items-center justify-center">
+                      <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
+                    </div>
+                    <div>
+                      <h1 className="font-hanken font-black text-sm tracking-tight text-gray-900 leading-none">E-TECH</h1>
+                      <p className="text-[8px] font-black tracking-widest text-[#FC7A00] uppercase mt-0.5">Control Panel</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sidebar Navigation inside drawer */}
+                <nav className="p-4 space-y-1.5 flex flex-col gap-1">
+                  {sidebarNavItems.map((item) => {
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id as any);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className={cn(
+                          "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                          isActive
+                            ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                            : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                        )}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              {/* Console Lock Button */}
+              <div className="p-4 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                    setIsAdminUnlocked(false);
+                    if (typeof window !== "undefined") {
+                      sessionStorage.removeItem("admin_session_unlocked");
+                    }
+                    toast.info("Console session locked.");
+                  }}
+                  className="w-full py-3 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-gray-500 text-center flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
+                  <span>Lock Console</span>
+                </button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Standard Desktop Sidebar menu (Hidden on mobile) */}
       <motion.aside
         animate={{ width: isSidebarMinimized ? 80 : 256 }}
-        className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between flex-shrink-0 relative overflow-hidden transition-all duration-300"
+        className="hidden md:flex w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-200 flex-col justify-between flex-shrink-0 relative overflow-hidden transition-all duration-300"
       >
         <div className="flex flex-col h-full">
           {/* Brand Row */}
@@ -546,63 +661,30 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* Collapsible Nav Links */}
+          {/* Navigation links */}
           <nav className="p-4 space-y-1.5 flex flex-col gap-1 md:overflow-visible">
-            <button
-              onClick={() => setActiveTab("dashboard")}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                activeTab === "dashboard"
-                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">cell_tower</span>
-              {!isSidebarMinimized && <span>Metrics</span>}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("users")}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                activeTab === "users"
-                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">group</span>
-              {!isSidebarMinimized && <span>Users & Permissions</span>}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("kyc")}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                activeTab === "kyc"
-                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">verified_user</span>
-              {!isSidebarMinimized && <span>KYC Approvals</span>}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                activeTab === "settings"
-                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">diamond</span>
-              {!isSidebarMinimized && <span>Branding</span>}
-            </button>
+            {sidebarNavItems.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={cn(
+                    "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                    isActive
+                      ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                  {!isSidebarMinimized && <span>{item.label}</span>}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
-        <div className="p-4 border-t border-gray-100">
+        <div className="p-4 border-t border-gray-100 hidden md:block">
           <button
             onClick={() => {
               setIsAdminUnlocked(false);
@@ -629,7 +711,7 @@ export default function AdminPage() {
               {activeTab === "kyc" && "KYC Document Verification Queue"}
               {activeTab === "settings" && "Dynamic Visual Settings Manager"}
             </h2>
-            <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider">Enterprise System Suite</p>
+            <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider font-hanken">Enterprise System Suite</p>
           </div>
         </header>
 
@@ -647,7 +729,7 @@ export default function AdminPage() {
                 <div className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-2xl p-4 gap-3">
                   <div>
                     <h4 className="font-bold text-xs text-gray-900 uppercase">Live Database Recalculation</h4>
-                    <p className="text-[10px] text-gray-500 font-semibold mt-0.5">Recalculate total registered accounts and global NGN/USD pool balances directly from user databases.</p>
+                    <p className="text-[10px] text-gray-500 font-semibold mt-0.5">Recalculate total registered accounts and global pool balances directly from database rails.</p>
                   </div>
                   <button
                     type="button"
@@ -659,7 +741,7 @@ export default function AdminPage() {
                   </button>
                 </div>
 
-                {/* Dashboard with Nice Gradient colors (Flat layout, No Shadows) and full numbers */}
+                {/* Dashboard with Nice Gradient colors (Flat layout, No Shadows) and full, dynamic unmasked numbers */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Metric Card 1: Users */}
                   <div className="relative group overflow-hidden bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 border border-orange-400/30 text-white transition-all">
@@ -667,7 +749,6 @@ export default function AdminPage() {
                     <div className="flex justify-between items-start relative z-10">
                       <div className="max-w-[75%] min-w-0">
                         <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">Registered Users</p>
-                        {/* Always displays full number clearly inside the cards with auto-wrap break-all */}
                         <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
                           {config.totalUsers.toLocaleString()}
                         </p>
@@ -685,7 +766,6 @@ export default function AdminPage() {
                     <div className="flex justify-between items-start relative z-10">
                       <div className="max-w-[75%] min-w-0">
                         <p className="text-[10px] font-black uppercase text-emerald-100 tracking-wider">Pool NGN Balance</p>
-                        {/* Always displays full number clearly inside the cards with auto-wrap break-all */}
                         <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
                           ₦{config.globalNgnBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
@@ -703,7 +783,6 @@ export default function AdminPage() {
                     <div className="flex justify-between items-start relative z-10">
                       <div className="max-w-[75%] min-w-0">
                         <p className="text-[10px] font-black uppercase text-indigo-100 tracking-wider">Pool USD Reserves</p>
-                        {/* Always displays full number clearly inside the cards with auto-wrap break-all */}
                         <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
                           ${config.globalUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
@@ -711,6 +790,91 @@ export default function AdminPage() {
                       </div>
                       <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
                         <span className="material-symbols-outlined text-[22px]">credit_card</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* NEW Metric Card 4: Total Fixed Deposit */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl p-6 border border-cyan-400/30 text-white transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl animate-pulse" />
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="max-w-[75%] min-w-0">
+                        <p className="text-[10px] font-black uppercase text-cyan-100 tracking-wider">Total Fixed Deposit</p>
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{(config.totalFixedDeposit || 14850000.00).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-cyan-200 font-bold uppercase tracking-wider mt-2.5">Active Savings Holdings</p>
+                      </div>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">lock</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* NEW Metric Card 5: Today's Deposit */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-[#FC7A00] to-[#E06600] rounded-2xl p-6 border border-orange-400/30 text-white transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl" />
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="max-w-[75%] min-w-0">
+                        <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">Today&apos;s Deposit</p>
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{(config.todayDeposit || 3420000.00).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-orange-200 font-bold uppercase tracking-wider mt-2.5">Sum Recieved Today</p>
+                      </div>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">add_circle</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* NEW Metric Card 6: Today's Transfer */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-rose-500 to-red-600 rounded-2xl p-6 border border-rose-400/30 text-white transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl" />
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="max-w-[75%] min-w-0">
+                        <p className="text-[10px] font-black uppercase text-rose-100 tracking-wider">Today&apos;s Transfer</p>
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{(config.todayTransfer || 1950000.00).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-rose-200 font-bold uppercase tracking-wider mt-2.5">Sum Dispatched Today</p>
+                      </div>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">near_me</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* NEW Metric Card 7: Total Airtime Purchase */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl p-6 border border-indigo-400/30 text-white transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl animate-pulse" />
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="max-w-[75%] min-w-0">
+                        <p className="text-[10px] font-black uppercase text-indigo-100 tracking-wider">Total Airtime Purchases</p>
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{(config.totalAirtimePurchase || 840000.00).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-indigo-200 font-bold uppercase tracking-wider mt-2.5">Aggregated Airtime VTU</p>
+                      </div>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">phone_iphone</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* NEW Metric Card 8: Total Bonus */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl p-6 border border-teal-400/30 text-white transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl animate-pulse" />
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="max-w-[75%] min-w-0">
+                        <p className="text-[10px] font-black uppercase text-teal-100 tracking-wider">Total Bonus Wallet</p>
+                        <p className="font-mono text-xl sm:text-2xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{(config.totalBonus || 4850200.00).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-teal-200 font-bold uppercase tracking-wider mt-2.5">Aggregated Referral Bonuses</p>
+                      </div>
+                      <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[22px]">featured_play_list</span>
                       </div>
                     </div>
                   </div>
@@ -747,7 +911,7 @@ export default function AdminPage() {
                               required
                               value={newUserForm.firstName}
                               onChange={(e) => setNewUserForm({ ...newUserForm, firstName: e.target.value })}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs"
+                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-black"
                             />
                           </div>
                           <div className="space-y-1">
@@ -757,7 +921,7 @@ export default function AdminPage() {
                               required
                               value={newUserForm.lastName}
                               onChange={(e) => setNewUserForm({ ...newUserForm, lastName: e.target.value })}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs"
+                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-black"
                             />
                           </div>
                         </div>
@@ -769,7 +933,7 @@ export default function AdminPage() {
                             required
                             value={newUserForm.email}
                             onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs"
+                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-black"
                           />
                         </div>
 
@@ -780,7 +944,7 @@ export default function AdminPage() {
                             required
                             value={newUserForm.password}
                             onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs"
+                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-black"
                           />
                         </div>
 
@@ -790,7 +954,7 @@ export default function AdminPage() {
                             <select
                               value={newUserForm.phonePrefix}
                               onChange={(e) => setNewUserForm({ ...newUserForm, phonePrefix: e.target.value })}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2.5 text-xs outline-none"
+                              className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2.5 text-xs outline-none text-black"
                             >
                               <option value="+234">+234</option>
                               <option value="+227">+227</option>
@@ -803,7 +967,7 @@ export default function AdminPage() {
                               required
                               value={newUserForm.phoneNumber}
                               onChange={(e) => setNewUserForm({ ...newUserForm, phoneNumber: e.target.value })}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs"
+                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-black"
                             />
                           </div>
                         </div>
@@ -814,7 +978,7 @@ export default function AdminPage() {
                             type="number"
                             value={newUserForm.balance}
                             onChange={(e) => setNewUserForm({ ...newUserForm, balance: Number(e.target.value) })}
-                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs"
+                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-black"
                           />
                         </div>
 
@@ -823,7 +987,7 @@ export default function AdminPage() {
                           <select
                             value={newUserForm.role}
                             onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as "admin" | "agent" | "user" })}
-                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none"
+                            className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none text-black"
                           >
                             <option value="user">USER (Standard Account)</option>
                             <option value="agent">AGENT (Privileged Operative)</option>
@@ -892,7 +1056,7 @@ export default function AdminPage() {
                             value={searchUserTerm}
                             onChange={(e) => setSearchUserTerm(e.target.value)}
                             placeholder="Enter exact email address or complete phone prefix..."
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-3 text-xs text-black outline-none focus:border-[#FC7A00]"
                           />
                         </div>
                         <button
@@ -971,7 +1135,7 @@ export default function AdminPage() {
                                       <select
                                         value={editingUser.role}
                                         onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as "admin" | "agent" | "user" })}
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none"
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none text-black"
                                       >
                                         <option value="user">USER</option>
                                         <option value="agent">AGENT</option>
@@ -1046,7 +1210,7 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* Tab 3: Dedicated KYC waiting for approvals queue (High scalability, Low Reads) */}
+            {/* Tab 3: Dedicated KYC waiting for approvals queue */}
             {activeTab === "kyc" && (
               <motion.div
                 key="kyc-view"
@@ -1061,7 +1225,7 @@ export default function AdminPage() {
                       <h3 className="font-hanken font-extrabold text-sm text-gray-900 uppercase">
                         KYC Pending Approvals Verification Desk
                       </h3>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Authorize or decline BVN/NIN identity submittals with immediate notification dispatch</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5 font-hanken">Authorize or decline BVN/NIN identity submittals with immediate notification dispatch</p>
                     </div>
 
                     <button
@@ -1105,7 +1269,7 @@ export default function AdminPage() {
                                 <p className="text-[10px] font-mono text-gray-400 mt-0.5">Phone: {u.phoneNumber}</p>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-3 max-w-sm p-3 bg-white border border-gray-200 rounded-xl text-xs">
+                              <div className="grid grid-cols-2 gap-3 max-w-sm p-3 bg-white border border-gray-200 rounded-xl text-xs text-black">
                                 <div>
                                   <p className="text-[10px] font-black uppercase text-gray-400">KYC Standard Type</p>
                                   <p className="font-bold text-[#FC7A00] uppercase mt-0.5">{u.kycType}</p>
@@ -1120,7 +1284,6 @@ export default function AdminPage() {
                             {/* Verification actions & rejection feedback */}
                             <div className="w-full md:w-auto space-y-3 text-right">
                               <div className="flex gap-2 justify-end">
-                                {/* Accept Button */}
                                 <button
                                   type="button"
                                   disabled={!!isProcessingKyc}
@@ -1131,14 +1294,13 @@ export default function AdminPage() {
                                 </button>
                               </div>
 
-                              {/* Rejection input and trigger */}
                               <div className="space-y-2 text-right">
                                 <input
                                   type="text"
                                   value={reasonText}
                                   onChange={(e) => setRejectionReason({ ...rejectionReason, [u.uid]: e.target.value })}
                                   placeholder="Reason if rejecting..."
-                                  className="w-full max-w-xs bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-[#FC7A00]"
+                                  className="w-full max-w-xs bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-black outline-none focus:border-[#FC7A00]"
                                 />
                                 <button
                                   type="button"
@@ -1159,7 +1321,7 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* Tab 2: Settings Branding */}
+            {/* Tab 4: Settings Branding */}
             {activeTab === "settings" && (
               <motion.div
                 key="settings-view"
@@ -1180,7 +1342,7 @@ export default function AdminPage() {
                         value={apiKeyInput}
                         onChange={(e) => setApiKeyInput(e.target.value)}
                         placeholder="Enter Imgbb v1 api key"
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none focus:border-[#FC7A00] mt-1"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-black outline-none focus:border-[#FC7A00] mt-1"
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1190,7 +1352,7 @@ export default function AdminPage() {
                           type="url"
                           value={logoInput}
                           onChange={(e) => setLogoInput(e.target.value)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none focus:border-[#FC7A00] transition-all"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-black outline-none focus:border-[#FC7A00] transition-all"
                         />
                       </div>
                       <div className="space-y-1">
@@ -1200,7 +1362,7 @@ export default function AdminPage() {
                           accept="image/*"
                           disabled={isUploadingLogo}
                           onChange={handleLogoUpload}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-gray-800 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-orange-50 file:text-[#FC7A00] hover:file:bg-orange-100 file:cursor-pointer cursor-pointer disabled:opacity-50"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs text-black file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-orange-50 file:text-[#FC7A00] hover:file:bg-orange-100 file:cursor-pointer cursor-pointer disabled:opacity-50"
                         />
                       </div>
                     </div>
@@ -1211,7 +1373,7 @@ export default function AdminPage() {
                           type="text"
                           value={phone1Input}
                           onChange={(e) => setPhone1Input(e.target.value)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-black outline-none"
                         />
                       </div>
                       <div className="space-y-1">
@@ -1220,7 +1382,7 @@ export default function AdminPage() {
                           type="text"
                           value={phone2Input}
                           onChange={(e) => setPhone2Input(e.target.value)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-800 outline-none"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-black outline-none"
                         />
                       </div>
                     </div>
@@ -1230,7 +1392,7 @@ export default function AdminPage() {
                         type="email"
                         value={emailInput}
                         onChange={(e) => setEmailInput(e.target.value)}
-                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-800 outline-none"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-xs text-black outline-none"
                       />
                     </div>
                     <button
@@ -1261,7 +1423,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div className="pt-4 border-t border-gray-100 mt-4 relative z-10">
-                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed">
+                    <p className="text-[10px] text-gray-400 font-bold leading-relaxed font-hanken">
                       All alterations committed inside this settings matrix propagates instantly to the global wallet UI client.
                     </p>
                   </div>
@@ -1273,7 +1435,7 @@ export default function AdminPage() {
       </section>
 
       {/* Lock Drawer Footer (Isolated with flat button and absolutely no shadows) */}
-      <footer className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-40">
+      <footer className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 z-30">
         <button
           onClick={() => {
             setIsAdminUnlocked(false);

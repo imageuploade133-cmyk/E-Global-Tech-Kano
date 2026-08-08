@@ -145,11 +145,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
         }
       },
       (error) => {
-        if (error.code === "permission-denied" || error.message?.toLowerCase().includes("permission")) {
-          console.warn("[Header Notifications Listener]: Missing or insufficient permissions. This is normal during authentication transitions.");
-        } else {
-          console.error("[Header Notifications Listener Exception]:", error.message);
-        }
+        console.error("[Header Notifications Listener Exception]:", error.message);
       }
     );
 
