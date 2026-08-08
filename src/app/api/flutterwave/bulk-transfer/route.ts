@@ -142,24 +142,30 @@ export async function POST(req: Request) {
       // PIN matches, reset attempts (WRITES operation start here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
+      // Apply Bulk Transfer Fee Profit Markup securely on server-side
+      const bulkTransferProfitMargin = Number(userData.bulkTransferProfitMargin) || 0;
+      const finalFlatFee = 10.00 + bulkTransferProfitMargin;
+      const finalTotalFees = trfRecipients.length * finalFlatFee;
+      const finalTotalDeduction = totalAmt + finalTotalFees;
+
       // Check balance using preloaded wallet
-      if (walletBalance < totalDeduction) {
+      if (walletBalance < finalTotalDeduction) {
         return {
           success: false,
-          error: `Insufficient wallet balance to complete this bulk transfer. Required: ₦${totalDeduction.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
+          error: `Insufficient wallet balance to complete this bulk transfer. Required: ₦${finalTotalDeduction.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
         };
       }
 
       // Perform local debit atomically with preloaded context
       await WalletService.debitWallet(transaction, {
         userId: uid,
-        amount: totalDeduction,
+        amount: finalTotalDeduction,
         currency: "NGN",
         reference: trfReference,
         type: "TRANSFER",
         description,
         recipientName: "Bulk Recipients",
-        fee: totalFees,
+        fee: finalTotalFees,
         preLoadedUser: {
           ref: userRef,
           data: userData,
@@ -300,10 +306,15 @@ export async function POST(req: Request) {
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
+          const bulkTransferProfitMargin = Number(uData.bulkTransferProfitMargin) || 0;
+          const finalFlatFee = 10.00 + bulkTransferProfitMargin;
+          const finalTotalFees = trfRecipients.length * finalFlatFee;
+          const finalTotalDeduction = totalAmt + finalTotalFees;
+
           const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
-            amount: totalDeduction,
+            amount: finalTotalDeduction,
             currency: "NGN",
             reference: `REFUND-${trfReference}`,
             description: `Refund for failed bulk transfer: ${description}`,
