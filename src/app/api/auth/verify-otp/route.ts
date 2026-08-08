@@ -30,7 +30,16 @@ export async function POST(req: Request) {
       }),
     });
 
-    const result = await response.json();
+    const responseText = await response.text();
+    let result: any = {};
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      console.error("[WhatsApp OTP Verify Proxy] Received non-JSON response from gateway:", responseText);
+      return NextResponse.json({
+        error: `Database Gateway unreachable or returned an invalid response (HTTP ${response.status}).`
+      }, { status: 502 });
+    }
 
     if (!response.ok) {
       return NextResponse.json({ error: result.message || "Failed to verify WhatsApp OTP." }, { status: response.status });
