@@ -93,8 +93,16 @@ export default function AdminPage() {
   // Admin lock validation
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit">("dashboard");
+
+  // Pre-fill admin email when user loads
+  useEffect(() => {
+    if (user?.email) {
+      setAdminEmail(user.email);
+    }
+  }, [user]);
 
   // VTU & Transfer Margins State
   const [margins, setMargins] = useState<AdminUser["balance"] | any>({
@@ -666,6 +674,23 @@ export default function AdminPage() {
 
     const isMock = sessionStorage.getItem("mock") === "true";
 
+    if (!isMock) {
+      if (!adminEmail.trim()) {
+        toast.error("Please enter your admin email address.");
+        setIsVerifyingPin(false);
+        return;
+      }
+
+      const cleanEnteredEmail = adminEmail.toLowerCase().trim();
+      const actualUserEmail = user?.email?.toLowerCase().trim() || "";
+
+      if (cleanEnteredEmail !== actualUserEmail) {
+        toast.error("Unauthorized: Entered email address does not match your session.");
+        setIsVerifyingPin(false);
+        return;
+      }
+    }
+
     if (isMock) {
       setTimeout(() => {
         setIsAdminUnlocked(true);
@@ -894,14 +919,26 @@ export default function AdminPage() {
           </div>
 
           <form onSubmit={handleAdminVerify} className="w-full space-y-4">
-            <div className="space-y-2 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin PIN / Access PIN</label>
+            <div className="space-y-1.5 text-left">
+              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Email Address</label>
+              <input
+                type="email"
+                required
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Access PIN</label>
               <input
                 type="password"
                 maxLength={6}
                 value={adminPin}
                 onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter passcode or your transaction PIN"
+                placeholder="Enter 4-digit Access PIN"
                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
               />
             </div>
@@ -1020,11 +1057,13 @@ export default function AdminPage() {
               <div className={cn("p-4 border-t", isDark ? "border-gray-800" : "border-gray-100")}>
                 <button
                   onClick={() => {
-                    setIsAdminUnlocked(false);
-                    if (typeof window !== "undefined") {
-                      sessionStorage.removeItem("admin_session_unlocked");
+                    if (window.confirm("Are you sure you want to lock the administrative console session?")) {
+                      setIsAdminUnlocked(false);
+                      if (typeof window !== "undefined") {
+                        sessionStorage.removeItem("admin_session_unlocked");
+                      }
+                      toast.info("Console session locked.");
                     }
-                    toast.info("Console session locked.");
                   }}
                   className={cn(
                     "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
@@ -1108,11 +1147,13 @@ export default function AdminPage() {
         <div className={cn("p-4 border-t hidden md:block", isDark ? "border-gray-800" : "border-gray-100")}>
           <button
             onClick={() => {
-              setIsAdminUnlocked(false);
-              if (typeof window !== "undefined") {
-                sessionStorage.removeItem("admin_session_unlocked");
+              if (window.confirm("Are you sure you want to lock the administrative console session?")) {
+                setIsAdminUnlocked(false);
+                if (typeof window !== "undefined") {
+                  sessionStorage.removeItem("admin_session_unlocked");
+                }
+                toast.info("Console session locked.");
               }
-              toast.info("Console session locked.");
             }}
             className={cn(
               "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
@@ -2458,11 +2499,13 @@ export default function AdminPage() {
       <footer className={cn("md:hidden fixed bottom-0 left-0 right-0 p-4 border-t z-30 transition-colors duration-300", isDark ? "bg-gray-900 border-gray-850" : "bg-white border-gray-100")}>
         <button
           onClick={() => {
-            setIsAdminUnlocked(false);
-            if (typeof window !== "undefined") {
-              sessionStorage.removeItem("admin_session_unlocked");
+            if (window.confirm("Are you sure you want to lock the administrative console session?")) {
+              setIsAdminUnlocked(false);
+              if (typeof window !== "undefined") {
+                sessionStorage.removeItem("admin_session_unlocked");
+              }
+              toast.info("Console session locked.");
             }
-            toast.info("Console session locked.");
           }}
           className={cn(
             "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center",
