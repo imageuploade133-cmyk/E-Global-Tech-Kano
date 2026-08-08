@@ -19,6 +19,7 @@ export interface AppConfig {
   todayTransfer?: number;
   totalAirtimePurchase?: number;
   totalBonus?: number;
+  newDeviceDetectorEnabled?: boolean;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -36,6 +37,7 @@ const DEFAULT_CONFIG: AppConfig = {
   todayTransfer: 0,
   totalAirtimePurchase: 0,
   totalBonus: 0,
+  newDeviceDetectorEnabled: true,
 };
 
 interface ConfigContextProps {
