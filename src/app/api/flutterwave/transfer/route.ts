@@ -179,12 +179,17 @@ export async function POST(req: Request) {
       // PIN matches, reset attempts (WRITE operation starts here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
+      // Apply Single Transfer Fee Profit Markup securely on server-side
+      const transferProfitMargin = Number(userData.transferProfitMargin) || 0;
+      const finalFee = fee + transferProfitMargin;
+      const finalTotalDeduction = trfAmount + finalFee;
+
       // Check balance using the pre-loaded specific wallet balance
-      console.log(`STEP 7 - Balance checked. Available wallet: ${walletBalance}, Required: ${totalDeduction}`);
-      if (walletBalance < totalDeduction) {
+      console.log(`STEP 7 - Balance checked. Available wallet: ${walletBalance}, Required: ${finalTotalDeduction}`);
+      if (walletBalance < finalTotalDeduction) {
         return {
           success: false,
-          error: `Insufficient wallet balance to complete this transfer. Required: ₦${totalDeduction.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
+          error: `Insufficient wallet balance to complete this transfer. Required: ₦${finalTotalDeduction.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
         };
       }
 
@@ -192,13 +197,13 @@ export async function POST(req: Request) {
       console.log("STEP 8 - Calling WalletService.debitWallet() with preloaded parameters");
       await WalletService.debitWallet(transaction, {
         userId: uid,
-        amount: totalDeduction,
+        amount: finalTotalDeduction,
         currency: trfCurrency,
         reference: trfReference,
         type: "TRANSFER",
         description,
         recipientName: trfName,
-        fee,
+        fee: finalFee,
         preLoadedUser: {
           ref: userRef,
           data: userData,
@@ -336,10 +341,14 @@ export async function POST(req: Request) {
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
+          const transferProfitMargin = Number(uData.transferProfitMargin) || 0;
+          const finalFee = fee + transferProfitMargin;
+          const finalTotalDeduction = trfAmount + finalFee;
+
           const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
-            amount: totalDeduction,
+            amount: finalTotalDeduction,
             currency: trfCurrency,
             reference: `REFUND-${trfReference}`,
             description: `Refund for failed transfer: ${description}`,
