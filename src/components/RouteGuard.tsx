@@ -258,6 +258,12 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     const deviceId = getOrCreateDeviceId();
     const verifiedList = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
 
+    // Check if New Device Detector is disabled globally via CPanel
+    if (config?.newDeviceDetectorEnabled === false) {
+      setIsNewDeviceBlocked(false);
+      return;
+    }
+
     // 1. First-time registration of deviceId: Whitelist the first device used to register/login
     if (!userData.registeredDeviceId && !initializingDeviceRef.current) {
       initializingDeviceRef.current = true;
@@ -303,7 +309,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       // 3. Unrecognized device detected: Block transaction activity with validation overlay
       setIsNewDeviceBlocked(true);
     }
-  }, [user, loading, userData, pathname, router, updateUserData]);
+  }, [user, loading, userData, pathname, router, updateUserData, config?.newDeviceDetectorEnabled]);
 
   // Instant verification check: triggered when user focuses the tab or tab becomes visible again
   useEffect(() => {
