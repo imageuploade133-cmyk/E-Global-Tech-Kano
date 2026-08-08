@@ -47,16 +47,16 @@ export async function GET(req: Request) {
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
     const apiKey = process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
-    // Retrieve user custom profit margin setting from Firestore to apply markup dynamically
+    // Retrieve admin global custom profit margin setting from Firestore to apply markup dynamically
     let profitMargin = 0;
-    if (uid && adminDb) {
+    if (adminDb) {
       try {
-        const userDoc = await adminDb.collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          profitMargin = Number(userDoc.data()?.dataProfitMargin) || 0;
+        const marginSnap = await adminDb.collection("config").doc("vtu_profit_margins").get();
+        if (marginSnap.exists) {
+          profitMargin = Number(marginSnap.data()?.dataProfitMargin) || 0;
         }
       } catch (dbErr) {
-        console.warn("[Plans Profit Margin] Failed to read user profitMargin:", dbErr);
+        console.warn("[Plans Profit Margin] Failed to read config profitMargin:", dbErr);
       }
     }
 
@@ -113,13 +113,13 @@ export async function GET(req: Request) {
     const normNetwork = network.trim().toUpperCase();
     const rawPlans = FALLBACK_DATA_PLANS[normNetwork] || Object.values(FALLBACK_DATA_PLANS).flat();
 
-    // Retrieve user custom profit margin setting from Firestore for exception path
+    // Retrieve admin global custom profit margin setting from Firestore for exception path
     let profitMargin = 0;
-    if (uid && adminDb) {
+    if (adminDb) {
       try {
-        const userDoc = await adminDb.collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          profitMargin = Number(userDoc.data()?.dataProfitMargin) || 0;
+        const marginSnap = await adminDb.collection("config").doc("vtu_profit_margins").get();
+        if (marginSnap.exists) {
+          profitMargin = Number(marginSnap.data()?.dataProfitMargin) || 0;
         }
       } catch (dbErr) {}
     }

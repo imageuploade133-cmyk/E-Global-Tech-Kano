@@ -142,8 +142,13 @@ export async function POST(req: Request) {
       // PIN matches, reset attempts (WRITES operation start here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      // Apply Bulk Transfer Fee Profit Markup securely on server-side
-      const bulkTransferProfitMargin = Number(userData.bulkTransferProfitMargin) || 0;
+      // Apply Bulk Transfer Fee Profit Markup securely on server-side from global admin config
+      let bulkTransferProfitMargin = 0;
+      const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
+      const marginSnap = await transaction.get(marginRef);
+      if (marginSnap.exists) {
+        bulkTransferProfitMargin = Number(marginSnap.data()?.bulkTransferProfitMargin) || 0;
+      }
       const finalFlatFee = 10.00 + bulkTransferProfitMargin;
       const finalTotalFees = trfRecipients.length * finalFlatFee;
       const finalTotalDeduction = totalAmt + finalTotalFees;
@@ -306,7 +311,12 @@ export async function POST(req: Request) {
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
-          const bulkTransferProfitMargin = Number(uData.bulkTransferProfitMargin) || 0;
+          let bulkTransferProfitMargin = 0;
+          const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
+          const marginSnap = await rollbackTx.get(marginRef);
+          if (marginSnap.exists) {
+            bulkTransferProfitMargin = Number(marginSnap.data()?.bulkTransferProfitMargin) || 0;
+          }
           const finalFlatFee = 10.00 + bulkTransferProfitMargin;
           const finalTotalFees = trfRecipients.length * finalFlatFee;
           const finalTotalDeduction = totalAmt + finalTotalFees;

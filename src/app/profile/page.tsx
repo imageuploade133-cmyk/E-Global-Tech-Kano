@@ -455,39 +455,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Data Profit Margin States & Save Handler
-  const [dataProfitMarginInput, setDataProfitMarginInput] = useState("0");
-  const [isSavingMargin, setIsSavingMargin] = useState(false);
-
-  useEffect(() => {
-    if (userData?.dataProfitMargin !== undefined) {
-      setDataProfitMarginInput(String(userData.dataProfitMargin));
-    }
-  }, [userData?.dataProfitMargin]);
-
-  const handleSaveProfitMargin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = Number(dataProfitMarginInput);
-    if (isNaN(val) || val < 0) {
-      toast.error("Please enter a valid non-negative profit margin amount.");
-      return;
-    }
-
-    setIsSavingMargin(true);
-    try {
-      await updateUserData({
-        dataProfitMargin: val
-      });
-      toast.success("Data profit margin applied successfully!", {
-        description: `₦${val} will be dynamically added to all displayed Mobile Data plans.`
-      });
-    } catch (err: any) {
-      toast.error("Failed to save profit margin: " + err.message);
-    } finally {
-      setIsSavingMargin(false);
-    }
-  };
-
   const handleUpdatePin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (oldPin.length !== 4 || isNaN(Number(oldPin))) {
@@ -1061,26 +1028,6 @@ export default function ProfilePage() {
                 {isUpdatingPin ? "Updating..." : "Update PIN"}
               </button>
             </form>
-          </section>
-
-          {/* Section: Custom Data Profit Margin Settings & Dedicated Markup Portal Link */}
-          <section className="premium-gradient-card premium-gradient-border p-6 space-y-4">
-            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100/60 pb-2.5 flex justify-between items-center">
-              <span>Commission Markups</span>
-              <span className="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded font-black">Secure S2S</span>
-            </h3>
-
-            <p className="font-hanken text-xs text-gray-500 leading-relaxed">
-              We offer a secure unified markup console where you can view all available VTU networks, airtime configurations, TV decoders, utility bill payments, and outward bank transfers to customize your sub-agent markup margins.
-            </p>
-
-            <Link
-              href="/profile/vtu-profit"
-              className="w-full py-4 bg-black text-white hover:bg-gray-900 rounded-2xl text-xs font-black uppercase tracking-widest text-center flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
-            >
-              <span className="material-symbols-outlined text-[16px] font-bold">tune</span>
-              <span>Open Dedicated Markup Portal</span>
-            </Link>
           </section>
 
           {/* Section: Change Password Form */}
