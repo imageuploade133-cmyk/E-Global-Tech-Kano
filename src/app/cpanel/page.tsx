@@ -94,7 +94,20 @@ export default function AdminPage() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit">("dashboard");
+
+  // VTU & Transfer Margins State
+  const [margins, setMargins] = useState<AdminUser["balance"] | any>({
+    dataProfitMargin: 0,
+    airtimeProfitMargin: 0,
+    cableProfitMargin: 0,
+    waecProfitMargin: 0,
+    electricityProfitMargin: 0,
+    transferProfitMargin: 0,
+    bulkTransferProfitMargin: 0,
+  });
+  const [isLoadingMargins, setIsLoadingMargins] = useState(false);
+  const [isSavingMargins, setIsSavingMargins] = useState(false);
 
   // WhatsApp Linking States
   const [whatsappStatus, setWhatsappStatus] = useState<"LINKED" | "UNLINKED">("UNLINKED");
@@ -363,9 +376,94 @@ export default function AdminPage() {
     setWhatsappLogs(prev => [`[${time}] ${msg}`, ...prev.slice(0, 49)]);
   };
 
+  const fetchGlobalMargins = async () => {
+    setIsLoadingMargins(true);
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/vtu-profit", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMargins({
+          dataProfitMargin: Number(data.dataProfitMargin) || 0,
+          airtimeProfitMargin: Number(data.airtimeProfitMargin) || 0,
+          cableProfitMargin: Number(data.cableProfitMargin) || 0,
+          waecProfitMargin: Number(data.waecProfitMargin) || 0,
+          electricityProfitMargin: Number(data.electricityProfitMargin) || 0,
+          transferProfitMargin: Number(data.transferProfitMargin) || 0,
+          bulkTransferProfitMargin: Number(data.bulkTransferProfitMargin) || 0,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load global profit margins:", err);
+    } finally {
+      setIsLoadingMargins(false);
+    }
+  };
+
+  const handleSaveGlobalMargins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingMargins(true);
+    toast.loading("Applying and securing global markup configurations...");
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/vtu-profit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify(margins),
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.success) {
+        toast.success("Global administrative markups applied successfully!");
+      } else {
+        toast.error(data.error || "Failed to save settings.");
+      }
+    } catch (err) {
+      toast.dismiss();
+      console.error("Error saving configurations:", err);
+      toast.error("Connection error. Could not save settings.");
+    } finally {
+      setIsSavingMargins(false);
+    }
+  };
+
+  const updateMarginField = (key: string, value: string) => {
+    const num = Math.max(0, parseFloat(value) || 0);
+    setMargins((prev: any) => ({
+      ...prev,
+      [key]: num,
+    }));
+  };
+
   useEffect(() => {
     if (isAdminUnlocked && activeTab === "whatsapp") {
       fetchWhatsappStatus();
+    }
+  }, [isAdminUnlocked, activeTab]);
+
+  useEffect(() => {
+    if (isAdminUnlocked && activeTab === "profit") {
+      fetchGlobalMargins();
     }
   }, [isAdminUnlocked, activeTab]);
 
@@ -773,6 +871,7 @@ export default function AdminPage() {
     { id: "kyc", label: "KYC Approvals", icon: "verified_user" },
     { id: "settings", label: "Branding", icon: "diamond" },
     { id: "whatsapp", label: "WhatsApp Link", icon: "hub" },
+    { id: "profit", label: "Commission Markups", icon: "tune" },
   ];
 
   if (!isAdminUnlocked) {
@@ -1041,6 +1140,7 @@ export default function AdminPage() {
               {activeTab === "kyc" && "KYC Document Verification Queue"}
               {activeTab === "settings" && "Dynamic Visual Settings Manager"}
               {activeTab === "whatsapp" && "WhatsApp API Gateway Link"}
+              {activeTab === "profit" && "Global Commission Markups Manager"}
             </h2>
             <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider font-hanken">Enterprise System Suite</p>
           </div>
@@ -2199,6 +2299,155 @@ export default function AdminPage() {
                     ))}
                   </div>
                 </div>
+              </motion.div>
+            )}
+
+            {/* Tab 6: Secure Commission Markups Settings Panel */}
+            {activeTab === "profit" && (
+              <motion.div
+                key="profit-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6 animate-fadeIn"
+              >
+                {/* Secure Alert Banner */}
+                <div className={cn(
+                  "p-5 rounded-2xl border text-left flex items-start gap-3.5 transition-colors duration-300",
+                  isDark ? "bg-emerald-950/20 border-emerald-900/30 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-900"
+                )}>
+                  <span className="material-symbols-outlined text-[22px] shrink-0 text-emerald-500 font-bold">shield</span>
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-xs uppercase tracking-wide">Secure Server-Side Markup Execution</h3>
+                    <p className="text-[11px] leading-relaxed font-semibold opacity-85">
+                      These global markup configs are stored in Firestore and loaded atomically by Google Cloud transaction engines. Public users or client-side packages can never access, read, or bypass these margins.
+                    </p>
+                  </div>
+                </div>
+
+                {isLoadingMargins ? (
+                  <div className="py-24 text-center text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse flex flex-col items-center gap-3">
+                    <ButtonSpinner />
+                    <span>Synchronizing commission guidelines...</span>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSaveGlobalMargins} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left Block */}
+                      <div className="space-y-4">
+                        <div className={cn("p-6 border rounded-2xl transition-colors duration-300 space-y-4", panelClass)}>
+                          <h4 className="text-xs font-black uppercase text-[#FC7A00] tracking-wider border-b pb-2">VTU Products Markup</h4>
+
+                          <div className="space-y-4">
+                            {/* Data Markup */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Mobile Data Markup (₦)</label>
+                              <input
+                                type="number"
+                                value={margins.dataProfitMargin || ""}
+                                onChange={(e) => updateMarginField("dataProfitMargin", e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. 50"
+                              />
+                              <p className="text-[9px] text-gray-500 font-semibold leading-relaxed mt-0.5">Added directly to MTN, Glo, Airtel & 9Mobile plans.</p>
+                            </div>
+
+                            {/* Airtime Markup */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Airtime Markup (₦)</label>
+                              <input
+                                type="number"
+                                value={margins.airtimeProfitMargin || ""}
+                                onChange={(e) => updateMarginField("airtimeProfitMargin", e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. 20"
+                              />
+                            </div>
+
+                            {/* Cable TV Markup */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Cable TV Markup (₦)</label>
+                              <input
+                                type="number"
+                                value={margins.cableProfitMargin || ""}
+                                onChange={(e) => updateMarginField("cableProfitMargin", e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. 100"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Block */}
+                      <div className="space-y-4">
+                        <div className={cn("p-6 border rounded-2xl transition-colors duration-300 space-y-4", panelClass)}>
+                          <h4 className="text-xs font-black uppercase text-[#FC7A00] tracking-wider border-b pb-2">Utility & Transfers Markup</h4>
+
+                          <div className="space-y-4">
+                            {/* Electricity Markup */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Electricity Markup (₦)</label>
+                              <input
+                                type="number"
+                                value={margins.electricityProfitMargin || ""}
+                                onChange={(e) => updateMarginField("electricityProfitMargin", e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. 150"
+                              />
+                            </div>
+
+                            {/* WAEC Markup */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">WAEC PIN Markup (₦)</label>
+                              <input
+                                type="number"
+                                value={margins.waecProfitMargin || ""}
+                                onChange={(e) => updateMarginField("waecProfitMargin", e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. 200"
+                              />
+                            </div>
+
+                            {/* Single Transfer Fee Markup */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Single Transfer Fee Markup (₦)</label>
+                              <input
+                                type="number"
+                                value={margins.transferProfitMargin || ""}
+                                onChange={(e) => updateMarginField("transferProfitMargin", e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. 50"
+                              />
+                              <p className="text-[9px] text-gray-500 font-semibold leading-relaxed mt-0.5">Markup fee added securely on Single out bank transfers.</p>
+                            </div>
+
+                            {/* Bulk Transfer Fee Markup */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Bulk Transfer Fee Markup (₦)</label>
+                              <input
+                                type="number"
+                                value={margins.bulkTransferProfitMargin || ""}
+                                onChange={(e) => updateMarginField("bulkTransferProfitMargin", e.target.value)}
+                                className={inputClass}
+                                placeholder="e.g. 30"
+                              />
+                              <p className="text-[9px] text-gray-500 font-semibold leading-relaxed mt-0.5">Markup fee added per recipient inside Bulk Transfers.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSavingMargins}
+                      className="px-6 py-3.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-98 shadow-sm flex items-center justify-center"
+                    >
+                      {isSavingMargins ? <><ButtonSpinner /> Saving changes...</> : "Save Markup configurations"}
+                    </button>
+                  </form>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

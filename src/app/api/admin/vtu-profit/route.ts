@@ -1,0 +1,103 @@
+import { NextResponse } from "next/server";
+import { verifyAdminAuth } from "@/lib/admin-auth";
+import { adminDb } from "@/lib/firebase-admin";
+
+export async function GET(req: Request) {
+  try {
+    const { uid, isAdmin } = await verifyAdminAuth(req);
+
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    }
+
+    // Default system fallback profit margins
+    let dataProfitMargin = 0;
+    let airtimeProfitMargin = 0;
+    let cableProfitMargin = 0;
+    let waecProfitMargin = 0;
+    let electricityProfitMargin = 0;
+    let transferProfitMargin = 0;
+    let bulkTransferProfitMargin = 0;
+
+    // Load from Firestore global admin configuration document or use default margins
+    try {
+      const docRef = adminDb.collection("config").doc("vtu_profit_margins");
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        dataProfitMargin = Number(data?.dataProfitMargin) || 0;
+        airtimeProfitMargin = Number(data?.airtimeProfitMargin) || 0;
+        cableProfitMargin = Number(data?.cableProfitMargin) || 0;
+        waecProfitMargin = Number(data?.waecProfitMargin) || 0;
+        electricityProfitMargin = Number(data?.electricityProfitMargin) || 0;
+        transferProfitMargin = Number(data?.transferProfitMargin) || 0;
+        bulkTransferProfitMargin = Number(data?.bulkTransferProfitMargin) || 0;
+      }
+    } catch (dbErr: any) {
+      console.warn("[Admin VTU Profit GET] Failed to fetch margin settings, returning defaults:", dbErr.message);
+    }
+
+    return NextResponse.json({
+      success: true,
+      dataProfitMargin,
+      airtimeProfitMargin,
+      cableProfitMargin,
+      waecProfitMargin,
+      electricityProfitMargin,
+      transferProfitMargin,
+      bulkTransferProfitMargin,
+    });
+  } catch (err: any) {
+    console.error("[Admin VTU Profit GET Exception]:", err.message);
+    return NextResponse.json({ error: "Unauthorized or backend error", details: err.message }, { status: 401 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const { uid, isAdmin } = await verifyAdminAuth(req);
+
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const {
+      dataProfitMargin,
+      airtimeProfitMargin,
+      cableProfitMargin,
+      waecProfitMargin,
+      electricityProfitMargin,
+      transferProfitMargin,
+      bulkTransferProfitMargin
+    } = body;
+
+    const updates: Record<string, number> = {};
+
+    if (dataProfitMargin !== undefined) updates.dataProfitMargin = Math.max(0, Number(dataProfitMargin) || 0);
+    if (airtimeProfitMargin !== undefined) updates.airtimeProfitMargin = Math.max(0, Number(airtimeProfitMargin) || 0);
+    if (cableProfitMargin !== undefined) updates.cableProfitMargin = Math.max(0, Number(cableProfitMargin) || 0);
+    if (waecProfitMargin !== undefined) updates.waecProfitMargin = Math.max(0, Number(waecProfitMargin) || 0);
+    if (electricityProfitMargin !== undefined) updates.electricityProfitMargin = Math.max(0, Number(electricityProfitMargin) || 0);
+    if (transferProfitMargin !== undefined) updates.transferProfitMargin = Math.max(0, Number(transferProfitMargin) || 0);
+    if (bulkTransferProfitMargin !== undefined) updates.bulkTransferProfitMargin = Math.max(0, Number(bulkTransferProfitMargin) || 0);
+
+    updates.updatedAt = new Date().toISOString() as any;
+
+    try {
+      await adminDb.collection("config").doc("vtu_profit_margins").set(updates, { merge: true });
+    } catch (dbErr: any) {
+      console.error("[Admin VTU Profit POST] DB write failed:", dbErr.message);
+      return NextResponse.json({ error: "Failed to write margins to Firestore." }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Global admin markup margins successfully saved and applied!",
+      updated: updates
+    });
+  } catch (err: any) {
+    console.error("[Admin VTU Profit POST Exception]:", err.message);
+    return NextResponse.json({ error: "Operation failed", details: err.message }, { status: 500 });
+  }
+}

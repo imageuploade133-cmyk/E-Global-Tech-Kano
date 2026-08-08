@@ -179,8 +179,13 @@ export async function POST(req: Request) {
       // PIN matches, reset attempts (WRITE operation starts here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      // Apply Single Transfer Fee Profit Markup securely on server-side
-      const transferProfitMargin = Number(userData.transferProfitMargin) || 0;
+      // Apply Single Transfer Fee Profit Markup securely on server-side from global admin config
+      let transferProfitMargin = 0;
+      const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
+      const marginSnap = await transaction.get(marginRef);
+      if (marginSnap.exists) {
+        transferProfitMargin = Number(marginSnap.data()?.transferProfitMargin) || 0;
+      }
       const finalFee = fee + transferProfitMargin;
       const finalTotalDeduction = trfAmount + finalFee;
 
@@ -341,7 +346,12 @@ export async function POST(req: Request) {
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
-          const transferProfitMargin = Number(uData.transferProfitMargin) || 0;
+          let transferProfitMargin = 0;
+          const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
+          const marginSnap = await rollbackTx.get(marginRef);
+          if (marginSnap.exists) {
+            transferProfitMargin = Number(marginSnap.data()?.transferProfitMargin) || 0;
+          }
           const finalFee = fee + transferProfitMargin;
           const finalTotalDeduction = trfAmount + finalFee;
 
