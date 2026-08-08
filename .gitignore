@@ -55,5 +55,8 @@ verification/screenshots/6_history.png
 verification/screenshots/7_history_filtered_usd.png
 verification/screenshots/error.png
 
-# Standalone payment gateway repository
-/payment-gateway/
+# Standalone payment gateway repository - allow source files but ignore build/deps/logs
+payment-gateway/node_modules/
+payment-gateway/coverage/
+payment-gateway/logs/
+payment-gateway/*.log
