@@ -2,10 +2,6 @@ import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
 
-const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL;
-const WHATSAPP_API_KEY = process.env.WHATSAPP_API_KEY;
-const WHATSAPP_INSTANCE_ID = process.env.WHATSAPP_INSTANCE_ID;
-
 export async function GET(req: Request) {
   try {
     const { uid, isAdmin } = await verifyAdminAuth(req);
@@ -14,57 +10,80 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
     }
 
-    // Check if WhatsApp VM API environment variables are set
-    const hasLiveConfig = !!WHATSAPP_API_URL && !!WHATSAPP_API_KEY && !!WHATSAPP_INSTANCE_ID;
+    // 1. Fetch dynamic WhatsApp API settings from Firestore config/whatsapp_api
+    let whatsappApiUrl = process.env.WHATSAPP_API_URL || "";
+    let whatsappApiKey = process.env.WHATSAPP_API_KEY || "";
+    let whatsappInstanceId = process.env.WHATSAPP_INSTANCE_ID || "";
+    let whatsappAdminUsername = process.env.WHATSAPP_ADMIN_USERNAME || "";
+    let whatsappAdminPassword = process.env.WHATSAPP_ADMIN_PASSWORD || "";
+
+    try {
+      const apiDoc = await adminDb.collection("config").doc("whatsapp_api").get();
+      if (apiDoc.exists) {
+        const apiData = apiDoc.data();
+        if (apiData?.whatsappApiUrl) whatsappApiUrl = apiData.whatsappApiUrl;
+        if (apiData?.whatsappApiKey) whatsappApiKey = apiData.whatsappApiKey;
+        if (apiData?.whatsappInstanceId) whatsappInstanceId = apiData.whatsappInstanceId;
+        if (apiData?.whatsappAdminUsername) whatsappAdminUsername = apiData.whatsappAdminUsername;
+        if (apiData?.whatsappAdminPassword) whatsappAdminPassword = apiData.whatsappAdminPassword;
+      }
+    } catch (dbErr) {
+      console.warn("[WhatsApp GET] Firestore config/whatsapp_api read failed, falling back to process.env:", dbErr);
+    }
+
+    const hasLiveConfig = !!whatsappApiUrl && !!whatsappInstanceId;
 
     if (!hasLiveConfig || uid === "mock-admin-uid") {
       // Fallback: Read from local Firestore config state
+      let currentStatus = "UNLINKED";
+      let phoneNumber = null;
+      let linkedAt = null;
+
       try {
         const docRef = adminDb.collection("config").doc("whatsapp");
         const docSnap = await docRef.get();
         if (docSnap.exists) {
           const data = docSnap.data();
-          return NextResponse.json({
-            success: true,
-            status: data?.status || "UNLINKED",
-            phoneNumber: data?.phoneNumber || null,
-            linkedAt: data?.linkedAt || null,
-            sessionName: data?.sessionName || "E-Tech Enterprise WhatsApp Sender (Fallback)",
-            isMock: !hasLiveConfig,
-            qrCode: data?.status === "UNLINKED" ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-fallback-session-${Date.now()}` : null
-          });
+          currentStatus = data?.status || "UNLINKED";
+          phoneNumber = data?.phoneNumber || null;
+          linkedAt = data?.linkedAt || null;
         }
       } catch (dbErr) {
-        console.warn("[WhatsApp GET] Firestore config unreachable, using initial UNLINKED state:", dbErr);
+        console.warn("[WhatsApp GET] Firestore config/whatsapp read failed:", dbErr);
       }
 
       return NextResponse.json({
         success: true,
-        status: "UNLINKED",
-        phoneNumber: null,
-        linkedAt: null,
+        status: currentStatus,
+        phoneNumber,
+        linkedAt,
         sessionName: "E-Tech VIP Whatsapp Gateway (Simulation Mode)",
         isMock: true,
-        qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-simulation-session-${Date.now()}`
+        qrCode: currentStatus === "UNLINKED" ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-simulation-session-${Date.now()}` : null,
+        apiConfig: {
+          whatsappApiUrl,
+          whatsappApiKey,
+          whatsappInstanceId,
+          whatsappAdminUsername,
+          whatsappAdminPassword
+        }
       });
     }
 
-    // LIVE INTERROGATION OF WHATSAPP VM API GATEWAY
-    console.log(`[WhatsApp API GET] Querying live VM gateway: ${WHATSAPP_API_URL}/instance/connectionStatus/${WHATSAPP_INSTANCE_ID}`);
+    // 2. LIVE INTERROGATION OF WHATSAPP VM API GATEWAY
+    console.log(`[WhatsApp API GET] Querying live VM gateway: ${whatsappApiUrl}/instance/connectionStatus/${whatsappInstanceId}`);
     try {
-      const statusResponse = await fetch(`${WHATSAPP_API_URL}/instance/connectionStatus/${WHATSAPP_INSTANCE_ID}`, {
+      const statusResponse = await fetch(`${whatsappApiUrl}/instance/connectionStatus/${whatsappInstanceId}`, {
         method: "GET",
         headers: {
-          "apikey": WHATSAPP_API_KEY || "",
+          "apikey": whatsappApiKey,
           "Content-Type": "application/json"
         },
-        // Set short timeout to prevent hanging the Next.js thread
         signal: AbortSignal.timeout(6000)
       });
 
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
-        // Check standard status keys from Evolution API / Waapi
         const state = statusData?.instance?.state || statusData?.status || statusData?.state;
         const isConnected = state === "open" || state === "CONNECTED" || state === "connected";
 
@@ -75,8 +94,15 @@ export async function GET(req: Request) {
             status: "LINKED",
             phoneNumber,
             linkedAt: new Date().toISOString(),
-            sessionName: `VM Instance: ${WHATSAPP_INSTANCE_ID}`,
-            isMock: false
+            sessionName: `VM Instance: ${whatsappInstanceId}`,
+            isMock: false,
+            apiConfig: {
+              whatsappApiUrl,
+              whatsappApiKey,
+              whatsappInstanceId,
+              whatsappAdminUsername,
+              whatsappAdminPassword
+            }
           });
         }
       }
@@ -84,14 +110,14 @@ export async function GET(req: Request) {
       console.error("[WhatsApp GET] Error querying live connectionStatus, trying QR connector:", apiErr.message);
     }
 
-    // IF DISCONNECTED/UNLINKED: FETCH QR CODE AUTOMATICALLY FROM THE INSTANCE
-    console.log(`[WhatsApp API GET] Disconnected. Fetching QR from connect endpoint: ${WHATSAPP_API_URL}/instance/connect/${WHATSAPP_INSTANCE_ID}`);
+    // 3. FETCH LIVE QR CODE AUTOMATICALLY FROM THE INSTANCE
+    console.log(`[WhatsApp API GET] Disconnected. Fetching QR from connect endpoint: ${whatsappApiUrl}/instance/connect/${whatsappInstanceId}`);
     let qrCodeUrl = "";
     try {
-      const qrResponse = await fetch(`${WHATSAPP_API_URL}/instance/connect/${WHATSAPP_INSTANCE_ID}`, {
+      const qrResponse = await fetch(`${whatsappApiUrl}/instance/connect/${whatsappInstanceId}`, {
         method: "GET",
         headers: {
-          "apikey": WHATSAPP_API_KEY || "",
+          "apikey": whatsappApiKey,
           "Content-Type": "application/json"
         },
         signal: AbortSignal.timeout(8000)
@@ -99,7 +125,6 @@ export async function GET(req: Request) {
 
       if (qrResponse.ok) {
         const qrData = await qrResponse.json();
-        // Extract Base64 QR code or string
         const base64Code = qrData?.base64 || qrData?.code || qrData?.qr || qrData?.qrcode;
         if (base64Code) {
           qrCodeUrl = base64Code.startsWith("data:") ? base64Code : `data:image/png;base64,${base64Code}`;
@@ -109,7 +134,6 @@ export async function GET(req: Request) {
       console.error("[WhatsApp GET] Error fetching QR code from VM gateway:", qrErr.message);
     }
 
-    // Fallback QR code if VM gateway connect failed to return QR
     if (!qrCodeUrl) {
       qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-vm-session-${Date.now()}`;
     }
@@ -119,9 +143,16 @@ export async function GET(req: Request) {
       status: "UNLINKED",
       phoneNumber: null,
       linkedAt: null,
-      sessionName: `VM Instance: ${WHATSAPP_INSTANCE_ID}`,
+      sessionName: `VM Instance: ${whatsappInstanceId}`,
       isMock: false,
-      qrCode: qrCodeUrl
+      qrCode: qrCodeUrl,
+      apiConfig: {
+        whatsappApiUrl,
+        whatsappApiKey,
+        whatsappInstanceId,
+        whatsappAdminUsername,
+        whatsappAdminPassword
+      }
     });
 
   } catch (err: any) {
@@ -139,15 +170,63 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { action, phoneNumber } = body;
+    const { action } = body;
 
     if (!action) {
       return NextResponse.json({ error: "Missing required parameter: action" }, { status: 400 });
     }
 
-    const hasLiveConfig = !!WHATSAPP_API_URL && !!WHATSAPP_API_KEY && !!WHATSAPP_INSTANCE_ID;
+    // 1. SAVE NEW API CONFIGURATION IN FIRESTORE
+    if (action === "save_api_config") {
+      const {
+        whatsappApiUrl,
+        whatsappApiKey,
+        whatsappInstanceId,
+        whatsappAdminUsername,
+        whatsappAdminPassword
+      } = body;
+
+      try {
+        await adminDb.collection("config").doc("whatsapp_api").set({
+          whatsappApiUrl: whatsappApiUrl || "",
+          whatsappApiKey: whatsappApiKey || "",
+          whatsappInstanceId: whatsappInstanceId || "",
+          whatsappAdminUsername: whatsappAdminUsername || "",
+          whatsappAdminPassword: whatsappAdminPassword || "",
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        return NextResponse.json({
+          success: true,
+          message: "WhatsApp API configurations successfully saved and updated!"
+        });
+      } catch (dbErr: any) {
+        console.error("[WhatsApp POST SaveConfig] DB Write Exception:", dbErr.message);
+        return NextResponse.json({ error: "Failed to write settings to Firestore: Permission denied or offline." }, { status: 400 });
+      }
+    }
+
+    // Load active config dynamically
+    let whatsappApiUrl = process.env.WHATSAPP_API_URL || "";
+    let whatsappApiKey = process.env.WHATSAPP_API_KEY || "";
+    let whatsappInstanceId = process.env.WHATSAPP_INSTANCE_ID || "";
+
+    try {
+      const apiDoc = await adminDb.collection("config").doc("whatsapp_api").get();
+      if (apiDoc.exists) {
+        const apiData = apiDoc.data();
+        if (apiData?.whatsappApiUrl) whatsappApiUrl = apiData.whatsappApiUrl;
+        if (apiData?.whatsappApiKey) whatsappApiKey = apiData.whatsappApiKey;
+        if (apiData?.whatsappInstanceId) whatsappInstanceId = apiData.whatsappInstanceId;
+      }
+    } catch (dbErr) {
+      console.warn("[WhatsApp POST] Firestore config/whatsapp_api fetch failed:", dbErr);
+    }
+
+    const hasLiveConfig = !!whatsappApiUrl && !!whatsappInstanceId;
 
     if (action === "link") {
+      const { phoneNumber } = body;
       if (!phoneNumber) {
         return NextResponse.json({ error: "Phone number is required for pairing." }, { status: 400 });
       }
@@ -157,13 +236,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Invalid WhatsApp phone number format." }, { status: 400 });
       }
 
-      // Try calling live gateway connect if in live mode
       if (hasLiveConfig && uid !== "mock-admin-uid") {
         try {
-          const response = await fetch(`${WHATSAPP_API_URL}/instance/connect/${WHATSAPP_INSTANCE_ID}`, {
+          const response = await fetch(`${whatsappApiUrl}/instance/connect/${whatsappInstanceId}`, {
             method: "GET",
             headers: {
-              "apikey": WHATSAPP_API_KEY || "",
+              "apikey": whatsappApiKey,
               "Content-Type": "application/json"
             }
           });
@@ -179,7 +257,7 @@ export async function POST(req: Request) {
         status: "LINKED",
         phoneNumber: `+${cleanNum}`,
         linkedAt: new Date().toISOString(),
-        sessionName: hasLiveConfig ? `VM Instance: ${WHATSAPP_INSTANCE_ID}` : "E-Tech Enterprise WhatsApp Sender (Mock)"
+        sessionName: hasLiveConfig ? `VM Instance: ${whatsappInstanceId}` : "E-Tech Enterprise WhatsApp Sender (Mock)"
       };
 
       try {
@@ -195,13 +273,12 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "unlink") {
-      // If live mode, hit logout instance
       if (hasLiveConfig && uid !== "mock-admin-uid") {
         try {
-          await fetch(`${WHATSAPP_API_URL}/instance/logout/${WHATSAPP_INSTANCE_ID}`, {
+          await fetch(`${whatsappApiUrl}/instance/logout/${whatsappInstanceId}`, {
             method: "DELETE",
             headers: {
-              "apikey": WHATSAPP_API_KEY || "",
+              "apikey": whatsappApiKey,
               "Content-Type": "application/json"
             }
           });
@@ -215,7 +292,7 @@ export async function POST(req: Request) {
         status: "UNLINKED",
         phoneNumber: null,
         linkedAt: null,
-        sessionName: hasLiveConfig ? `VM Instance: ${WHATSAPP_INSTANCE_ID}` : "E-Tech Enterprise WhatsApp Sender"
+        sessionName: hasLiveConfig ? `VM Instance: ${whatsappInstanceId}` : "E-Tech Enterprise WhatsApp Sender"
       };
 
       try {
