@@ -184,19 +184,19 @@
   animation: shimmer 1.5s infinite linear;
 }
 
-/* Premium Mobile Safe Area Adaptability Overrides */
+/* Premium Mobile Safe Area Adaptability Overrides - Safe Area Removed */
 header {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+  padding-top: 12px !important;
   background-color: #FFFFFF !important;
   background-image: none !important;
 }
 
 main {
-  margin-top: calc(env(safe-area-inset-top, 0px) + 80px) !important;
+  margin-top: 80px !important;
 }
 
 @media (min-width: 375px) {
   main {
-    margin-top: calc(env(safe-area-inset-top, 0px) + 96px) !important;
+    margin-top: 96px !important;
   }
 }
