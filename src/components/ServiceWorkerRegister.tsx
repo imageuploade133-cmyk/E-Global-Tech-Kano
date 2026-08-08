@@ -15,17 +15,16 @@ export function ServiceWorkerRegister() {
 
       const balanceVisible = localStorage.getItem("balance_visible");
 
-      // Clear localStorage and sessionStorage
-      localStorage.clear();
+      // Clear sessionStorage
       sessionStorage.clear();
 
       // Restore critical user visual preferences
       if (balanceVisible !== null) {
-        localStorage.setItem("balance_visible", balanceVisible);
+        sessionStorage.setItem("balance_visible", balanceVisible);
       }
 
       // Record new version code
-      localStorage.setItem("APP_VERSION", CURRENT_VERSION);
+      sessionStorage.setItem("APP_VERSION", CURRENT_VERSION);
 
       // Force instant window reload to fetch latest client bundles
       window.location.reload();

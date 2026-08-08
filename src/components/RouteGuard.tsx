@@ -8,16 +8,24 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { handleAppSignOut } from "@/lib/logout-util";
 
-// Persistently identify the device using localStorage
+// Persistently identify the device using sessionStorage instead of localStorage (Bypasses caching on Ctrl+F5)
 const getOrCreateDeviceId = (): string => {
   if (typeof window === "undefined") return "";
-  let devId = localStorage.getItem("deviceId");
+  let devId = sessionStorage.getItem("deviceId");
   if (!devId) {
     devId = "device_" + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-    localStorage.setItem("deviceId", devId);
+    sessionStorage.setItem("deviceId", devId);
   }
   return devId;
 };
+
+// Global flat micro spinner
+const ButtonSpinner = () => (
+  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, isPinVerified, userData, updateUserData } = useAuth();
@@ -132,15 +140,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     const txRef = params.get("tx_ref") || params.get("txRef");
 
     if (verify === "flw" || transactionId || status === "successful" || status === "completed" || status === "cancelled") {
-      console.log("[Redirect Detected] Flutterwave parameters detected on app startup:", {
-        verify,
-        status,
-        transactionId,
-        txRef
-      });
-
       if (status === "cancelled") {
-        console.log("[Redirect Detected] Payment was cancelled by user.");
         toast.error("The transaction checkout flow was cancelled.");
 
         if (txRef) {
@@ -156,7 +156,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
                 }
               }
 
-              console.log(`[Cancel Cleanup Started] Cleaning up pending payment: ${txRef}`);
               const res = await fetch("/api/flutterwave/cancel", {
                 method: "POST",
                 headers: {
@@ -165,10 +164,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
                 },
                 body: JSON.stringify({ txRef })
               });
-              const data = await res.json();
-              console.log("[Cancel Cleanup Complete] Server response received:", data);
+              await res.json();
             } catch (err) {
-              console.error("[Cancel Cleanup Error] Failed to contact cancel clean endpoint:", err);
+              console.error("[Cancel Cleanup Error] Failed:", err);
             } finally {
               const url = new URL(window.location.href);
               url.search = "";
@@ -185,16 +183,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (!transactionId) {
-        console.warn("[Redirect Detected] missing transaction_id parameter. Skipping verification.");
-        return;
-      }
+      if (!transactionId) return;
 
       const verifyTransaction = async () => {
         setFlwVerifying(true);
         setFlwMessage("Securing settlement credentials...");
-
-        console.log(`[Calling Verify Endpoint] POST /api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
 
         try {
           let idToken = "mock-token";
@@ -217,27 +210,21 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           });
           const data = await res.json();
 
-          console.log("[Verification Complete] Server response received:", data);
-
           if (data.success) {
             const url = new URL(window.location.href);
             url.search = "";
             window.history.replaceState({}, "", url.toString());
 
             if (data.duplicate) {
-              console.log("[Duplicate Detected] Transaction was already processed.");
               toast.info("Transaction already processed", {
                 description: "This transaction has already been processed. Your wallet was not credited again."
               });
             } else {
-              console.log(`[Wallet Refreshed] Successfully verified transaction. Amount: ₦${data.fundedAmount || "N/A"}. New balance: ₦${data.newBalance || "N/A"}`);
-
               toast.success("Wallet funded successfully!", {
                 description: data.message || "Your payment was verified and credited."
               });
             }
           } else {
-            console.error("[Verification Complete] Verification unsuccessful:", data.error);
             toast.error("Payment settlement was rejected.", {
               description: data.error || "Please contact customer support."
             });
@@ -246,7 +233,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             window.history.replaceState({}, "", url.toString());
           }
         } catch (err) {
-          console.error("[Verification Complete] Endpoint execution error:", err);
+          console.error("[Verification Complete] Error:", err);
           toast.error("Verification failed.", {
             description: "Connection error with settlement gateway."
           });
@@ -259,7 +246,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  // Smooth scroll and keyboard focus positions reset to prevent page shifting/gaps
+  // Smooth scroll reset helper
   useEffect(() => {
     const handleBlur = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
@@ -285,7 +272,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     setVerifyingDevice(true);
 
     try {
-      // Normalize and clean phone digits for safe matching
       const inputPhoneClean = verPhone.replace(/\D/g, "");
       const registeredPhoneClean = (userData.phoneNumber as string || "").replace(/\D/g, "");
 
@@ -298,7 +284,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       const ninValue = (userData.nin as string || "").trim();
 
       if (bvnValue || ninValue) {
-        // Match last 4 of BVN or NIN
         const last4Bvn = bvnValue.slice(-4);
         const last4Nin = ninValue.slice(-4);
         const inputTrimmed = verBvnOrNinOrEmail.trim();
@@ -307,7 +292,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           (!!bvnValue && inputTrimmed === last4Bvn) ||
           (!!ninValue && inputTrimmed === last4Nin);
       } else {
-        // Otherwise, compare registered email address case-insensitively
         const registeredEmail = (userData.email as string || "").trim().toLowerCase();
         isBvnOrNinOrEmailMatch = verBvnOrNinOrEmail.trim().toLowerCase() === registeredEmail;
       }
@@ -316,7 +300,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         const deviceId = getOrCreateDeviceId();
         const currentVerified = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
 
-        // Save verified status
         await updateUserData({
           verifiedDevices: [...currentVerified, deviceId],
           currentDeviceId: deviceId,
@@ -385,7 +368,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
         <div className="relative flex flex-col items-center">
-          <div className="flex flex-col items-center p-6 rounded-3xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50 shadow-[0_8px_32px_rgba(0,0,0,0.03)] max-w-xs text-center">
+          <div className="flex flex-col items-center p-6 rounded-3xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50 max-w-xs text-center">
             <div className="relative w-12 h-12 flex items-center justify-center">
               <motion.div
                 animate={{ rotate: 360 }}
@@ -424,7 +407,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                className="relative w-7 h-7 bg-white rounded-full p-0.5 shadow-sm flex items-center justify-center overflow-hidden"
+                className="relative w-7 h-7 bg-white rounded-full p-0.5 flex items-center justify-center overflow-hidden"
               >
                 <Image
                   src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
@@ -457,7 +440,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
     return (
       <div className="flex min-h-screen flex-col bg-white p-8 items-center justify-between z-[999999] fixed inset-0 overflow-y-auto">
-        {/* Brand Header */}
         <div className="w-full flex flex-col items-center text-center mt-6 shrink-0">
           <div className="relative w-16 h-16 mb-4">
             <Image
@@ -483,9 +465,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Dynamic Verification Form */}
         <form onSubmit={handleVerifyNewDevice} className="w-full max-w-xs space-y-4 my-10 flex-grow flex flex-col justify-center text-left">
-          {/* Phone Number Input */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
               Registered Phone Number
@@ -500,7 +480,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          {/* Dynamic Identity Verification (Last 4 of BVN/NIN vs Email address) */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
               {hasKyc ? "Last 4 Digits of your BVN or NIN" : "Registered Email Address"}
@@ -522,7 +501,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          {/* Verify button positioned directly below inputs */}
           <button
             type="submit"
             disabled={verifyingDevice || !verPhone || !verBvnOrNinOrEmail}
@@ -539,7 +517,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           </button>
         </form>
 
-        {/* Fallback exit button with Sign Out in bold RED color at bottom */}
         <div className="w-full text-center border-t border-gray-150 pt-4 pb-4 shrink-0 max-w-xs">
           <button
             type="button"

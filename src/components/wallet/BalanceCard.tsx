@@ -24,7 +24,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const { userData, user } = useAuth();
 
   useEffect(() => {
-    const saved = localStorage.getItem("balance_visible");
+    const saved = sessionStorage.getItem("balance_visible");
     if (saved !== null) {
       setIsVisible(saved === "true");
     }
@@ -33,7 +33,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const toggleVisibility = () => {
     const nextState = !isVisible;
     setIsVisible(nextState);
-    localStorage.setItem("balance_visible", String(nextState));
+    sessionStorage.setItem("balance_visible", String(nextState));
   };
   const { config } = useAppConfig();
   const router = useRouter();
