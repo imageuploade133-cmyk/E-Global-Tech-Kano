@@ -1279,6 +1279,16 @@ export default function AdminPage() {
                                   <p className="font-mono font-bold text-gray-800 mt-0.5 select-all">{u.kycNumber}</p>
                                 </div>
                               </div>
+
+                              {/* Secured face biometrics/document verification */}
+                              {(u as any).capturedSelfie && (
+                                <div className="mt-3">
+                                  <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Submitted Identity Image</p>
+                                  <div className="relative w-28 h-28 rounded-2xl border border-gray-200 overflow-hidden shadow-xs bg-white group/img cursor-zoom-in">
+                                    <img src={(u as any).capturedSelfie} alt="Selfie/Document" className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-110" />
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             {/* Verification actions & rejection feedback */}

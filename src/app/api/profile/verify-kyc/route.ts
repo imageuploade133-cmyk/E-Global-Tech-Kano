@@ -91,16 +91,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: result.message || "Identity verification failed." }, { status: response.status });
     }
 
-    const account = result.data || {};
-
     return NextResponse.json({
       success: true,
-      message: "KYC and Face Verification successful! Your static virtual account number has been allocated.",
-      account: {
-        bankName: account.bank_name || "Wema Bank",
-        accountNumber: account.account_number || "2345678901",
-        accountName: account.account_name || `${nameFallback}`,
-      }
+      message: "KYC submitted successfully. Your verification is now PENDING administrator approval.",
+      status: "PENDING"
     });
 
   } catch (err: unknown) {

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
-import { NotificationService } from "@/services/notification-service";
+
+const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
 export async function GET(req: Request) {
   try {
@@ -22,7 +23,8 @@ export async function GET(req: Request) {
           kycType: "bvn",
           kycNumber: "22223333444",
           kycStatus: "PENDING",
-          submittedAt: new Date().toISOString()
+          submittedAt: new Date().toISOString(),
+          capturedSelfie: null,
         },
         {
           uid: "mock-kyc-2",
@@ -32,15 +34,16 @@ export async function GET(req: Request) {
           kycType: "nin",
           kycNumber: "55556666777",
           kycStatus: "PENDING",
-          submittedAt: new Date().toISOString()
+          submittedAt: new Date().toISOString(),
+          capturedSelfie: null,
         }
       ];
       return NextResponse.json({ success: true, pendingUsers: mockPendingKyc });
     }
 
-    // LOW READS: Query only users whose kycStatus is strictly PENDING with a small page limit (max 50 users)
-    const pendingSnap = await adminDb.collection("users")
-      .where("kycStatus", "==", "PENDING")
+    // Query pending KYC submissions directly from the secure `kyc_submissions` collection
+    const pendingSnap = await adminDb.collection("kyc_submissions")
+      .where("status", "==", "PENDING")
       .limit(50)
       .get();
 
@@ -48,13 +51,15 @@ export async function GET(req: Request) {
       const data = doc.data();
       return {
         uid: doc.id,
-        name: data.name || data.displayName || `${data.firstName || ""} ${data.lastName || ""}`.trim() || "SUBMITTED USER",
+        name: `${data.firstName || ""} ${data.lastName || ""}`.trim() || "SUBMITTED USER",
         email: data.email || "",
-        phoneNumber: data.phoneNumber || "",
-        kycType: data.kycType || "bvn",
-        kycNumber: data.kycNumber || data.bvn || data.nin || "•••••••••••",
+        phoneNumber: data.phone || "",
+        kycType: data.documentType || "bvn",
+        kycNumber: data.documentNumber || "•••••••••••",
         kycStatus: "PENDING",
-        submittedAt: data.kycSubmittedAt || data.createdAt || new Date().toISOString()
+        submittedAt: data.submittedAt || new Date().toISOString(),
+        capturedSelfie: data.capturedSelfie || null, // securely exposed Base64 image
+        livenessChallenge: data.livenessChallenge || null
       };
     });
 
@@ -83,52 +88,54 @@ export async function POST(req: Request) {
     if (uid === "mock-admin-uid") {
       return NextResponse.json({
         success: true,
-        message: `Mock User KYC state marked as ${action === "approve" ? "VERIFIED" : "FAILED"} successfully!`
+        message: `Mock User KYC state marked as ${action === "approve" ? "APPROVED" : "REJECTED"} successfully!`
       });
     }
 
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+
     if (action === "approve") {
-      // 1. Update user profile to verified in Firestore
-      await adminDb.collection("users").doc(targetUid).update({
-        kycStatus: "VERIFIED",
-        kycVerifiedAt: new Date().toISOString()
+      // Forward approval request to payment-gateway secure S2S endpoint
+      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/approve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": gatewayApiKey
+        },
+        body: JSON.stringify({
+          targetUid,
+          adminId: uid
+        })
       });
 
-      // 2. DISPATCH NOTIFICATION to user once approved (Atomic push + in-app log)
-      try {
-        await NotificationService.sendPushNotification(targetUid, {
-          title: "Identity Verified successfully! 🎉",
-          body: "Congratulations! Your identity documents (KYC verification) have been approved. You now have full access to virtual cards and virtual accounts.",
-          type: "security"
-        });
-        console.log(`[Admin KYC] Dispatch approved notification successfully for user=${targetUid}`);
-      } catch (notifyErr: any) {
-        console.error("[Admin KYC Notification Error] Failed to send push:", notifyErr.message);
+      const result = await response.json();
+      if (!response.ok) {
+        return NextResponse.json({ error: result.message || "Failed to approve KYC in gateway." }, { status: response.status });
       }
 
       return NextResponse.json({
         success: true,
-        message: "User KYC successfully verified and notification dispatched!"
+        message: "User KYC successfully approved and static virtual account provisioned!"
       });
 
     } else if (action === "reject") {
-      // 1. Update user profile to failed in Firestore
-      await adminDb.collection("users").doc(targetUid).update({
-        kycStatus: "FAILED",
-        kycRejectionReason: reason || "Provided identity details mismatch.",
-        kycRejectedAt: new Date().toISOString()
+      // Forward rejection request to payment-gateway secure S2S endpoint
+      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": gatewayApiKey
+        },
+        body: JSON.stringify({
+          targetUid,
+          adminId: uid,
+          reason
+        })
       });
 
-      // 2. DISPATCH NOTIFICATION to user on rejection (Atomic push + in-app log)
-      try {
-        await NotificationService.sendPushNotification(targetUid, {
-          title: "KYC Verification Rejected",
-          body: `Identity verification failed: ${reason || "Provided BVN/NIN name mismatch"}. Please try again inside profile settings.`,
-          type: "security"
-        });
-        console.log(`[Admin KYC] Dispatch rejected notification successfully for user=${targetUid}`);
-      } catch (notifyErr: any) {
-        console.error("[Admin KYC Notification Error] Failed to send push:", notifyErr.message);
+      const result = await response.json();
+      if (!response.ok) {
+        return NextResponse.json({ error: result.message || "Failed to reject KYC in gateway." }, { status: response.status });
       }
 
       return NextResponse.json({

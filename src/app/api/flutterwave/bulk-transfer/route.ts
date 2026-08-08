@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticateUserRequest } from "@/lib/auth-util";
+import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
@@ -32,6 +32,12 @@ export async function POST(req: Request) {
     const error = authErr as Error;
     console.error("[Bulk Transfer Auth Error] Verification failed:", error.message);
     return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
+  }
+
+  // Enforce KYC verification
+  const isApproved = await verifyUserKycApproved(uid);
+  if (!isApproved) {
+    return NextResponse.json({ error: "Forbidden: Account verification is required to perform financial transactions." }, { status: 403 });
   }
 
   try {
