@@ -92,13 +92,25 @@ export default function SignUpPage() {
       toast.error("Please enter your phone number first.");
       return;
     }
+
+    let cleanPhone = phoneNumber.trim().replace(/\D/g, "");
+    if (cleanPhone.startsWith("0")) {
+      cleanPhone = cleanPhone.slice(1);
+    }
+
+    const requiredLength = phonePrefix === "+234" ? 10 : 8;
+    if (cleanPhone.length < requiredLength) {
+      toast.error(`The phone number you entered is not up to the correct number of digits (should be exactly ${requiredLength} digits for ${phonePrefix === "+234" ? "Nigeria" : "Niger"}).`);
+      return;
+    }
+
     setIsSendingOtp(true);
     setOtpError("");
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phonePrefix, phoneNumber }),
+        body: JSON.stringify({ phonePrefix, phoneNumber: cleanPhone }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -125,13 +137,19 @@ export default function SignUpPage() {
       toast.error("Please enter a valid 6-digit OTP code.");
       return;
     }
+
+    let cleanPhone = phoneNumber.trim().replace(/\D/g, "");
+    if (cleanPhone.startsWith("0")) {
+      cleanPhone = cleanPhone.slice(1);
+    }
+
     setIsVerifyingOtp(true);
     setOtpError("");
     try {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phonePrefix, phoneNumber, otpCode }),
+        body: JSON.stringify({ phonePrefix, phoneNumber: cleanPhone, otpCode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -252,6 +270,18 @@ export default function SignUpPage() {
         toast.error("Phone number is required.");
         return;
       }
+
+      let cleanPhoneVal = phoneNumber.trim().replace(/\D/g, "");
+      if (cleanPhoneVal.startsWith("0")) {
+        cleanPhoneVal = cleanPhoneVal.slice(1);
+      }
+
+      const requiredLength = phonePrefix === "+234" ? 10 : 8;
+      if (cleanPhoneVal.length < requiredLength) {
+        toast.error(`The phone number you entered is not up to the correct number of digits (should be exactly ${requiredLength} digits for ${phonePrefix === "+234" ? "Nigeria" : "Niger"}).`);
+        return;
+      }
+
       if (!email || !email.includes("@")) {
         toast.error("Please provide a valid email address.");
         return;
@@ -263,7 +293,7 @@ export default function SignUpPage() {
       }
 
       // Check if phone number already exists before proceeding!
-      const fullPhone = `${phonePrefix}${phoneNumber}`;
+      const fullPhone = `${phonePrefix}${cleanPhoneVal}`;
       const alreadyExists = await checkAccountExists(fullPhone, bvnNin, email);
       if (alreadyExists) return;
 
@@ -522,9 +552,15 @@ export default function SignUpPage() {
                       type="tel"
                       required
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\D/g, "");
+                        if (val.startsWith("0")) {
+                          val = val.slice(1);
+                        }
+                        setPhoneNumber(val);
+                      }}
                       className="flex-grow bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all font-mono"
-                      placeholder="08012345678"
+                      placeholder="8012345678"
                     />
                   </div>
                   <p className="text-[9.5px] text-amber-600 font-bold leading-tight mt-1">

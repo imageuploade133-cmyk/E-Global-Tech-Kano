@@ -100,6 +100,7 @@ export default function AdminPage() {
   const [whatsappStatus, setWhatsappStatus] = useState<"LINKED" | "UNLINKED">("UNLINKED");
   const [whatsappPhoneNumber, setWhatsappPhoneNumber] = useState<string | null>(null);
   const [whatsappLinkedAt, setWhatsappLinkedAt] = useState<string | null>(null);
+  const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
   const [isLoadingWhatsapp, setIsLoadingWhatsapp] = useState(false);
   const [isLinkingWhatsapp, setIsLinkingWhatsapp] = useState(false);
   const [whatsappPairMode, setWhatsappPairMode] = useState<"qr" | "code">("qr");
@@ -326,9 +327,12 @@ export default function AdminPage() {
         setWhatsappStatus(data.status || "UNLINKED");
         setWhatsappPhoneNumber(data.phoneNumber || null);
         setWhatsappLinkedAt(data.linkedAt || null);
+        setWhatsappQrCode(data.qrCode || null);
         if (data.status === "LINKED") {
           addWhatsappLog(`Active secure session found: ${data.phoneNumber} (Linked at: ${new Date(data.linkedAt).toLocaleString()})`);
           addWhatsappLog(`WhatsApp Gateway active and monitoring OTP dispatch rails.`);
+        } else {
+          addWhatsappLog(`WhatsApp Gateway disconnected. Please scan the QR code to pair.`);
         }
       }
     } catch (err: any) {
@@ -1803,7 +1807,7 @@ export default function AdminPage() {
                     ? "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-500/25 text-emerald-900 dark:text-emerald-300"
                     : "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/25 text-amber-900 dark:text-amber-300"
                 )}>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <div className={cn(
                       "w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-white relative",
                       whatsappStatus === "LINKED"
@@ -1816,7 +1820,7 @@ export default function AdminPage() {
                     </div>
                     <div>
                       <h3 className={cn("font-hanken font-extrabold text-base tracking-tight uppercase", isDark ? "text-white" : "text-gray-900")}>
-                        Gateway Status: {whatsappStatus === "LINKED" ? "ACTIVE & LINKED" : "UNLINKED / OFFLINE"}
+                        Gateway Status: {whatsappStatus === "LINKED" ? "ACTIVE & LINKED" : "DISCONNECTED / OFFLINE"}
                       </h3>
                       {whatsappStatus === "LINKED" ? (
                         <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
@@ -1830,28 +1834,52 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {whatsappStatus === "LINKED" && (
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      disabled={isLinkingWhatsapp}
-                      onClick={handleUnlinkWhatsapp}
-                      className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(220,38,38,0.2)] disabled:opacity-50"
+                      disabled={isLoadingWhatsapp}
+                      onClick={fetchWhatsappStatus}
+                      className="px-4 py-2.5 bg-black hover:bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
                     >
-                      {isLinkingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">logout</span>}
-                      <span>Unlink WhatsApp Sender</span>
+                      {isLoadingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
+                      <span>Refresh Status</span>
                     </button>
-                  )}
+
+                    {whatsappStatus === "LINKED" && (
+                      <button
+                        type="button"
+                        disabled={isLinkingWhatsapp}
+                        onClick={handleUnlinkWhatsapp}
+                        className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(220,38,38,0.2)] disabled:opacity-50"
+                      >
+                        {isLinkingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">logout</span>}
+                        <span>Unlink WhatsApp Sender</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {whatsappStatus === "UNLINKED" && (
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                     {/* Left side: Instructions and Pairing Panel */}
                     <div className={cn("rounded-2xl p-6 md:col-span-3 border transition-colors duration-300 space-y-6", panelClass)}>
-                      <div className="border-b pb-4">
-                        <h4 className={cn("font-hanken font-extrabold text-sm uppercase", labelClass)}>
-                          Link WhatsApp Sender Device
-                        </h4>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Setup professional OTP & notification delivery systems</p>
+                      <div className="border-b pb-4 flex justify-between items-center">
+                        <div>
+                          <h4 className={cn("font-hanken font-extrabold text-sm uppercase", labelClass)}>
+                            Link WhatsApp Sender Device
+                          </h4>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Setup professional OTP & notification delivery systems</p>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isLoadingWhatsapp}
+                          onClick={fetchWhatsappStatus}
+                          className="px-3 py-1.5 bg-[#FC7A00] text-white hover:brightness-105 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1"
+                        >
+                          {isLoadingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">refresh</span>}
+                          <span>Reconnect / Fetch QR</span>
+                        </button>
                       </div>
 
                       {/* Mode Toggles */}
@@ -1893,9 +1921,9 @@ export default function AdminPage() {
                           </p>
 
                           <div className={cn("p-4 rounded-2xl bg-white border inline-block relative overflow-hidden group shadow-xs transition-colors", isDark ? "border-gray-800" : "border-gray-150")}>
-                            {/* Embedded high fidelity QR Server API with custom unique token */}
+                            {/* Embedded high fidelity QR Server API or Live VM Base64 QR code */}
                             <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-session-${Date.now()}&color=000000`}
+                              src={whatsappQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-session-${Date.now()}&color=000000`}
                               alt="WhatsApp Pairing QR Code"
                               className="w-48 h-48 object-contain transition-transform group-hover:scale-102"
                             />
