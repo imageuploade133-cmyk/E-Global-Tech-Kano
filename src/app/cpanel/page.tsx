@@ -102,6 +102,14 @@ export default function AdminPage() {
   const [whatsappLinkedAt, setWhatsappLinkedAt] = useState<string | null>(null);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
   const [isLoadingWhatsapp, setIsLoadingWhatsapp] = useState(false);
+
+  // WhatsApp API VM Configuration States
+  const [whatsappApiUrlInput, setWhatsappApiUrlInput] = useState("");
+  const [whatsappApiKeyInput, setWhatsappApiKeyInput] = useState("");
+  const [whatsappInstanceIdInput, setWhatsappInstanceIdInput] = useState("");
+  const [whatsappAdminUsernameInput, setWhatsappAdminUsernameInput] = useState("");
+  const [whatsappAdminPasswordInput, setWhatsappAdminPasswordInput] = useState("");
+  const [isSavingApiConfig, setIsSavingApiConfig] = useState(false);
   const [isLinkingWhatsapp, setIsLinkingWhatsapp] = useState(false);
   const [whatsappPairMode, setWhatsappPairMode] = useState<"qr" | "code">("qr");
   const [whatsappPhoneInput, setWhatsappPhoneInput] = useState("");
@@ -328,6 +336,13 @@ export default function AdminPage() {
         setWhatsappPhoneNumber(data.phoneNumber || null);
         setWhatsappLinkedAt(data.linkedAt || null);
         setWhatsappQrCode(data.qrCode || null);
+        if (data.apiConfig) {
+          setWhatsappApiUrlInput(data.apiConfig.whatsappApiUrl || "");
+          setWhatsappApiKeyInput(data.apiConfig.whatsappApiKey || "");
+          setWhatsappInstanceIdInput(data.apiConfig.whatsappInstanceId || "");
+          setWhatsappAdminUsernameInput(data.apiConfig.whatsappAdminUsername || "");
+          setWhatsappAdminPasswordInput(data.apiConfig.whatsappAdminPassword || "");
+        }
         if (data.status === "LINKED") {
           addWhatsappLog(`Active secure session found: ${data.phoneNumber} (Linked at: ${new Date(data.linkedAt).toLocaleString()})`);
           addWhatsappLog(`WhatsApp Gateway active and monitoring OTP dispatch rails.`);
@@ -491,6 +506,51 @@ export default function AdminPage() {
       addWhatsappLog(`[ERROR] Unlink API error: ${err.message}`);
     } finally {
       setIsLinkingWhatsapp(false);
+    }
+  };
+
+  const handleSaveWhatsappApiConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingApiConfig(true);
+    addWhatsappLog("Applying and storing new WhatsApp API VM gateway configs...");
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/whatsapp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          action: "save_api_config",
+          whatsappApiUrl: whatsappApiUrlInput.trim(),
+          whatsappApiKey: whatsappApiKeyInput.trim(),
+          whatsappInstanceId: whatsappInstanceIdInput.trim(),
+          whatsappAdminUsername: whatsappAdminUsernameInput.trim(),
+          whatsappAdminPassword: whatsappAdminPasswordInput.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("WhatsApp API Credentials secured successfully!");
+        addWhatsappLog("Success: WhatsApp API connection keys applied.");
+        // Fetch status again with new keys
+        fetchWhatsappStatus();
+      } else {
+        toast.error(data.error || "Failed to save configuration.");
+      }
+    } catch (err: any) {
+      toast.error("Network communication failure applying settings.");
+      addWhatsappLog(`[ERROR] Save config failed: ${err.message}`);
+    } finally {
+      setIsSavingApiConfig(false);
     }
   };
 
@@ -2029,35 +2089,78 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    {/* Right side: Instructions / Setup tips */}
-                    <div className={cn("rounded-2xl p-6 md:col-span-2 border transition-colors duration-300 flex flex-col justify-between space-y-6", panelClass)}>
-                      <div className="space-y-4">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-[#FC7A00]">Requirements & Settings</h4>
-                        <ul className="space-y-3.5 text-xs text-gray-400 font-semibold leading-relaxed">
-                          <li className="flex items-start gap-2.5">
-                            <span className="material-symbols-outlined text-[16px] text-[#FC7A00] shrink-0">check_circle</span>
-                            <span>A stable internet connection on both your serverless node and your mobile device.</span>
-                          </li>
-                          <li className="flex items-start gap-2.5">
-                            <span className="material-symbols-outlined text-[16px] text-[#FC7A00] shrink-0">check_circle</span>
-                            <span>WhatsApp application installed and registered with the specified phone number.</span>
-                          </li>
-                          <li className="flex items-start gap-2.5">
-                            <span className="material-symbols-outlined text-[16px] text-[#FC7A00] shrink-0">check_circle</span>
-                            <span>Do not close or reload this workspace panel during live pairing handshakes.</span>
-                          </li>
-                          <li className="flex items-start gap-2.5">
-                            <span className="material-symbols-outlined text-[16px] text-[#FC7A00] shrink-0">check_circle</span>
-                            <span>Linked devices can be monitored and revoked directly from your phone&apos;s WhatsApp settings at any time.</span>
-                          </li>
-                        </ul>
+                    {/* Right side: Dynamic WhatsApp API Configuration Form */}
+                    <div className={cn("rounded-2xl p-6 md:col-span-2 border transition-colors duration-300 space-y-4", panelClass)}>
+                      <div className="border-b pb-3.5">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-[#FC7A00]">API Configuration Keys</h4>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Manage live connection to backend WhatsApp API VM</p>
                       </div>
 
-                      <div className={cn("p-4 rounded-xl border", isDark ? "bg-gray-800/40 border-gray-700" : "bg-gray-50 border-gray-150")}>
-                        <p className="text-[10px] text-gray-400 font-bold leading-normal">
-                          ⚠️ Security Advisory: The WhatsApp API connection provides secure end-to-end communication pathways. Keep your pairing workspace private.
-                        </p>
-                      </div>
+                      <form onSubmit={handleSaveWhatsappApiConfig} className="space-y-3.5 text-left">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-gray-404">WHATSAPP_API_URL</label>
+                          <input
+                            type="url"
+                            value={whatsappApiUrlInput}
+                            onChange={(e) => setWhatsappApiUrlInput(e.target.value)}
+                            placeholder="e.g. http://192.168.1.100:3055"
+                            className={inputClass}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-gray-404">WHATSAPP_API_KEY</label>
+                          <input
+                            type="password"
+                            value={whatsappApiKeyInput}
+                            onChange={(e) => setWhatsappApiKeyInput(e.target.value)}
+                            placeholder="Enter API apikey"
+                            className={inputClass}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-gray-404">WHATSAPP_INSTANCE_ID</label>
+                          <input
+                            type="text"
+                            value={whatsappInstanceIdInput}
+                            onChange={(e) => setWhatsappInstanceIdInput(e.target.value)}
+                            placeholder="e.g. my-session-instance"
+                            className={inputClass}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-404">Admin User</label>
+                            <input
+                              type="text"
+                              value={whatsappAdminUsernameInput}
+                              onChange={(e) => setWhatsappAdminUsernameInput(e.target.value)}
+                              placeholder="Username"
+                              className={inputClass}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-404">Admin Pass</label>
+                            <input
+                              type="password"
+                              value={whatsappAdminPasswordInput}
+                              onChange={(e) => setWhatsappAdminPasswordInput(e.target.value)}
+                              placeholder="Password"
+                              className={inputClass}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isSavingApiConfig}
+                          className="w-full py-3.5 bg-black hover:bg-[#FC7A00] text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 disabled:opacity-50"
+                        >
+                          {isSavingApiConfig ? <><ButtonSpinner /> Saving Configs...</> : "Save API Configuration"}
+                        </button>
+                      </form>
                     </div>
                   </div>
                 )}
