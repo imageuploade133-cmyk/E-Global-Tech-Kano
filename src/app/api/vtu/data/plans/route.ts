@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { safeParseJson } from "@/lib/utils";
+import { adminDb } from "@/lib/firebase-admin";
 
 const FALLBACK_DATA_PLANS: Record<string, any[]> = {
   "MTN": [
@@ -28,8 +29,16 @@ const FALLBACK_DATA_PLANS: Record<string, any[]> = {
 
 export async function GET(req: Request) {
   let network = "";
+  let uid = "";
+
   try {
-    await authenticateUserRequest(req);
+    const authResult = await authenticateUserRequest(req);
+    uid = authResult.uid;
+  } catch (e) {
+    // If unauthenticated, still allow fallback loading without crash
+  }
+
+  try {
     const idToken = req.headers.get("Authorization")?.split("Bearer ")[1] || "mock-token";
 
     const { searchParams } = new URL(req.url);
@@ -37,6 +46,19 @@ export async function GET(req: Request) {
 
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
     const apiKey = process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+
+    // Retrieve user custom profit margin setting from Firestore to apply markup dynamically
+    let profitMargin = 0;
+    if (uid && adminDb) {
+      try {
+        const userDoc = await adminDb.collection("users").doc(uid).get();
+        if (userDoc.exists) {
+          profitMargin = Number(userDoc.data()?.dataProfitMargin) || 0;
+        }
+      } catch (dbErr) {
+        console.warn("[Plans Profit Margin] Failed to read user profitMargin:", dbErr);
+      }
+    }
 
     const gatewayRes = await fetch(`${gatewayUrl}/api/vtu/data/plans?network=${network}`, {
       method: "GET",
@@ -51,21 +73,66 @@ export async function GET(req: Request) {
       console.warn(`[Data Plans Gateway Fallback Activated]: ${gatewayRes.status} - ${errText}`);
 
       const normNetwork = network.trim().toUpperCase();
-      const plans = FALLBACK_DATA_PLANS[normNetwork] || Object.values(FALLBACK_DATA_PLANS).flat();
+      const rawPlans = FALLBACK_DATA_PLANS[normNetwork] || Object.values(FALLBACK_DATA_PLANS).flat();
+
+      // Apply Profit Margin dynamically on FALLBACK PLANS
+      const plans = rawPlans.map(p => {
+        const amt = Number(p.amount || p.price || 0) + profitMargin;
+        return {
+          ...p,
+          amount: amt,
+          price: amt
+        };
+      });
+
       return NextResponse.json({
         success: true,
         data: plans
       });
     }
 
-    const data = await safeParseJson(gatewayRes);
-    return NextResponse.json(data);
+    const resData = await safeParseJson(gatewayRes);
+
+    // Apply Profit Margin dynamically on RETRIEVED API PLANS
+    if (resData && Array.isArray(resData.data)) {
+      resData.data = resData.data.map((p: any) => {
+        const amt = Number(p.amount || p.price || 0) + profitMargin;
+        return {
+          ...p,
+          amount: amt,
+          price: amt
+        };
+      });
+    }
+
+    return NextResponse.json(resData);
   } catch (err: unknown) {
     const error = err as Error;
     console.warn("[Data Plans Route Exception Fallback Activated]:", error.message);
 
     const normNetwork = network.trim().toUpperCase();
-    const plans = FALLBACK_DATA_PLANS[normNetwork] || Object.values(FALLBACK_DATA_PLANS).flat();
+    const rawPlans = FALLBACK_DATA_PLANS[normNetwork] || Object.values(FALLBACK_DATA_PLANS).flat();
+
+    // Retrieve user custom profit margin setting from Firestore for exception path
+    let profitMargin = 0;
+    if (uid && adminDb) {
+      try {
+        const userDoc = await adminDb.collection("users").doc(uid).get();
+        if (userDoc.exists) {
+          profitMargin = Number(userDoc.data()?.dataProfitMargin) || 0;
+        }
+      } catch (dbErr) {}
+    }
+
+    const plans = rawPlans.map(p => {
+      const amt = Number(p.amount || p.price || 0) + profitMargin;
+      return {
+        ...p,
+        amount: amt,
+        price: amt
+      };
+    });
+
     return NextResponse.json({
       success: true,
       data: plans

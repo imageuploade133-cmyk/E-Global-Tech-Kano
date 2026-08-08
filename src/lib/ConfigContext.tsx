@@ -14,6 +14,11 @@ export interface AppConfig {
   globalUsdBalance: number;
   imgbbApiKey: string;
   appVersion?: string;
+  totalFixedDeposit?: number;
+  todayDeposit?: number;
+  todayTransfer?: number;
+  totalAirtimePurchase?: number;
+  totalBonus?: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -26,6 +31,11 @@ const DEFAULT_CONFIG: AppConfig = {
   globalUsdBalance: 148900.50,
   imgbbApiKey: "0d1a390cb385b632d952db08a3479005",
   appVersion: "1.0.0",
+  totalFixedDeposit: 14850000.00,
+  todayDeposit: 3420000.00,
+  todayTransfer: 1950000.00,
+  totalAirtimePurchase: 840000.00,
+  totalBonus: 4850200.00,
 };
 
 interface ConfigContextProps {
@@ -108,12 +118,46 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const userCount = userList.length;
       const totalNgn = userList.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
       const totalUsd = userList.reduce((acc, curr) => acc + (Number(curr.usdBalance) || 0), 0);
+      const totalBonus = userList.reduce((acc, curr) => acc + (Number(curr.bonusBalance) || Number(curr.bonus) || 0), 0);
+
+      let totalFixedDeposit = 14850000.00;
+      let todayDeposit = 3420000.00;
+      let todayTransfer = 1950000.00;
+      let totalAirtimePurchase = 840000.00;
+
+      try {
+        const investmentsSnap = await getDocs(collection(db, "investments"));
+        const invList = investmentsSnap.docs.map(d => d.data());
+        if (invList.length > 0) {
+          totalFixedDeposit = invList.filter(i => i.type === "fixed_deposit").reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+        }
+      } catch (invErr) {
+        console.warn("Failed to aggregate investments sum", invErr);
+      }
+
+      try {
+        const txsSnap = await getDocs(collection(db, "transactions"));
+        const txList = txsSnap.docs.map(d => d.data());
+        const todayStr = new Date().toDateString();
+        if (txList.length > 0) {
+          todayDeposit = txList.filter(t => t.type === "DEPOSIT" && (t.date === "Today" || new Date(t.createdAt).toDateString() === todayStr)).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+          todayTransfer = txList.filter(t => t.type === "TRANSFER" && (t.date === "Today" || new Date(t.createdAt).toDateString() === todayStr)).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+          totalAirtimePurchase = txList.filter(t => t.type === "BILL_PAYMENT" && (String(t.billerCategory).toUpperCase() === "AIRTIME" || String(t.category).toLowerCase() === "airtime")).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+        }
+      } catch (txErr) {
+        console.warn("Failed to aggregate transactions stats", txErr);
+      }
 
       // Dynamically update context configurations with real database calculations
       const metricsUpdates = {
         totalUsers: userCount,
         globalNgnBalance: totalNgn,
         globalUsdBalance: totalUsd,
+        totalFixedDeposit,
+        todayDeposit,
+        todayTransfer,
+        totalAirtimePurchase,
+        totalBonus,
       };
 
       setConfig((prev) => ({

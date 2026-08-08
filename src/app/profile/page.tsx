@@ -454,6 +454,39 @@ export default function ProfilePage() {
     }
   };
 
+  // Data Profit Margin States & Save Handler
+  const [dataProfitMarginInput, setDataProfitMarginInput] = useState("0");
+  const [isSavingMargin, setIsSavingMargin] = useState(false);
+
+  useEffect(() => {
+    if (userData?.dataProfitMargin !== undefined) {
+      setDataProfitMarginInput(String(userData.dataProfitMargin));
+    }
+  }, [userData?.dataProfitMargin]);
+
+  const handleSaveProfitMargin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = Number(dataProfitMarginInput);
+    if (isNaN(val) || val < 0) {
+      toast.error("Please enter a valid non-negative profit margin amount.");
+      return;
+    }
+
+    setIsSavingMargin(true);
+    try {
+      await updateUserData({
+        dataProfitMargin: val
+      });
+      toast.success("Data profit margin applied successfully!", {
+        description: `₦${val} will be dynamically added to all displayed Mobile Data plans.`
+      });
+    } catch (err: any) {
+      toast.error("Failed to save profit margin: " + err.message);
+    } finally {
+      setIsSavingMargin(false);
+    }
+  };
+
   const handleUpdatePin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (oldPin.length !== 4 || isNaN(Number(oldPin))) {
@@ -1025,6 +1058,39 @@ export default function ProfilePage() {
                 className="w-full bg-black text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 cursor-pointer"
               >
                 {isUpdatingPin ? "Updating..." : "Update PIN"}
+              </button>
+            </form>
+          </section>
+
+          {/* Section: Custom Data Profit Margin Settings */}
+          <section className="premium-gradient-card premium-gradient-border p-6 space-y-4">
+            <h3 className="font-hanken font-bold text-sm tracking-wider uppercase text-gray-500 border-b border-gray-100/60 pb-2.5">
+              Data Profit Markup Settings
+            </h3>
+            <p className="font-hanken text-xs text-gray-500 leading-relaxed">
+              Set your desired markup/profit margin (in Naira) to be added on top of all Mobile Data purchase plan prices automatically.
+            </p>
+
+            <form onSubmit={handleSaveProfitMargin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-black">Data Margin Profit (₦)</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={dataProfitMarginInput}
+                  onChange={(e) => setDataProfitMarginInput(e.target.value)}
+                  className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black outline-none focus:border-black/60 shadow-sm"
+                  placeholder="e.g. 100"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingMargin}
+                className="w-full bg-[#FC7A00] text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {isSavingMargin ? "Saving Margin..." : "Save Profit Margin"}
               </button>
             </form>
           </section>
