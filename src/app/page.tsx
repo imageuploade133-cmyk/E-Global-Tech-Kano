@@ -282,7 +282,7 @@ export default function Home() {
       <div
         className="fixed left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none"
         style={{
-          top: `calc(env(safe-area-inset-top, 0px) + ${Math.min(100, 64 + pullDistance)}px)`,
+          top: `${Math.min(100, 64 + pullDistance)}px`,
           opacity: pullDistance > 10 || isRefreshing ? 1 : 0,
           scale: pullDistance > 10 || isRefreshing ? 1 : 0.85,
         }}
