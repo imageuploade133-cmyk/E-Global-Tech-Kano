@@ -797,7 +797,7 @@ export default function ProfilePage() {
                     <span className="material-symbols-outlined text-red-500 font-bold">error</span>
                     <div>
                       <p className="font-hanken font-bold text-xs">Verification Failed</p>
-                      <p className="text-[10px] text-red-500 leading-tight">The BVN or NIN provided could not be verified by Flutterwave gateway. Please try again with valid records.</p>
+                      <p className="text-[10px] text-red-500 leading-tight">The BVN or NIN provided could not be verified by our secure banking gateway. Please try again with valid records.</p>
                     </div>
                   </div>
                 )}
