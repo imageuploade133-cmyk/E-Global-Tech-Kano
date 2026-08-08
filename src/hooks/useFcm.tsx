@@ -48,7 +48,7 @@ export function useFcm() {
         const token = await (window as any).flutter_inappwebview.callHandler("getFcmToken");
         if (token) {
           setFcmToken(token);
-          localStorage.setItem("active_fcm_token", token);
+          sessionStorage.setItem("active_fcm_token", token);
           console.log("[FCM Hook] Retrieved Flutter FCM token via JS Bridge successfully:", token);
           await syncTokenWithBackend(token, "register");
           return token;
@@ -96,7 +96,7 @@ export function useFcm() {
       if (token) {
         setFcmToken(token);
         if (typeof window !== "undefined") {
-          localStorage.setItem("active_fcm_token", token);
+          sessionStorage.setItem("active_fcm_token", token);
         }
         console.log("[FCM Hook] Generated secure FCM token successfully:", token);
         await syncTokenWithBackend(token, "register");
@@ -116,7 +116,7 @@ export function useFcm() {
       (window as any).__syncFcmToken = async (newToken: string) => {
         console.log("[FCM Bridge] Sync request received from Flutter container:", newToken);
         setFcmToken(newToken);
-        localStorage.setItem("active_fcm_token", newToken);
+        sessionStorage.setItem("active_fcm_token", newToken);
         if (user) {
           await syncTokenWithBackend(newToken, "register");
         }

@@ -84,7 +84,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           unsubscribe = null;
         }
         if (typeof window !== "undefined") {
-          const cached = localStorage.getItem("app_global_config");
+          const cached = sessionStorage.getItem("app_global_config");
           if (cached) {
             try { setConfig(JSON.parse(cached)); } catch { /* ignore */ }
           }
@@ -137,7 +137,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (e) {
       console.error("Failed to commit settings updates to Firebase Firestore:", e);
       if (typeof window !== "undefined") {
-        localStorage.setItem("app_global_config_fallback", JSON.stringify(newConfig));
+        sessionStorage.setItem("app_global_config_fallback", JSON.stringify(newConfig));
       }
     }
   };

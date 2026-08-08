@@ -1,27 +1,34 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { handleAppSignOut } from "@/lib/logout-util";
-import { cn } from "@/lib/utils";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Persistently identify the device using localStorage
+// Persistently identify the device using sessionStorage instead of localStorage (Bypasses caching on Ctrl+F5)
 const getOrCreateDeviceId = (): string => {
   if (typeof window === "undefined") return "";
-  let devId = localStorage.getItem("deviceId");
+  let devId = sessionStorage.getItem("deviceId");
   if (!devId) {
     devId = "device_" + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-    localStorage.setItem("deviceId", devId);
+    sessionStorage.setItem("deviceId", devId);
   }
   return devId;
 };
+
+// Global flat micro spinner
+const ButtonSpinner = () => (
+  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, isPinVerified, userData, updateUserData } = useAuth();
@@ -39,24 +46,41 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const [verError, setVerError] = useState("");
   const [verifyingDevice, setVerifyingDevice] = useState(false);
 
+  // Multi-Device Suspension States (OPay-like Session Overlap Blockers)
+  const [isSessionSuspended, setIsSessionSuspended] = useState(false);
+  const [isChangingPin, setIsChangingPin] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinChangeError, setPinChangeError] = useState("");
+  const [isSavingPin, setIsSavingPin] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Capture the exact instant the multi-device conflict is intercepted
+  const [suspendTime] = useState(() => new Date().toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }));
+
   // System-wide update states for real-time versions
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateProgress, setUpdateProgress] = useState(0);
 
   const initializingDeviceRef = useRef(false);
 
-  // Real-time server-side version mismatch update controller
+  // Real-time server-side version mismatch update controller (Bypasses caching on Ctrl+F5)
   useEffect(() => {
     if (typeof window === "undefined" || !config?.appVersion) return;
 
     const serverVersion = config.appVersion;
-    const cachedVersion = localStorage.getItem("cached_app_version");
+    const cachedVersion = sessionStorage.getItem("cached_app_version");
 
     if (cachedVersion === null) {
-      // Brand new user: record version silently without showing any update screen
-      localStorage.setItem("cached_app_version", serverVersion);
+      sessionStorage.setItem("cached_app_version", serverVersion);
     } else if (cachedVersion !== serverVersion) {
-      // Existing user: show beautiful full-screen update loader and clear localStorage & service caches
       setIsUpdating(true);
       setUpdateProgress(0);
 
@@ -72,16 +96,15 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               });
             }
 
-            // Clear localStorage & sessionStorage completely
-            localStorage.clear();
+            // Clear sessionStorage completely
             sessionStorage.clear();
 
             // Set new app version cache and force reload
-            localStorage.setItem("cached_app_version", serverVersion);
+            sessionStorage.setItem("cached_app_version", serverVersion);
             window.location.reload();
             return 100;
           }
-          return prev + 5; // increment towards 100 over ~3s
+          return prev + 5;
         });
       }, 150);
 
@@ -100,15 +123,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     const txRef = params.get("tx_ref") || params.get("txRef");
 
     if (verify === "flw" || transactionId || status === "successful" || status === "completed" || status === "cancelled") {
-      console.log("[Redirect Detected] Flutterwave parameters detected on app startup:", {
-        verify,
-        status,
-        transactionId,
-        txRef
-      });
-
       if (status === "cancelled") {
-        console.log("[Redirect Detected] Payment was cancelled by user.");
         toast.error("The transaction checkout flow was cancelled.");
 
         if (txRef) {
@@ -124,7 +139,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
                 }
               }
 
-              console.log(`[Cancel Cleanup Started] Cleaning up pending payment: ${txRef}`);
               const res = await fetch("/api/flutterwave/cancel", {
                 method: "POST",
                 headers: {
@@ -133,10 +147,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
                 },
                 body: JSON.stringify({ txRef })
               });
-              const data = await res.json();
-              console.log("[Cancel Cleanup Complete] Server response received:", data);
+              await res.json();
             } catch (err) {
-              console.error("[Cancel Cleanup Error] Failed to contact cancel clean endpoint:", err);
+              console.error("[Cancel Cleanup Error] Failed:", err);
             } finally {
               const url = new URL(window.location.href);
               url.search = "";
@@ -153,16 +166,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (!transactionId) {
-        console.warn("[Redirect Detected] missing transaction_id parameter. Skipping verification.");
-        return;
-      }
+      if (!transactionId) return;
 
       const verifyTransaction = async () => {
         setFlwVerifying(true);
         setFlwMessage("Securing settlement credentials...");
-
-        console.log(`[Calling Verify Endpoint] POST /api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
 
         try {
           let idToken = "mock-token";
@@ -185,27 +193,21 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           });
           const data = await res.json();
 
-          console.log("[Verification Complete] Server response received:", data);
-
           if (data.success) {
             const url = new URL(window.location.href);
             url.search = "";
             window.history.replaceState({}, "", url.toString());
 
             if (data.duplicate) {
-              console.log("[Duplicate Detected] Transaction was already processed.");
               toast.info("Transaction already processed", {
                 description: "This transaction has already been processed. Your wallet was not credited again."
               });
             } else {
-              console.log(`[Wallet Refreshed] Successfully verified transaction. Amount: ₦${data.fundedAmount || "N/A"}. New balance: ₦${data.newBalance || "N/A"}`);
-
               toast.success("Wallet funded successfully!", {
                 description: data.message || "Your payment was verified and credited."
               });
             }
           } else {
-            console.error("[Verification Complete] Verification unsuccessful:", data.error);
             toast.error("Payment settlement was rejected.", {
               description: data.error || "Please contact customer support."
             });
@@ -214,7 +216,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             window.history.replaceState({}, "", url.toString());
           }
         } catch (err) {
-          console.error("[Verification Complete] Endpoint execution error:", err);
+          console.error("[Verification Complete] Error:", err);
           toast.error("Verification failed.", {
             description: "Connection error with settlement gateway."
           });
@@ -227,7 +229,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Smooth scroll and keyboard focus positions reset to prevent page shifting/gaps
+  // Smooth scroll reset helper
   useEffect(() => {
     const handleBlur = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
@@ -249,7 +251,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (loading || isMock || !user || !userData) return;
 
-    // Skip device enforcement on public routes
+    // Skip device enforcement on public/auth routes
     const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
     if (isPublicRoute) return;
 
@@ -259,7 +261,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     // 1. First-time registration of deviceId: Whitelist the first device used to register/login
     if (!userData.registeredDeviceId && !initializingDeviceRef.current) {
       initializingDeviceRef.current = true;
-      console.log("[Device Guard] Initializing original registered device ID:", deviceId);
       updateUserData({
         registeredDeviceId: deviceId,
         verifiedDevices: [deviceId],
@@ -276,27 +277,14 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // 2. Real-time active session validation (Force logout if logged in elsewhere)
+    // 2. Real-time active session validation (Suspend session if logged in elsewhere)
     const isCurrentDeviceVerified = userData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
     if (isCurrentDeviceVerified) {
       setIsNewDeviceBlocked(false);
 
       if (userData.currentDeviceId && userData.currentDeviceId !== deviceId) {
-        console.warn("[Device Guard] Active session changed to another device. Terminating this session.");
-        toast.error("Session Expired", {
-          description: "Your account was logged in on another device. Logging out...",
-        });
-
-        // Clear all device caches instantly upon multi-device logout trigger
-        if ("caches" in window) {
-          caches.keys().then((keys) => {
-            Promise.all(keys.map((key) => caches.delete(key)));
-          });
-        }
-        localStorage.clear();
-        sessionStorage.clear();
-
-        handleAppSignOut(router);
+        console.warn("[Device Guard] Active session changed to another device. Suspending active session.");
+        setIsSessionSuspended(true);
         return;
       }
 
@@ -313,7 +301,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       }
     } else {
       // 3. Unrecognized device detected: Block transaction activity with validation overlay
-      console.warn("[Device Guard] Unrecognized device detected:", deviceId);
       setIsNewDeviceBlocked(true);
     }
   }, [user, loading, userData, pathname, router, updateUserData]);
@@ -334,21 +321,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           const isVerifiedOnThisDevice = freshData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
 
           if (isVerifiedOnThisDevice && freshData.currentDeviceId && freshData.currentDeviceId !== deviceId) {
-            console.warn("[Instant Session Check] Active session has been taken by another device. Logging out.");
-            toast.error("Session Terminated", {
-              description: "You have logged in from another device. Clearing cache and logging out..."
-            });
-
-            // Instant clear caches and logout
-            if ("caches" in window) {
-              caches.keys().then((keys) => {
-                Promise.all(keys.map((key) => caches.delete(key)));
-              });
-            }
-            localStorage.clear();
-            sessionStorage.clear();
-
-            handleAppSignOut(router);
+            console.warn("[Instant Session Check] Session overtaken. Suspending active session.");
+            setIsSessionSuspended(true);
           }
         }
       } catch (err) {
@@ -356,7 +330,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Attach listeners on focus and visibilitychange to check instantly on any user return
     const handleFocusCheck = () => {
       performInstantSessionCheck();
     };
@@ -368,7 +341,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       window.removeEventListener("focus", handleFocusCheck);
       document.removeEventListener("visibilitychange", handleFocusCheck);
     };
-  }, [user, userData, router]);
+  }, [user, userData]);
 
   // Route protection rules for standard login status
   useEffect(() => {
@@ -411,7 +384,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     setVerifyingDevice(true);
 
     try {
-      // Normalize and clean phone digits for safe matching
       const inputPhoneClean = verPhone.replace(/\D/g, "");
       const registeredPhoneClean = (userData.phoneNumber as string || "").replace(/\D/g, "");
 
@@ -424,7 +396,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       const ninValue = (userData.nin as string || "").trim();
 
       if (bvnValue || ninValue) {
-        // Match last 4 of BVN or NIN
         const last4Bvn = bvnValue.slice(-4);
         const last4Nin = ninValue.slice(-4);
         const inputTrimmed = verBvnOrNinOrEmail.trim();
@@ -433,7 +404,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           (!!bvnValue && inputTrimmed === last4Bvn) ||
           (!!ninValue && inputTrimmed === last4Nin);
       } else {
-        // Otherwise, compare registered email address case-insensitively
         const registeredEmail = (userData.email as string || "").trim().toLowerCase();
         isBvnOrNinOrEmailMatch = verBvnOrNinOrEmail.trim().toLowerCase() === registeredEmail;
       }
@@ -442,7 +412,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         const deviceId = getOrCreateDeviceId();
         const currentVerified = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
 
-        // Save verified status
         await updateUserData({
           verifiedDevices: [...currentVerified, deviceId],
           currentDeviceId: deviceId,
@@ -473,11 +442,91 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     await handleAppSignOut(router);
   };
 
+  // Re-login trigger inside the Suspend Overlay
+  const handleSuspendReLogin = async () => {
+    setIsLoggingOut(true);
+    toast.loading("Clearing session state...");
+    try {
+      if ("caches" in window) {
+        await caches.keys().then((keys) => {
+          return Promise.all(keys.map((key) => caches.delete(key)));
+        });
+      }
+      sessionStorage.clear();
+      await handleAppSignOut(router);
+    } catch {
+      toast.dismiss();
+      toast.error("Failed to re-login smoothly.");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // Inline PIN override for suspended accounts (Change Password)
+  const handleChangePinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinChangeError("");
+
+    if (newPin.length !== 4 || isNaN(Number(newPin))) {
+      setPinChangeError("Security PIN must be a 4-digit numeric code.");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinChangeError("The confirmed PIN does not match.");
+      return;
+    }
+
+    setIsSavingPin(true);
+    toast.loading("Securing new PIN credentials...");
+
+    try {
+      let idToken = "mock-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      // Secure REST API POST to /api/auth/pin with action 'set' (Updates user pinHash server-side atomically)
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          action: "set",
+          pin: newPin
+        })
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.success) {
+        toast.success("Security PIN updated successfully!", {
+          description: "Your credentials are changed. Logging out of conflict state..."
+        });
+        // Clear conflicting sessions and force logout to re-login with the new PIN
+        setIsChangingPin(false);
+        setNewPin("");
+        setConfirmPin("");
+        handleSuspendReLogin();
+      } else {
+        setPinChangeError(data.error || "Failed to save secure PIN in database.");
+      }
+    } catch {
+      toast.dismiss();
+      setPinChangeError("Network connection failure changing PIN.");
+    } finally {
+      setIsSavingPin(false);
+    }
+  };
+
   if (flwVerifying) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
         <div className="relative flex flex-col items-center">
-          <div className="flex flex-col items-center p-6 rounded-3xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50 shadow-[0_8px_32px_rgba(0,0,0,0.03)] max-w-xs text-center">
+          <div className="flex flex-col items-center p-6 rounded-3xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50 max-w-xs text-center">
             <div className="relative w-12 h-12 flex items-center justify-center">
               <motion.div
                 animate={{ rotate: 360 }}
@@ -502,7 +551,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
         <div className="relative flex flex-col items-center">
-          <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50 shadow-[0_8px_32px_rgba(0,0,0,0.03)]">
+          <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50">
             <div className="relative w-10 h-10 flex items-center justify-center">
               <motion.div
                 animate={{ rotate: 360 }}
@@ -513,7 +562,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                className="relative w-7 h-7 bg-white rounded-full p-0.5 shadow-sm flex items-center justify-center overflow-hidden"
+                className="relative w-7 h-7 bg-white rounded-full p-0.5 flex items-center justify-center overflow-hidden"
               >
                 <Image
                   src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
@@ -538,16 +587,15 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Render high-fidelity professional system update overlay
+  // Render high-fidelity professional system update overlay (Ctrl+F5 instant reload powered)
   if (isUpdating) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6 z-[9999999] relative">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-800/10 shadow-2xl"
+          className="w-full max-w-sm bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-800/10"
         >
-          {/* Logo Brand and Spinning Gradient update wheels */}
           <div className="space-y-4">
             <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
               <motion.div
@@ -568,7 +616,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             </p>
           </div>
 
-          {/* Progress Percent counter dial & track */}
           <div className="space-y-2">
             <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
               <span>Memory Clearance</span>
@@ -586,7 +633,134 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Render high-fidelity professional full-screen BVN/NIN/Email authentication page for new devices
+  // OPay-like Multi-Device Real-time suspension Modal overlay screen (Extremely high-fidelity)
+  if (isSessionSuspended && userData) {
+    const activeDeviceModel = (userData.currentDeviceModel || userData.platform || "Unrecognized Mobile Device") as string;
+    return (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[999999] flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="w-full max-w-md bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-200"
+        >
+          {/* Warning Icon and Title header */}
+          <div className="space-y-2">
+            <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto">
+              <span className="material-symbols-outlined text-[34px] animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_bad</span>
+            </div>
+            <h2 className="font-hanken font-black text-lg text-black uppercase tracking-wider leading-tight">
+              SESSION EXPIRED
+            </h2>
+            <p className="font-hanken text-[10px] text-rose-600 font-black uppercase tracking-widest leading-none">
+              Logged in on another device
+            </p>
+          </div>
+
+          {/* Device logs details box */}
+          <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl text-left space-y-2.5">
+            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Conflict Session Details</p>
+            <div className="grid grid-cols-1 gap-2 text-xs font-semibold text-gray-800">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">smartphone</span>
+                <span className="text-gray-500 uppercase">Device:</span>
+                <span className="font-bold select-all text-gray-900">{activeDeviceModel}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] text-emerald-600">calendar_month</span>
+                <span className="text-gray-500 uppercase">Timestamp:</span>
+                <span className="font-mono text-gray-900 font-bold">{suspendTime}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Conflict safety notice */}
+          <p className="font-hanken text-[11px] text-gray-500 leading-relaxed font-semibold">
+            Your account was logged in on another device. For your financial safety, this session has been suspended.
+            <span className="text-rose-600 block mt-1.5 font-bold uppercase text-[9px] tracking-wider">
+              If you did not do this, kindly change your access credentials immediately.
+            </span>
+          </p>
+
+          {/* Action Row */}
+          {!isChangingPin ? (
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                disabled={isLoggingOut}
+                onClick={handleSuspendReLogin}
+                className="w-full py-3.5 bg-black hover:bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isLoggingOut ? <><ButtonSpinner /> Clearing Session...</> : "Dismiss & Re-login"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPinChangeError("");
+                  setIsChangingPin(true);
+                }}
+                className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all"
+              >
+                Change Security PIN
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleChangePinSubmit} className="space-y-4 text-left border-t border-gray-100 pt-4 animate-fadeIn">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Enter New 4-Digit PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    required
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+                    placeholder="New 4-digit code"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-mono font-bold text-center"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Confirm New 4-Digit PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    required
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
+                    placeholder="Confirm 4-digit code"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-mono font-bold text-center"
+                  />
+                </div>
+              </div>
+
+              {pinChangeError && (
+                <p className="text-[10px] text-red-600 font-bold text-center">{pinChangeError}</p>
+              )}
+
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsChangingPin(false)}
+                  className="w-1/3 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-black uppercase text-center"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPin || newPin.length !== 4}
+                  className="w-2/3 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider disabled:opacity-50"
+                >
+                  {isSavingPin ? <><ButtonSpinner /> Saving...</> : "Save PIN & Log Out"}
+                </button>
+              </div>
+            </form>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Render high-fidelity professional BVN/NIN/Email authentication page for new devices
   if (isNewDeviceBlocked && userData) {
     const bvnValue = (userData.bvn as string || "").trim();
     const ninValue = (userData.nin as string || "").trim();
@@ -594,7 +768,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
     return (
       <div className="flex min-h-screen flex-col bg-white p-8 items-center justify-between z-[999999] fixed inset-0 overflow-y-auto">
-        {/* Brand Header */}
         <div className="w-full flex flex-col items-center text-center mt-6 shrink-0">
           <div className="relative w-16 h-16 mb-4">
             <Image
@@ -620,9 +793,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Dynamic Verification Form */}
         <form onSubmit={handleVerifyNewDevice} className="w-full max-w-xs space-y-4 my-10 flex-grow flex flex-col justify-center text-left">
-          {/* Phone Number Input */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
               Registered Phone Number
@@ -637,7 +808,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          {/* Dynamic Identity Verification (Last 4 of BVN/NIN vs Email address) */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
               {hasKyc ? "Last 4 Digits of your BVN or NIN" : "Registered Email Address"}
@@ -659,7 +829,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          {/* Verify button positioned directly below inputs */}
           <button
             type="submit"
             disabled={verifyingDevice || !verPhone || !verBvnOrNinOrEmail}
@@ -676,7 +845,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           </button>
         </form>
 
-        {/* Fallback exit button with Sign Out in bold RED color at bottom */}
         <div className="w-full text-center border-t border-gray-150 pt-4 pb-4 shrink-0 max-w-xs">
           <button
             type="button"

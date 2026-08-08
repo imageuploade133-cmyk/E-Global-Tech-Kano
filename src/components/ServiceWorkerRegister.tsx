@@ -9,24 +9,23 @@ export function ServiceWorkerRegister() {
     if (typeof window === "undefined") return;
 
     // 1. Version Update Check (Clears caches, local storage, and forces reload on new build deploy)
-    const savedVersion = localStorage.getItem("APP_VERSION");
+    const savedVersion = sessionStorage.getItem("APP_VERSION");
     if (savedVersion !== CURRENT_VERSION) {
       console.log(`[Version Control] New deployment detected (${CURRENT_VERSION}). Initializing fresh cache and storage update...`);
 
       // Preserve non-sensitive visual toggles if desired, or clear everything
-      const balanceVisible = localStorage.getItem("balance_visible");
+      const balanceVisible = sessionStorage.getItem("balance_visible");
 
-      // Clear localStorage and sessionStorage
-      localStorage.clear();
+      // Clear sessionStorage
       sessionStorage.clear();
 
       // Restore critical user visual preferences
       if (balanceVisible !== null) {
-        localStorage.setItem("balance_visible", balanceVisible);
+        sessionStorage.setItem("balance_visible", balanceVisible);
       }
 
       // Record new version code
-      localStorage.setItem("APP_VERSION", CURRENT_VERSION);
+      sessionStorage.setItem("APP_VERSION", CURRENT_VERSION);
 
       // Unregister any active Service Workers first
       if ("serviceWorker" in navigator) {

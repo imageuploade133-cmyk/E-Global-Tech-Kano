@@ -17,7 +17,7 @@ export async function handleAppSignOut(router: any) {
       console.log("[SignOut] Mock sign-out initiated.");
       if (typeof window !== "undefined") {
         sessionStorage.clear();
-        localStorage.removeItem("active_fcm_token");
+        sessionStorage.removeItem("active_fcm_token");
         toast.success("Logged out successfully");
         window.location.href = "/auth/login";
       } else {
@@ -29,7 +29,7 @@ export async function handleAppSignOut(router: any) {
     const user = auth.currentUser;
     const tokensToUnregister: string[] = [];
 
-    const browserToken = typeof window !== "undefined" ? localStorage.getItem("active_fcm_token") : null;
+    const browserToken = typeof window !== "undefined" ? sessionStorage.getItem("active_fcm_token") : null;
     if (browserToken) {
       tokensToUnregister.push(browserToken);
     }
@@ -74,7 +74,7 @@ export async function handleAppSignOut(router: any) {
   } finally {
     try {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("active_fcm_token");
+        sessionStorage.removeItem("active_fcm_token");
       }
       await signOut(auth);
       toast.success("Logged out successfully");
