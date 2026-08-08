@@ -95,7 +95,11 @@ export default function AdminPage() {
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "investments">("dashboard");
+
+  // Fixed Deposit States
+  const [fdList, setFdList] = useState<any[]>([]);
+  const [isLoadingFd, setIsLoadingFd] = useState(false);
 
   // Pre-fill admin email when user loads
   useEffect(() => {
@@ -472,6 +476,37 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAdminUnlocked && activeTab === "profit") {
       fetchGlobalMargins();
+    }
+  }, [isAdminUnlocked, activeTab]);
+
+  const fetchGlobalInvestments = async () => {
+    setIsLoadingFd(true);
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/investments", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setFdList(data.investments || []);
+      }
+    } catch (err) {
+      console.error("Failed to load global investments:", err);
+    } finally {
+      setIsLoadingFd(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdminUnlocked && activeTab === "investments") {
+      fetchGlobalInvestments();
     }
   }, [isAdminUnlocked, activeTab]);
 
@@ -897,6 +932,7 @@ export default function AdminPage() {
     { id: "settings", label: "Branding", icon: "diamond" },
     { id: "whatsapp", label: "WhatsApp Link", icon: "hub" },
     { id: "profit", label: "Commission Markups", icon: "tune" },
+    { id: "investments", label: "Fixed Deposits", icon: "savings" },
   ];
 
   if (!isAdminUnlocked) {
@@ -2489,6 +2525,129 @@ export default function AdminPage() {
                     </button>
                   </form>
                 )}
+              </motion.div>
+            )}
+
+            {/* Tab 7: Secure Fixed Deposits Auditing Panel */}
+            {activeTab === "investments" && (
+              <motion.div
+                key="investments-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6 animate-fadeIn"
+              >
+                {/* Metrics overview widgets inside Cpanel tab */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Active Savings</p>
+                    <p className="font-mono text-xl font-black text-emerald-500 mt-1 leading-none">
+                      ₦{fdList.filter(f => f.status === "ACTIVE").reduce((sum, curr) => sum + (Number(curr.amount) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-2">Active Accumulation</p>
+                  </div>
+
+                  <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Settled / Credited</p>
+                    <p className="font-mono text-xl font-black text-blue-500 mt-1 leading-none">
+                      ₦{fdList.filter(f => f.status === "SETTLED" || f.status === "CLAIMED").reduce((sum, curr) => sum + (Number(curr.amount) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-2">Accrued Disbursements</p>
+                  </div>
+
+                  <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Ledger Audits</p>
+                    <p className="font-mono text-xl font-black text-[#FC7A00] mt-1 leading-none">
+                      {fdList.length}
+                    </p>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-2">Placements Count</p>
+                  </div>
+                </div>
+
+                <div className={cn("rounded-2xl p-6 border transition-colors duration-300 space-y-4", panelClass)}>
+                  <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-[#FC7A00] tracking-wider">User Fixed Deposits Directory</h4>
+                      <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Audit active placements and settled payouts</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isLoadingFd}
+                      onClick={fetchGlobalInvestments}
+                      className={cn(
+                        "px-3 py-1.5 border hover:border-[#FC7A00] text-[10px] font-bold uppercase rounded-xl cursor-pointer transition-all",
+                        isDark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-600"
+                      )}
+                    >
+                      {isLoadingFd ? "Syncing..." : "Force Sync Queue"}
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto pr-1">
+                    {isLoadingFd ? (
+                      <div className="text-center py-16 text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+                        <ButtonSpinner /> Auditing system savings records...
+                      </div>
+                    ) : fdList.length === 0 ? (
+                      <div className="text-center py-12 text-gray-500 uppercase font-black text-xs">
+                        There are currently no waiting or active placements in the database.
+                      </div>
+                    ) : (
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-250 dark:border-gray-800 text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                            <th className="pb-3 pl-2">User Details</th>
+                            <th className="pb-3 text-right">Principal</th>
+                            <th className="pb-3 text-center">Rate</th>
+                            <th className="pb-3 text-right">Yield</th>
+                            <th className="pb-3 text-center">Status</th>
+                            <th className="pb-3 text-center">Created / Maturity</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
+                          {fdList.map((inv) => {
+                            const estYield = inv.amount * (Number(inv.interestRate) / 100);
+                            const isActive = inv.status === "ACTIVE";
+
+                            return (
+                              <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10">
+                                <td className="py-3">
+                                  <p className="font-extrabold text-xs">{inv.userName || "System User"}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">{inv.userEmail}</p>
+                                  <p className="text-[9px] font-mono text-gray-500">{inv.userPhone}</p>
+                                </td>
+                                <td className="py-3 text-right font-mono font-bold text-xs">
+                                  ₦{inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-3 text-center font-mono font-black text-[#FC7A00]">
+                                  {inv.interestRate}%
+                                </td>
+                                <td className="py-3 text-right font-mono font-extrabold text-emerald-500">
+                                  +₦{estYield.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-3 text-center">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                    isActive
+                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                      : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                  )}>
+                                    {inv.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 text-center">
+                                  <p className="text-[9px] font-semibold text-gray-400">Created: {new Date(inv.createdAt).toLocaleDateString()}</p>
+                                  <p className="text-[9px] font-extrabold text-[#FC7A00] mt-0.5">Matures: {new Date(inv.maturesAt).toLocaleDateString()}</p>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
