@@ -6,18 +6,6 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { GatewayConfig } from "@/lib/payment/PaymentGatewayManager";
-
-interface AdminTxLog {
-  id: string;
-  userName: string;
-  type: "DEPOSIT" | "TRANSFER" | "BILL_PAYMENT";
-  amount: number;
-  status: "SUCCESS" | "PENDING" | "FAILED";
-  reference: string;
-  date: string;
-  time: string;
-}
 
 interface AdminUser {
   uid: string;
@@ -29,59 +17,6 @@ interface AdminUser {
   balance: number;
   createdAt: string;
 }
-
-const INITIAL_ADMIN_LOGS: AdminTxLog[] = [
-  {
-    id: "tx-adm-1",
-    userName: "STEVE COLLINS",
-    type: "TRANSFER",
-    amount: 120000.00,
-    status: "SUCCESS",
-    reference: "ETF-1039845-812",
-    date: "Jul 11, 2024",
-    time: "06:15 PM"
-  },
-  {
-    id: "tx-adm-2",
-    userName: "JULES VERNE",
-    type: "DEPOSIT",
-    amount: 500000.00,
-    status: "SUCCESS",
-    reference: "ETF-8924021-992",
-    date: "Jul 12, 2024",
-    time: "10:42 AM"
-  },
-  {
-    id: "tx-adm-3",
-    userName: "AMINA BELLO",
-    type: "BILL_PAYMENT",
-    amount: 15000.00,
-    status: "PENDING",
-    reference: "ETF-9908123-667",
-    date: "Today",
-    time: "11:58 PM"
-  },
-  {
-    id: "tx-adm-4",
-    userName: "CHIDI OKEKE",
-    type: "TRANSFER",
-    amount: 45000.00,
-    status: "FAILED",
-    reference: "ETF-1123984-500",
-    date: "Jul 05, 2024",
-    time: "08:12 AM"
-  },
-  {
-    id: "tx-adm-5",
-    userName: "YUSUF HARUNA",
-    type: "DEPOSIT",
-    amount: 250000.00,
-    status: "SUCCESS",
-    reference: "ETF-3904812-709",
-    date: "Jul 09, 2024",
-    time: "02:30 PM"
-  }
-];
 
 const PERMISSIONS_CATALOG = [
   { key: "can_transact", label: "Allow Transactions" },
@@ -116,7 +51,7 @@ export default function AdminPage() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "transactions" | "gateways" | "users">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "settings" | "users">("dashboard");
 
   // Eye View Feature (Masks balances, total users, and sensitive credentials)
   const [showSensitive, setShowSensitive] = useState(false);
@@ -126,10 +61,6 @@ export default function AdminPage() {
   const [isSyncingFirebase, setIsSyncingFirebase] = useState(false);
   const [isSavingMetrics, setIsSavingMetrics] = useState(false);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
-  const [isInjecting, setIsInjecting] = useState(false);
-  const [isSavingKeys, setIsSavingKeys] = useState<Record<string, boolean>>({});
-  const [isTestingConnection, setIsTestingConnection] = useState<Record<string, boolean>>({});
-  const [isProcessingTx, setIsProcessingTx] = useState<Record<string, boolean>>({});
 
   // User management loading states
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -152,13 +83,6 @@ export default function AdminPage() {
   const [ngnBalanceInput, setNgnBalanceInput] = useState(config.globalNgnBalance);
   const [usdBalanceInput, setUsdBalanceInput] = useState(config.globalUsdBalance);
 
-  // Transaction Log states
-  const [logs, setLogs] = useState<AdminTxLog[]>([]);
-  const [searchLogTerm, setSearchLogTerm] = useState("");
-
-  // Gateway Manager states
-  const [gateways, setGateways] = useState<Record<string, GatewayConfig>>({});
-
   // Users management states
   const [usersList, setUsersList] = useState<AdminUser[]>([]);
   const [searchUserTerm, setSearchUserTerm] = useState("");
@@ -176,24 +100,6 @@ export default function AdminPage() {
     role: "user" as "admin" | "agent" | "user",
     permissions: [] as string[]
   });
-
-  const fetchGateways = async () => {
-    try {
-      const res = await fetch("/api/banks");
-      if (res.ok) {
-        const { collection, getDocs } = await import("firebase/firestore");
-        const { db } = await import("@/lib/firebase");
-        const snap = await getDocs(collection(db, "payment_gateways"));
-        const configs: Record<string, GatewayConfig> = {};
-        snap.forEach((doc) => {
-          configs[doc.id] = doc.data() as GatewayConfig;
-        });
-        setGateways(configs);
-      }
-    } catch (err: unknown) {
-      console.error("Failed to load gateways configuration:", (err as Error).message);
-    }
-  };
 
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
@@ -236,40 +142,9 @@ export default function AdminPage() {
   useEffect(() => {
     const fetchRealData = async () => {
       if (!isAdminUnlocked) {
-        setLogs(INITIAL_ADMIN_LOGS);
         return;
       }
-
-      await fetchGateways();
       await fetchUsers();
-
-      try {
-        const { collection, getDocs } = await import("firebase/firestore");
-        const { db } = await import("@/lib/firebase");
-
-        const querySnap = await getDocs(collection(db, "transactions"));
-        if (!querySnap.empty) {
-          const fetchedLogs = querySnap.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              userName: data.userName || data.recipientName || "USER",
-              type: data.type || "TRANSFER",
-              amount: data.amount || 0,
-              status: data.status || "SUCCESS",
-              reference: data.reference || doc.id,
-              date: data.date || "Today",
-              time: data.time || "12:00 PM"
-            } as AdminTxLog;
-          });
-          setLogs(fetchedLogs);
-        } else {
-          setLogs(INITIAL_ADMIN_LOGS);
-        }
-      } catch (err: unknown) {
-        console.warn("Could not retrieve real transactions, fallback to local activity logs:", (err as Error).message);
-        setLogs(INITIAL_ADMIN_LOGS);
-      }
     };
 
     fetchRealData();
@@ -306,7 +181,6 @@ export default function AdminPage() {
       return;
     }
 
-    // Master passcode verification or standard fallback checks
     const isMasterCode = adminPin === "9900" || adminPin === "8888" || adminPin === "1234";
 
     if (isMasterCode) {
@@ -439,114 +313,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateLogStatus = async (id: string, newStatus: "SUCCESS" | "FAILED" | "PENDING") => {
-    setIsProcessingTx(prev => ({ ...prev, [id]: true }));
-    try {
-      // Simulate/perform async updates
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const updated = logs.map(l => l.id === id ? { ...l, status: newStatus } : l);
-      setLogs(updated);
-      toast.success(`Transaction status marked as ${newStatus}!`);
-    } catch {
-      toast.error("Failed to update status.");
-    } finally {
-      setIsProcessingTx(prev => ({ ...prev, [id]: false }));
-    }
-  };
-
-  const handleAddSimulatedTx = async () => {
-    setIsInjecting(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      const newTx: AdminTxLog = {
-        id: `tx-adm-${Date.now()}`,
-        userName: "AUTOMATED USER " + Math.floor(100 + Math.random() * 900),
-        type: Math.random() > 0.5 ? "DEPOSIT" : "TRANSFER",
-        amount: Math.floor(5000 + Math.random() * 95000),
-        status: "PENDING",
-        reference: `ETF-SIM-${Math.floor(1000000 + Math.random() * 9000000)}`,
-        date: "Today",
-        time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-      };
-      setLogs(updated => [newTx, ...updated]);
-      toast.success("Simulated transaction log generated!");
-    } finally {
-      setIsInjecting(false);
-    }
-  };
-
-  // Gateway Config Mutations
-  const handleToggleGatewayEnabled = async (id: string, current: boolean) => {
-    try {
-      const { doc, updateDoc } = await import("firebase/firestore");
-      const { db } = await import("@/lib/firebase");
-      const ref = doc(db, "payment_gateways", id);
-      await updateDoc(ref, { enabled: !current });
-      toast.success(`${id.toUpperCase()} gateway state updated successfully!`);
-      fetchGateways();
-    } catch (err: unknown) {
-      toast.error("Failed to update gateway status: " + (err as Error).message);
-    }
-  };
-
-  const handleUpdatePriority = async (id: string, priorityVal: number) => {
-    try {
-      const { doc, updateDoc } = await import("firebase/firestore");
-      const { db } = await import("@/lib/firebase");
-      const ref = doc(db, "payment_gateways", id);
-      await updateDoc(ref, { priority: priorityVal });
-      toast.success(`${id.toUpperCase()} priority set to ${priorityVal}!`);
-      fetchGateways();
-    } catch (err: unknown) {
-      toast.error("Failed to update gateway priority: " + (err as Error).message);
-    }
-  };
-
-  const handleToggleFeature = async (id: string, feature: keyof GatewayConfig["features"], current: boolean) => {
-    try {
-      const { doc, updateDoc } = await import("firebase/firestore");
-      const { db } = await import("@/lib/firebase");
-      const ref = doc(db, "payment_gateways", id);
-      await updateDoc(ref, { [`features.${feature}`]: !current });
-      toast.success(`${id.toUpperCase()} feature flag [${feature}] updated successfully!`);
-      fetchGateways();
-    } catch (err: unknown) {
-      toast.error("Failed to toggle gateway feature: " + (err as Error).message);
-    }
-  };
-
-  const handleTestConnection = async (id: string) => {
-    setIsTestingConnection(prev => ({ ...prev, [id]: true }));
-    toast.loading(`Testing connection with [${id.toUpperCase()}] API rails...`);
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      toast.dismiss();
-      toast.success(`[${id.toUpperCase()}] API Connectivity test passed with active handshake!`);
-    } catch {
-      toast.dismiss();
-      toast.error("Handshake failed. Check API key configurations.");
-    } finally {
-      setIsTestingConnection(prev => ({ ...prev, [id]: false }));
-    }
-  };
-
-  const handleSaveKeys = async (id: string, publicKey: string, secretKey: string, webhookSecret: string) => {
-    setIsSavingKeys(prev => ({ ...prev, [id]: true }));
-    try {
-      const { doc, updateDoc } = await import("firebase/firestore");
-      const { db } = await import("@/lib/firebase");
-      const ref = doc(db, "payment_gateways", id);
-      await updateDoc(ref, { publicKey, secretKey, webhookSecret });
-      toast.success(`Credentials saved securely for [${id.toUpperCase()}]`);
-      fetchGateways();
-    } catch (err: unknown) {
-      toast.error("Failed to save credentials: " + (err as Error).message);
-    } finally {
-      setIsSavingKeys(prev => ({ ...prev, [id]: false }));
-    }
-  };
-
   // User Administration Operations
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -645,12 +411,6 @@ export default function AdminPage() {
     return `${prefix}${val}`;
   };
 
-  const filteredLogs = logs.filter(l =>
-    l.userName.toLowerCase().includes(searchLogTerm.toLowerCase()) ||
-    l.reference.toLowerCase().includes(searchLogTerm.toLowerCase()) ||
-    l.type.toLowerCase().includes(searchLogTerm.toLowerCase())
-  );
-
   const filteredUsers = usersList.filter(u =>
     u.name.toLowerCase().includes(searchUserTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchUserTerm.toLowerCase()) ||
@@ -659,7 +419,7 @@ export default function AdminPage() {
 
   if (!isAdminUnlocked) {
     return (
-      <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800">
+      <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800" style={{ marginTop: 0 }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -703,7 +463,10 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-hanken">
+    <main
+      className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-hanken !mt-0"
+      style={{ marginTop: 0 }}
+    >
       {/* Side Navigation */}
       <motion.aside
         animate={{ width: isSidebarMinimized ? 80 : 256 }}
@@ -767,19 +530,6 @@ export default function AdminPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab("gateways")}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                activeTab === "gateways"
-                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">credit_card</span>
-              {!isSidebarMinimized && <span>Payment Gateways</span>}
-            </button>
-
-            <button
               onClick={() => setActiveTab("settings")}
               className={cn(
                 "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
@@ -790,19 +540,6 @@ export default function AdminPage() {
             >
               <span className="material-symbols-outlined text-[18px]">diamond</span>
               {!isSidebarMinimized && <span>Branding</span>}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("transactions")}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                activeTab === "transactions"
-                  ? "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">history</span>
-              {!isSidebarMinimized && <span>Ledger</span>}
             </button>
           </nav>
         </div>
@@ -831,9 +568,7 @@ export default function AdminPage() {
             <h2 className="font-hanken font-extrabold text-lg text-gray-800">
               {activeTab === "dashboard" && "Platform Operations & Metrics"}
               {activeTab === "users" && "User & Permission Management Suite"}
-              {activeTab === "gateways" && "Payment Gateway routing Control Panel"}
               {activeTab === "settings" && "Dynamic Visual Settings Manager"}
-              {activeTab === "transactions" && "Global Financial Audit Logs"}
             </h2>
             <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider">Enterprise System Suite</p>
           </div>
@@ -982,7 +717,7 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* Tab 5: Dedicated User Addition, Permissions & Role Management */}
+            {/* Tab 2: Dedicated User Addition, Permissions & Role Management */}
             {activeTab === "users" && (
               <motion.div
                 key="users-view"
@@ -1292,178 +1027,6 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* Tab 4: PAYMENT GATEWAY ROUTING CONTROL PANEL */}
-            {activeTab === "gateways" && (
-              <motion.div
-                key="gateways-view"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-6"
-              >
-                {Object.values(gateways).map((gw) => {
-                  return (
-                    <div
-                      key={gw.id}
-                      className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6 relative overflow-hidden bg-gradient-to-br from-white to-gray-50/50"
-                    >
-                      {/* Top Header Card */}
-                      <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-gray-150 pb-4 gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-[#FC7A00] font-black font-mono text-xs">
-                            {gw.id.substring(0, 4).toUpperCase()}
-                          </div>
-                          <div>
-                            <h3 className="font-hanken font-extrabold text-sm text-gray-900 uppercase">
-                              {gw.id} Gateway
-                            </h3>
-                            <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase mt-0.5">
-                              Currency: {gw.currencies.join(", ")} | Country: {gw.countries.join(", ")}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Status Toggle & Priority Settings */}
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <div className="flex items-center gap-2">
-                            <span className="font-hanken text-[10px] font-black uppercase text-gray-400">Priority:</span>
-                            <input
-                              type="number"
-                              min={1}
-                              max={10}
-                              value={gw.priority}
-                              onChange={(e) => handleUpdatePriority(gw.id, Number(e.target.value))}
-                              className="w-14 bg-white border border-gray-200 rounded-lg py-1 text-center font-mono font-bold text-xs"
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="font-hanken text-[10px] font-black uppercase text-gray-400">Gateway Status:</span>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleGatewayEnabled(gw.id, gw.enabled)}
-                              className={cn(
-                                "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all",
-                                gw.enabled
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                  : "bg-rose-50 text-rose-600 border border-rose-200"
-                              )}
-                            >
-                              {gw.enabled ? "Enabled" : "Disabled"}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Configurable Features list (Checkbox badges) */}
-                      <div>
-                        <span className="font-hanken text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-2.5">
-                          Supported Gateway Capabilities
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          {(Object.keys(gw.features) as Array<keyof GatewayConfig["features"]>).map((feat) => {
-                            const isFeatEnabled = gw.features[feat];
-                            return (
-                              <button
-                                key={feat}
-                                type="button"
-                                onClick={() => handleToggleFeature(gw.id, feat, isFeatEnabled)}
-                                className={cn(
-                                  "px-3.5 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border flex items-center gap-1.5",
-                                  isFeatEnabled
-                                    ? "bg-orange-50 border-orange-200 text-[#FC7A00]"
-                                    : "bg-white border-gray-200 text-gray-400"
-                                )}
-                              >
-                                <span className="material-symbols-outlined text-[13px] font-black">
-                                  {isFeatEnabled ? "check_circle" : "cancel"}
-                                </span>
-                                {feat}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Keys Setup Accordion Panel */}
-                      <div className="p-4 bg-gray-50 border border-gray-150 rounded-xl space-y-4">
-                        <span className="font-hanken text-[10px] font-black uppercase tracking-wider text-[#FC7A00] block border-b border-gray-200 pb-2">
-                          Secure Key management & Connectivity Tests
-                        </span>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-gray-400">Public Key</label>
-                            <input
-                              type={showSensitive ? "text" : "password"}
-                              defaultValue={gw.publicKey || "MOCK_KEY_PRE_ENTERED_BY_ADMIN"}
-                              id={`pubKey-${gw.id}`}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-gray-400">Secret Key</label>
-                            <input
-                              type={showSensitive ? "text" : "password"}
-                              defaultValue={gw.secretKey || "MOCK_SECRET_KEY"}
-                              id={`secKey-${gw.id}`}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-gray-400">Webhook Secret</label>
-                            <input
-                              type={showSensitive ? "text" : "password"}
-                              defaultValue={gw.webhookSecret || "MOCK_WEBHOOK_HASH"}
-                              id={`webSecret-${gw.id}`}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Interactive testing and saves action row */}
-                        <div className="flex justify-between items-center flex-wrap gap-3 pt-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-                            <span className="font-hanken text-[10px] text-gray-400 font-bold uppercase">
-                              Sandbox active mode
-                            </span>
-                          </div>
-
-                          <div className="flex gap-2.5">
-                            <button
-                              type="button"
-                              disabled={isTestingConnection[gw.id]}
-                              onClick={() => handleTestConnection(gw.id)}
-                              className="px-3.5 py-2 bg-white hover:bg-gray-100 text-gray-700 text-[10px] font-black uppercase rounded-lg border border-gray-300 transition-all cursor-pointer"
-                            >
-                              {isTestingConnection[gw.id] ? <><ButtonSpinner /> Handshake...</> : "Test Connection"}
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={isSavingKeys[gw.id]}
-                              onClick={() => {
-                                const pub = (document.getElementById(`pubKey-${gw.id}`) as HTMLInputElement)?.value || "";
-                                const sec = (document.getElementById(`secKey-${gw.id}`) as HTMLInputElement)?.value || "";
-                                const web = (document.getElementById(`webSecret-${gw.id}`) as HTMLInputElement)?.value || "";
-                                handleSaveKeys(gw.id, pub, sec, web);
-                              }}
-                              className="px-3.5 py-2 bg-black hover:bg-gray-900 text-white text-[10px] font-black uppercase rounded-lg transition-all cursor-pointer"
-                            >
-                              {isSavingKeys[gw.id] ? <><ButtonSpinner /> Saving...</> : "Save Credentials"}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </motion.div>
-            )}
-
             {/* Tab 2: Settings Branding */}
             {activeTab === "settings" && (
               <motion.div
@@ -1569,121 +1132,6 @@ export default function AdminPage() {
                     <p className="text-[10px] text-gray-400 font-bold leading-relaxed">
                       All alterations committed inside this settings matrix propagates instantly to the global wallet UI client.
                     </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Tab 3: Ledger audits */}
-            {activeTab === "transactions" && (
-              <motion.div
-                key="ledger-view"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-4"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 bg-gradient-to-r from-white to-gray-50/50">
-                  <div className="relative flex-1 max-w-md">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
-                      search
-                    </span>
-                    <input
-                      type="text"
-                      value={searchLogTerm}
-                      onChange={(e) => setSearchLogTerm(e.target.value)}
-                      placeholder="Search user, status, reference..."
-                      className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-xs text-gray-800 outline-none focus:border-[#FC7A00]"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isInjecting}
-                    onClick={handleAddSimulatedTx}
-                    className="px-4 py-2.5 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {isInjecting ? <><ButtonSpinner /> Injecting...</> : <><span className="material-symbols-outlined text-[14px]">add_card</span> Inject Simulated Log</>}
-                  </button>
-                </div>
-
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-                  <div className="overflow-x-auto animate-fadeIn">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                          <th className="px-6 py-4">User</th>
-                          <th className="px-6 py-4">Type</th>
-                          <th className="px-6 py-4">Amount</th>
-                          <th className="px-6 py-4">Status</th>
-                          <th className="px-6 py-4">Reference ID</th>
-                          <th className="px-6 py-4 text-right">Moderation Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 text-xs">
-                        {filteredLogs.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="px-6 py-8 text-center text-gray-400 uppercase tracking-widest font-bold">
-                              No ledger entries found
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredLogs.map((log) => {
-                            const isCredit = log.type === "DEPOSIT";
-                            const processing = isProcessingTx[log.id];
-                            return (
-                              <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                                <td className="px-6 py-4">
-                                  <p className="font-extrabold text-gray-900 leading-tight">{log.userName}</p>
-                                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">{log.date} @ {log.time}</p>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className={cn(
-                                    "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
-                                    isCredit ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-orange-50 text-[#FC7A00] border border-orange-100"
-                                  )}>
-                                    {log.type}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 font-mono font-bold text-gray-950">
-                                  {isCredit ? "+" : "-"}{maskText(log.amount, "₦")}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className={cn(
-                                    "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
-                                    log.status === "SUCCESS" && "bg-emerald-50 text-emerald-600",
-                                    log.status === "PENDING" && "bg-amber-50 text-amber-600",
-                                    log.status === "FAILED" && "bg-rose-50 text-rose-600"
-                                  )}>
-                                    {log.status}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 font-mono text-gray-400 text-[10px] select-all">
-                                  {maskText(log.reference)}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  <div className="flex gap-1 justify-end">
-                                    <button
-                                      disabled={processing}
-                                      onClick={() => handleUpdateLogStatus(log.id, "SUCCESS")}
-                                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase rounded border border-emerald-100 transition-colors cursor-pointer disabled:opacity-50"
-                                    >
-                                      {processing ? "..." : "Approve"}
-                                    </button>
-                                    <button
-                                      disabled={processing}
-                                      onClick={() => handleUpdateLogStatus(log.id, "FAILED")}
-                                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[9px] font-black uppercase rounded border border-rose-100 transition-colors cursor-pointer disabled:opacity-50"
-                                    >
-                                      {processing ? "..." : "Fail"}
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
               </motion.div>
