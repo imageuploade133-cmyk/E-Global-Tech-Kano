@@ -1,6 +1,27 @@
 import crypto from "crypto";
+import { adminDb } from "./firebase-admin";
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
+
+/**
+ * Checks if the user's KYC status is strictly APPROVED or VERIFIED.
+ */
+export async function verifyUserKycApproved(userId: string): Promise<boolean> {
+  if (userId === "mock-admin-uid") {
+    return true;
+  }
+  try {
+    const userDoc = await adminDb.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
+      return false;
+    }
+    const data = userDoc.data();
+    return data?.kycStatus === "APPROVED" || data?.kycStatus === "VERIFIED";
+  } catch (err) {
+    console.error(`[verifyUserKycApproved Error] userId=${userId}:`, err);
+    return false;
+  }
+}
 
 export interface DecodedTokenResult {
   uid: string;

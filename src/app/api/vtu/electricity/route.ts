@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
-import { authenticateUserRequest } from "@/lib/auth-util";
+import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { safeParseJson } from "@/lib/utils";
 
 export async function POST(req: Request) {
   try {
-    await authenticateUserRequest(req);
+    const authResult = await authenticateUserRequest(req);
+    const uid = authResult.uid;
+
+    const isApproved = await verifyUserKycApproved(uid);
+    if (!isApproved) {
+      return NextResponse.json({ error: "Forbidden: Account verification is required to perform financial transactions." }, { status: 403 });
+    }
+
     const idToken = req.headers.get("Authorization")?.split("Bearer ")[1] || "mock-token";
 
     const body = await req.json();

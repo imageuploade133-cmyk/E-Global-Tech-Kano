@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticateUserRequest } from "@/lib/auth-util";
+import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { InvestmentService } from "@/services/investment-service";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
@@ -19,6 +19,12 @@ export async function POST(req: Request) {
     uid = authResult.uid;
   } catch {
     return NextResponse.json({ error: "Unauthorized: Invalid or missing authorization token." }, { status: 401 });
+  }
+
+  // Enforce KYC verification
+  const isApproved = await verifyUserKycApproved(uid);
+  if (!isApproved) {
+    return NextResponse.json({ error: "Forbidden: Account verification is required to perform financial transactions." }, { status: 403 });
   }
 
   try {

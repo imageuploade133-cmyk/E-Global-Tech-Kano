@@ -11,15 +11,14 @@ interface VerificationRequiredDrawerProps {
 }
 
 export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProps> = ({ isOpen, onClose }) => {
-  const { user, userData } = useAuth();
+  const { user } = useAuth();
 
   // Verification states
   const [idType, setIdType] = useState<"bvn" | "nin">("bvn");
   const [idNumber, setIdNumber] = useState("");
   const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isVerifiedSuccessfully, setIsVerifiedSuccessfully] = useState(false);
-  const [verifiedAccount, setVerifiedAccount] = useState<{ bankName: string; accountNumber: string; accountName: string } | null>(null);
+  const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const controls = useAnimation();
@@ -30,8 +29,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       setIdNumber("");
       setSelfieBase64(null);
       setIsSubmitting(false);
-      setIsVerifiedSuccessfully(false);
-      setVerifiedAccount(null);
+      setIsSubmittedSuccessfully(false);
     }
   }, [isOpen]);
 
@@ -49,7 +47,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
 
   const handleDragEnd = async (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     // Disable drag dismiss if currently submitting or successfully verified to prevent state interruption
-    if (isSubmitting || isVerifiedSuccessfully) return;
+    if (isSubmitting || isSubmittedSuccessfully) return;
     if (info.offset.y > 100 || info.velocity.y > 500) {
       onClose();
     } else {
@@ -100,7 +98,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
     }
 
     setIsSubmitting(true);
-    toast.loading(`Verifying ${idType.toUpperCase()} database and analyzing selfie live scan...`);
+    toast.loading(`Submitting ${idType.toUpperCase()} database and registering selfie live scan...`);
 
     try {
       const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
@@ -119,7 +117,8 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
         body: JSON.stringify({
           idNumber: idNumber.trim(),
           type: idType,
-          idCardImage: selfieBase64,
+          capturedSelfie: selfieBase64,
+          livenessChallenge: true, // required by API
         }),
       });
 
@@ -130,12 +129,11 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
         throw new Error(resData.error || `Verification failed.`);
       }
 
-      setVerifiedAccount(resData.account);
-      setIsVerifiedSuccessfully(true);
-      toast.success("Account successfully verified and static virtual accounts provisioned!");
+      setIsSubmittedSuccessfully(true);
+      toast.success("KYC submission registered! Pending administrator approval.");
     } catch (err: any) {
       toast.dismiss();
-      toast.error(err.message || "Failed to verify identity. Please verify details and try again.");
+      toast.error(err.message || "Failed to submit identity. Please verify details and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -151,7 +149,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => {
-              if (!isSubmitting && !isVerifiedSuccessfully) onClose();
+              if (!isSubmitting && !isSubmittedSuccessfully) onClose();
             }}
             className="fixed inset-0 bg-black/70 backdrop-blur-md z-[19999] pointer-events-auto"
           />
@@ -162,7 +160,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 260, mass: 0.95 }}
-            drag={isSubmitting || isVerifiedSuccessfully ? false : "y"}
+            drag={isSubmitting || isSubmittedSuccessfully ? false : "y"}
             dragDirectionLock
             dragConstraints={{ top: 0, bottom: 600 }}
             dragElastic={{ top: 0, bottom: 0.2 }}
@@ -189,7 +187,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
             </div>
 
             {/* Step Content */}
-            {!isVerifiedSuccessfully ? (
+            {!isSubmittedSuccessfully ? (
               <form onSubmit={handleVerifyKyc} className="w-full flex-1 flex flex-col justify-between">
                 <div className="space-y-5">
                   {/* Warning banner */}
@@ -289,7 +287,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
                           </div>
                           <span className="font-hanken text-[11px] font-extrabold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
                             <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                            Selfie Authenticated
+                            Selfie Capture Saved
                           </span>
                           <span className="text-[9px] text-gray-400 font-bold">Tap to capture another picture</span>
                         </div>
@@ -315,7 +313,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
                     disabled={isSubmitting || !idNumber || idNumber.length !== 11 || !selfieBase64}
                     className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                   >
-                    {isSubmitting ? "Processing Verification..." : "Verify & Activate Account"}
+                    {isSubmitting ? "Submitting Verification..." : "Submit KYC details"}
                   </button>
                 </div>
               </form>
@@ -323,36 +321,18 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
               // --- SUCCESS / WELCOME SCREEN ---
               <div className="w-full flex-1 flex flex-col justify-between text-center mt-4">
                 <div className="space-y-6 flex flex-col items-center">
-                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 animate-bounce-subtle">
+                  <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 animate-bounce-subtle">
                     <span className="material-symbols-outlined text-[44px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                      verified
+                      pending_actions
                     </span>
                   </div>
 
                   <div className="space-y-1.5">
-                    <h3 className="font-bodoni text-[20px] font-black text-black uppercase tracking-tight">Identity Fully Verified</h3>
+                    <h3 className="font-bodoni text-[20px] font-black text-black uppercase tracking-tight">Submission Received</h3>
                     <p className="font-hanken text-xs text-gray-500 font-semibold max-w-[280px] leading-relaxed mx-auto">
-                      Thank you! Your BVN/NIN identity and live selfie matching have been verified against banking directories. Your limits are now fully unlocked.
+                      Thank you! Your BVN/NIN identity and live selfie have been submitted successfully. Your account is now pending manual administrative approval. You will receive a notification once activated.
                     </p>
                   </div>
-
-                  {verifiedAccount && (
-                    <div className="w-full bg-[#FC7A00]/5 border border-black/10 rounded-2xl p-4 text-left space-y-2 max-w-[320px] mx-auto">
-                      <p className="font-hanken text-[9px] font-black uppercase text-[#FC7A00] tracking-wider leading-none">Your Static Funding Account</p>
-                      <div className="flex justify-between items-center pt-1.5">
-                        <span className="font-hanken text-[10px] font-bold text-gray-400">BANK</span>
-                        <span className="font-hanken text-xs font-extrabold text-black">{verifiedAccount.bankName}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-hanken text-[10px] font-bold text-gray-400">ACC NUMBER</span>
-                        <span className="font-mono text-xs font-black text-black tracking-wider">{verifiedAccount.accountNumber}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-hanken text-[10px] font-bold text-gray-400">NAME</span>
-                        <span className="font-hanken text-[10px] font-extrabold text-black truncate max-w-[170px] uppercase">{verifiedAccount.accountName}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="pt-6 border-t border-gray-100 w-full">

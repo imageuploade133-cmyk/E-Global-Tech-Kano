@@ -26,16 +26,16 @@ const DEFAULT_CONFIG: AppConfig = {
   supportPhone1: "+234 800 345 6225",
   supportPhone2: "+234 901 234 5678",
   supportEmail: "support@e-globaltechhub.com",
-  totalUsers: 4820,
-  globalNgnBalance: 312500450.75,
-  globalUsdBalance: 148900.50,
+  totalUsers: 0,
+  globalNgnBalance: 0,
+  globalUsdBalance: 0,
   imgbbApiKey: "0d1a390cb385b632d952db08a3479005",
   appVersion: "1.0.0",
-  totalFixedDeposit: 14850000.00,
-  todayDeposit: 3420000.00,
-  todayTransfer: 1950000.00,
-  totalAirtimePurchase: 840000.00,
-  totalBonus: 4850200.00,
+  totalFixedDeposit: 0,
+  todayDeposit: 0,
+  todayTransfer: 0,
+  totalAirtimePurchase: 0,
+  totalBonus: 0,
 };
 
 interface ConfigContextProps {
@@ -114,16 +114,15 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const usersSnap = await getDocs(collection(db, "users"));
       const userList = usersSnap.docs.map((d) => d.data());
 
-      // If the database has no registered accounts, seed a demo account so we do not show blank or static fallbacks
       const userCount = userList.length;
       const totalNgn = userList.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
       const totalUsd = userList.reduce((acc, curr) => acc + (Number(curr.usdBalance) || 0), 0);
       const totalBonus = userList.reduce((acc, curr) => acc + (Number(curr.bonusBalance) || Number(curr.bonus) || 0), 0);
 
-      let totalFixedDeposit = 14850000.00;
-      let todayDeposit = 3420000.00;
-      let todayTransfer = 1950000.00;
-      let totalAirtimePurchase = 840000.00;
+      let totalFixedDeposit = 0;
+      let todayDeposit = 0;
+      let todayTransfer = 0;
+      let totalAirtimePurchase = 0;
 
       try {
         const investmentsSnap = await getDocs(collection(db, "investments"));
