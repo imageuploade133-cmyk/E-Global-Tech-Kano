@@ -40,8 +40,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
 
   // Multi-currency States
-  const [selectedCurrency, setSelectedCurrency] = useState<"NGN" | "USD">("NGN");
-  const [walletBalances, setWalletBalances] = useState({ NGN: balance, USD: 0 });
+  const [selectedCurrency, setSelectedCurrency] = useState<"NGN" | "USD" | "XOF">("NGN");
+  const [walletBalances, setWalletBalances] = useState({ NGN: balance, USD: 0, XOF: 0 });
   const [usdAccountData, setUsdAccountData] = useState<{
     accountNumber: string;
     bankName: string;
@@ -54,6 +54,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   // Swap states
   const [swapAmount, setSwapAmount] = useState("");
+  const [swapToCurrency, setSwapToCurrency] = useState<"NGN" | "USD" | "XOF">("USD");
   const [swapRate, setSwapRate] = useState<number | null>(null);
   const [swapTargetAmount, setSwapTargetAmount] = useState<number>(0);
   const [isRatesLoading, setIsRatesLoading] = useState(false);
@@ -62,6 +63,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   useEffect(() => {
     setWalletBalances(prev => ({ ...prev, NGN: balance }));
   }, [balance]);
+
+  useEffect(() => {
+    if (isSwapOpen) {
+      if (selectedCurrency === "NGN") {
+        setSwapToCurrency("USD");
+      } else {
+        setSwapToCurrency("NGN");
+      }
+    }
+  }, [selectedCurrency, isSwapOpen]);
 
   const fetchWalletBalances = async () => {
     if (!user) return;
@@ -72,7 +83,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         idToken = await user.getIdToken();
       } else {
         // Mock data
-        setWalletBalances({ NGN: balance, USD: 1250 });
+        setWalletBalances({ NGN: balance, USD: 1250, XOF: 750000 });
         setUsdAccountData({
           accountNumber: "2209418374",
           bankName: "Silicon Valley Bank",
@@ -92,7 +103,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         if (data.success && data.wallets) {
           const ngnBal = data.wallets.NGN?.balance ?? balance;
           const usdBal = data.wallets.USD?.balance ?? 0;
-          setWalletBalances({ NGN: ngnBal, USD: usdBal });
+          const xofBal = data.wallets.XOF?.balance ?? 0;
+          setWalletBalances({ NGN: ngnBal, USD: usdBal, XOF: xofBal });
         }
       }
 
@@ -150,13 +162,31 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setIsRatesLoading(true);
       try {
         const fromCurrency = selectedCurrency;
-        const toCurrency = selectedCurrency === "NGN" ? "USD" : "NGN";
+        const toCurrency = swapToCurrency;
 
         if (sessionStorage.getItem("mock") === "true") {
           setTimeout(() => {
-            const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
+            let valInNgn = 0;
+            if (fromCurrency === "NGN") {
+              valInNgn = amt;
+            } else if (fromCurrency === "USD") {
+              valInNgn = amt * 1500;
+            } else if (fromCurrency === "XOF") {
+              valInNgn = amt / 0.40;
+            }
+
+            let targetAmt = 0;
+            if (toCurrency === "NGN") {
+              targetAmt = valInNgn;
+            } else if (toCurrency === "USD") {
+              targetAmt = valInNgn / 1500;
+            } else if (toCurrency === "XOF") {
+              targetAmt = valInNgn * 0.40;
+            }
+
+            const rate = targetAmt / amt;
             setSwapRate(rate);
-            setSwapTargetAmount(amt * rate);
+            setSwapTargetAmount(targetAmt);
             setIsRatesLoading(false);
           }, 300);
           return;
@@ -195,14 +225,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     const delay = setTimeout(fetchRate, 400);
     return () => clearTimeout(delay);
-  }, [swapAmount, isSwapOpen, selectedCurrency, user]);
+  }, [swapAmount, isSwapOpen, selectedCurrency, swapToCurrency, user]);
 
   const handleSwapExecute = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(swapAmount);
     const fromCurrency = selectedCurrency;
-    const toCurrency = selectedCurrency === "NGN" ? "USD" : "NGN";
-    const available = fromCurrency === "NGN" ? walletBalances.NGN : walletBalances.USD;
+    const toCurrency = swapToCurrency;
+    const available = fromCurrency === "NGN" ? walletBalances.NGN : (fromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
 
     if (isNaN(amt) || amt <= 0) {
       toast.error("Please enter a valid swap amount");
@@ -221,8 +251,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       if (sessionStorage.getItem("mock") === "true") {
         setTimeout(() => {
           toast.dismiss();
-          const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
-          const targetAmt = amt * rate;
+
+          let valInNgn = 0;
+          if (fromCurrency === "NGN") {
+            valInNgn = amt;
+          } else if (fromCurrency === "USD") {
+            valInNgn = amt * 1500;
+          } else if (fromCurrency === "XOF") {
+            valInNgn = amt / 0.40;
+          }
+
+          let targetAmt = 0;
+          if (toCurrency === "NGN") {
+            targetAmt = valInNgn;
+          } else if (toCurrency === "USD") {
+            targetAmt = valInNgn / 1500;
+          } else if (toCurrency === "XOF") {
+            targetAmt = valInNgn * 0.40;
+          }
 
           // Deduct from source and credit target
           setWalletBalances(prev => {
@@ -1160,15 +1206,22 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const currentSelectedBalance = selectedCurrency === "NGN" ? walletBalances.NGN : walletBalances.USD;
+  const currentSelectedBalance = selectedCurrency === "NGN"
+    ? walletBalances.NGN
+    : (selectedCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
 
-  const formattedBalance = new Intl.NumberFormat(selectedCurrency === "NGN" ? "en-NG" : "en-US", {
-    style: "currency",
-    currency: selectedCurrency,
-    minimumFractionDigits: 2,
-  }).format(currentSelectedBalance);
+  const formattedBalance = new Intl.NumberFormat(
+    selectedCurrency === "NGN" ? "en-NG" : (selectedCurrency === "USD" ? "en-US" : "fr-FR"),
+    {
+      style: "currency",
+      currency: selectedCurrency,
+      minimumFractionDigits: 2,
+    }
+  ).format(currentSelectedBalance);
 
-  const balanceStr = isVisible ? formattedBalance : (selectedCurrency === "NGN" ? "₦ •••,•••.••" : "$ •••,•••.••");
+  const balanceStr = isVisible
+    ? formattedBalance
+    : (selectedCurrency === "NGN" ? "₦ •••,•••.••" : (selectedCurrency === "USD" ? "$ •••,•••.••" : "CFA •••,•••.••"));
 
   // Dynamic font scaling
   let fontSizeClass = "text-[20px] min-[360px]:text-[24px] min-[400px]:text-[30px] md:text-[36px] lg:text-[40px]";
@@ -1856,15 +1909,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   return (
     <>
-    <div className="relative p-[1px] rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#E06600] w-full max-w-[240px] mx-auto mb-5 shadow-sm select-none">
+    <div className="relative p-[1px] rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#E06600] w-full max-w-[280px] mx-auto mb-5 shadow-sm select-none">
       <div className="bg-white rounded-[15px] p-1 flex w-full relative overflow-hidden">
-        {["NGN", "USD"].map((curr) => {
+        {["NGN", "USD", "XOF"].map((curr) => {
           const isActive = selectedCurrency === curr;
           return (
             <button
               key={curr}
               onClick={() => {
-                setSelectedCurrency(curr as "NGN" | "USD");
+                setSelectedCurrency(curr as "NGN" | "USD" | "XOF");
                 toast.info(`Switched to ${curr} Wallet`);
               }}
               className={`relative flex-1 py-2 text-xs font-extrabold uppercase tracking-widest rounded-xl transition-colors duration-300 focus:outline-none z-10 cursor-pointer ${
@@ -1896,14 +1949,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       onDragEnd={(event, info) => {
         const threshold = 60; // minimum drag distance in pixels to trigger transition
         if (info.offset.x < -threshold) {
-          // Dragged left -> switch to USD
-          if (selectedCurrency !== "USD") {
+          // Dragged left -> NGN -> USD -> XOF
+          if (selectedCurrency === "NGN") {
             setSelectedCurrency("USD");
             toast.info("Switched to USD Wallet");
+          } else if (selectedCurrency === "USD") {
+            setSelectedCurrency("XOF");
+            toast.info("Switched to XOF Wallet");
           }
         } else if (info.offset.x > threshold) {
-          // Dragged right -> switch to NGN
-          if (selectedCurrency !== "NGN") {
+          // Dragged right -> XOF -> USD -> NGN
+          if (selectedCurrency === "XOF") {
+            setSelectedCurrency("USD");
+            toast.info("Switched to USD Wallet");
+          } else if (selectedCurrency === "USD") {
             setSelectedCurrency("NGN");
             toast.info("Switched to NGN Wallet");
           }
@@ -2092,7 +2151,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
-            if (userData?.kycStatus !== "VERIFIED") {
+            const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+            if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
               setIsKycDrawerOpen(true);
               return;
             }
@@ -2115,7 +2175,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
-            if (userData?.kycStatus !== "VERIFIED") {
+            const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+            if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
               setIsKycDrawerOpen(true);
               return;
             }
@@ -2134,7 +2195,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
-            if (userData?.kycStatus !== "VERIFIED") {
+            const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+            if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
               setIsKycDrawerOpen(true);
               return;
             }
@@ -2154,7 +2216,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       </div>
 
       {/* Premium Verification / KYC Alert Banner */}
-      {userData?.kycStatus !== "VERIFIED" && (
+      {userData?.kycStatus !== "VERIFIED" && (typeof window === "undefined" || sessionStorage.getItem("mock") !== "true") && (
         <motion.div
           whileTap={{ scale: 0.98 }}
           onClick={() => setIsKycDrawerOpen(true)}
@@ -3910,7 +3972,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
               <h3 className="font-hanken font-bold text-base text-black">
-                Swap {selectedCurrency} → {selectedCurrency === "NGN" ? "USD" : "NGN"}
+                Swap {selectedCurrency} → {swapToCurrency}
               </h3>
               <button
                 type="button"
@@ -3922,11 +3984,34 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </div>
 
             <form onSubmit={handleSwapExecute} className="space-y-4 text-left">
+              {/* Dynamic Swap To Currency pill selector */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap To Currency</label>
+                <div className="flex gap-2">
+                  {(["NGN", "USD", "XOF"] as const)
+                    .filter((c) => c !== selectedCurrency)
+                    .map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setSwapToCurrency(c)}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer border ${
+                          swapToCurrency === c
+                            ? "bg-[#FC7A00]/10 border-[#FC7A00] text-[#FC7A00]"
+                            : "bg-gray-50 border-gray-250 text-gray-500 hover:text-black"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                </div>
+              </div>
+
               <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 flex items-center justify-between">
                 <div>
                   <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Available Balance</p>
                   <p className="font-mono font-black text-black text-sm mt-0.5">
-                    {selectedCurrency === "NGN" ? "₦" : "$"}{currentSelectedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {selectedCurrency === "NGN" ? "₦" : (selectedCurrency === "USD" ? "$" : "CFA ")}{currentSelectedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <span className="text-[10px] bg-[#FC7A00]/10 text-[#FC7A00] font-black px-2 py-0.5 rounded">
@@ -3938,7 +4023,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Swap</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">
-                    {selectedCurrency === "NGN" ? "₦" : "$"}
+                    {selectedCurrency === "NGN" ? "₦" : (selectedCurrency === "USD" ? "$" : "CFA ")}
                   </span>
                   <input
                     type="number"
@@ -3947,7 +4032,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     value={swapAmount}
                     onChange={(e) => setSwapAmount(e.target.value)}
                     placeholder="Enter amount"
-                    className="w-full bg-white border border-gray-100 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                    className="w-full bg-white border border-gray-100 rounded-2xl pl-16 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
                   />
                 </div>
               </div>
@@ -3964,13 +4049,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   <div className="flex justify-between text-gray-500">
                     <span className="font-semibold">Exchange Rate</span>
                     <span className="font-mono font-black text-black">
-                      1 {selectedCurrency} = {swapRate.toFixed(6)} {selectedCurrency === "NGN" ? "USD" : "NGN"}
+                      1 {selectedCurrency} = {swapRate.toFixed(6)} {swapToCurrency}
                     </span>
                   </div>
                   <div className="flex justify-between text-gray-500 border-t border-gray-150 pt-2 items-center">
                     <span className="font-bold">You will receive</span>
                     <span className="font-mono font-black text-emerald-600 text-sm">
-                      {selectedCurrency === "NGN" ? "$" : "₦"}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>

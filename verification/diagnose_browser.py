@@ -1,25 +1,20 @@
-import asyncio
-from playwright.async_api import async_playwright
+import os
+import time
+from playwright.sync_api import sync_playwright
 
-async def run():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        context = await browser.new_context(
-            viewport={"width": 375, "height": 812},
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
-        )
-        page = await context.new_page()
-        await page.goto("http://localhost:3000/bills?type=waec&mock=true")
-        await page.wait_for_timeout(5000)
+def inspect_console_logs():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(viewport={"width": 390, "height": 844})
+        page = context.new_page()
 
-        content = await page.content()
-        print(f"HTML Content length: {len(content)}")
-        print("Frames:")
-        for frame in page.frames:
-            print(f"  Frame name: {frame.name}, url: {frame.url}")
+        # Listen to console events
+        page.on("console", lambda msg: print(f"[CONSOLE {msg.type}] {msg.text}"))
+        page.on("pageerror", lambda err: print(f"[PAGE ERROR] {err}"))
 
-        await context.close()
-        await browser.close()
+        page.goto("http://localhost:3055/?mock=true")
+        page.wait_for_timeout(3000)
+        browser.close()
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    inspect_console_logs()

@@ -125,13 +125,15 @@ export async function GET(req: Request) {
       await userRef.update({ accountId });
     }
 
-    // 2. Fetch NGN and USD wallets concurrently
+    // 2. Fetch NGN, USD, and XOF wallets concurrently
     const ngnWalletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
     const usdWalletRef = adminDb.collection("wallets").doc(`${uid}_USD`);
+    const xofWalletRef = adminDb.collection("wallets").doc(`${uid}_XOF`);
 
-    const [ngnSnap, usdSnap] = await Promise.all([
+    const [ngnSnap, usdSnap, xofSnap] = await Promise.all([
       ngnWalletRef.get(),
-      usdWalletRef.get()
+      usdWalletRef.get(),
+      xofWalletRef.get()
     ]);
 
     let ngnBalance = legacyBalance;
@@ -139,6 +141,8 @@ export async function GET(req: Request) {
     let ngnUpdatedAt = new Date().toISOString();
     let usdBalance = 0.00;
     let usdUpdatedAt = new Date().toISOString();
+    let xofBalance = 0.00;
+    let xofUpdatedAt = new Date().toISOString();
 
     // 3. Defensive initialization for NGN wallet
     if (!ngnSnap.exists) {
@@ -172,6 +176,21 @@ export async function GET(req: Request) {
       usdUpdatedAt = usdData.updatedAt || usdUpdatedAt;
     }
 
+    // 4.5. Defensive initialization for XOF wallet
+    if (!xofSnap.exists) {
+      console.log(`[GET /api/wallets] [${reqId}] Initializing missing XOF wallet document for uid: ${uid}`);
+      await xofWalletRef.set({
+        userId: uid,
+        currency: "XOF",
+        balance: 0.00,
+        updatedAt: xofUpdatedAt
+      }, { merge: true });
+    } else {
+      const xofData = xofSnap.data() || {};
+      xofBalance = typeof xofData.balance === "number" ? xofData.balance : 0.00;
+      xofUpdatedAt = xofData.updatedAt || xofUpdatedAt;
+    }
+
     // 5. Keep legacy balance synchronized with NGN balance
     if (userData.balance !== ngnBalance) {
       console.log(`[GET /api/wallets] [${reqId}] Balance mismatch detected: Profile legacy balance is ₦${userData.balance}, NGN Wallet balance is ₦${ngnBalance}`);
@@ -191,7 +210,7 @@ export async function GET(req: Request) {
       await userRef.update({ bonusBalance: ngnBonusBalance });
     }
 
-    console.log(`[GET /api/wallets] [${reqId}] Wallet balances retrieved in ${Date.now() - startTime}ms. NGN: ₦${ngnBalance}, USD: $${usdBalance}, BONUS: ₦${ngnBonusBalance}`);
+    console.log(`[GET /api/wallets] [${reqId}] Wallet balances retrieved in ${Date.now() - startTime}ms. NGN: ₦${ngnBalance}, USD: $${usdBalance}, XOF: CFA${xofBalance}, BONUS: ₦${ngnBonusBalance}`);
 
     return NextResponse.json({
       success: true,
@@ -209,6 +228,12 @@ export async function GET(req: Request) {
           currency: "USD",
           balance: usdBalance,
           updatedAt: usdUpdatedAt
+        },
+        XOF: {
+          userId: uid,
+          currency: "XOF",
+          balance: xofBalance,
+          updatedAt: xofUpdatedAt
         },
         BONUS: {
           userId: uid,
