@@ -95,11 +95,18 @@ export default function AdminPage() {
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "investments">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "investments" | "history">("dashboard");
 
   // Fixed Deposit States
   const [fdList, setFdList] = useState<any[]>([]);
   const [isLoadingFd, setIsLoadingFd] = useState(false);
+
+  // User History States
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [historyTargetUser, setHistoryTargetUser] = useState<any | null>(null);
+  const [historyTransactions, setHistoryTransactions] = useState<any[]>([]);
+  const [historyInvestments, setHistoryInvestments] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   // Pre-fill admin email when user loads
   useEffect(() => {
@@ -933,6 +940,7 @@ export default function AdminPage() {
     { id: "whatsapp", label: "WhatsApp Link", icon: "hub" },
     { id: "profit", label: "Commission Markups", icon: "tune" },
     { id: "investments", label: "Fixed Deposits", icon: "savings" },
+    { id: "history", label: "User Ledger Audits", icon: "history" },
   ];
 
   if (!isAdminUnlocked) {
@@ -1218,6 +1226,8 @@ export default function AdminPage() {
               {activeTab === "settings" && "Dynamic Visual Settings Manager"}
               {activeTab === "whatsapp" && "WhatsApp API Gateway Link"}
               {activeTab === "profit" && "Global Commission Markups Manager"}
+              {activeTab === "investments" && "Secure Fixed Deposits Auditing Panel"}
+              {activeTab === "history" && "User Ledger Audits & History Logs"}
             </h2>
             <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider font-hanken">Enterprise System Suite</p>
           </div>
@@ -2525,6 +2535,324 @@ export default function AdminPage() {
                     </button>
                   </form>
                 )}
+              </motion.div>
+            )}
+
+            {/* Tab 8: User History & Ledger Auditing Panel */}
+            {activeTab === "history" && (
+              <motion.div
+                key="history-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6 animate-fadeIn"
+              >
+                {/* Search Panel inside main page context */}
+                <div className={cn("rounded-2xl p-6 border transition-all duration-300 space-y-4", panelClass)}>
+                  <div>
+                    <h3 className="font-extrabold text-sm uppercase">Secure Profile Search Engine</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Audit user account profiles, transaction ledgers, and placements</p>
+                  </div>
+
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!historySearchQuery.trim()) {
+                        toast.warning("Please enter a user email or phone prefix to search.");
+                        return;
+                      }
+
+                      setIsHistoryLoading(true);
+                      setHistoryTargetUser(null);
+                      setHistoryTransactions([]);
+                      setHistoryInvestments([]);
+
+                      try {
+                        const isMock = sessionStorage.getItem("mock") === "true";
+                        let idToken = "mock-admin-token";
+                        if (!isMock && user) {
+                          idToken = await user.getIdToken();
+                        }
+
+                        const res = await fetch(`/api/admin/user-history?search=${encodeURIComponent(historySearchQuery.trim())}`, {
+                          headers: {
+                            "Authorization": `Bearer ${idToken}`,
+                          },
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                          if (!data.user) {
+                            toast.error(data.error || "No matching account found.");
+                          } else {
+                            setHistoryTargetUser(data.user);
+                            setHistoryTransactions(data.transactions || []);
+                            setHistoryInvestments(data.investments || []);
+                            toast.success("User timeline populated!");
+                          }
+                        } else {
+                          toast.error(data.error || "Failed to parse query.");
+                        }
+                      } catch {
+                        toast.error("Network communication failure searching user profile.");
+                      } finally {
+                        setIsHistoryLoading(false);
+                      }
+                    }}
+                    className="flex gap-2"
+                  >
+                    <div className="relative flex-1">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+                        search
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        value={historySearchQuery}
+                        onChange={(e) => setHistorySearchQuery(e.target.value)}
+                        placeholder="Enter exact email address or complete phone prefix (e.g. jules@example.com)"
+                        className={cn(
+                          "w-full rounded-xl pl-9 pr-3 py-3 text-xs outline-none transition-all",
+                          isDark ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500" : "bg-gray-50 border border-gray-200 text-black focus:border-[#FC7A00]"
+                        )}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isHistoryLoading}
+                      className="px-5 py-3 bg-black hover:bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider active:scale-95 disabled:opacity-50 flex-shrink-0 cursor-pointer"
+                    >
+                      {isHistoryLoading ? (
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : "Inspect Profile"}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Display Area */}
+                <AnimatePresence mode="wait">
+                  {isHistoryLoading ? (
+                    <div className="py-24 text-center text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 rounded-full border-3 border-gray-250 border-t-[#FC7A00] animate-spin" />
+                      <span>Querying database timelines securely...</span>
+                    </div>
+                  ) : historyTargetUser ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="space-y-6"
+                    >
+                      {/* Profile Card Summary & Balances */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Profile card */}
+                        <div className={cn("p-6 rounded-2xl border transition-colors duration-300 md:col-span-1 space-y-4", panelClass)}>
+                          <div className="border-b pb-3.5">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-[#FC7A00]">Account Summary</h4>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Enriched user profile meta-data</p>
+                          </div>
+
+                          <div className="space-y-3.5">
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-gray-400">Legal Name</p>
+                              <p className="font-extrabold text-sm mt-0.5 leading-tight">{historyTargetUser.name}</p>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-gray-400">Email Address</p>
+                              <p className="font-semibold text-xs text-gray-400 mt-0.5 break-all select-all leading-tight">{historyTargetUser.email}</p>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-gray-400">Phone Number</p>
+                              <p className="font-mono text-xs font-semibold text-gray-400 mt-0.5 select-all leading-tight">{historyTargetUser.phoneNumber}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <p className="text-[10px] font-black uppercase text-gray-400">KYC Status</p>
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider inline-block mt-0.5 border",
+                                  historyTargetUser.kycStatus === "APPROVED"
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                )}>
+                                  {historyTargetUser.kycStatus}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black uppercase text-gray-400">System Role</p>
+                                <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-gray-500/10 text-gray-400 border border-gray-500/20 inline-block mt-0.5">
+                                  {historyTargetUser.role}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Main Balance card */}
+                        <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/90 to-orange-600/90 border border-orange-400/30 text-white shadow-xs flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">Main Wallet Balance</p>
+                            <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none">
+                              ₦{historyTargetUser.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <p className="text-[9px] text-orange-200 font-bold uppercase tracking-wider mt-4">NGN Reserve Balance</p>
+                        </div>
+
+                        {/* Bonus Balance card */}
+                        <div className="p-6 rounded-2xl bg-gradient-to-br from-teal-500/90 to-emerald-600/90 border border-teal-400/30 text-white shadow-xs flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-teal-100 tracking-wider">Bonus Wallet Balance</p>
+                            <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none">
+                              ₦{historyTargetUser.bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <p className="text-[9px] text-teal-200 font-bold uppercase tracking-wider mt-4">Commissions & Referrals</p>
+                        </div>
+                      </div>
+
+                      {/* Transactions list card */}
+                      <div className={cn("p-6 rounded-2xl border transition-colors duration-300 space-y-4", panelClass)}>
+                        <div className="border-b pb-3.5 flex justify-between items-center">
+                          <div>
+                            <h4 className="text-xs font-black uppercase text-[#FC7A00] tracking-wider">Transaction History Log</h4>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Full S2S ledger record audits ({historyTransactions.length})</p>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto pr-1">
+                          {historyTransactions.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 uppercase font-black text-xs">
+                              No transactional logs exist for this account.
+                            </div>
+                          ) : (
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="border-b border-gray-250 dark:border-gray-800 text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                                  <th className="pb-3 pl-2">Description</th>
+                                  <th className="pb-3 text-right">Amount</th>
+                                  <th className="pb-3 text-center">Type</th>
+                                  <th className="pb-3 text-center">Status</th>
+                                  <th className="pb-3 text-center">Reference ID</th>
+                                  <th className="pb-3 text-center">Timestamp</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
+                                {historyTransactions.map((tx) => {
+                                  const isCredit = tx.type === "DEPOSIT" || tx.type === "REFUND";
+                                  const isSuccess = tx.status === "SUCCESSFUL" || tx.status === "SUCCESS";
+                                  return (
+                                    <tr key={tx.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10">
+                                      <td className="py-3 pl-2 max-w-[220px] truncate" title={tx.description}>
+                                        <p className="font-extrabold text-xs">{tx.description}</p>
+                                      </td>
+                                      <td className={cn(
+                                        "py-3 text-right font-mono font-black text-xs",
+                                        isCredit ? "text-emerald-500" : (isDark ? "text-white" : "text-gray-900")
+                                      )}>
+                                        {isCredit ? "+" : "-"}₦{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="py-3 text-center font-bold">
+                                        <span className="px-2 py-0.5 rounded text-[8px] bg-gray-500/10 border border-gray-500/20 text-gray-400 font-black uppercase tracking-wider">
+                                          {tx.type}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 text-center">
+                                        <span className={cn(
+                                          "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                          isSuccess
+                                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                            : "bg-red-500/10 text-red-400 border border-red-500/20"
+                                        )}>
+                                          {tx.status}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 text-center font-mono text-[9px] text-gray-500 break-all select-all">
+                                        {tx.reference}
+                                      </td>
+                                      <td className="py-3 text-center text-gray-400 text-[10px] font-semibold font-mono">
+                                        {new Date(tx.createdAt).toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Fixed Deposits list card */}
+                      {historyInvestments.length > 0 && (
+                        <div className={cn("p-6 rounded-2xl border transition-colors duration-300 space-y-4", panelClass)}>
+                          <div className="border-b pb-3.5">
+                            <h4 className="text-xs font-black uppercase text-[#FC7A00] tracking-wider">Fixed Deposits Placements</h4>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Savings placements & matures logs ({historyInvestments.length})</p>
+                          </div>
+
+                          <div className="overflow-x-auto pr-1">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="border-b border-gray-250 dark:border-gray-800 text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                                  <th className="pb-3 pl-2">Savings Plan</th>
+                                  <th className="pb-3 text-right">Principal</th>
+                                  <th className="pb-3 text-center">Accrued Yield</th>
+                                  <th className="pb-3 text-center">Status</th>
+                                  <th className="pb-3 text-center">Timeline</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
+                                {historyInvestments.map((inv) => {
+                                  const estYield = inv.amount * (Number(inv.interestRate) / 100);
+                                  const isActive = inv.status === "ACTIVE";
+                                  return (
+                                    <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10">
+                                      <td className="py-3 pl-2">
+                                        <p className="font-extrabold text-xs">{inv.description}</p>
+                                      </td>
+                                      <td className="py-3 text-right font-mono font-bold text-xs">
+                                        ₦{inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                      </td>
+                                      <td className="py-3 text-center font-mono font-black text-[#FC7A00]">
+                                        {inv.interestRate}% (+₦{estYield.toLocaleString()})
+                                      </td>
+                                      <td className="py-3 text-center">
+                                        <span className={cn(
+                                          "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                          isActive
+                                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                            : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                        )}>
+                                          {inv.status}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 text-center">
+                                        <p className="text-[9px] font-semibold text-gray-400">Created: {new Date(inv.createdAt).toLocaleDateString()}</p>
+                                        <p className="text-[9px] font-extrabold text-[#FC7A00] mt-0.5">Matures: {new Date(inv.maturesAt).toLocaleDateString()}</p>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  ) : (
+                    <div className={cn("border rounded-xl p-8 text-center space-y-1.5", isDark ? "border-orange-950/30 bg-orange-950/10 text-gray-400" : "border-orange-100 bg-orange-50/30 text-gray-500")}>
+                      <span className="material-symbols-outlined text-[32px] text-[#FC7A00]" style={{ fontVariationSettings: '"FILL" 1' }}>query_stats</span>
+                      <p className={cn("font-black text-xs uppercase", isDark ? "text-white" : "text-gray-800")}>No Loaded Ledger</p>
+                      <p className="text-[11px] leading-normal max-w-sm mx-auto font-medium">
+                        To secure our database reads, please enter an exact user email address or phone prefix in the search panel above to fetch timelines and full financial ledgers.
+                      </p>
+                    </div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
