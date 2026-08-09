@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
+    const { isAdmin } = await verifyAdminAuth(req);
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
@@ -46,7 +45,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
     }
 
-    const { action, targetUid, reason } = await req.json();
+    const { action, targetUid, reason, provider } = await req.json();
 
     if (!targetUid) {
       return NextResponse.json({ error: "Missing target user identifier." }, { status: 400 });
@@ -65,14 +64,19 @@ export async function POST(req: Request) {
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     if (action === "approve") {
-      // Forward approval request to payment-gateway secure human-only endpoint with strict Bearer Authorization header
+      if (!provider || (provider !== "flutterwave" && provider !== "squad")) {
+        return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected." }, { status: 400 });
+      }
+
+      // Forward approval request to payment-gateway secure human-only endpoint with strict Bearer Authorization header and explicit provider in body
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-api-key": gatewayApiKey,
           "Authorization": `Bearer ${idToken}`
-        }
+        },
+        body: JSON.stringify({ provider })
       });
 
       const result = await response.json();
@@ -82,7 +86,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: "User KYC successfully approved and static virtual account provisioned!"
+        message: `User KYC successfully approved and static virtual account provisioned via ${provider}!`
       });
 
     } else if (action === "reject") {
@@ -108,6 +112,10 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "retry") {
+      if (!provider || (provider !== "flutterwave" && provider !== "squad")) {
+        return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected for retry." }, { status: 400 });
+      }
+
       // Forward retry provisioning request to payment-gateway
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/retry-provisioning`, {
         method: "POST",
@@ -115,7 +123,8 @@ export async function POST(req: Request) {
           "Content-Type": "application/json",
           "x-api-key": gatewayApiKey,
           "Authorization": `Bearer ${idToken}`
-        }
+        },
+        body: JSON.stringify({ provider })
       });
 
       const result = await response.json();
@@ -125,7 +134,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: "Virtual account successfully provisioned on retry!"
+        message: `Virtual account successfully provisioned on retry via ${provider}!`
       });
 
     } else {

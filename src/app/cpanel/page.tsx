@@ -191,6 +191,8 @@ export default function AdminPage() {
   // KYC pending users waiting for approval
   const [pendingKycList, setPendingKycUser] = useState<PendingKycUser[]>([]);
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
+  // Selected virtual account provider for each pending submission
+  const [selectedProvider, setSelectedProvider] = useState<Record<string, "flutterwave" | "squad">>({});
 
   // Add user form states
   const [newUserForm, setNewUserForm] = useState({
@@ -274,6 +276,13 @@ export default function AdminPage() {
   const handleProcessKyc = async (targetUid: string, action: "approve" | "reject" | "retry") => {
     setIsProcessingKyc(targetUid);
     const reason = rejectionReason[targetUid] || "";
+    const provider = selectedProvider[targetUid];
+
+    if ((action === "approve" || action === "retry") && !provider) {
+      toast.error("Please explicitly select a virtual-account provider (Flutterwave or Squadco) before proceeding.");
+      setIsProcessingKyc(null);
+      return;
+    }
 
     if (action === "reject" && !reason.trim()) {
       toast.error("Please enter a rejection reason before rejecting identity verification.");
@@ -297,7 +306,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           action,
           targetUid,
-          reason
+          reason,
+          provider
         })
       });
 
@@ -1850,6 +1860,24 @@ export default function AdminPage() {
 
                             {/* Verification actions & rejection feedback */}
                             <div className="w-full md:w-auto space-y-3 text-right">
+                              {u.kycStatus !== "REJECTED" && (
+                                <div className="flex items-center gap-2 justify-end mb-2">
+                                  <label className="text-[10px] font-black uppercase text-gray-400">Provider:</label>
+                                  <select
+                                    value={selectedProvider[u.uid] || ""}
+                                    onChange={(e) => setSelectedProvider({ ...selectedProvider, [u.uid]: e.target.value as "flutterwave" | "squad" })}
+                                    className={cn(
+                                      "rounded-lg px-2 py-1 text-[11px] font-bold outline-none border transition-colors cursor-pointer",
+                                      isDark ? "bg-gray-800 border-gray-750 text-white" : "bg-white border-gray-250 text-black"
+                                    )}
+                                  >
+                                    <option value="">-- Select Provider --</option>
+                                    <option value="flutterwave">Flutterwave</option>
+                                    <option value="squad">Squadco (GTBank)</option>
+                                  </select>
+                                </div>
+                              )}
+
                               <div className="flex gap-2 justify-end">
                                 {u.kycStatus === "PROVISIONING_FAILED" ? (
                                   <button
