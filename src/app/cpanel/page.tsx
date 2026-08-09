@@ -92,6 +92,7 @@ export default function AdminPage() {
 
   // Admin lock validation
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
@@ -945,7 +946,7 @@ export default function AdminPage() {
 
   if (!isAdminUnlocked) {
     return (
-      <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800" style={{ marginTop: 0 }}>
+      <main className="!mt-0 min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800" style={{ marginTop: 0 }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1003,7 +1004,7 @@ export default function AdminPage() {
   return (
     <main
       className={cn(
-        "min-h-screen flex flex-col md:flex-row font-hanken !mt-0 relative transition-colors duration-300",
+        "h-screen overflow-hidden flex flex-col md:flex-row font-hanken !mt-0 relative transition-colors duration-300",
         isDark ? "bg-gray-950 text-gray-100" : "bg-gray-50 text-gray-800"
       )}
       style={{ marginTop: 0 }}
@@ -1100,15 +1101,7 @@ export default function AdminPage() {
               {/* Console Lock Button */}
               <div className={cn("p-4 border-t", isDark ? "border-gray-800" : "border-gray-100")}>
                 <button
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to lock the administrative console session?")) {
-                      setIsAdminUnlocked(false);
-                      if (typeof window !== "undefined") {
-                        sessionStorage.removeItem("admin_session_unlocked");
-                      }
-                      toast.info("Console session locked.");
-                    }
-                  }}
+                  onClick={() => setShowLockConfirm(true)}
                   className={cn(
                     "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
                     isDark
@@ -1190,15 +1183,7 @@ export default function AdminPage() {
 
         <div className={cn("p-4 border-t hidden md:block", isDark ? "border-gray-800" : "border-gray-100")}>
           <button
-            onClick={() => {
-              if (window.confirm("Are you sure you want to lock the administrative console session?")) {
-                setIsAdminUnlocked(false);
-                if (typeof window !== "undefined") {
-                  sessionStorage.removeItem("admin_session_unlocked");
-                }
-                toast.info("Console session locked.");
-              }
-            }}
+            onClick={() => setShowLockConfirm(true)}
             className={cn(
               "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
               isDark
@@ -1213,7 +1198,7 @@ export default function AdminPage() {
       </motion.aside>
 
       {/* Main Content Workspace */}
-      <section className="flex-1 flex flex-col min-w-0">
+      <section className="flex-1 flex flex-col min-w-0 h-full md:h-screen overflow-hidden">
         <div role="banner" className={cn(
           "flex justify-between items-center px-8 py-5 border-b transition-colors duration-300",
           isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
@@ -2985,15 +2970,7 @@ export default function AdminPage() {
       {/* Lock Drawer Footer (Isolated with flat button and absolutely no shadows) */}
       <footer className={cn("md:hidden fixed bottom-0 left-0 right-0 p-4 border-t z-30 transition-colors duration-300", isDark ? "bg-gray-900 border-gray-850" : "bg-white border-gray-100")}>
         <button
-          onClick={() => {
-            if (window.confirm("Are you sure you want to lock the administrative console session?")) {
-              setIsAdminUnlocked(false);
-              if (typeof window !== "undefined") {
-                sessionStorage.removeItem("admin_session_unlocked");
-              }
-              toast.info("Console session locked.");
-            }
-          }}
+          onClick={() => setShowLockConfirm(true)}
           className={cn(
             "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center",
             isDark
@@ -3004,6 +2981,66 @@ export default function AdminPage() {
           Lock Admin Console Session
         </button>
       </footer>
+
+      {/* Premium Glassmorphic Lock Console Confirmation Modal */}
+      <AnimatePresence>
+        {showLockConfirm && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLockConfirm(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[99999]"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 max-w-sm md:w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[32px] p-6 text-center shadow-2xl z-[100000] font-hanken"
+            >
+              {/* Animated Danger Badge */}
+              <div className="w-14 h-14 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>lock_reset</span>
+              </div>
+
+              <h4 className="font-extrabold text-base text-gray-900 dark:text-white leading-tight">
+                Lock Console Session?
+              </h4>
+              <p className="text-[11.5px] text-gray-500 dark:text-gray-400 mt-2 font-medium leading-relaxed">
+                Are you sure you want to lock the administrative console session? This will immediately secure all system configurations and log out your active session.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowLockConfirm(false)}
+                  className="py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLockConfirm(false);
+                    setIsAdminUnlocked(false);
+                    if (typeof window !== "undefined") {
+                      sessionStorage.removeItem("admin_session_unlocked");
+                    }
+                    toast.info("Console session locked.");
+                  }}
+                  className="py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 transition-all cursor-pointer active:scale-95"
+                >
+                  Yes, Lock
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
