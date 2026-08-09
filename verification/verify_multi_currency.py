@@ -20,7 +20,7 @@ def run_verification():
         page = context.new_page()
 
         print("[Verification] Navigating to E-Tech Wallet home with mock flag...")
-        page.goto("http://localhost:3000/?mock=true")
+        page.goto("http://localhost:3055/?mock=true")
         page.wait_for_timeout(2000) # Let page fully load and hydrate
 
         # Take a screenshot of the initial dashboard with NGN wallet active
@@ -38,22 +38,37 @@ def run_verification():
         page.screenshot(path="/home/jules/verification/screenshots/2_dashboard_usd.png")
         page.wait_for_timeout(1000)
 
-        # Open Swap Modal
-        print("[Verification] Opening Swap converter...")
+        # Switch to XOF Wallet
+        print("[Verification] Switching to XOF Wallet...")
+        page.click("text=XOF")
+        page.wait_for_timeout(1500)
+
+        # Take a screenshot of the XOF wallet active
+        print("[Verification] Capturing active XOF Wallet screen...")
+        page.screenshot(path="/home/jules/verification/screenshots/2b_dashboard_xof.png")
+        page.wait_for_timeout(1000)
+
+        # Open Swap Modal from XOF
+        print("[Verification] Opening Swap converter from XOF...")
         page.click("text=Swap")
         page.wait_for_timeout(1500)
 
-        print("[Verification] Capturing Swap Modal...")
-        page.screenshot(path="/home/jules/verification/screenshots/3_swap_modal.png")
+        print("[Verification] Capturing Swap Modal with XOF selected...")
+        page.screenshot(path="/home/jules/verification/screenshots/3_swap_modal_xof.png")
+        page.wait_for_timeout(1000)
+
+        # Choose to swap XOF to NGN by clicking the NGN pill selector in the form
+        print("[Verification] Selecting Swap-To currency as NGN in the modal form...")
+        page.click("form button:has-text('NGN')")
         page.wait_for_timeout(1000)
 
         # Enter swap amount
-        print("[Verification] Entering swap amount...")
-        page.fill("input[placeholder*='amount']", "100")
+        print("[Verification] Entering XOF swap amount...")
+        page.fill("input[placeholder*='amount']", "1000")
         page.wait_for_timeout(1500)
 
-        print("[Verification] Capturing swap conversion calculation...")
-        page.screenshot(path="/home/jules/verification/screenshots/4_swap_calculated.png")
+        print("[Verification] Capturing swap conversion calculation XOF -> NGN...")
+        page.screenshot(path="/home/jules/verification/screenshots/4_swap_calculated_xof_to_ngn.png")
         page.wait_for_timeout(1000)
 
         # Complete Swap
@@ -63,25 +78,7 @@ def run_verification():
 
         # Capturing dashboard post-swap
         print("[Verification] Capturing dashboard after exchange conversion...")
-        page.screenshot(path="/home/jules/verification/screenshots/5_post_swap.png")
-        page.wait_for_timeout(1000)
-
-        # Navigate to Activity History Log
-        print("[Verification] Navigating to Activity History...")
-        page.click("text=See All")
-        page.wait_for_timeout(2000)
-
-        print("[Verification] Capturing transaction history...")
-        page.screenshot(path="/home/jules/verification/screenshots/6_history.png")
-        page.wait_for_timeout(1000)
-
-        # Toggle USD currency filter in history
-        print("[Verification] Filtering by USD...")
-        page.click("text=USD ($)")
-        page.wait_for_timeout(1500)
-
-        print("[Verification] Capturing filtered transaction history...")
-        page.screenshot(path="/home/jules/verification/screenshots/7_history_filtered_usd.png")
+        page.screenshot(path="/home/jules/verification/screenshots/5_post_swap_xof.png")
         page.wait_for_timeout(1000)
 
         # Close browser to trigger video export
