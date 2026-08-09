@@ -1,14 +1,37 @@
+   ▲ Next.js 15.1.12
+   - Local:        http://localhost:3055
+   - Network:      http://192.168.0.2:3055
 
-> e-global-wallet@0.1.0 start
-> next start -p 3055
-
- ⨯ Failed to start server
-Error: listen EADDRINUSE: address already in use :::3055
-    at <unknown> (Error: listen EADDRINUSE: address already in use :::3055)
-    at new Promise (<anonymous>) {
-  code: 'EADDRINUSE',
-  errno: -98,
-  syscall: 'listen',
-  address: '::',
-  port: 3055
-}
+ ✓ Starting...
+ ✓ Ready in 609ms
+[Firebase Admin] Initialized with explicit fallback projectId: e-tech-global-hub
+(node:64194) MetadataLookupWarning: received unexpected error = All promises were rejected code = UNKNOWN
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Transfer-Fee API Exception] [fee-req-1786244070208-i4qn] CRITICAL FAILURE: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information. Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at GoogleAuth.getApplicationDefaultAsync (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:284:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async #determineClient (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:764:36)
+    at async GoogleAuth.getClient (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:741:20)
+    at async GrpcClient._getCredentials (/app/node_modules/google-gax/build/src/grpc.js:192:24)
+    at async GrpcClient.createStub (/app/node_modules/google-gax/build/src/grpc.js:373:23)
+Caused by: Error:
+    at /app/node_modules/@google-cloud/firestore/build/src/index.js:1097:27
+    at /app/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:125:30
+    at NoopContextManager.with (/app/node_modules/@opentelemetry/api/build/src/context/NoopContextManager.js:14:19)
+    at ContextAPI.with (/app/node_modules/@opentelemetry/api/build/src/api/context.js:51:46)
+    at NoopTracer.startActiveSpan (/app/node_modules/@opentelemetry/api/build/src/trace/NoopTracer.js:54:31)
+    at ProxyTracer.startActiveSpan (/app/node_modules/@opentelemetry/api/build/src/trace/ProxyTracer.js:27:24)
+    at EnabledTraceUtil.startActiveSpan (/app/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:117:28)
+    at Firestore.getAll (/app/node_modules/@google-cloud/firestore/build/src/index.js:1088:32)
+    at /app/node_modules/@google-cloud/firestore/build/src/reference/document-reference.js:185:36
+    at /app/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:125:30
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]

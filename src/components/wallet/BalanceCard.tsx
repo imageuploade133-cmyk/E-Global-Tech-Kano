@@ -775,65 +775,67 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
 
-  // Automatically calculate transfer fee when transferAmount changes (Single Mode)
+  // Automatically calculate transfer fee when transferAmount or bulkRecipients changes (Single & Bulk Mode)
   useEffect(() => {
-    if (isBulkMode) return;
-    const amt = parseFloat(trfAmount);
-    if (!isNaN(amt) && amt > 0) {
-      const fetchFee = async () => {
-        setIsFeeLoading(true);
-        try {
-          let idToken = "mock-token";
-          if (user && sessionStorage.getItem("mock") !== "true") {
-            idToken = await user.getIdToken();
-          }
+    const amt = isBulkMode
+      ? bulkRecipients.reduce((sum, curr) => sum + curr.amount, 0)
+      : parseFloat(trfAmount);
 
-          const res = await fetch(`/api/flutterwave/transfer-fee?amount=${amt}`, {
-            headers: {
-              "Authorization": `Bearer ${idToken}`,
-            },
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            setTrfFee(data.fee);
-            setTrfTotalDebit(data.totalDebit);
-          } else {
-            // Backend error message or fallback
-            const fallbackFee = 10.00;
-            setTrfFee(fallbackFee);
-            setTrfTotalDebit(amt + fallbackFee);
-          }
-        } catch {
-          const fallbackFee = 10.00;
-          setTrfFee(fallbackFee);
-          setTrfTotalDebit(amt + fallbackFee);
-        } finally {
-          setIsFeeLoading(false);
-        }
-      };
-
-      const delayDebounce = setTimeout(() => {
-        fetchFee();
-      }, 500);
-
-      return () => clearTimeout(delayDebounce);
-    } else {
+    if (isNaN(amt) || amt <= 0) {
       setTrfFee(0);
       setTrfTotalDebit(0);
+      if (isBulkMode) {
+        setTrfAmount("0");
+      }
+      return;
     }
-  }, [trfAmount, user, isBulkMode]);
 
-  // Calculate Bulk Mode Totals Dynamically
-  useEffect(() => {
-    if (!isBulkMode) return;
-    const totalAmt = bulkRecipients.reduce((sum, curr) => sum + curr.amount, 0);
-    const flatFee = 10.00;
-    const totalFees = bulkRecipients.length * flatFee;
+    if (isBulkMode) {
+      setTrfAmount(amt.toString());
+    }
 
-    setTrfAmount(totalAmt.toString());
-    setTrfFee(totalFees);
-    setTrfTotalDebit(totalAmt + totalFees);
-  }, [bulkRecipients, isBulkMode]);
+    const fetchFee = async () => {
+      setIsFeeLoading(true);
+      try {
+        let idToken = "mock-token";
+        if (user && sessionStorage.getItem("mock") !== "true") {
+          idToken = await user.getIdToken();
+        }
+
+        const url = isBulkMode
+          ? `/api/flutterwave/transfer-fee?amount=${amt}&bulk=true&count=${bulkRecipients.length}`
+          : `/api/flutterwave/transfer-fee?amount=${amt}`;
+
+        const res = await fetch(url, {
+          headers: {
+            "Authorization": `Bearer ${idToken}`,
+          },
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setTrfFee(data.fee);
+          setTrfTotalDebit(data.totalDebit);
+        } else {
+          // Backend error message or fallback
+          const fallbackFee = isBulkMode ? bulkRecipients.length * 10.00 : 10.00;
+          setTrfFee(fallbackFee);
+          setTrfTotalDebit(amt + fallbackFee);
+        }
+      } catch {
+        const fallbackFee = isBulkMode ? bulkRecipients.length * 10.00 : 10.00;
+        setTrfFee(fallbackFee);
+        setTrfTotalDebit(amt + fallbackFee);
+      } finally {
+        setIsFeeLoading(false);
+      }
+    };
+
+    const delayDebounce = setTimeout(() => {
+      fetchFee();
+    }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [trfAmount, bulkRecipients, isBulkMode, user]);
 
   // Load the permanent virtual account dynamically from Firestore (Idempotent check/load)
   const fetchPermanentVirtualAccount = async () => {
@@ -937,6 +939,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   // Fetch banks dynamically from our Discovery API endpoint
   const fetchBanks = async () => {
     setIsBanksLoading(true);
+    if (sessionStorage.getItem("mock") === "true") {
+      setBanksList([
+        { id: "035", name: "Wema Bank", code: "035" },
+        { id: "058", name: "GTBank", code: "058" },
+        { id: "999992", name: "OPay", code: "999992" }
+      ]);
+      setIsBanksLoading(false);
+      return;
+    }
+
     try {
       let idToken = "mock-token";
       if (user && sessionStorage.getItem("mock") !== "true") {
@@ -3106,7 +3118,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                 <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
                               </div>
                               <div className="flex justify-between text-gray-500 border-b border-gray-200/50 pb-2">
-                                <span className="font-semibold">Settlement Fee</span>
+                                <span className="font-semibold">Transfer Fee</span>
                                 {isFeeLoading ? (
                                   <span className="material-symbols-outlined text-[14px] animate-spin text-[#FC7A00]">progress_activity</span>
                                 ) : (
