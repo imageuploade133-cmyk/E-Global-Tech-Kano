@@ -1,69 +1,35 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
+    const { isAdmin } = await verifyAdminAuth(req);
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
     }
 
-    // Mock playtesting response
-    if (uid === "mock-admin-uid") {
-      const mockPendingKyc = [
-        {
-          uid: "mock-kyc-1",
-          name: "CHIDI OKEKE",
-          email: "chidi@example.com",
-          phoneNumber: "+2348033445566",
-          kycType: "bvn",
-          kycNumber: "22223333444",
-          kycStatus: "PENDING",
-          submittedAt: new Date().toISOString(),
-          capturedSelfie: null,
-        },
-        {
-          uid: "mock-kyc-2",
-          name: "AMINA BELLO",
-          email: "amina@example.com",
-          phoneNumber: "+2348122334455",
-          kycType: "nin",
-          kycNumber: "55556666777",
-          kycStatus: "PENDING",
-          submittedAt: new Date().toISOString(),
-          capturedSelfie: null,
-        }
-      ];
-      return NextResponse.json({ success: true, pendingUsers: mockPendingKyc });
-    }
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "mock-admin-token";
 
-    // Query pending KYC submissions directly from the secure `kyc_submissions` collection
-    const pendingSnap = await adminDb.collection("kyc_submissions")
-      .where("status", "==", "PENDING")
-      .limit(50)
-      .get();
-
-    const pendingUsers = pendingSnap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        uid: doc.id,
-        name: `${data.firstName || ""} ${data.lastName || ""}`.trim() || "SUBMITTED USER",
-        email: data.email || "",
-        phoneNumber: data.phone || "",
-        kycType: data.documentType || "bvn",
-        kycNumber: data.documentNumber || "•••••••••••",
-        kycStatus: "PENDING",
-        submittedAt: data.submittedAt || new Date().toISOString(),
-        capturedSelfie: data.capturedSelfie || null, // securely exposed Base64 image
-        livenessChallenge: data.livenessChallenge || null
-      };
+    // Forward the GET request directly to Payment Gateway to retrieve real PENDING KYC list
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/pending`, {
+      method: "GET",
+      headers: {
+        "x-api-key": gatewayApiKey,
+        "Authorization": `Bearer ${idToken}`
+      }
     });
 
-    return NextResponse.json({ success: true, pendingUsers });
+    const result = await response.json();
+    if (!response.ok) {
+      return NextResponse.json({ error: result.message || "Failed to query kyc queue from gateway." }, { status: response.status });
+    }
+
+    return NextResponse.json({ success: true, pendingUsers: result.pendingUsers });
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Admin KYC GET API] Error:", error.message);
@@ -79,7 +45,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
     }
 
-    const { action, targetUid, reason } = await req.json();
+    const { action, targetUid, reason, provider } = await req.json();
 
     if (!targetUid) {
       return NextResponse.json({ error: "Missing target user identifier." }, { status: 400 });
@@ -92,20 +58,25 @@ export async function POST(req: Request) {
       });
     }
 
+    const authHeader = req.headers.get("Authorization") || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     if (action === "approve") {
-      // Forward approval request to payment-gateway secure S2S endpoint
-      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/approve`, {
+      if (!provider || (provider !== "flutterwave" && provider !== "squad")) {
+        return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected." }, { status: 400 });
+      }
+
+      // Forward approval request to payment-gateway secure human-only endpoint with strict Bearer Authorization header and explicit provider in body
+      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey
+          "x-api-key": gatewayApiKey,
+          "Authorization": `Bearer ${idToken}`
         },
-        body: JSON.stringify({
-          targetUid,
-          adminId: uid
-        })
+        body: JSON.stringify({ provider })
       });
 
       const result = await response.json();
@@ -115,22 +86,19 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: "User KYC successfully approved and static virtual account provisioned!"
+        message: `User KYC successfully approved and static virtual account provisioned via ${provider}!`
       });
 
     } else if (action === "reject") {
-      // Forward rejection request to payment-gateway secure S2S endpoint
-      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/reject`, {
+      // Forward rejection request to payment-gateway secure human-only endpoint with strict Bearer Authorization header
+      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/reject`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey
+          "x-api-key": gatewayApiKey,
+          "Authorization": `Bearer ${idToken}`
         },
-        body: JSON.stringify({
-          targetUid,
-          adminId: uid,
-          reason
-        })
+        body: JSON.stringify({ reason })
       });
 
       const result = await response.json();
@@ -141,6 +109,32 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: "User KYC rejected and notification dispatched successfully."
+      });
+
+    } else if (action === "retry") {
+      if (!provider || (provider !== "flutterwave" && provider !== "squad")) {
+        return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected for retry." }, { status: 400 });
+      }
+
+      // Forward retry provisioning request to payment-gateway
+      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/retry-provisioning`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": gatewayApiKey,
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ provider })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        return NextResponse.json({ error: result.message || "Failed to retry virtual account provisioning." }, { status: response.status });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Virtual account successfully provisioned on retry via ${provider}!`
       });
 
     } else {

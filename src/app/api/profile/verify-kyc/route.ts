@@ -72,12 +72,10 @@ export async function POST(req: Request) {
         "Authorization": idToken ? `Bearer ${idToken}` : "",
       },
       body: JSON.stringify({
-        userId: uid,
         firstName: nameFallback.split(" ")[0] || "User",
         lastName: nameFallback.split(" ").slice(1).join(" ") || "User",
         documentType: type,
         documentNumber: idNumber.trim(),
-        faceConfidence: 0.95,
         email: emailFallback,
         phone: "", // Will be resolved natively inside gateway
         capturedSelfie,

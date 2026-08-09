@@ -171,7 +171,7 @@ export function FaceVerificationDrawer({
       }
 
       setLivenessStep("success");
-      toast.success("Identity and Face verified successfully!");
+      toast.success("Identity and Face submitted successfully!");
       onSuccess(data.account);
     } catch (err: any) {
       console.error("[Face Verification Error]:", err);
@@ -338,9 +338,9 @@ export function FaceVerificationDrawer({
                   </div>
 
                   <div className="space-y-1">
-                    <h4 className="font-hanken font-black text-base text-black uppercase">Verification Passed</h4>
+                    <h4 className="font-hanken font-black text-base text-black uppercase">KYC Submitted</h4>
                     <p className="font-hanken text-xs text-gray-500 leading-relaxed max-w-[260px]">
-                      Identity resolution and live facial liveness verification matched successfully!
+                      Identity and facial liveness verification successfully submitted and is PENDING administrator approval!
                     </p>
                   </div>
 
@@ -352,7 +352,7 @@ export function FaceVerificationDrawer({
                     }}
                     className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer"
                   >
-                    Finish & View Account
+                    Finish & Close
                   </button>
                 </div>
               )}
