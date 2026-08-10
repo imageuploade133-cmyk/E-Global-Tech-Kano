@@ -76,8 +76,10 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
           const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
           if (userDoc.exists) {
             const userData = userDoc.data() || {};
-            const isEmailAdmin = ROOT_ADMIN_EMAIL && decoded.email === ROOT_ADMIN_EMAIL;
-            const isAdmin = userData.role === "admin" || userData.role === "SUPER_ADMIN" || isEmailAdmin;
+            const cleanEmail = (decoded.email || "").toLowerCase().trim();
+            const isEmailAdmin = ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL;
+            const userRole = (userData.role || "").trim().toUpperCase();
+            const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
             if (isAdmin) {
               return { uid: decoded.uid, isAdmin: true };
             }
@@ -115,8 +117,10 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
     }
 
     const userData = userDoc.data() || {};
-    const isEmailAdmin = ROOT_ADMIN_EMAIL && userData.email === ROOT_ADMIN_EMAIL;
-    const isAdmin = userData.role === "admin" || userData.role === "SUPER_ADMIN" || isEmailAdmin;
+    const userEmail = (userData.email || "").toLowerCase().trim();
+    const isEmailAdmin = ROOT_ADMIN_EMAIL && userEmail === ROOT_ADMIN_EMAIL;
+    const userRole = (userData.role || "").trim().toUpperCase();
+    const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
 
     if (!isAdmin) {
       throw new Error("Forbidden: User is not an administrator.");
