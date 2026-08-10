@@ -15,6 +15,7 @@
     "firebase-admin": "^14.1.0",
     "framer-motion": "^12.4.2",
     "html2canvas": "^1.4.1",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "next": "^15.1.12",
     "react": "^19.0.0",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.17.17",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
