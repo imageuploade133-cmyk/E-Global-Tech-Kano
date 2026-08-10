@@ -47,8 +47,10 @@ export async function GET() {
     }
 
     const userData = userDoc.data() || {};
-    const isEmailAdmin = ROOT_ADMIN_EMAIL && decoded.email === ROOT_ADMIN_EMAIL;
-    const isAdmin = userData.role === "admin" || userData.role === "SUPER_ADMIN" || isEmailAdmin;
+    const cleanEmail = (decoded.email || "").toLowerCase().trim();
+    const isEmailAdmin = ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL;
+    const userRole = (userData.role || "").trim().toUpperCase();
+    const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
 
     if (!isAdmin) {
       return NextResponse.json({ success: false, error: "Forbidden: Not an administrator." }, { status: 403 });

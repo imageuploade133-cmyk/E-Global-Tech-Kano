@@ -53,9 +53,16 @@ export async function POST(req: Request) {
       }
     }
 
-    // Query Firestore for admin user matching email exactly
+    // Query Firestore for admin user matching email. Use multiple case variations to ensure we never get blocked by case-sensitivity.
+    const emailVariations = Array.from(new Set([
+      cleanEmail,
+      email.trim(),
+      email.trim().toUpperCase(),
+      email.trim().toLowerCase()
+    ])).filter(Boolean);
+
     const userQuery = await adminDb.collection("users")
-      .where("email", "==", cleanEmail)
+      .where("email", "in", emailVariations)
       .limit(1)
       .get();
 
@@ -68,7 +75,8 @@ export async function POST(req: Request) {
     const uid = userDoc.id;
 
     const isEmailAdmin = ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL;
-    const isAdmin = userData.role === "admin" || userData.role === "SUPER_ADMIN" || isEmailAdmin;
+    const userRole = (userData.role || "").trim().toUpperCase();
+    const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Your account is not authorized to access this console." }, { status: 403 });
@@ -81,8 +89,8 @@ export async function POST(req: Request) {
 
     if (pinHash) {
       isMatch = bcrypt.compareSync(pin, pinHash);
-    } else if (legacyPlainPin) {
-      isMatch = (pin === legacyPlainPin);
+    } else if (legacyPlainPin !== undefined && legacyPlainPin !== null) {
+      isMatch = (String(pin) === String(legacyPlainPin));
     }
 
     if (!isMatch) {
