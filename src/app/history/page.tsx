@@ -10,106 +10,6 @@ import { TransactionReceipt, Transaction } from "@/components/wallet/Transaction
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 
-const HISTORICAL_TRANSACTIONS: Transaction[] = [
-  {
-    id: "tx-1001",
-    reference: "ETF-8924021-992",
-    type: "DEPOSIT",
-    amount: 500000.00,
-    currency: "NGN",
-    description: "Inbound Bank Settlement",
-    recipientName: "JULES VERNE",
-    bankName: "Providus Bank",
-    status: "SUCCESS",
-    date: "Jul 12, 2024",
-    time: "10:42 AM",
-    fee: 0.00,
-  },
-  {
-    id: "tx-1002",
-    reference: "ETF-1039845-812",
-    type: "TRANSFER",
-    amount: 120000.00,
-    currency: "NGN",
-    description: "Account Transfer to Steve",
-    recipientName: "STEVE COLLINS",
-    bankName: "Opay Wallet",
-    status: "SUCCESS",
-    date: "Jul 11, 2024",
-    time: "06:15 PM",
-    fee: 10.00,
-  },
-  {
-    id: "tx-1003",
-    reference: "ETF-3904812-709",
-    type: "BILL_PAYMENT",
-    amount: 25000.00,
-    currency: "NGN",
-    description: "DSTV Premium Renewal",
-    recipientName: "MultiChoice DSTV",
-    bankName: "E-Tech Bills Hub",
-    status: "SUCCESS",
-    date: "Jul 09, 2024",
-    time: "02:30 PM",
-    fee: 100.00,
-  },
-  {
-    id: "tx-1004",
-    reference: "ETF-7719283-441",
-    type: "CARD_FUND",
-    amount: 50.00,
-    currency: "USD",
-    description: "USD Card Provisioning",
-    recipientName: "USD Virtual Card",
-    bankName: "Silicon Valley Bank",
-    status: "SUCCESS",
-    date: "Jul 08, 2024",
-    time: "09:05 AM",
-    fee: 1.50,
-  },
-  {
-    id: "tx-1005",
-    reference: "ETF-1123984-500",
-    type: "TRANSFER",
-    amount: 45000.00,
-    currency: "NGN",
-    description: "Rent Allocation Payment",
-    recipientName: "ADEYEMI LANDLORDS",
-    bankName: "Access Bank Plc",
-    status: "SUCCESS",
-    date: "Jul 05, 2024",
-    time: "08:12 AM",
-    fee: 25.00,
-  },
-  {
-    id: "tx-1006",
-    reference: "ETF-9908123-667",
-    type: "BILL_PAYMENT",
-    amount: 15000.00,
-    currency: "NGN",
-    description: "IKEDC Prepaid Meter recharge",
-    recipientName: "Ikeja Electric",
-    status: "FAILED",
-    date: "Jul 03, 2024",
-    time: "11:58 PM",
-    fee: 0.00,
-  },
-  {
-    id: "tx-1007",
-    reference: "ETF-4819203-311",
-    type: "CASHOUT",
-    amount: 30000.00,
-    currency: "NGN",
-    description: "Card Withdrawal Cashout",
-    recipientName: "Self POS Agent",
-    bankName: "First Bank ATM",
-    status: "SUCCESS",
-    date: "Jun 28, 2024",
-    time: "04:50 PM",
-    fee: 150.00,
-  }
-];
-
 export default function HistoryPage() {
   const { userData, user } = useAuth();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -152,7 +52,7 @@ export default function HistoryPage() {
   useEffect(() => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (isMock || !user) {
-      setTransactions(HISTORICAL_TRANSACTIONS);
+      setTransactions([]);
       setLoading(false);
       setHasMore(false);
       return;
@@ -197,8 +97,7 @@ export default function HistoryPage() {
         }
       } catch (err) {
         console.error("[HistoryPage Initial Load Exception]:", err);
-        // Fallback to mock gracefully on query error (e.g. index build in progress)
-        setTransactions(HISTORICAL_TRANSACTIONS);
+        setTransactions([]);
         setHasMore(false);
       } finally {
         setLoading(false);

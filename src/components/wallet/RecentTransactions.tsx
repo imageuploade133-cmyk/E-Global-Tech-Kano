@@ -9,35 +9,6 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
 
-const RECENT_ITEMS: Transaction[] = [
-  {
-    id: "tx-recent-1",
-    reference: "ETF-RG-8924021",
-    type: "DEPOSIT",
-    amount: 150000.00,
-    description: "Inbound Settlement Transfer",
-    recipientName: "E-TECH WALLET",
-    bankName: "Providus Bank",
-    status: "SUCCESS",
-    date: "Today",
-    time: "11:42 AM",
-    fee: 0.00,
-  },
-  {
-    id: "tx-recent-2",
-    reference: "ETF-RG-1039845",
-    type: "TRANSFER",
-    amount: 35000.00,
-    description: "Outgoing Peer-to-Peer",
-    recipientName: "STEVE COLLINS",
-    bankName: "Opay Wallet",
-    status: "SUCCESS",
-    date: "Yesterday",
-    time: "04:15 PM",
-    fee: 10.00,
-  },
-];
-
 interface RecentTransactionsProps {
   isLoading?: boolean;
 }
@@ -53,7 +24,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
   useEffect(() => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (isMock || !user) {
-      setTransactions(RECENT_ITEMS);
+      setTransactions([]);
       setLoading(false);
       return;
     }
@@ -94,17 +65,12 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           (tx) => tx.type === "DEPOSIT" || tx.type === "TRANSFER" || tx.type === "CASHOUT"
         ).slice(0, 2);
 
-        // Fallback to mock data if there are no real transactions yet
-        if (filtered.length === 0) {
-          setTransactions(RECENT_ITEMS);
-        } else {
-          setTransactions(filtered);
-        }
+        setTransactions(filtered);
         setLoading(false);
       },
       (error) => {
         console.error("[RecentTransactions Listener Error]:", error);
-        setTransactions(RECENT_ITEMS);
+        setTransactions([]);
         setLoading(false);
       }
     );
