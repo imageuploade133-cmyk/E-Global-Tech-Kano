@@ -239,6 +239,70 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Single-device session listener & verification guard
+  useEffect(() => {
+    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (loading || isMock || !user || !userData) return;
+
+    // Skip device enforcement on public/auth routes
+    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
+    if (isPublicRoute) return;
+
+    const deviceId = getOrCreateDeviceId();
+    const verifiedList = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
+
+    // Check if New Device Detector is disabled globally via CPanel
+    if (config?.newDeviceDetectorEnabled === false) {
+      setIsNewDeviceBlocked(false);
+      return;
+    }
+
+    // 1. First-time registration of deviceId: Whitelist the first device used to register/login
+    if (!userData.registeredDeviceId && !initializingDeviceRef.current) {
+      initializingDeviceRef.current = true;
+      updateUserData({
+        registeredDeviceId: deviceId,
+        verifiedDevices: [deviceId],
+        currentDeviceId: deviceId,
+      })
+        .then(() => {
+          setIsNewDeviceBlocked(false);
+          initializingDeviceRef.current = false;
+        })
+        .catch((err) => {
+          console.error("Failed to initialize registered device:", err);
+          initializingDeviceRef.current = false;
+        });
+      return;
+    }
+
+    // 2. Real-time active session validation (Suspend session if logged in elsewhere)
+    const isCurrentDeviceVerified = userData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
+    if (isCurrentDeviceVerified) {
+      setIsNewDeviceBlocked(false);
+
+      if (userData.currentDeviceId && userData.currentDeviceId !== deviceId) {
+        console.warn("[Device Guard] Active session changed to another device. Suspending active session.");
+        setIsSessionSuspended(true);
+        return;
+      }
+
+      // If we are verified but database records another currentDeviceId, sync it atomically
+      if (userData.currentDeviceId !== deviceId && !initializingDeviceRef.current) {
+        initializingDeviceRef.current = true;
+        updateUserData({ currentDeviceId: deviceId })
+          .then(() => {
+            initializingDeviceRef.current = false;
+          })
+          .catch(() => {
+            initializingDeviceRef.current = false;
+          });
+      }
+    } else {
+      // 3. Unrecognized device detected: Block transaction activity with validation overlay
+      setIsNewDeviceBlocked(true);
+    }
+  }, [user, loading, userData, pathname, router, updateUserData, config?.newDeviceDetectorEnabled]);
 
   // Instant verification check: triggered when user focuses the tab or tab becomes visible again
   useEffect(() => {
@@ -283,7 +347,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (loading && !isMock) return;
 
-    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
+    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
 
     if (!user && !isMock) {
       if (!isPublicRoute) {
@@ -293,7 +357,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       const hasPin = Boolean(userData?.pin || userData?.pinHash);
       const isPinRequired = userData?.isPinRequired !== false;
 
-      if (pathname === "/cpanel") {
+      if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) {
         return;
       }
 
@@ -629,10 +693,108 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
+  // Render high-fidelity professional BVN/NIN/Email authentication page for new devices
+  if (isNewDeviceBlocked && userData) {
+    const bvnValue = (userData.bvn as string || "").trim();
+    const ninValue = (userData.nin as string || "").trim();
+    const hasKyc = !!(bvnValue || ninValue);
+
+    return (
+      <div className="flex min-h-screen flex-col bg-white p-8 items-center justify-between z-[999999] fixed inset-0 overflow-y-auto">
+        <div className="w-full flex flex-col items-center text-center mt-6 shrink-0">
+          <div className="relative w-16 h-16 mb-4">
+            <Image
+              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
+              alt="E-Tech Logo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+          <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
+
+          <div className="space-y-1 mt-3">
+            <h2 className="font-hanken font-black text-sm text-red-600 uppercase tracking-wider leading-none">
+              NEW DEVICE DETECTED
+            </h2>
+            <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider leading-none mt-1">
+              Security Verification Required
+            </p>
+            <p className="font-hanken text-xs text-gray-500 max-w-xs mt-2.5 leading-relaxed font-semibold px-4">
+              To secure your wallet and complete transactions, please authorize this device by confirming your registration credentials.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleVerifyNewDevice} className="w-full max-w-xs space-y-4 my-10 flex-grow flex flex-col justify-center text-left">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Registered Phone Number
+            </label>
+            <input
+              type="tel"
+              required
+              value={verPhone}
+              onChange={(e) => setVerPhone(e.target.value)}
+              placeholder="080XXXXXXXX"
+              className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              {hasKyc ? "Last 4 Digits of your BVN or NIN" : "Registered Email Address"}
+            </label>
+            <input
+              type={hasKyc ? "password" : "email"}
+              maxLength={hasKyc ? 4 : undefined}
+              required
+              value={verBvnOrNinOrEmail}
+              onChange={(e) => setVerBvnOrNinOrEmail(e.target.value)}
+              placeholder={hasKyc ? "•••• (Last 4)" : "doe@example.com"}
+              className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono"
+            />
+          </div>
+
+          {verError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-[10px] text-red-600 font-bold leading-relaxed text-center">
+              {verError}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={verifyingDevice || !verPhone || !verBvnOrNinOrEmail}
+            className="w-full py-4 bg-[#FC7A00] hover:brightness-105 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50"
+          >
+            {verifyingDevice ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Authorizing Device...</span>
+              </>
+            ) : (
+              "Verify & Authorize Device"
+            )}
+          </button>
+        </form>
+
+        <div className="w-full text-center border-t border-gray-150 pt-4 pb-4 shrink-0 max-w-xs">
+          <button
+            type="button"
+            onClick={handleSignOutFromBlockedDevice}
+            className="text-[11px] font-extrabold text-red-600 uppercase tracking-widest hover:text-red-700 hover:underline py-2.5 cursor-pointer transition-colors"
+          >
+            Sign Out from Account
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
 
   if (!user && !isPublicRoute && !isMockRoute) return null;
-  if (pathname === "/cpanel") return <>{children}</>;
+  if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) return <>{children}</>;
   if (user && !(userData?.pin || userData?.pinHash) && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
   if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;

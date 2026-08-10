@@ -105,7 +105,7 @@ export class PaymentGatewayManager {
   }): Promise<{ name: string; payBills: (payload: BillPaymentPayload, idToken?: string) => Promise<BillPaymentResponse> }> {
     console.log(`[PaymentGatewayManager] Selecting gateway for feature: ${params.feature}`);
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
-    const gatewayApiKey = process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     // Option 1 Design: If feature is airtime, route to Clubkonnect VTU endpoint on the Payment Gateway
     if (params.feature === "airtime") {
