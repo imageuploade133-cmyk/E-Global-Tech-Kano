@@ -1,18 +1,40 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
+import { verifyAdminAuth, mintFirebaseIdToken } from "@/lib/admin-auth";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
 export async function GET(req: Request) {
   try {
-    const { isAdmin } = await verifyAdminAuth(req);
+    const { uid, isAdmin } = await verifyAdminAuth(req);
 
     if (!isAdmin) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
     }
 
+    if (uid === "mock-admin-uid") {
+      const mockPending = [
+        {
+          uid: "mock-kyc-user-1",
+          name: "JULES VERNE",
+          email: "jules@example.com",
+          phoneNumber: "+2348011223344",
+          kycType: "bvn",
+          kycNumber: "22233344455",
+          kycStatus: "PENDING",
+          submittedAt: new Date().toISOString(),
+          capturedSelfie: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+          livenessChallenge: "Smile & Blink"
+        }
+      ];
+      return NextResponse.json({ success: true, pendingUsers: mockPending });
+    }
+
     const authHeader = req.headers.get("Authorization") || "";
-    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "mock-admin-token";
+    let idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    if (!idToken && uid) {
+      idToken = await mintFirebaseIdToken(uid);
+    }
 
     // Forward the GET request directly to Payment Gateway to retrieve real PENDING KYC list
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
@@ -59,7 +81,11 @@ export async function POST(req: Request) {
     }
 
     const authHeader = req.headers.get("Authorization") || "";
-    const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    let idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+
+    if (!idToken && uid) {
+      idToken = await mintFirebaseIdToken(uid);
+    }
 
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 

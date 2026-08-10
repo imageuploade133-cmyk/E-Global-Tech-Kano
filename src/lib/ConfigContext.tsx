@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { doc, setDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 
 export interface AppConfig {
@@ -52,6 +52,22 @@ const ConfigContext = createContext<ConfigContextProps | undefined>(undefined);
 export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
 
+  // Helper to fetch public visual configuration via serverless API
+  const fetchPublicConfigFallback = async () => {
+    try {
+      const res = await fetch("/api/config");
+      const data = await res.json();
+      if (res.ok && data.success && data.config) {
+        setConfig((prev) => ({
+          ...prev,
+          ...data.config,
+        }));
+      }
+    } catch (err) {
+      console.warn("Failed to fetch public config fallback:", err);
+    }
+  };
+
   // Sync core visual/support configs directly from Firestore config document
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -65,16 +81,11 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               ...prev,
               ...remoteData,
             }));
-          } else {
-            // Seed default config quietly without throwing permission exceptions
-            setDoc(doc(db, "config", "app"), DEFAULT_CONFIG).catch(() => {
-              // Ignore if we lack write permissions initially
-            });
           }
         }, (error) => {
-          // Quietly handle permission failures for guest users
+          // Quietly handle permission failures for guest or unauthenticated users and fetch via serverless API
           if (error.code === "permission-denied") {
-            console.log("Config subscription postponed: Admin authorization required.");
+            fetchPublicConfigFallback();
           } else {
             console.warn("Config listener error:", error);
           }
@@ -90,17 +101,12 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (unsubscribe) unsubscribe();
         setupListener();
       } else {
-        // Load fallback config immediately if unauthenticated
+        // Load config from serverless API if unauthenticated
         if (unsubscribe) {
           unsubscribe();
           unsubscribe = null;
         }
-        if (typeof window !== "undefined") {
-          const cached = sessionStorage.getItem("app_global_config");
-          if (cached) {
-            try { setConfig(JSON.parse(cached)); } catch { /* ignore */ }
-          }
-        }
+        fetchPublicConfigFallback();
       }
     });
 
@@ -113,61 +119,19 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Sync real counts, balances and aggregated sum of all registered accounts dynamically from Firebase
   const syncRealFirebaseData = async () => {
     try {
-      const usersSnap = await getDocs(collection(db, "users"));
-      const userList = usersSnap.docs.map((d) => d.data());
-
-      const userCount = userList.length;
-      const totalNgn = userList.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0);
-      const totalUsd = userList.reduce((acc, curr) => acc + (Number(curr.usdBalance) || 0), 0);
-      const totalBonus = userList.reduce((acc, curr) => acc + (Number(curr.bonusBalance) || Number(curr.bonus) || 0), 0);
-
-      let totalFixedDeposit = 0;
-      let todayDeposit = 0;
-      let todayTransfer = 0;
-      let totalAirtimePurchase = 0;
-
-      try {
-        const investmentsSnap = await getDocs(collection(db, "investments"));
-        const invList = investmentsSnap.docs.map(d => d.data());
-        if (invList.length > 0) {
-          totalFixedDeposit = invList.filter(i => i.type === "fixed_deposit").reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      // Rather than running direct client-side collection scans which can fail with permission exceptions,
+      // let's fetch from the metrics endpoint or handle securely
+      const res = await fetch("/api/admin/config");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.config) {
+          setConfig((prev) => ({
+            ...prev,
+            ...data.config,
+          }));
+          return;
         }
-      } catch (invErr) {
-        console.warn("Failed to aggregate investments sum", invErr);
       }
-
-      try {
-        const txsSnap = await getDocs(collection(db, "transactions"));
-        const txList = txsSnap.docs.map(d => d.data());
-        const todayStr = new Date().toDateString();
-        if (txList.length > 0) {
-          todayDeposit = txList.filter(t => t.type === "DEPOSIT" && (t.date === "Today" || new Date(t.createdAt).toDateString() === todayStr)).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-          todayTransfer = txList.filter(t => t.type === "TRANSFER" && (t.date === "Today" || new Date(t.createdAt).toDateString() === todayStr)).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-          totalAirtimePurchase = txList.filter(t => t.type === "BILL_PAYMENT" && (String(t.billerCategory).toUpperCase() === "AIRTIME" || String(t.category).toLowerCase() === "airtime")).reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-        }
-      } catch (txErr) {
-        console.warn("Failed to aggregate transactions stats", txErr);
-      }
-
-      // Dynamically update context configurations with real database calculations
-      const metricsUpdates = {
-        totalUsers: userCount,
-        globalNgnBalance: totalNgn,
-        globalUsdBalance: totalUsd,
-        totalFixedDeposit,
-        todayDeposit,
-        todayTransfer,
-        totalAirtimePurchase,
-        totalBonus,
-      };
-
-      setConfig((prev) => ({
-        ...prev,
-        ...metricsUpdates,
-      }));
-
-      // Also persist to config document on firebase securely
-      await setDoc(doc(db, "config", "app"), metricsUpdates, { merge: true });
     } catch (e) {
       console.warn("Real-time Firebase metrics agg fetch failed. (Falling back to local cache):", e);
     }
@@ -178,19 +142,40 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setConfig(newConfig);
 
     try {
-      await setDoc(doc(db, "config", "app"), updates, { merge: true });
+      // Securely update config through the serverless admin config API
+      const res = await fetch("/api/admin/config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to save configuration server-side.");
+      }
+
+      // Update state with updated server-authoritative data
+      if (data.config) {
+        setConfig((prev) => ({
+          ...prev,
+          ...data.config,
+        }));
+      }
     } catch (e) {
       console.error("Failed to commit settings updates to Firebase Firestore:", e);
       if (typeof window !== "undefined") {
         sessionStorage.setItem("app_global_config_fallback", JSON.stringify(newConfig));
       }
+      throw e;
     }
   };
 
   const resetConfig = async () => {
     setConfig(DEFAULT_CONFIG);
     try {
-      await setDoc(doc(db, "config", "app"), DEFAULT_CONFIG);
+      await updateConfig(DEFAULT_CONFIG);
     } catch (e) {
       console.error("Failed to reset config doc:", e);
     }
