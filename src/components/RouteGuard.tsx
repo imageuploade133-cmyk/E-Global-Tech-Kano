@@ -41,6 +41,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   // Multi-Device Suspension States (OPay-like Session Overlap Blockers)
   const [isSessionSuspended, setIsSessionSuspended] = useState(false);
+  const [isNewDeviceBlocked, setIsNewDeviceBlocked] = useState(false);
   const [isChangingPin, setIsChangingPin] = useState(false);
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -63,6 +64,87 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const [updateProgress, setUpdateProgress] = useState(0);
 
   const initializingDeviceRef = useRef(false);
+
+  // New device authorization form states
+  const [verPhone, setVerPhone] = useState("");
+  const [verBvnOrNinOrEmail, setVerBvnOrNinOrEmail] = useState("");
+  const [verifyingDevice, setVerifyingDevice] = useState(false);
+  const [verError, setVerError] = useState("");
+
+  const handleVerifyNewDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userData) return;
+    setVerifyingDevice(true);
+    setVerError("");
+
+    try {
+      const deviceId = getOrCreateDeviceId();
+      const inputPhone = verPhone.trim().replace(/\D/g, "");
+      const storedPhone = String(userData.phoneNumber || userData.phone || "").trim().replace(/\D/g, "");
+
+      // Match phone number (safely match last 10 digits or exact match)
+      const phoneMatched = storedPhone && (storedPhone === inputPhone || storedPhone.endsWith(inputPhone) || inputPhone.endsWith(storedPhone));
+
+      if (!phoneMatched) {
+        setVerError("Incorrect phone number. Please enter the number registered with this account.");
+        setVerifyingDevice(false);
+        return;
+      }
+
+      const bvnValue = String(userData.bvn || "").trim();
+      const ninValue = String(userData.nin || "").trim();
+      const kycVal = bvnValue || ninValue;
+      const hasKyc = !!kycVal;
+
+      let credentialsMatched = false;
+
+      if (hasKyc) {
+        const last4 = kycVal.slice(-4);
+        credentialsMatched = (verBvnOrNinOrEmail.trim() === last4);
+        if (!credentialsMatched) {
+          setVerError("Incorrect verification details. Please enter the last 4 digits of your BVN or NIN.");
+          setVerifyingDevice(false);
+          return;
+        }
+      } else {
+        const storedEmail = String(userData.email || "").trim().toLowerCase();
+        credentialsMatched = (verBvnOrNinOrEmail.trim().toLowerCase() === storedEmail);
+        if (!credentialsMatched) {
+          setVerError("Incorrect email address. Please enter your registered email address.");
+          setVerifyingDevice(false);
+          return;
+        }
+      }
+
+      if (credentialsMatched) {
+        const currentVerified = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
+        const updatedDevices = Array.from(new Set([...currentVerified, deviceId]));
+
+        await updateUserData({
+          verifiedDevices: updatedDevices,
+          currentDeviceId: deviceId
+        });
+
+        setIsNewDeviceBlocked(false);
+        toast.success("Device verified and authorized successfully!");
+      }
+    } catch (err: any) {
+      console.error("[Device Verification Failure]:", err);
+      setVerError(err.message || "Device authorization failed. Please try again.");
+    } finally {
+      setVerifyingDevice(false);
+    }
+  };
+
+  const handleSignOutFromBlockedDevice = async () => {
+    try {
+      await handleAppSignOut(router);
+    } catch (err) {
+      console.error("Sign out error from blocked device:", err);
+      sessionStorage.clear();
+      router.push("/auth/login");
+    }
+  };
 
   // Real-time server-side version mismatch update controller (Bypasses caching on Ctrl+F5)
   useEffect(() => {

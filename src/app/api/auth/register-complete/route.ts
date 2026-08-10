@@ -1,65 +1,92 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
-
-const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+import { adminDb } from "@/lib/firebase-admin";
+import { ReferralService } from "@/services/referral-service";
 
 export async function POST(req: Request) {
   let uid = "";
-  let idToken = "";
-
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    idToken = authHeader.split("Bearer ")[1];
-  }
 
   try {
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
-  } catch {
+  } catch (authErr: any) {
+    console.error("[Register Complete Proxy Auth Error] Authentication failed:", authErr.message);
     return NextResponse.json({ error: "Unauthorized: Invalid or missing authorization token." }, { status: 401 });
   }
 
   try {
     const body = await req.json();
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const {
+      firstName,
+      lastName,
+      phonePrefix,
+      phoneNumber,
+      email,
+      referralCode,
+    } = body;
 
-    // Include uid and authenticate request to payment-gateway using Bearer and API keys
-    const response = await fetch(`${GATEWAY_URL}/api/auth/register-complete`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": gatewayApiKey,
-        "Authorization": idToken ? `Bearer ${idToken}` : "",
-      },
-      body: JSON.stringify({
-        uid,
-        ...body,
-      }),
-    });
-
-    const responseText = await response.text();
-    let result: any = {};
-    try {
-      result = JSON.parse(responseText);
-    } catch {
-      console.error("[Register Complete Proxy] Received non-JSON response from gateway:", responseText);
-      return NextResponse.json({
-        error: `Database Gateway unreachable or returned an invalid response (HTTP ${response.status}).`
-      }, { status: 502 });
+    if (!firstName || !lastName || !email) {
+      return NextResponse.json({ error: "Missing required profile fields: firstName, lastName, and email are required." }, { status: 400 });
     }
 
-    if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Failed to finalize registration." }, { status: response.status });
+    const cleanFirstName = firstName.trim();
+    const cleanLastName = lastName.trim();
+    const fullName = `${cleanFirstName} ${cleanLastName}`;
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Construct phone number safely
+    let fullPhone = "";
+    if (phoneNumber) {
+      const prefix = (phonePrefix || "").trim();
+      const num = (phoneNumber || "").trim();
+      fullPhone = `${prefix}${num}`;
+    }
+
+    console.log(`[Register Complete] Initializing user profile directly in Firestore for uid: ${uid}`);
+
+    const userRef = adminDb.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+
+    // Standard initial fields for new premium account
+    const initialProfile = {
+      uid,
+      name: fullName,
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      email: cleanEmail,
+      phoneNumber: fullPhone,
+      createdAt: userSnap.exists && userSnap.data()?.createdAt ? userSnap.data()?.createdAt : new Date().toISOString(),
+      balance: userSnap.exists && typeof userSnap.data()?.balance === "number" ? userSnap.data()?.balance : 0.00,
+      bonusBalance: userSnap.exists && typeof userSnap.data()?.bonusBalance === "number" ? userSnap.data()?.bonusBalance : 0.00,
+      kycStatus: userSnap.exists && userSnap.data()?.kycStatus ? userSnap.data()?.kycStatus : "UNVERIFIED",
+      role: userSnap.exists && userSnap.data()?.role ? userSnap.data()?.role : "USER",
+      dailyLimit: userSnap.exists && typeof userSnap.data()?.dailyLimit === "number" ? userSnap.data()?.dailyLimit : 500000,
+      isPinRequired: userSnap.exists && userSnap.data()?.isPinRequired !== undefined ? userSnap.data()?.isPinRequired : true,
+      isFaceIdEnabled: userSnap.exists && userSnap.data()?.isFaceIdEnabled !== undefined ? userSnap.data()?.isFaceIdEnabled : false,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Save user document securely
+    await userRef.set(initialProfile, { merge: true });
+
+    // Handle referral registration if code was provided
+    if (referralCode) {
+      console.log(`[Register Complete] Processing referral for uid: ${uid} with code: ${referralCode}`);
+      try {
+        await ReferralService.registerReferral(uid, referralCode, fullName, cleanEmail);
+      } catch (refErr: any) {
+        console.error(`[Register Complete Referral Error]:`, refErr.message);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: result.message || "Registration finalized successfully."
+      message: "User registration finalized successfully directly in secure database."
     });
 
   } catch (err: unknown) {
     const error = err as Error;
-    console.error("[Register Complete Proxy] Error:", error);
+    console.error("[Register Complete] Error writing user registration data:", error);
     return NextResponse.json({ error: error.message || "An error occurred writing user registration data." }, { status: 500 });
   }
 }

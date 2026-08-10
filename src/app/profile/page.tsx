@@ -784,21 +784,17 @@ export default function ProfilePage() {
                   <p className="text-xs text-gray-400 font-bold text-center">Static account details could not be loaded. Please contact support.</p>
                 )}
               </div>
-            ) : ["PENDING_REVIEW", "VERIFYING", "PROCESSING", "PROVISIONING", "IDENTITY_VERIFIED", "PROVISIONING_FAILED"].includes((userData?.kycStatus as string) || "") ? (
+            ) : ["PENDING", "PENDING_REVIEW", "VERIFYING", "PROCESSING", "PROVISIONING", "IDENTITY_VERIFIED", "PROVISIONING_FAILED"].includes((userData?.kycStatus as string) || "") ? (
               // PENDING REVIEW / VERIFYING / PROVISIONING STATE DISPLAY
               <div className="space-y-4 text-left animate-fadeIn">
-                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800">
-                  <span className="material-symbols-outlined text-amber-600 font-black text-[22px] animate-pulse">pending_actions</span>
+                <div className="flex items-center gap-3 p-4 bg-amber-50/70 border border-amber-100 rounded-2xl text-amber-800">
+                  <span className="material-symbols-outlined text-amber-600 font-black text-[24px] animate-pulse shrink-0">pending_actions</span>
                   <div>
-                    <p className="font-hanken font-extrabold text-xs">
-                      {userData?.kycStatus === "IDENTITY_VERIFIED"
-                        ? "Identity Verified"
-                        : "Verification Under Review"}
+                    <p className="font-hanken font-extrabold text-xs uppercase tracking-wider text-amber-700">
+                      Pending In Review
                     </p>
-                    <p className="text-[10px] text-amber-600 font-semibold leading-relaxed">
-                      {userData?.kycStatus === "IDENTITY_VERIFIED"
-                        ? "Your identity has been successfully verified and is awaiting final account approval."
-                        : "Your KYC is currently being reviewed. Please hold on. Verification may take up to 30 minutes."}
+                    <p className="text-[11px] text-amber-800 font-bold leading-relaxed mt-1">
+                      Your account will be approved or rejected in 30 minutes. Thanks for banking with us.
                     </p>
                   </div>
                 </div>
@@ -807,7 +803,7 @@ export default function ProfilePage() {
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-gray-400 font-semibold uppercase">Current Status</span>
                     <span className="font-black text-[10px] uppercase px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 tracking-wider">
-                      {(userData?.kycStatus as string)?.replace("_", " ")}
+                      Pending In Review
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-xs">

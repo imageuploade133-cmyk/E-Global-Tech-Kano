@@ -333,14 +333,14 @@ export function FaceVerificationDrawer({
 
               {livenessStep === "success" && (
                 <div className="flex flex-col items-center space-y-5 w-full">
-                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
-                    <span className="material-symbols-outlined text-[36px] font-bold">verified</span>
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 animate-bounce">
+                    <span className="material-symbols-outlined text-[36px] font-bold">pending_actions</span>
                   </div>
 
-                  <div className="space-y-1">
-                    <h4 className="font-hanken font-black text-base text-black uppercase">KYC Submitted</h4>
-                    <p className="font-hanken text-xs text-gray-500 leading-relaxed max-w-[260px]">
-                      Identity and facial liveness verification successfully submitted and is PENDING administrator approval!
+                  <div className="space-y-2">
+                    <h4 className="font-hanken font-black text-lg text-black uppercase tracking-tight">Pending In Review</h4>
+                    <p className="font-hanken text-xs text-gray-600 leading-relaxed max-w-[300px] mx-auto font-semibold">
+                      Your account will be approved or rejected in 30 minutes. Thanks for banking with us.
                     </p>
                   </div>
 
@@ -350,9 +350,9 @@ export function FaceVerificationDrawer({
                       onClose();
                       window.location.reload();
                     }}
-                    className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer"
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer shadow-md"
                   >
-                    Finish & Close
+                    Pending In Review
                   </button>
                 </div>
               )}
