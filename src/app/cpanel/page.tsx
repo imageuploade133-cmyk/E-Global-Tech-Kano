@@ -193,6 +193,8 @@ export default function AdminPage() {
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
   // Selected virtual account provider for each pending submission
   const [selectedProvider, setSelectedProvider] = useState<Record<string, "flutterwave" | "squad">>({});
+  // Real-time pending count for sidebar badge
+  const [kycPendingCount, setKycPendingCount] = useState(0);
 
   // Add user form states
   const [newUserForm, setNewUserForm] = useState({
@@ -342,10 +344,14 @@ export default function AdminPage() {
   }, [user]);
 
   useEffect(() => {
-    if (isAdminUnlocked && activeTab === "kyc") {
+    if (isAdminUnlocked && (activeTab === "kyc" || kycPendingCount === 0)) {
       fetchPendingKyc();
     }
   }, [isAdminUnlocked, activeTab]);
+
+  useEffect(() => {
+    setKycPendingCount(pendingKycList.length);
+  }, [pendingKycList]);
 
   // Automatically trigger real-time metrics sync on load once authorized
   useEffect(() => {
@@ -1106,7 +1112,15 @@ export default function AdminPage() {
                         )}
                       >
                         <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                        <span>{item.label}</span>
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {item.id === "kyc" && kycPendingCount > 0 && (
+                          <span className="relative flex h-5 w-5 items-center justify-center mr-1">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-5 w-5 bg-red-600 text-[10px] font-sans font-bold text-white items-center justify-center shadow-[0_0_8px_rgba(239,68,68,0.6)]">
+                              {kycPendingCount}
+                            </span>
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -1189,7 +1203,15 @@ export default function AdminPage() {
                   )}
                 >
                   <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                  {!isSidebarMinimized && <span>{item.label}</span>}
+                  {!isSidebarMinimized && <span className="flex-1 text-left">{item.label}</span>}
+                  {item.id === "kyc" && kycPendingCount > 0 && (
+                    <span className={cn("relative flex h-5 w-5 items-center justify-center mr-1", isSidebarMinimized ? "ml-auto" : "")}>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-5 w-5 bg-red-600 text-[10px] font-sans font-bold text-white items-center justify-center shadow-[0_0_8px_rgba(239,68,68,0.6)]">
+                        {kycPendingCount}
+                      </span>
+                    </span>
+                  )}
                 </button>
               );
             })}
