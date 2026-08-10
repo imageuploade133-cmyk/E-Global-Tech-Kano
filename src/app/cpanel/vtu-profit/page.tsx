@@ -51,7 +51,32 @@ export default function VtuProfitSetupPage() {
   // Admin lock validation
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  // Check cookie-based admin session on mount
+  useEffect(() => {
+    const checkCPanelSession = async () => {
+      try {
+        const res = await fetch("/api/admin/auth/session");
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          setIsAdminUnlocked(true);
+          setAdminEmail(data.user.email);
+        }
+      } catch (err) {
+        console.warn("No active admin cookie session found on mount:", err);
+      }
+    };
+    checkCPanelSession();
+  }, []);
+
+  // Pre-fill admin email when user loads as fallback
+  useEffect(() => {
+    if (user?.email && !adminEmail) {
+      setAdminEmail(user.email);
+    }
+  }, [user, adminEmail]);
 
   const [margins, setMargins] = useState<ProfitMargins>({
     dataProfitMargin: 0,
@@ -112,33 +137,26 @@ export default function VtuProfitSetupPage() {
     e.preventDefault();
     setIsVerifyingPin(true);
 
-    const isActualAdmin = userData?.role === "admin" || sessionStorage.getItem("mock") === "true";
-    if (!isActualAdmin) {
-      toast.error("Your logged-in account is not authorized to access this console.");
+    if (!adminEmail.trim()) {
+      toast.error("Please enter your admin email address.");
       setIsVerifyingPin(false);
       return;
     }
 
-    const isMock = sessionStorage.getItem("mock") === "true";
-    if (isMock) {
-      setTimeout(() => {
-        setIsAdminUnlocked(true);
-        toast.success("Admin Authorization Granted (Mock Playtesting)!");
-        setIsVerifyingPin(false);
-      }, 800);
+    if (!adminPin || adminPin.length < 4) {
+      toast.error("Please enter your 4-digit Access PIN.");
+      setIsVerifyingPin(false);
       return;
     }
 
     try {
-      const idToken = await user?.getIdToken();
-      const res = await fetch("/api/auth/pin", {
+      const res = await fetch("/api/admin/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          action: "verify",
+          email: adminEmail,
           pin: adminPin,
         }),
       });
@@ -146,12 +164,12 @@ export default function VtuProfitSetupPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setIsAdminUnlocked(true);
-        toast.success("Identity PIN Verified. Access Granted!");
+        toast.success(data.message || "Identity PIN Verified. Access Granted!");
       } else {
-        toast.error(data.message || "Invalid Passcode or Transaction PIN!");
+        toast.error(data.error || "Invalid Email or Access PIN!");
       }
-    } catch {
-      toast.error("API error during verification.");
+    } catch (err: any) {
+      toast.error("API connection error during verification.");
     } finally {
       setIsVerifyingPin(false);
     }
@@ -275,14 +293,26 @@ export default function VtuProfitSetupPage() {
           </div>
 
           <form onSubmit={handleAdminVerify} className="w-full space-y-4">
-            <div className="space-y-2 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin PIN / Access PIN</label>
+            <div className="space-y-1.5 text-left">
+              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Email Address</label>
+              <input
+                type="email"
+                required
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Access PIN</label>
               <input
                 type="password"
                 maxLength={6}
                 value={adminPin}
                 onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter passcode or transaction PIN"
+                placeholder="Enter 4-digit Access PIN"
                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
               />
             </div>

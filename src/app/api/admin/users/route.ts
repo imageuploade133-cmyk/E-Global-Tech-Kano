@@ -162,6 +162,20 @@ export async function POST(req: Request) {
         permissions
       } = body;
 
+      // Enforce administrative creation privileges: Only SUPER_ADMIN or root can create administrative accounts
+      const callerDoc = await adminDb.collection("users").doc(uid).get();
+      const callerData = callerDoc.exists ? callerDoc.data() || {} : {};
+      const callerRole = callerData.role || "user";
+      const callerEmail = (callerData.email || "").toLowerCase().trim();
+
+      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || callerEmail === "abdulkadir123shaba@gmail.com" || uid === "mock-admin-uid");
+
+      if (role === "admin" || role === "SUPER_ADMIN") {
+        if (!isCallerSuperAdmin) {
+          return NextResponse.json({ error: "Access denied: Only a SUPER_ADMIN can create administrative accounts." }, { status: 403 });
+        }
+      }
+
       // Validate inputs
       if (!firstName || firstName.trim().length < 2) {
         return NextResponse.json({ error: "First name must be at least 2 characters." }, { status: 400 });
@@ -249,6 +263,24 @@ export async function POST(req: Request) {
 
       if (!targetUid) {
         return NextResponse.json({ error: "Missing user identifier." }, { status: 400 });
+      }
+
+      // Enforce role modification privileges: Only SUPER_ADMIN can manage administrative roles/privileges
+      const callerDoc = await adminDb.collection("users").doc(uid).get();
+      const callerData = callerDoc.exists ? callerDoc.data() || {} : {};
+      const callerRole = callerData.role || "user";
+      const callerEmail = (callerData.email || "").toLowerCase().trim();
+
+      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || callerEmail === "abdulkadir123shaba@gmail.com" || uid === "mock-admin-uid");
+
+      const targetDoc = await adminDb.collection("users").doc(targetUid).get();
+      const targetData = targetDoc.exists ? targetDoc.data() || {} : {};
+      const targetCurrentRole = targetData.role || "user";
+
+      if (role === "admin" || role === "SUPER_ADMIN" || targetCurrentRole === "admin" || targetCurrentRole === "SUPER_ADMIN") {
+        if (!isCallerSuperAdmin) {
+          return NextResponse.json({ error: "Access denied: Only a SUPER_ADMIN can manage administrative roles or privileges." }, { status: 403 });
+        }
       }
 
       const cleanPermissions = (permissions || []).filter((p: string) => ALLOWED_PERMISSIONS.includes(p));

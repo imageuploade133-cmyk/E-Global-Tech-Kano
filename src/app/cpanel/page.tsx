@@ -109,12 +109,32 @@ export default function AdminPage() {
   const [historyInvestments, setHistoryInvestments] = useState<any[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-  // Pre-fill admin email when user loads
+  // Check cookie-based admin session on mount
   useEffect(() => {
-    if (user?.email) {
+    const checkCPanelSession = async () => {
+      try {
+        const res = await fetch("/api/admin/auth/session");
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          setIsAdminUnlocked(true);
+          setAdminEmail(data.user.email);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("admin_session_unlocked", "true");
+          }
+        }
+      } catch (err) {
+        console.warn("No active admin cookie session found on mount:", err);
+      }
+    };
+    checkCPanelSession();
+  }, []);
+
+  // Pre-fill admin email when user loads as fallback
+  useEffect(() => {
+    if (user?.email && !adminEmail) {
       setAdminEmail(user.email);
     }
-  }, [user]);
+  }, [user, adminEmail]);
 
   // VTU & Transfer Margins State
   const [margins, setMargins] = useState<AdminUser["balance"] | any>({
@@ -724,59 +744,30 @@ export default function AdminPage() {
     }
   };
 
-  const isActualAdminUser = userData?.role === "admin" || isEmailAdmin || sessionStorage.getItem("mock") === "true";
-
   const handleAdminVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifyingPin(true);
 
-    if (!isActualAdminUser) {
-      toast.error("Your logged-in account is not authorized to access this console.");
+    if (!adminEmail.trim()) {
+      toast.error("Please enter your admin email address.");
       setIsVerifyingPin(false);
       return;
     }
 
-    const isMock = sessionStorage.getItem("mock") === "true";
-
-    if (!isMock) {
-      if (!adminEmail.trim()) {
-        toast.error("Please enter your admin email address.");
-        setIsVerifyingPin(false);
-        return;
-      }
-
-      const cleanEnteredEmail = adminEmail.toLowerCase().trim();
-      const actualUserEmail = user?.email?.toLowerCase().trim() || "";
-
-      if (cleanEnteredEmail !== actualUserEmail) {
-        toast.error("Unauthorized: Entered email address does not match your session.");
-        setIsVerifyingPin(false);
-        return;
-      }
-    }
-
-    if (isMock) {
-      setTimeout(() => {
-        setIsAdminUnlocked(true);
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("admin_session_unlocked", "true");
-        }
-        toast.success("Admin Authorization Granted (Mock Playtesting)!");
-        setIsVerifyingPin(false);
-      }, 800);
+    if (!adminPin || adminPin.length < 4) {
+      toast.error("Please enter your 4-digit Access PIN.");
+      setIsVerifyingPin(false);
       return;
     }
 
     try {
-      const idToken = await user?.getIdToken();
-      const res = await fetch("/api/auth/pin", {
+      const res = await fetch("/api/admin/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          action: "verify",
+          email: adminEmail,
           pin: adminPin,
         }),
       });
@@ -787,12 +778,12 @@ export default function AdminPage() {
         if (typeof window !== "undefined") {
           sessionStorage.setItem("admin_session_unlocked", "true");
         }
-        toast.success("Identity PIN Verified. Access Granted!");
+        toast.success(data.message || "Identity PIN Verified. Access Granted!");
       } else {
-        toast.error(data.message || "Invalid Passcode or Transaction PIN!");
+        toast.error(data.error || "Invalid Email or Access PIN!");
       }
-    } catch {
-      toast.error("API error during verification.");
+    } catch (err: any) {
+      toast.error("API connection error during verification.");
     } finally {
       setIsVerifyingPin(false);
     }
@@ -3107,8 +3098,13 @@ export default function AdminPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setShowLockConfirm(false);
+                    try {
+                      await fetch("/api/admin/auth/logout", { method: "POST" });
+                    } catch (err) {
+                      console.error("Logout API call failed:", err);
+                    }
                     setIsAdminUnlocked(false);
                     if (typeof window !== "undefined") {
                       sessionStorage.removeItem("admin_session_unlocked");

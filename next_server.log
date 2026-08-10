@@ -1,11 +1,1271 @@
 
-> e-global-wallet@0.1.0 start
-> next start
+> e-global-wallet@0.1.0 dev
+> next dev
 
    ▲ Next.js 15.1.12
    - Local:        http://localhost:3000
    - Network:      http://192.168.0.2:3000
 
  ✓ Starting...
- ✓ Ready in 642ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+ ✓ Ready in 1880ms
+ ○ Compiling /cpanel ...
+ ✓ Compiled /cpanel in 16.7s (1700 modules)
+ GET /cpanel 200 in 18746ms
+ GET /cpanel 200 in 87ms
+ GET /cpanel?mock=true 200 in 201ms
+ ○ Compiling /api/admin/auth/session ...
+ ✓ Compiled /api/config in 2.6s (1775 modules)
 [Firebase Admin] Initialized with explicit fallback projectId: e-tech-global-hub
+ GET /api/admin/auth/session 401 in 3206ms
+(node:190992) MetadataLookupWarning: received unexpected error = All promises were rejected code = UNKNOWN
+(Use `node --trace-warnings ...` to show where the warning was created)
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ GET /api/admin/auth/session 401 in 181ms
+ GET /cpanel?mock=true 200 in 1079ms
+ ✓ Compiled in 420ms (747 modules)
+ GET /cpanel?mock=true 200 in 57ms
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ✓ Compiled /api/admin/auth/login in 401ms (1778 modules)
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ✓ Compiled in 319ms (747 modules)
+ GET /cpanel?mock=true 200 in 106ms
+[Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection: [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+ ⨯ unhandledRejection:  [Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.]
+[Public Config API] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+ GET /api/config 500 in 11195ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[CPanel Login Exception] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+ POST /api/admin/auth/login 500 in 9514ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled in 264ms (747 modules)
+ GET /cpanel?mock=true 200 in 33ms
+ ✓ Compiled in 779ms (1683 modules)
+ GET /cpanel 200 in 676ms
+ ✓ Compiled in 357ms (747 modules)
+ GET /cpanel?mock=true 200 in 46ms
+ ✓ Compiled /api/config in 420ms (1040 modules)
+ ✓ Compiled (1042 modules)
+ GET /api/admin/auth/session 401 in 741ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /api/admin/auth/session 401 in 351ms
+ GET /cpanel?mock=true 200 in 1339ms
+ GET /api/config 200 in 1199ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /api/admin/auth/session 401 in 93ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /api/admin/auth/session 401 in 580ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled in 613ms (747 modules)
+ GET /cpanel?mock=true 200 in 30ms
+ ✓ Compiled /api/admin/auth/login in 216ms (1045 modules)
+ POST /api/admin/auth/login 200 in 285ms
+ GET /cpanel?mock=true 200 in 142ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ○ Compiling /api/admin/config ...
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[Public Config API] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled /api/admin/config in 3.7s (1798 modules)
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[Admin KYC GET API] Error: fetch failed
+ GET /api/admin/kyc 500 in 4016ms
+[Admin KYC GET API] Error: fetch failed
+ GET /api/admin/kyc 500 in 109ms
+ GET /cpanel?mock=true 200 in 464ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /api/admin/config 200 in 5090ms
+ GET /api/config 200 in 6832ms
+ ✓ Compiled in 286ms (747 modules)
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[Public Config API] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[Admin Config GET API] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled in 1001ms (1683 modules)
+ GET /cpanel 200 in 644ms
+ ✓ Compiled in 329ms (747 modules)
+ GET /cpanel?mock=true 200 in 42ms
+ ✓ Compiled /api/config in 336ms (1040 modules)
+ ✓ Compiled (1042 modules)
+ GET /api/admin/auth/session 401 in 649ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /api/admin/auth/session 401 in 473ms
+ GET /cpanel?mock=true 200 in 1405ms
+ GET /api/config 200 in 1315ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /api/admin/auth/session 401 in 16ms
+ GET /api/admin/auth/session 401 in 46ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled in 564ms (747 modules)
+ GET /cpanel?mock=true 200 in 44ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled /api/admin/auth/login in 455ms (1045 modules)
+ POST /api/admin/auth/login 200 in 520ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ○ Compiling /api/admin/config ...
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled /api/admin/config in 2.4s (1049 modules)
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ✓ Compiled in 904ms (1798 modules)
+ GET /api/admin/kyc 200 in 3643ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /cpanel?mock=true 200 in 1526ms
+ GET /api/admin/kyc 200 in 84ms
+ GET /cpanel?mock=true 200 in 24ms
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ GET /api/config 200 in 6889ms
+ GET /api/admin/config 200 in 4824ms
+ ✓ Compiled in 308ms (747 modules)
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[Public Config API] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[Public Config API] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+[Admin Config GET API] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
+ ⨯ unhandledRejection:  Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/auth/login/route.ts:59:7)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/config/route.ts:6:66)
+    at get (src/app/api/admin/config/route.ts:12:66)
+  4 | export async function GET() {
+  5 |   try {
+> 6 |     const docSnap = await adminDb.collection("config").doc("app").get();
+    |                                                                  ^
+  7 |     if (docSnap.exists) {
+  8 |       const data = docSnap.data();
+  9 |       // Only expose non-privileged visual branding information to public route
