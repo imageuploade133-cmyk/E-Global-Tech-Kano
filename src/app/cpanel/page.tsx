@@ -199,7 +199,8 @@ export default function AdminPage() {
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
   const [emailInput, setEmailInput] = useState(config.supportEmail);
-  const [apiKeyInput, setApiKeyInput] = useState(config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005");
+  const [apiKeyInput, setApiKeyInput] = useState(config.imgbbApiKey || "");
+  const [uploadSizeInput, setUploadSizeInput] = useState(config.maxKycUploadSizeMb || 10);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUpdatingDetector, setIsUpdatingDetector] = useState(false);
 
@@ -394,7 +395,8 @@ export default function AdminPage() {
     setPhone1Input(config.supportPhone1);
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
-    setApiKeyInput(config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005");
+    setApiKeyInput(config.imgbbApiKey || "");
+    setUploadSizeInput(config.maxKycUploadSizeMb || 10);
   }, [config]);
 
   // WhatsApp Gateway Sync & Operation Handlers
@@ -822,6 +824,7 @@ export default function AdminPage() {
         supportPhone2: phone2Input,
         supportEmail: emailInput,
         imgbbApiKey: apiKeyInput,
+        maxKycUploadSizeMb: uploadSizeInput,
       });
       toast.success("Branding, Support and API configurations applied!");
     } catch (err: unknown) {
@@ -840,7 +843,12 @@ export default function AdminPage() {
     const formData = new FormData();
     formData.append("image", file);
 
-    const key = apiKeyInput || "0d1a390cb385b632d952db08a3479005";
+    const key = apiKeyInput || "";
+    if (!key) {
+      toast.error("Imgbb API Key is missing. Please enter and save an API key under Branding Configurations.");
+      setIsUploadingLogo(false);
+      return;
+    }
     toast.loading("Uploading app logo to Imgbb servers...");
 
     try {
@@ -2025,6 +2033,19 @@ export default function AdminPage() {
                         placeholder="Enter Imgbb v1 api key"
                         className={inputClass}
                       />
+                    </div>
+                    <div className={cn("space-y-1 p-4 rounded-xl border transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                      <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Max KYC Document Upload Size (MB)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={uploadSizeInput}
+                        onChange={(e) => setUploadSizeInput(Math.max(1, parseInt(e.target.value) || 1))}
+                        placeholder="e.g. 10"
+                        className={inputClass}
+                      />
+                      <p className="text-[9px] text-gray-400 mt-1">Configure the maximum permitted file size in MB for Identity document image uploads.</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
