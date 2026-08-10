@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
+const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
 
 export async function GET() {
   try {
@@ -46,7 +47,7 @@ export async function GET() {
     }
 
     const userData = userDoc.data() || {};
-    const isEmailAdmin = decoded.email === "abdulkadir123shaba@gmail.com";
+    const isEmailAdmin = ROOT_ADMIN_EMAIL && decoded.email === ROOT_ADMIN_EMAIL;
     const isAdmin = userData.role === "admin" || userData.role === "SUPER_ADMIN" || isEmailAdmin;
 
     if (!isAdmin) {

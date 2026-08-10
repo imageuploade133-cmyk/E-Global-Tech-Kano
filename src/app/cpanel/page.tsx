@@ -39,7 +39,7 @@ const PERMISSIONS_CATALOG = [
   { key: "can_moderate_users", label: "Moderate Users" }
 ];
 
-// Secure client-side check of email hash matching "abdulkadir123shaba@gmail.com"
+// Secure client-side check of hashed email
 async function computeSha256(message: string): Promise<string> {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
@@ -352,7 +352,7 @@ export default function AdminPage() {
     }
   };
 
-  // Secure client-side check of email hash matching "abdulkadir123shaba@gmail.com"
+  // Secure client-side check of hashed email
   useEffect(() => {
     if (user?.email) {
       computeSha256(user.email.toLowerCase().trim()).then((hash) => {

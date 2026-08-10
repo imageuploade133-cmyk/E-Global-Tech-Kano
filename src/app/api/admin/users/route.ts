@@ -10,6 +10,8 @@ const ALLOWED_PERMISSIONS = [
   "can_moderate_users"
 ];
 
+const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
+
 export async function GET(req: Request) {
   try {
     const { uid, isAdmin } = await verifyAdminAuth(req);
@@ -168,7 +170,7 @@ export async function POST(req: Request) {
       const callerRole = callerData.role || "user";
       const callerEmail = (callerData.email || "").toLowerCase().trim();
 
-      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || callerEmail === "abdulkadir123shaba@gmail.com" || uid === "mock-admin-uid");
+      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || (ROOT_ADMIN_EMAIL && callerEmail === ROOT_ADMIN_EMAIL) || uid === "mock-admin-uid");
 
       if (role === "admin" || role === "SUPER_ADMIN") {
         if (!isCallerSuperAdmin) {
@@ -271,7 +273,7 @@ export async function POST(req: Request) {
       const callerRole = callerData.role || "user";
       const callerEmail = (callerData.email || "").toLowerCase().trim();
 
-      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || callerEmail === "abdulkadir123shaba@gmail.com" || uid === "mock-admin-uid");
+      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || (ROOT_ADMIN_EMAIL && callerEmail === ROOT_ADMIN_EMAIL) || uid === "mock-admin-uid");
 
       const targetDoc = await adminDb.collection("users").doc(targetUid).get();
       const targetData = targetDoc.exists ? targetDoc.data() || {} : {};
