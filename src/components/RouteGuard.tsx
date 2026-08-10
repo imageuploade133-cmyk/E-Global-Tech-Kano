@@ -252,7 +252,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     if (loading || isMock || !user || !userData) return;
 
     // Skip device enforcement on public/auth routes
-    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
+    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
     if (isPublicRoute) return;
 
     const deviceId = getOrCreateDeviceId();
@@ -354,7 +354,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (loading && !isMock) return;
 
-    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
+    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
 
     if (!user && !isMock) {
       if (!isPublicRoute) {
@@ -364,7 +364,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       const hasPin = Boolean(userData?.pin || userData?.pinHash);
       const isPinRequired = userData?.isPinRequired !== false;
 
-      if (pathname === "/cpanel") {
+      if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) {
         return;
       }
 
@@ -864,10 +864,10 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel";
+  const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
 
   if (!user && !isPublicRoute && !isMockRoute) return null;
-  if (pathname === "/cpanel") return <>{children}</>;
+  if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) return <>{children}</>;
   if (user && !(userData?.pin || userData?.pinHash) && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
   if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
