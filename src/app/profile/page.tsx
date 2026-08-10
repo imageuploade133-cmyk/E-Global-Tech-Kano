@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { useRouter } from "next/navigation";
 import { useAppConfig } from "@/lib/ConfigContext";
-import { FaceVerificationDrawer } from "@/components/profile/FaceVerificationDrawer";
+import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import { handleAppSignOut } from "@/lib/logout-util";
 
 const LIMIT_CATEGORIES = [
@@ -60,7 +60,7 @@ export default function ProfilePage() {
   const { userData, user, loading, updateUserData } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
-  const [isFaceVerificationOpen, setIsFaceVerificationOpen] = useState(false);
+  const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
 
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
@@ -87,10 +87,21 @@ export default function ProfilePage() {
   const [imgError, setImgError] = useState(false);
   const hasCustomPhoto = isCustomAvatar(currentPhoto) && !imgError;
 
+  // Cache user token securely for the drawers to consume
+  useEffect(() => {
+    if (user && typeof user.getIdToken === "function") {
+      user.getIdToken().then((idToken) => {
+        (window as any).firebaseUserToken = idToken;
+      }).catch((err) => {
+        console.error("Failed to retrieve token:", err);
+      });
+    } else if (user) {
+      // Mock fallback
+      (window as any).firebaseUserToken = "mock-token";
+    }
+  }, [user]);
+
   // Interactive KYC flow states
-  const [kycType, setKycType] = useState<"bvn" | "nin">("bvn");
-  const [idNumber, setIdNumber] = useState("");
-  const [verifyingKyc, setVerifyingKyc] = useState(false);
   const [staticAccount, setStaticAccount] = useState<{
     bankName: string;
     accountNumber: string;
@@ -264,26 +275,6 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userData?.kycStatus]);
 
-  // Execute verification call
-  const handleVerifyKyc = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!idNumber || !/^\d{11}$/.test(idNumber.trim())) {
-      toast.error("Identity number must be exactly 11 digits.");
-      return;
-    }
-
-    // Capture user JWT token securely inside global window hooks for the camera drawer to consume
-    try {
-      const idToken = await user?.getIdToken();
-      (window as any).firebaseUserToken = idToken;
-    } catch (err) {
-      console.error("Token cache failed:", err);
-    }
-
-    // Toggle camera Face Verification Drawer
-    setIsFaceVerificationOpen(true);
-  };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -309,7 +300,11 @@ export default function ProfilePage() {
     const formData = new FormData();
     formData.append("image", file);
 
-    const key = config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005";
+    const key = config.imgbbApiKey || "";
+    if (!key) {
+      toast.error("Configuration Error: Imgbb API key is not configured in the Cpanel. Please contact support.");
+      return;
+    }
     toast.loading("Uploading user avatar directly to Imgbb storage...");
 
     try {
@@ -387,7 +382,7 @@ export default function ProfilePage() {
     ];
 
     const randomAvatar = premiumAvatars[Math.floor(Math.random() * premiumAvatars.length)];
-    const key = config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005";
+    const key = config.imgbbApiKey || "";
     setDiagnosticText("UPLOADING BIOMETRIC FACIAL PROFILE...");
 
     try {
@@ -838,73 +833,18 @@ export default function ProfilePage() {
 
                 <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 text-amber-800">
                   <p className="font-hanken text-[11px] leading-relaxed font-semibold">
-                    Submit your valid 11-digit BVN or NIN to instantly verify your identity and generate your permanent, static virtual bank account for continuous, direct funding.
+                    Submit your valid 11-digit BVN or NIN and upload your identity document photo to instantly verify your identity and request permanent virtual bank account allocation.
                   </p>
                 </div>
 
-                <form onSubmit={handleVerifyKyc} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Select Verification Method</label>
-                    <div className="grid grid-cols-2 p-1 bg-gray-100 rounded-full border border-gray-200/50">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setKycType("bvn");
-                          setIdNumber("");
-                        }}
-                        className={cn(
-                          "py-2 text-xs font-black font-hanken rounded-full transition-all cursor-pointer",
-                          kycType === "bvn" ? "bg-[#FC7A00] text-white shadow-none" : "bg-transparent text-gray-400"
-                        )}
-                      >
-                        BVN
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setKycType("nin");
-                          setIdNumber("");
-                        }}
-                        className={cn(
-                          "py-2 text-xs font-black font-hanken rounded-full transition-all cursor-pointer",
-                          kycType === "nin" ? "bg-[#FC7A00] text-white shadow-none" : "bg-transparent text-gray-400"
-                        )}
-                      >
-                        NIN
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label htmlFor="idNumber" className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                      Enter {kycType.toUpperCase()} (11 Digits)
-                    </label>
-                    <input
-                      id="idNumber"
-                      type="number"
-                      required
-                      value={idNumber}
-                      onChange={(e) => setIdNumber(e.target.value.slice(0, 11))}
-                      placeholder={`Enter 11-digit ${kycType.toUpperCase()}...`}
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={verifyingKyc || idNumber.length !== 11}
-                    className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-3.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50 shadow-[0_4px_15px_rgba(252,122,0,0.15)] flex items-center justify-center gap-2"
-                  >
-                    {verifyingKyc ? (
-                      <>
-                        <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                        <span>Verifying...</span>
-                      </>
-                    ) : (
-                      "Verify & Allocate Account"
-                    )}
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  onClick={() => setIsKycDrawerOpen(true)}
+                  className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_4px_15px_rgba(252,122,0,0.15)] flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">verified_user</span>
+                  Verify My Identity
+                </button>
               </div>
             )}
           </section>
@@ -1305,16 +1245,11 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <FaceVerificationDrawer
-        isOpen={isFaceVerificationOpen}
-        onClose={() => setIsFaceVerificationOpen(false)}
-        idNumber={idNumber}
-        kycType={kycType}
-        onSuccess={(accountData) => {
-          setIsFaceVerificationOpen(false);
-          if (accountData) {
-            setStaticAccount(accountData);
-          }
+      <KycVerificationDrawer
+        isOpen={isKycDrawerOpen}
+        onClose={() => setIsKycDrawerOpen(false)}
+        onSuccess={() => {
+          setIsKycDrawerOpen(false);
           window.location.reload();
         }}
       />

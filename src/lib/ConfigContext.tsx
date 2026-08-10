@@ -20,6 +20,7 @@ export interface AppConfig {
   totalAirtimePurchase?: number;
   totalBonus?: number;
   newDeviceDetectorEnabled?: boolean;
+  maxKycUploadSizeMb?: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -38,6 +39,7 @@ const DEFAULT_CONFIG: AppConfig = {
   totalAirtimePurchase: 0,
   totalBonus: 0,
   newDeviceDetectorEnabled: true,
+  maxKycUploadSizeMb: 10,
 };
 
 interface ConfigContextProps {
