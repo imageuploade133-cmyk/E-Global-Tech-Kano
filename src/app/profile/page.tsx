@@ -789,15 +789,49 @@ export default function ProfilePage() {
                   <p className="text-xs text-gray-400 font-bold text-center">Static account details could not be loaded. Please contact support.</p>
                 )}
               </div>
+            ) : ["PENDING_REVIEW", "VERIFYING", "PROCESSING", "PROVISIONING", "IDENTITY_VERIFIED", "PROVISIONING_FAILED"].includes((userData?.kycStatus as string) || "") ? (
+              // PENDING REVIEW / VERIFYING / PROVISIONING STATE DISPLAY
+              <div className="space-y-4 text-left animate-fadeIn">
+                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800">
+                  <span className="material-symbols-outlined text-amber-600 font-black text-[22px] animate-pulse">pending_actions</span>
+                  <div>
+                    <p className="font-hanken font-extrabold text-xs">
+                      {userData?.kycStatus === "IDENTITY_VERIFIED"
+                        ? "Identity Verified"
+                        : "Verification Under Review"}
+                    </p>
+                    <p className="text-[10px] text-amber-600 font-semibold leading-relaxed">
+                      {userData?.kycStatus === "IDENTITY_VERIFIED"
+                        ? "Your identity has been successfully verified and is awaiting final account approval."
+                        : "Your KYC is currently being reviewed. Please hold on. Verification may take up to 30 minutes."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 border border-gray-150 rounded-2xl space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-400 font-semibold uppercase">Current Status</span>
+                    <span className="font-black text-[10px] uppercase px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 tracking-wider">
+                      {(userData?.kycStatus as string)?.replace("_", " ")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-400 font-semibold uppercase">Verification Time</span>
+                    <span className="font-mono text-gray-800 font-bold">~ 30 Minutes</span>
+                  </div>
+                </div>
+              </div>
             ) : (
               // PENDING / FAILED INTERACTIVE FLOW CARD
               <div className="space-y-4 text-left">
-                {userData?.kycStatus === "FAILED" && (
+                {(userData?.kycStatus === "REJECTED" || userData?.kycStatus === "VERIFICATION_FAILED" || userData?.kycStatus === "FAILED") && (
                   <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-150 rounded-2xl text-red-700">
                     <span className="material-symbols-outlined text-red-500 font-bold">error</span>
                     <div>
-                      <p className="font-hanken font-bold text-xs">Verification Failed</p>
-                      <p className="text-[10px] text-red-500 leading-tight">The BVN or NIN provided could not be verified by our secure banking gateway. Please try again with valid records.</p>
+                      <p className="font-hanken font-bold text-xs">KYC Verification Unsuccessful</p>
+                      <p className="text-[10px] text-red-500 leading-tight">
+                        {(userData?.kycRejectionReason as string) || "Your KYC verification was unsuccessful. Please check the information provided and try again."}
+                      </p>
                     </div>
                   </div>
                 )}

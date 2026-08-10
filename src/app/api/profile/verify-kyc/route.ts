@@ -91,8 +91,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "KYC submitted successfully. Your verification is now PENDING administrator approval.",
-      status: "PENDING"
+      message: "KYC submitted successfully. Please hold on while our verification team reviews your information. Your verification may take up to 30 minutes.",
+      status: "PENDING_REVIEW"
     });
 
   } catch (err: unknown) {

@@ -63,7 +63,28 @@ export async function POST(req: Request) {
 
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
-    if (action === "approve") {
+    if (action === "verify") {
+      // Forward verify request to payment-gateway secure human-only endpoint with strict Bearer Authorization header
+      const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": gatewayApiKey,
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        return NextResponse.json({ error: result.message || "Failed to execute identity verification in gateway." }, { status: response.status });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "User identity verification completed successfully."
+      });
+
+    } else if (action === "approve") {
       if (!provider || (provider !== "flutterwave" && provider !== "squad")) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected." }, { status: 400 });
       }

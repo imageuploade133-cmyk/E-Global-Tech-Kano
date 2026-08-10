@@ -25,7 +25,7 @@ interface PendingKycUser {
   phoneNumber: string;
   kycType: "bvn" | "nin";
   kycNumber: string;
-  kycStatus: "PENDING" | "PROCESSING" | "PROVISIONING_FAILED" | "VERIFIED" | "REJECTED";
+  kycStatus: "PENDING" | "PENDING_REVIEW" | "VERIFYING" | "IDENTITY_VERIFIED" | "VERIFICATION_FAILED" | "PROCESSING" | "PROVISIONING" | "VERIFIED" | "REJECTED" | "PROVISIONING_FAILED";
   submittedAt: string;
   capturedSelfie?: string;
   livenessChallenge?: string;
@@ -275,7 +275,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleProcessKyc = async (targetUid: string, action: "approve" | "reject" | "retry") => {
+  const handleProcessKyc = async (targetUid: string, action: "verify" | "approve" | "reject" | "retry") => {
     setIsProcessingKyc(targetUid);
     const reason = rejectionReason[targetUid] || "";
     const provider = selectedProvider[targetUid];
@@ -316,14 +316,22 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success(data.message || `KYC successfully processed!`);
-        if (action === "approve" || action === "retry") {
-          // Filter out on successful approval or retry
+        if (action === "approve") {
+          // Filter out on successful approval
           setPendingKycUser(prev => prev.filter(u => u.uid !== targetUid));
-        } else {
-          setPendingKycUser(prev => prev.map(u => u.uid === targetUid ? { ...u, kycStatus: "REJECTED" as const } : u));
+        } else if (action === "verify") {
+          // Update status to IDENTITY_VERIFIED in the local list
+          setPendingKycUser(prev => prev.map(u => u.uid === targetUid ? { ...u, kycStatus: "IDENTITY_VERIFIED" as any } : u));
+        } else if (action === "reject") {
+          setPendingKycUser(prev => prev.map(u => u.uid === targetUid ? { ...u, kycStatus: "REJECTED" as any } : u));
+        } else if (action === "retry") {
+          setPendingKycUser(prev => prev.filter(u => u.uid !== targetUid));
         }
       } else {
         toast.error(data.error || "Failed to process KYC verification.");
+        if (action === "verify") {
+          setPendingKycUser(prev => prev.map(u => u.uid === targetUid ? { ...u, kycStatus: "VERIFICATION_FAILED" as any } : u));
+        }
       }
     } catch {
       toast.error("API connection error during verification processing.");
@@ -1840,9 +1848,10 @@ export default function AdminPage() {
                                   {u.name}
                                   <span className={cn(
                                     "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
-                                    u.kycStatus === "PENDING" && "bg-orange-500/10 border border-orange-500/20 text-[#FC7A00]",
-                                    u.kycStatus === "PROCESSING" && "bg-blue-500/10 border border-blue-500/20 text-blue-500 animate-pulse",
-                                    u.kycStatus === "PROVISIONING_FAILED" && "bg-red-500/10 border border-red-500/20 text-red-500",
+                                    (u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW") && "bg-orange-500/10 border border-orange-500/20 text-[#FC7A00]",
+                                    (u.kycStatus === "PROCESSING" || u.kycStatus === "VERIFYING") && "bg-blue-500/10 border border-blue-500/20 text-blue-500 animate-pulse",
+                                    u.kycStatus === "IDENTITY_VERIFIED" && "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-bold",
+                                    (u.kycStatus === "PROVISIONING_FAILED" || u.kycStatus === "VERIFICATION_FAILED") && "bg-red-500/10 border border-red-500/20 text-red-500",
                                     u.kycStatus === "REJECTED" && "bg-gray-500/10 border border-gray-500/20 text-gray-500"
                                   )}>
                                     {u.kycStatus}
@@ -1901,7 +1910,29 @@ export default function AdminPage() {
                               )}
 
                               <div className="flex gap-2 justify-end">
-                                {u.kycStatus === "PROVISIONING_FAILED" ? (
+                                {(u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW" || u.kycStatus === "VERIFICATION_FAILED") && (
+                                  <button
+                                    type="button"
+                                    disabled={!!isProcessingKyc}
+                                    onClick={() => handleProcessKyc(u.uid, "verify")}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center"
+                                  >
+                                    {processing ? <ButtonSpinner /> : "Check Identity"}
+                                  </button>
+                                )}
+
+                                {u.kycStatus === "IDENTITY_VERIFIED" && (
+                                  <button
+                                    type="button"
+                                    disabled={!!isProcessingKyc}
+                                    onClick={() => handleProcessKyc(u.uid, "approve")}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center"
+                                  >
+                                    {processing ? <ButtonSpinner /> : "Approve & Provision"}
+                                  </button>
+                                )}
+
+                                {u.kycStatus === "PROVISIONING_FAILED" && (
                                   <button
                                     type="button"
                                     disabled={!!isProcessingKyc}
@@ -1911,17 +1942,6 @@ export default function AdminPage() {
                                     {processing ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">refresh</span>}
                                     <span>Retry Provisioning</span>
                                   </button>
-                                ) : (
-                                  u.kycStatus !== "REJECTED" && (
-                                    <button
-                                      type="button"
-                                      disabled={!!isProcessingKyc}
-                                      onClick={() => handleProcessKyc(u.uid, "approve")}
-                                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center"
-                                    >
-                                      {processing ? <ButtonSpinner /> : "Approve verification"}
-                                    </button>
-                                  )
                                 )}
                               </div>
 
