@@ -113,7 +113,7 @@ export async function POST(req: Request) {
     const walletRef = adminDb.collection("wallets").doc(`${uid}_${trfCurrency}`);
 
     const transactionResult = await adminDb.runTransaction(async (transaction) => {
-      console.log("STEP 5 - ALL READS: Loading user and wallet documents first");
+      console.log("STEP 5 - ALL READS: Loading user, wallet, and margin documents first");
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
         throw new Error("USER_NOT_FOUND");
@@ -122,6 +122,14 @@ export async function POST(req: Request) {
       // Fetch the specific wallet document
       const walletDoc = await transaction.get(walletRef);
       const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
+      // Fetch margins document (All reads must be done before any writes!)
+      let transferProfitMargin = 0;
+      const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
+      const marginSnap = await transaction.get(marginRef);
+      if (marginSnap.exists) {
+        transferProfitMargin = Number(marginSnap.data()?.transferProfitMargin) || 0;
+      }
 
       const userData = userDoc.data() || {};
       const pinHash = userData.pinHash;
@@ -179,13 +187,6 @@ export async function POST(req: Request) {
       // PIN matches, reset attempts (WRITE operation starts here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      // Apply Single Transfer Fee Profit Markup securely on server-side from global admin config
-      let transferProfitMargin = 0;
-      const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
-      const marginSnap = await transaction.get(marginRef);
-      if (marginSnap.exists) {
-        transferProfitMargin = Number(marginSnap.data()?.transferProfitMargin) || 0;
-      }
       const finalFee = fee + transferProfitMargin;
       const finalTotalDeduction = trfAmount + finalFee;
 
