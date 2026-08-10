@@ -39,13 +39,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const [flwVerifying, setFlwVerifying] = useState(false);
   const [flwMessage, setFlwMessage] = useState("");
 
-  // New Device verification states
-  const [isNewDeviceBlocked, setIsNewDeviceBlocked] = useState(false);
-  const [verPhone, setVerPhone] = useState("");
-  const [verBvnOrNinOrEmail, setVerBvnOrNinOrEmail] = useState("");
-  const [verError, setVerError] = useState("");
-  const [verifyingDevice, setVerifyingDevice] = useState(false);
-
   // Multi-Device Suspension States (OPay-like Session Overlap Blockers)
   const [isSessionSuspended, setIsSessionSuspended] = useState(false);
   const [isChangingPin, setIsChangingPin] = useState(false);
@@ -381,72 +374,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, isPinVerified, userData, pathname, router]);
 
-  // Verification submission handler for unrecognized devices (BVN/NIN/Email match)
-  const handleVerifyNewDevice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userData) return;
-
-    setVerError("");
-    setVerifyingDevice(true);
-
-    try {
-      const inputPhoneClean = verPhone.replace(/\D/g, "");
-      const registeredPhoneClean = (userData.phoneNumber as string || "").replace(/\D/g, "");
-
-      const isPhoneMatch =
-        inputPhoneClean.length >= 7 &&
-        (registeredPhoneClean.endsWith(inputPhoneClean) || inputPhoneClean.endsWith(registeredPhoneClean));
-
-      let isBvnOrNinOrEmailMatch = false;
-      const bvnValue = (userData.bvn as string || "").trim();
-      const ninValue = (userData.nin as string || "").trim();
-
-      if (bvnValue || ninValue) {
-        const last4Bvn = bvnValue.slice(-4);
-        const last4Nin = ninValue.slice(-4);
-        const inputTrimmed = verBvnOrNinOrEmail.trim();
-
-        isBvnOrNinOrEmailMatch =
-          (!!bvnValue && inputTrimmed === last4Bvn) ||
-          (!!ninValue && inputTrimmed === last4Nin);
-      } else {
-        const registeredEmail = (userData.email as string || "").trim().toLowerCase();
-        isBvnOrNinOrEmailMatch = verBvnOrNinOrEmail.trim().toLowerCase() === registeredEmail;
-      }
-
-      if (isPhoneMatch && isBvnOrNinOrEmailMatch) {
-        const deviceId = getOrCreateDeviceId();
-        const currentVerified = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
-
-        await updateUserData({
-          verifiedDevices: [...currentVerified, deviceId],
-          currentDeviceId: deviceId,
-        });
-
-        toast.success("Device Authorized!", {
-          description: "This device is verified. Security sessions initialized.",
-        });
-        setIsNewDeviceBlocked(false);
-      } else {
-        const hasKyc = bvnValue || ninValue;
-        setVerError(
-          hasKyc
-            ? "Verification failed. The registered phone number or last 4 digits of your BVN/NIN do not match."
-            : "Verification failed. The registered phone number or email address do not match."
-        );
-      }
-    } catch (err: any) {
-      console.error("Device verification failed:", err);
-      setVerError("Internal error during device validation. Please try again.");
-    } finally {
-      setVerifyingDevice(false);
-    }
-  };
-
-  const handleSignOutFromBlockedDevice = async () => {
-    setIsNewDeviceBlocked(false);
-    await handleAppSignOut(router);
-  };
 
   // Re-login trigger inside the Suspend Overlay
   const handleSuspendReLogin = async () => {
