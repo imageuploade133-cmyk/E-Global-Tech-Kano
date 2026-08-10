@@ -1987,43 +1987,6 @@ export default function AdminPage() {
                     Live Brand Settings
                   </h3>
                   <form onSubmit={handleSaveSettings} className="space-y-4">
-                    {/* New Device Detector Toggle */}
-                    <div className={cn("p-4 rounded-xl border transition-colors duration-300 flex items-center justify-between gap-4", isDark ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-250")}>
-                      <div>
-                        <label className={cn("text-xs font-black uppercase tracking-wider block", isDark ? "text-white" : "text-gray-900")}>
-                          New Device Detector Guard
-                        </label>
-                        <p className={cn("text-[10px] font-semibold mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                          Require users to verify registration credentials when logging in on unrecognized viewports or new browsers.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={isUpdatingDetector}
-                        onClick={async () => {
-                          setIsUpdatingDetector(true);
-                          const newVal = config.newDeviceDetectorEnabled !== false ? false : true;
-                          try {
-                            await updateConfig({ newDeviceDetectorEnabled: newVal });
-                            toast.success(`New Device Detector is now ${newVal ? "ENABLED (ON)" : "DISABLED (OFF)"}!`);
-                          } catch {
-                            toast.error("Failed to update New Device Detector state.");
-                          } finally {
-                            setIsUpdatingDetector(false);
-                          }
-                        }}
-                        className={cn(
-                          "px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer whitespace-nowrap border active:scale-95",
-                          config.newDeviceDetectorEnabled !== false
-                            ? "bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-700"
-                            : "bg-rose-600 border-rose-500 text-white hover:bg-rose-700"
-                        )}
-                      >
-                        {isUpdatingDetector ? <ButtonSpinner /> : (config.newDeviceDetectorEnabled !== false ? "ACTIVE (ON)" : "DISABLED (OFF)")}
-                      </button>
-                    </div>
-
                     <div className={cn("space-y-1 p-4 rounded-xl border transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
                       <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Imgbb API Key (Image Upload Rail)</label>
                       <input
