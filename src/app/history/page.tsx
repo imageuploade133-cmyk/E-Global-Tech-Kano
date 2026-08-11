@@ -10,6 +10,20 @@ import { TransactionReceipt, Transaction } from "@/components/wallet/Transaction
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 
+const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
+  const s = String(status || "").toUpperCase().trim();
+  if (s === "SUCCESS" || s === "SUCCESSFUL" || s === "COMPLETED" || s === "COMPLETE" || s === "ACTIVE" || s === "DELIVERED") {
+    return "SUCCESS";
+  }
+  if (s === "PENDING" || s === "PROCESSING") {
+    return "PENDING";
+  }
+  if (s === "REFUND" || s === "REFUNDED" || s === "REVERSED") {
+    return "REFUND";
+  }
+  return "FAILED";
+};
+
 export default function HistoryPage() {
   const { userData, user } = useAuth();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -368,16 +382,22 @@ export default function HistoryPage() {
                           {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
 
-                        <span
-                          className={cn(
-                            "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase",
-                            tx.status === "SUCCESS" && "bg-emerald-50 text-emerald-600",
-                            tx.status === "PENDING" && "bg-amber-50 text-amber-600",
-                            tx.status === "FAILED" && "bg-error/5 text-error"
-                          )}
-                        >
-                          {tx.status}
-                        </span>
+                        {(() => {
+                          const normalized = normalizeStatus(tx.status);
+                          return (
+                            <span
+                              className={cn(
+                                "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase",
+                                normalized === "SUCCESS" && "bg-emerald-50 text-emerald-600",
+                                normalized === "PENDING" && "bg-amber-50 text-amber-600",
+                                normalized === "REFUND" && "bg-blue-50 text-blue-600",
+                                normalized === "FAILED" && "bg-error/5 text-error"
+                              )}
+                            >
+                              {normalized === "SUCCESS" ? "Successful" : normalized === "REFUND" ? "Refunded" : normalized === "PENDING" ? "Pending" : "Failed"}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </button>
                   );

@@ -13,6 +13,20 @@ interface RecentTransactionsProps {
   isLoading?: boolean;
 }
 
+const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
+  const s = String(status || "").toUpperCase().trim();
+  if (s === "SUCCESS" || s === "SUCCESSFUL" || s === "COMPLETED" || s === "COMPLETE" || s === "ACTIVE" || s === "DELIVERED") {
+    return "SUCCESS";
+  }
+  if (s === "PENDING" || s === "PROCESSING") {
+    return "PENDING";
+  }
+  if (s === "REFUND" || s === "REFUNDED" || s === "REVERSED") {
+    return "REFUND";
+  }
+  return "FAILED";
+};
+
 export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoading: propIsLoading }) => {
   const { user } = useAuth();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -209,15 +223,23 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
                     ₦{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
 
-                  <div className="inline-flex items-center gap-1 bg-gray-50 border border-gray-150 rounded-full px-2 py-0.5 mt-1.5 shadow-3xs">
-                    <span className={cn(
-                      "w-1.5 h-1.5 rounded-full animate-pulse",
-                      isDeposit ? "bg-emerald-500" : "bg-[#FC7A00]"
-                    )} />
-                    <span className="font-hanken text-[8px] font-black uppercase tracking-widest text-gray-500">
-                      {tx.status}
-                    </span>
-                  </div>
+                  {(() => {
+                    const normalized = normalizeStatus(tx.status);
+                    return (
+                      <div className="inline-flex items-center gap-1 bg-gray-50 border border-gray-150 rounded-full px-2 py-0.5 mt-1.5 shadow-3xs">
+                        <span className={cn(
+                          "w-1.5 h-1.5 rounded-full animate-pulse",
+                          normalized === "SUCCESS" && "bg-emerald-500",
+                          normalized === "PENDING" && "bg-amber-500",
+                          normalized === "REFUND" && "bg-blue-500",
+                          normalized === "FAILED" && "bg-red-500"
+                        )} />
+                        <span className="font-hanken text-[8px] font-black uppercase tracking-widest text-gray-500">
+                          {normalized === "SUCCESS" ? "Successful" : normalized === "REFUND" ? "Refunded" : normalized === "PENDING" ? "Pending" : "Failed"}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.button>
             );
