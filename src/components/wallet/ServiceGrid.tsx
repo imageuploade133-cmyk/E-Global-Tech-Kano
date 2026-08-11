@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
-import { VerificationRequiredDrawer } from "@/components/layout/VerificationRequiredDrawer";
 
 const services = [
   { icon: "cell_tower", label: "Airtime", color: "text-secondary", href: "/bills?type=airtime" },
@@ -43,7 +42,6 @@ export const ServiceGrid: React.FC = () => {
 
   // Modal states
   const [activeModal, setActiveModal] = useState<"loan" | "wealth" | "more" | null>(null);
-  const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
 
   // Prevent background scrolling while the service info modal is active
   useEffect(() => {
@@ -58,11 +56,6 @@ export const ServiceGrid: React.FC = () => {
   }, [activeModal]);
 
   const handleServiceClick = (service: typeof services[0]) => {
-    // If user is not verified, always block service items and show verification drawer
-    if (userData?.kycStatus !== "VERIFIED") {
-      setIsKycDrawerOpen(true);
-      return;
-    }
     if (service.action) {
       setActiveModal(service.action as "loan" | "wealth" | "more");
     }
@@ -70,10 +63,6 @@ export const ServiceGrid: React.FC = () => {
 
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
-    if (href !== "/referrals" && userData?.kycStatus !== "VERIFIED") {
-      setIsKycDrawerOpen(true);
-      return;
-    }
     router.push(href);
   };
 
@@ -217,11 +206,6 @@ export const ServiceGrid: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Verification Required Drawer Overlay */}
-      <VerificationRequiredDrawer
-        isOpen={isKycDrawerOpen}
-        onClose={() => setIsKycDrawerOpen(false)}
-      />
     </>
   );
 };
