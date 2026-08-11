@@ -5,7 +5,7 @@ const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get("Authorization") || "";
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     // Forward Bearer token and secure S2S Api Key to payment gateway
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-reset-otp`, {

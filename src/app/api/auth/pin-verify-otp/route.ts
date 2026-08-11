@@ -5,7 +5,7 @@ const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get("Authorization") || "";
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
     const body = await req.json();
 
     // Forward Bearer token, body payload, and secure S2S Api Key to payment gateway
