@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
+import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
+import { toast } from "sonner";
 
 const services = [
   { icon: "cell_tower", label: "Airtime", color: "text-secondary", href: "/bills?type=airtime" },
@@ -42,6 +44,7 @@ export const ServiceGrid: React.FC = () => {
 
   // Modal states
   const [activeModal, setActiveModal] = useState<"loan" | "wealth" | "more" | null>(null);
+  const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
 
   // Prevent background scrolling while the service info modal is active
   useEffect(() => {
@@ -56,6 +59,12 @@ export const ServiceGrid: React.FC = () => {
   }, [activeModal]);
 
   const handleServiceClick = (service: typeof services[0]) => {
+    const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
+      toast.warning("Please complete your identity verification (KYC) to access this activity.");
+      setIsKycDrawerOpen(true);
+      return;
+    }
     if (service.action) {
       setActiveModal(service.action as "loan" | "wealth" | "more");
     }
@@ -63,6 +72,12 @@ export const ServiceGrid: React.FC = () => {
 
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
+    const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    if (href !== "/referrals" && userData?.kycStatus !== "VERIFIED" && !isMockMode) {
+      toast.warning("Please complete your identity verification (KYC) to access this utility.");
+      setIsKycDrawerOpen(true);
+      return;
+    }
     router.push(href);
   };
 
@@ -206,6 +221,12 @@ export const ServiceGrid: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* Unified Global KYC Verification Drawer */}
+      <KycVerificationDrawer
+        isOpen={isKycDrawerOpen}
+        onClose={() => setIsKycDrawerOpen(false)}
+        onSuccess={() => setIsKycDrawerOpen(false)}
+      />
     </>
   );
 };

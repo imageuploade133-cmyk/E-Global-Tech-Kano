@@ -31,6 +31,18 @@ export default function Home() {
     }
   }, [loading]);
 
+  useEffect(() => {
+    if (user && typeof user.getIdToken === "function") {
+      user.getIdToken().then((idToken) => {
+        (window as any).firebaseUserToken = idToken;
+      }).catch((err) => {
+        console.error("Failed to populate firebaseUserToken globally:", err);
+      });
+    } else if (user) {
+      (window as any).firebaseUserToken = "mock-token";
+    }
+  }, [user]);
+
   // Prevent background scrolling while any settlement verification overlay is shown
   useEffect(() => {
     if (verificationStatus !== "idle") {

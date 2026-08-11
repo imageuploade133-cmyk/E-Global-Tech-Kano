@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 
 interface BalanceCardProps {
   balance: number;
@@ -37,6 +38,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const { config } = useAppConfig();
   const router = useRouter();
   const [totalInvestment, setTotalInvestment] = useState<number>(0);
+  const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
 
   // Multi-currency States
   const [selectedCurrency, setSelectedCurrency] = useState<"NGN" | "USD" | "XOF">("NGN");
@@ -2147,6 +2149,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
+            const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+            if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
+              toast.warning("Please complete your identity verification (KYC) to fund your account.");
+              setIsKycDrawerOpen(true);
+              return;
+            }
             if (selectedCurrency === "USD") {
               setIsUsdFundingOpen(true);
             } else {
@@ -2166,6 +2174,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
+            const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+            if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
+              toast.warning("Please complete your identity verification (KYC) to swap currency.");
+              setIsKycDrawerOpen(true);
+              return;
+            }
             setIsSwapOpen(true);
           }}
           className="flex-1 min-w-0 py-2.5 min-[360px]:py-3.5 px-1.5 min-[360px]:px-2 bg-gradient-to-br from-[#0c1324] via-[#111827] to-[#1e293b] border border-white/10 rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:brightness-95 transition-all duration-300 group cursor-pointer relative overflow-hidden shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2181,6 +2195,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           whileTap={isLoading ? {} : { scale: 0.96 }}
           whileHover={isLoading ? {} : { scale: 1.02 }}
           onClick={() => {
+            const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+            if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
+              toast.warning("Please complete your identity verification (KYC) to transfer funds.");
+              setIsKycDrawerOpen(true);
+              return;
+            }
             if (selectedCurrency === "NGN") {
               setIsTransferOpen(true);
             } else {
@@ -2196,6 +2216,33 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </motion.button>
       </div>
 
+      {/* Premium Verification / KYC Alert Banner */}
+      {userData?.kycStatus !== "VERIFIED" && (typeof window === "undefined" || sessionStorage.getItem("mock") !== "true") && (
+        <motion.div
+          whileTap={{ scale: 0.98 }}
+          onClick={() => {
+            toast.info("Please complete your identity details to activate unlimited access.");
+            setIsKycDrawerOpen(true);
+          }}
+          className="mt-4 p-4.5 bg-gradient-to-br from-[#FFFDF9] via-[#FFF3E6] to-[#FFEADA] border-[1.5px] border-[#FC7A00]/40 rounded-xl flex items-center justify-between cursor-pointer active:brightness-95 hover:brightness-102 transition-all select-none relative overflow-hidden shadow-none"
+        >
+          {/* Subtle background luxury badge icon */}
+          <div className="absolute right-0 bottom-0 opacity-5 text-[60px] pointer-events-none translate-x-2 translate-y-2 select-none">
+            <span className="material-symbols-outlined text-[#FC7A00] font-black">gpp_maybe</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-orange-50 border border-[#FFECD8] flex items-center justify-center text-[#FC7A00] flex-shrink-0">
+              <span className="material-symbols-outlined text-[20px] font-bold animate-pulse">gpp_maybe</span>
+            </div>
+            <div>
+              <h4 className="font-hanken font-extrabold text-xs text-black leading-tight">Verify Your Identity (KYC)</h4>
+              <p className="font-hanken text-[10.5px] text-gray-500 font-bold uppercase mt-1 tracking-wider leading-none">Link BVN or NIN to activate unlimited deposits & transfers</p>
+            </div>
+          </div>
+          <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
+        </motion.div>
+      )}
     </motion.section>
 
     {/* Add Money Bottom Sheet Overlay Modal */}
@@ -4032,6 +4079,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       )}
     </AnimatePresence>
 
+    {/* Unified Global KYC Verification Drawer */}
+    <KycVerificationDrawer
+      isOpen={isKycDrawerOpen}
+      onClose={() => setIsKycDrawerOpen(false)}
+      onSuccess={() => setIsKycDrawerOpen(false)}
+    />
     </>
   );
 };
