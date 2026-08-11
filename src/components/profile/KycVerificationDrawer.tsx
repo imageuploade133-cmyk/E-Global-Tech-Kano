@@ -217,52 +217,29 @@ export function KycVerificationDrawer({
     }
   };
 
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.offset.y > 100 || info.velocity.y > 500) {
-      onClose();
-    }
-  };
-
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop Overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
-          />
-
-          {/* Bottom Sheet Drawer */}
+          {/* Immersive Full Screen Page Container */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            drag="y"
-            dragDirectionLock
-            dragConstraints={{ top: 0, bottom: 450 }}
-            dragElastic={{ top: 0, bottom: 0.2 }}
-            onDragEnd={handleDragEnd}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[92dvh] p-6 pb-8 z-[99999] flex flex-col items-center shadow-2xl text-black"
+            transition={{ type: "spring", damping: 26, stiffness: 220, mass: 1 }}
+            className="fixed inset-0 max-w-md mx-auto bg-white h-screen w-full z-[99999] flex flex-col items-center shadow-2xl text-black"
           >
-            {/* Grab handle */}
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-1 mb-3 cursor-grab" />
-
-            {/* Header */}
-            <div className="w-full flex justify-between items-center border-b border-gray-100 pb-3 mb-3">
-              <div className="w-8" />
-              <h3 className="font-hanken font-bold text-base text-black text-center">Identity Verification (KYC)</h3>
+            {/* Header / Top Navigation Bar */}
+            <div className="w-full flex justify-between items-center bg-gray-50/50 border-b border-gray-100 px-6 py-4 flex-shrink-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer transition-all"
+                className="w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-black hover:border-black active:scale-95 transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                <span className="material-symbols-outlined text-[20px] font-black">arrow_back</span>
               </button>
+              <h3 className="font-hanken font-extrabold text-base text-black text-center tracking-tight">Identity Verification (KYC)</h3>
+              <div className="w-9" />
             </div>
 
             {/* Hidden canvas for video captures */}
@@ -352,29 +329,6 @@ export function KycVerificationDrawer({
                             className="text-xs text-gray-500 hover:text-black font-bold underline cursor-pointer"
                           >
                             Tap to capture another picture
-                          </button>
-                        </div>
-                      ) : isCameraActive ? (
-                        <div className="flex flex-col items-center space-y-3 w-full">
-                          <div className="relative w-28 h-26 rounded-full overflow-hidden border-4 border-black shadow-md bg-black">
-                            <video
-                              ref={videoRef}
-                              autoPlay
-                              playsInline
-                              muted
-                              className="w-full h-full object-cover scale-x-[-1]"
-                            />
-                            {/* Scanning indicator */}
-                            <div className="absolute left-0 right-0 h-0.5 bg-[#00C060] opacity-80 animate-pulse top-1/2" />
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={capturePhoto}
-                            className="px-4 py-2 bg-black hover:bg-gray-900 text-white font-bold text-[10px] rounded-xl uppercase tracking-wider active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">photo_camera</span>
-                            Capture Frame
                           </button>
                         </div>
                       ) : (
@@ -516,6 +470,74 @@ export function KycVerificationDrawer({
               )}
             </div>
           </motion.div>
+
+          {/* Full Screen Biometric Camera Overlay */}
+          {isCameraActive && (
+            <div className="fixed inset-0 max-w-md mx-auto bg-black z-[100000] flex flex-col justify-between items-center overflow-hidden animate-fade-in select-none">
+              {/* Camera Feed */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+              />
+
+              {/* Biometric Oval Cutout Mask */}
+              <div className="absolute inset-0 flex flex-col justify-center items-center pointer-events-none">
+                <div className="w-full h-full bg-black/60 flex flex-col justify-between items-center p-6 relative">
+                  {/* Top Header inside camera */}
+                  <div className="w-full text-center pt-10">
+                    <p className="font-hanken font-bold text-xs text-white uppercase tracking-widest bg-black/40 px-4 py-1.5 rounded-full inline-block">
+                      Liveness Face Match
+                    </p>
+                  </div>
+
+                  {/* Centered biometric oval border cutout indicator */}
+                  <div className="relative w-64 h-80 rounded-[120px] border-4 border-dashed border-[#00C060] shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] flex flex-col items-center justify-center">
+                    {/* Scanning laser line */}
+                    <div className="absolute left-0 right-0 h-1 bg-[#00C060]/70 rounded-full animate-bounce" style={{ top: "35%", animationDuration: "3s" }} />
+                  </div>
+
+                  {/* Bottom Guide Text */}
+                  <div className="w-full text-center pb-28">
+                    <p className="font-hanken font-extrabold text-sm text-white drop-shadow-md">
+                      Align face within oval & smile
+                    </p>
+                    <p className="font-hanken text-[10px] text-gray-300 font-bold uppercase tracking-wider mt-1.5 drop-shadow-sm">
+                      Official Biometrics Verification Service
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Camera Actions top bar */}
+              <div className="w-full flex justify-between items-center p-6 flex-shrink-0 z-[100001] bg-gradient-to-b from-black/80 to-transparent">
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="w-10 h-10 rounded-full bg-black/40 border border-white/20 text-white flex items-center justify-center hover:bg-black/60 active:scale-95 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-black">close</span>
+                </button>
+                <span className="text-white text-xs font-black uppercase tracking-wider">Verification Camera</span>
+                <div className="w-10" />
+              </div>
+
+              {/* Shutter Button bottom bar */}
+              <div className="w-full flex flex-col items-center p-8 z-[100001] bg-gradient-to-t from-black/85 via-black/40 to-transparent flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="w-20 h-20 rounded-full border-4 border-white bg-white/20 hover:bg-white/40 flex items-center justify-center p-1 active:scale-95 transition-all cursor-pointer shadow-2xl"
+                >
+                  <div className="w-full h-full bg-white rounded-full flex items-center justify-center shadow-inner">
+                    <span className="material-symbols-outlined text-black text-[32px] font-black">photo_camera</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </AnimatePresence>
