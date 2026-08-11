@@ -146,7 +146,7 @@ export default function ReferralsPage() {
           </div>
         </div>
 
-        <main className="flex-1 max-w-md w-full mx-auto px-4 pt-5 space-y-6">
+        <main className="flex-1 max-w-md w-full mx-auto px-4 pt-5 space-y-6 !mt-0" style={{ marginTop: 0 }}>
           {/* Header Description banner */}
           <div className="bg-gradient-to-r from-[#1E293B] to-[#0F172A] border border-white/5 rounded-3xl p-5 text-white relative overflow-hidden select-none shadow-sm">
             <div className="absolute right-0 bottom-0 opacity-10 text-[100px] select-none pointer-events-none translate-x-1/6 translate-y-1/6">

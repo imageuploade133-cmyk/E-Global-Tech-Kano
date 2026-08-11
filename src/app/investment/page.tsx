@@ -95,6 +95,171 @@ export default function InvestmentPage() {
   const [showCancelModal, setShowCancelModal] = useState<boolean>(false);
   const [selectedCancelId, setSelectedCancelId] = useState<string>("");
 
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
+
+  const renderCalendarModal = () => {
+    if (!showCalendarModal) return null;
+
+    const minAllowedDate = new Date();
+    minAllowedDate.setDate(minAllowedDate.getDate() + selectedProduct.durationDays);
+    // strip hours for clean day boundary comparisons
+    minAllowedDate.setHours(0, 0, 0, 0);
+
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const startDayOfWeek = firstDayOfMonth.getDay(); // 0 is Sunday, 6 is Saturday
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // construct an array of the days to display
+    const daysArray: (Date | null)[] = [];
+    // pre-padding days
+    for (let i = 0; i < startDayOfWeek; i++) {
+      daysArray.push(null);
+    }
+    // actual days
+    for (let day = 1; day <= daysInMonth; day++) {
+      daysArray.push(new Date(year, month, day));
+    }
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    const handlePrevMonth = () => {
+      setCalendarMonth(new Date(year, month - 1, 1));
+    };
+
+    const handleNextMonth = () => {
+      setCalendarMonth(new Date(year, month + 1, 1));
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+        <div className="absolute inset-0" onClick={() => setShowCalendarModal(false)} />
+
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 220 }}
+          className="relative bg-white w-full max-w-md rounded-t-[32px] p-6 shadow-2xl border-t border-gray-100 z-10"
+        >
+          <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bodoni text-[16px] font-bold text-black flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-primary text-[20px]">
+                calendar_month
+              </span>
+              Pick Maturity Date
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowCalendarModal(false)}
+              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          </div>
+
+          {/* Guide Warning Description banner */}
+          <div className="bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-3.5 mb-4 text-xs">
+            <p className="font-hanken font-bold text-black leading-snug">
+              Lock Duration: {selectedProduct.durationDays} Days Minimum
+            </p>
+            <p className="font-hanken text-[10.5px] text-gray-500 mt-1 leading-relaxed">
+              Your chosen savings plan requires capital to be locked for at least {selectedProduct.durationDays} days. Days before <span className="text-primary font-bold">{minAllowedDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span> are locked and cannot be selected.
+            </p>
+          </div>
+
+          {/* Month Navigation */}
+          <div className="flex items-center justify-between mb-4 px-1">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            </button>
+            <span className="font-hanken text-sm font-extrabold text-black">
+              {monthNames[month]} {year}
+            </span>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+            </button>
+          </div>
+
+          {/* Calendar Grid Header */}
+          <div className="grid grid-cols-7 gap-1 text-center mb-1">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((dayName) => (
+              <span key={dayName} className="font-hanken text-[10px] font-extrabold text-gray-400 uppercase tracking-wider py-1">
+                {dayName}
+              </span>
+            ))}
+          </div>
+
+          {/* Calendar Grid Body */}
+          <div className="grid grid-cols-7 gap-1 text-center mb-6">
+            {daysArray.map((dayDate, idx) => {
+              if (!dayDate) {
+                return <div key={`empty-${idx}`} className="aspect-square" />;
+              }
+
+              // compare purely on dates without hours/mins
+              const compareDate = new Date(dayDate);
+              compareDate.setHours(0, 0, 0, 0);
+
+              const isBeforeMin = compareDate < minAllowedDate;
+              const formattedValue = dayDate.toISOString().split("T")[0];
+              const isSelected = maturityDate === formattedValue;
+
+              return (
+                <button
+                  key={formattedValue}
+                  type="button"
+                  disabled={isBeforeMin}
+                  onClick={() => {
+                    setMaturityDate(formattedValue);
+                    setShowCalendarModal(false);
+                  }}
+                  className={`aspect-square rounded-xl font-hanken text-xs font-bold transition-all flex flex-col items-center justify-center relative cursor-pointer ${
+                    isSelected
+                      ? "bg-primary text-white shadow-sm"
+                      : isBeforeMin
+                      ? "text-gray-300 bg-gray-50/50 cursor-not-allowed line-through"
+                      : "text-black hover:bg-gray-100 active:scale-95"
+                  }`}
+                >
+                  <span>{dayDate.getDate()}</span>
+                  {isSelected && (
+                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Bottom Cancel Button */}
+          <button
+            type="button"
+            onClick={() => setShowCalendarModal(false)}
+            className="w-full py-3.5 border border-gray-200 text-gray-500 hover:text-black rounded-xl font-hanken text-[12.5px] font-bold tracking-wide active:scale-95 transition-all"
+          >
+            Close Calendar
+          </button>
+        </motion.div>
+      </div>
+    );
+  };
+
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
 
@@ -102,7 +267,7 @@ export default function InvestmentPage() {
   const hasPushedState = React.useRef(false);
 
   useEffect(() => {
-    if (showConfirmModal || showCancelModal) {
+    if (showConfirmModal || showCancelModal || showCalendarModal) {
       window.history.pushState({ modalOpen: true }, "");
       hasPushedState.current = true;
 
@@ -111,6 +276,7 @@ export default function InvestmentPage() {
         hasPushedState.current = false;
         setShowConfirmModal(false);
         setShowCancelModal(false);
+        setShowCalendarModal(false);
       };
 
       window.addEventListener("popstate", handlePopState);
@@ -122,11 +288,11 @@ export default function InvestmentPage() {
         }
       };
     }
-  }, [showConfirmModal, showCancelModal]);
+  }, [showConfirmModal, showCancelModal, showCalendarModal]);
 
-  // Prevent background scroll when investment confirm or cancel modals are open
+  // Prevent background scroll when investment confirm, cancel or calendar modals are open
   useEffect(() => {
-    if (showConfirmModal || showCancelModal) {
+    if (showConfirmModal || showCancelModal || showCalendarModal) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -134,7 +300,7 @@ export default function InvestmentPage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showConfirmModal, showCancelModal]);
+  }, [showConfirmModal, showCancelModal, showCalendarModal]);
 
   // Load specs and records from dynamic backend or sessionStorage fallback
   const loadInvestmentData = async () => {
@@ -672,16 +838,38 @@ export default function InvestmentPage() {
 
             {/* Maturity end date selectpicker */}
             <div className="mb-5">
-              <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                When do you want to unlock your savings? (Pick a Date)
+              <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                When do you want to unlock your savings?
               </label>
-              <input
-                type="date"
-                value={maturityDate}
-                onChange={(e) => setMaturityDate(e.target.value)}
-                min={new Date(Date.now() + selectedProduct.durationDays * 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
-                className="w-full max-w-full box-border px-4 py-3.5 bg-white border border-black rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-              />
+              <p className="font-hanken text-[10px] text-gray-400 mb-2 leading-relaxed">
+                Click the button below to view the secure vault calendar and pick a lock date. Days matching your plan&apos;s lock duration will be highlighted.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const minDays = selectedProduct.durationDays;
+                  const initialDate = new Date();
+                  initialDate.setDate(initialDate.getDate() + minDays);
+                  setCalendarMonth(initialDate);
+                  setShowCalendarModal(true);
+                }}
+                className="w-full text-left px-4 py-3.5 bg-white border border-black rounded-2xl flex items-center justify-between shadow-sm active:scale-98 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-primary">
+                    calendar_month
+                  </span>
+                  <span className="font-hanken text-xs font-semibold text-black">
+                    {maturityDate
+                      ? new Date(maturityDate).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+                      : "Tap to Pick Maturity Date"
+                    }
+                  </span>
+                </div>
+                <span className="material-symbols-outlined text-[16px] text-gray-400">
+                  chevron_right
+                </span>
+              </button>
             </div>
 
             {/* Live Reward Calculation Summary */}
@@ -1018,6 +1206,11 @@ export default function InvestmentPage() {
               </motion.div>
             </div>
           )}
+        </AnimatePresence>
+
+        {/* Premium Interactive Custom Calendar Picker Modal */}
+        <AnimatePresence>
+          {renderCalendarModal()}
         </AnimatePresence>
       </div>
     </RouteGuard>
