@@ -192,7 +192,7 @@ export async function GET(req: Request) {
     }
 
     // 5. Keep legacy balance synchronized with NGN balance
-    if (typeof userData.balance === "number" && userData.balance !== ngnBalance) {
+    if (typeof userData.balance === "number" && typeof ngnBalance === "number" && userData.balance !== ngnBalance) {
       console.log(`[GET /api/wallets] [${reqId}] Balance mismatch detected: Profile legacy balance is ₦${userData.balance}, NGN Wallet balance is ₦${ngnBalance}`);
 
       // If profile balance was updated externally (e.g., via deposit webhook, manual top-up, or admin action),

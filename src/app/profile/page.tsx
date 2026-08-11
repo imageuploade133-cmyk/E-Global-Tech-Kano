@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence, PanInfo } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
@@ -110,26 +110,8 @@ export default function ProfilePage() {
   const [loadingAccount, setLoadingAccount] = useState(false);
 
   // Modal / Drawer States
-  const [showCameraDrawer, setShowCameraDrawer] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
-  // Prevent background scrolling while the selfie camera drawer is open
-  useEffect(() => {
-    if (showCameraDrawer) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [showCameraDrawer]);
-
-  // Camera & Image Variables
-  const [flash, setFlash] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
-  const [diagnosticText, setDiagnosticText] = useState("SYSTEM READY");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Security Toggles State
@@ -281,13 +263,6 @@ export default function ProfilePage() {
     toast.success(`${label} copied to clipboard!`);
   };
 
-  const stopCamera = React.useCallback(() => {
-    setShowCameraDrawer(false);
-    setIsScanning(false);
-    setScanProgress(0);
-    setDiagnosticText("SYSTEM READY");
-  }, []);
-
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -328,90 +303,6 @@ export default function ProfilePage() {
     }
   };
 
-  const startSimulatedScan = () => {
-    setShowCameraDrawer(true);
-    setIsScanning(false);
-    setScanProgress(0);
-    setDiagnosticText("ALIGN YOUR FACE WITHIN THE OVAL");
-  };
-
-  const triggerCapture = () => {
-    if (isScanning) return;
-    setIsScanning(true);
-    setScanProgress(0);
-    setDiagnosticText("INITIALIZING 3D BIOMETRIC MESH...");
-
-    const diagnostics = [
-      "CALIBRATING SENSORS...",
-      "STABILIZING POSITION: 99.4%",
-      "OPTIMIZING EXPOSURE...",
-      "GENERATING BIOMETRIC KEYPOINTS...",
-      "SECURE KYC ENCRYPTION..."
-    ];
-
-    let currentDiagIndex = 0;
-    const diagInterval = setInterval(() => {
-      if (currentDiagIndex < diagnostics.length) {
-        setDiagnosticText(diagnostics[currentDiagIndex]);
-        currentDiagIndex++;
-      }
-    }, 600);
-
-    const progressInterval = setInterval(() => {
-      setScanProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          clearInterval(diagInterval);
-          executeSimulatedCapture();
-          return 100;
-        }
-        return prev + 4;
-      });
-    }, 120);
-  };
-
-  const executeSimulatedCapture = async () => {
-    setFlash(true);
-    setTimeout(() => setFlash(false), 300);
-
-    const premiumAvatars = [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400",
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400",
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=400"
-    ];
-
-    const randomAvatar = premiumAvatars[Math.floor(Math.random() * premiumAvatars.length)];
-    const key = config.imgbbApiKey || "";
-    setDiagnosticText("UPLOADING BIOMETRIC FACIAL PROFILE...");
-
-    try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${key}&image=${encodeURIComponent(randomAvatar)}`, {
-        method: "POST"
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        const uploadedUrl = json.data.display_url;
-        await updateUserData({ photoURL: uploadedUrl });
-        toast.success("3D Biometric Face Scan complete & securely stored on Imgbb!");
-      } else {
-        await updateUserData({ photoURL: randomAvatar });
-        toast.success("3D Biometric Face Scan complete!");
-      }
-    } catch {
-      await updateUserData({ photoURL: randomAvatar });
-      toast.success("3D Biometric Face Scan complete!");
-    } finally {
-      stopCamera();
-    }
-  };
-
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.offset.y > 100 || info.velocity.y > 500) {
-      stopCamera();
-    }
-  };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -620,16 +511,7 @@ export default function ProfilePage() {
                 className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-black text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="material-symbols-outlined text-[14px]">upload_file</span>
-                Upload File
-              </button>
-              <button
-                disabled={isProfileLoading}
-                type="button"
-                onClick={startSimulatedScan}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-[10px] font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[14px]">photo_camera</span>
-                Take Selfie
+                Upload Avatar File
               </button>
             </div>
 
@@ -1116,130 +998,6 @@ export default function ProfilePage() {
           </section>
         </motion.div>
       </main>
-
-      {/* Selfie Capture Sheet Modal */}
-      <AnimatePresence>
-        {showCameraDrawer && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={stopCamera}
-              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[99998]"
-            />
-
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-              drag="y"
-              dragDirectionLock
-              dragConstraints={{ top: 0, bottom: 450 }}
-              dragElastic={{ top: 0, bottom: 0.2 }}
-              onDragEnd={handleDragEnd}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#0a0f1d] rounded-t-[32px] h-[85dvh] z-[99999] flex flex-col items-center select-none cursor-default shadow-none touch-none overflow-hidden"
-            >
-              <div className="w-12 h-1.5 bg-gray-700/80 rounded-full mt-4 mb-4 cursor-grab" />
-
-              <div className="w-full px-6 flex justify-between items-center border-b border-white/5 pb-4 mb-6">
-                <div className="w-8" />
-                <h3 className="font-hanken font-bold text-base text-white text-center">
-                  3D Biometric Face Scan
-                </h3>
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="w-8 h-8 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
-                </button>
-              </div>
-
-              <div className="flex-grow flex flex-col justify-center items-center w-full px-6 relative">
-                <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
-
-                <div className="relative w-full aspect-square max-w-[270px] rounded-[32px] overflow-hidden bg-black/60 flex items-center justify-center border-2 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.1)]">
-                  <div className="absolute inset-0 border border-emerald-500/10 rounded-full scale-90 animate-spin" style={{ animationDuration: "12s" }} />
-                  <div className="absolute inset-0 border border-dashed border-emerald-500/20 rounded-full scale-75 animate-spin" style={{ animationDuration: "8s" }} />
-
-                  <svg
-                    className={cn(
-                      "w-48 h-48 text-emerald-400/75 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)] transition-all duration-300",
-                      isScanning ? "animate-pulse" : ""
-                    )}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 2a10 10 0 00-10 10c0 5.523 4.477 10 10 10s10-4.477 10-10A10 10 0 0012 2zm0 18c-4.418 0-8-3.582-8-8s3.582-8 8-8 8 3.582 8 8-3.582 8-8 8zm0-12a2 2 0 100 4 2 2 0 000-4zm-4 7c0-2 2-3 4-3s4 1 4 3"
-                    />
-                  </svg>
-
-                  <div className="absolute w-44 h-52 rounded-[100px] border-2 border-dashed border-emerald-400/50 flex items-center justify-center animate-pulse" />
-
-                  {isScanning && (
-                    <motion.div
-                      initial={{ y: "-100%" }}
-                      animate={{ y: "100%" }}
-                      transition={{
-                        repeat: Infinity,
-                        repeatType: "reverse",
-                        duration: 1.8,
-                        ease: "easeInOut",
-                      }}
-                      className="absolute left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_rgba(52,211,153,0.8)] z-10"
-                    />
-                  )}
-
-                  {flash && (
-                    <div className="absolute inset-0 bg-white z-20 animate-pulse" />
-                  )}
-                </div>
-
-                <div className="w-full max-w-[270px] mt-8 space-y-2 text-center">
-                  <div className="flex justify-between items-center text-[10px] font-mono tracking-widest text-emerald-400/75 uppercase">
-                    <span>{diagnosticText}</span>
-                    <span>{scanProgress}%</span>
-                  </div>
-
-                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                    <motion.div
-                      className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                      style={{ width: `${scanProgress}%` }}
-                      transition={{ ease: "easeInOut" }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full p-6 border-t border-white/5 flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={triggerCapture}
-                  disabled={isScanning}
-                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-none transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">photo_camera</span>
-                  {isScanning ? "Scanning Face..." : "Start Biometric Scan"}
-                </button>
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="w-full py-4 bg-[#0a0f1d]/40 hover:bg-white/5 active:scale-95 text-white/90 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer premium-gradient-border"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       <KycVerificationDrawer
         isOpen={isKycDrawerOpen}
