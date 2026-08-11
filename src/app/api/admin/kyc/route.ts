@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     }
 
     // Forward the GET request directly to Payment Gateway to retrieve real PENDING KYC list
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
     const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/pending`, {
       method: "GET",
       headers: {
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
       idToken = await mintFirebaseIdToken(uid);
     }
 
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     if (action === "verify") {
       // Forward verify request to payment-gateway secure human-only endpoint with strict Bearer Authorization header
