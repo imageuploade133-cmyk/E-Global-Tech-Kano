@@ -65,6 +65,9 @@ export default function GenericBillPage() {
   const [selectedBiller, setSelectedBiller] = useState<Biller | null>(null);
   const [selectedItem, setSelectedItem] = useState<BillItem | null>(null);
 
+  // Active data categorisation/tab state
+  const [activeDataTab, setActiveDataTab] = useState<string>("ALL");
+
   const [customerId, setCustomerId] = useState<string>("");
   const [customAmount, setCustomAmount] = useState<string>("");
   const [validatedName, setValidatedName] = useState<string>("");
@@ -227,6 +230,7 @@ export default function GenericBillPage() {
     async function fetchItems() {
       setIsItemsLoading(true);
       setSelectedItem(null);
+      setActiveDataTab("ALL"); // Reset tab back to default on provider swap
       setCustomerId("");
       setCustomAmount("");
       setValidatedName("");
@@ -353,6 +357,30 @@ export default function GenericBillPage() {
       duration,
       displayName: cleanedName || "Standard Plan"
     };
+  };
+
+  // Helper to categorize data plans into tabs based on plan attributes
+  const getDataPlanCategory = (plan: BillItem): string => {
+    const nameLower = plan.name.toLowerCase();
+
+    // Weekend Plan check
+    if (nameLower.includes("weekend") || nameLower.includes("sat & sun") || nameLower.includes("[sun]")) {
+      return "WEEKEND";
+    }
+    // 1GB check (Exact 1GB or SME 1GB or popular small sized plans)
+    if (nameLower.includes("1 gb") || nameLower.includes("1gb") || nameLower.includes("1000 mb") || nameLower.includes("1000mb")) {
+      return "1GB";
+    }
+    // Daily Plan check
+    if (nameLower.includes("1 day") || nameLower.includes("2 day") || nameLower.includes("daily") || nameLower.includes("awoof") || nameLower.includes("awooof")) {
+      return "DAILY";
+    }
+    // Weekly Plan check
+    if (nameLower.includes("7 days") || nameLower.includes("14 days") || nameLower.includes("weekly")) {
+      return "WEEKLY";
+    }
+    // Default/Fallback is Monthly/More
+    return "MONTHLY";
   };
 
   // Compute final transaction amount dynamically
@@ -965,51 +993,109 @@ export default function GenericBillPage() {
                         No plans available from this provider.
                       </div>
                     ) : pageCategory === "DATA" ? (
-                      /* --- HIGH FIDELITY DATA PLANS GRID --- */
-                      <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
-                        {sortedItems.map((i) => {
-                          const isSelected = selectedItem?.id === i.id;
-                          const planInfo = parseDataPlan(i.name);
+                      /* --- HIGH FIDELITY DATA PLANS GRID WITH TABS --- */
+                      <div className="space-y-4">
+                        {/* Horizontal Custom Tabs Container */}
+                        <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin no-scrollbar">
+                          {[
+                            { id: "ALL", label: "All Plans" },
+                            { id: "1GB", label: "1GB / Popular" },
+                            { id: "DAILY", label: "Daily Plans" },
+                            { id: "WEEKEND", label: "Weekend" },
+                            { id: "WEEKLY", label: "Weekly" },
+                            { id: "MONTHLY", label: "Monthly / More" }
+                          ].map((tab) => {
+                            const count = tab.id === "ALL"
+                              ? sortedItems.length
+                              : sortedItems.filter(item => getDataPlanCategory(item) === tab.id).length;
+
+                            const isTabActive = activeDataTab === tab.id;
+
+                            return (
+                              <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveDataTab(tab.id)}
+                                className={`px-3.5 py-2 rounded-xl text-[11px] font-bold tracking-tight whitespace-nowrap flex items-center gap-1.5 transition-all duration-200 cursor-pointer border ${
+                                  isTabActive
+                                    ? "bg-black border-black text-white"
+                                    : "bg-white border-gray-150 text-gray-600 hover:border-gray-200"
+                                }`}
+                              >
+                                {tab.label}
+                                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-mono font-black ${
+                                  isTabActive ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"
+                                }`}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* List grid filtered by active data categorization tab */}
+                        {(() => {
+                          const filteredPlans = sortedItems.filter((item) => {
+                            if (activeDataTab === "ALL") return true;
+                            return getDataPlanCategory(item) === activeDataTab;
+                          });
+
+                          if (filteredPlans.length === 0) {
+                            return (
+                              <div className="py-8 text-center text-gray-400 font-hanken text-xs font-semibold">
+                                No plans available under this category.
+                              </div>
+                            );
+                          }
 
                           return (
-                            <button
-                              key={i.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedItem(i);
-                                setCustomAmount(i.amount.toString());
-                              }}
-                              className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-[120px] transition-all duration-300 cursor-pointer shadow-none ${
-                                isSelected
-                                  ? "bg-orange-50/50 border-[#FC7A00]"
-                                  : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
-                              }`}
-                            >
-                              <div className="w-full">
-                                <div className="flex justify-between items-start gap-1 w-full">
-                                  <span className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black tracking-tight leading-none ${
-                                    isSelected ? "bg-[#FC7A00] text-white" : "bg-gray-200 text-gray-700"
-                                  }`}>
-                                    {planInfo.size}
-                                  </span>
-                                  <span className="text-[8px] text-gray-400 font-bold uppercase truncate">
-                                    {planInfo.duration}
-                                  </span>
-                                </div>
-                                <p className="font-hanken text-[10px] font-extrabold text-black mt-2 leading-tight line-clamp-2">
-                                  {planInfo.displayName}
-                                </p>
-                              </div>
+                            <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                              {filteredPlans.map((i) => {
+                                const isSelected = selectedItem?.id === i.id;
+                                const planInfo = parseDataPlan(i.name);
 
-                              <div className="w-full text-right mt-2 pt-1 border-t border-gray-100/30 flex justify-between items-center">
-                                <span className="text-[7.5px] text-gray-400 font-bold uppercase">Price</span>
-                                <span className="font-mono text-[11.5px] font-black text-black">
-                                  ₦{i.amount.toLocaleString()}
-                                </span>
-                              </div>
-                            </button>
+                                return (
+                                  <button
+                                    key={i.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedItem(i);
+                                      setCustomAmount(i.amount.toString());
+                                    }}
+                                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-[120px] transition-all duration-300 cursor-pointer shadow-none ${
+                                      isSelected
+                                        ? "bg-orange-50/50 border-[#FC7A00]"
+                                        : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    <div className="w-full">
+                                      <div className="flex justify-between items-start gap-1 w-full">
+                                        <span className={`px-2 py-0.5 rounded-lg font-mono text-[11px] font-black tracking-tight leading-none ${
+                                          isSelected ? "bg-[#FC7A00] text-white" : "bg-gray-200 text-gray-700"
+                                        }`}>
+                                          {planInfo.size}
+                                        </span>
+                                        <span className="text-[8px] text-gray-400 font-bold uppercase truncate">
+                                          {planInfo.duration}
+                                        </span>
+                                      </div>
+                                      <p className="font-hanken text-[10px] font-extrabold text-black mt-2 leading-tight line-clamp-2">
+                                        {planInfo.displayName}
+                                      </p>
+                                    </div>
+
+                                    <div className="w-full text-right mt-2 pt-1 border-t border-gray-100/30 flex justify-between items-center">
+                                      <span className="text-[7.5px] text-gray-400 font-bold uppercase">Price</span>
+                                      <span className="font-mono text-[11.5px] font-black text-black">
+                                        ₦{i.amount.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           );
-                        })}
+                        })()}
                       </div>
                     ) : (
                       /* Standard package selector (e.g. Airtime, Cable, Utility) */
