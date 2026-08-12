@@ -124,6 +124,37 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] total bonus sum failed:", err.message);
     }
 
+    // H. Read VTU margins and compute total Transfer Profit and total Data Profit
+    let totalTransferProfit = 0;
+    let totalDataProfit = 0;
+    try {
+      let dataProfitMargin = 0;
+      let transferProfitMargin = 0;
+
+      const marginSnap = await adminDb.collection("config").doc("vtu_profit_margins").get();
+      if (marginSnap.exists) {
+        const marginData = marginSnap.data();
+        dataProfitMargin = Number(marginData?.dataProfitMargin) || 0;
+        transferProfitMargin = Number(marginData?.transferProfitMargin) || 0;
+      }
+
+      // Calculate transfer profit based on successful TRANSFER transactions count
+      const transferTxSnap = await adminDb.collection("transactions")
+        .where("type", "==", "TRANSFER")
+        .where("status", "==", "SUCCESS")
+        .get();
+      totalTransferProfit = transferTxSnap.size * transferProfitMargin;
+
+      // Calculate data profit based on successful DATA transactions count
+      const dataTxSnap = await adminDb.collection("transactions")
+        .where("type", "==", "DATA")
+        .where("status", "==", "SUCCESS")
+        .get();
+      totalDataProfit = dataTxSnap.size * dataProfitMargin;
+    } catch (err: any) {
+      console.warn("[Admin Config GET API] profit computation failed:", err.message);
+    }
+
     // 3. Compile and merge aggregated values into config object
     const mergedConfig = {
       ...baseConfig,
@@ -135,6 +166,8 @@ export async function GET(req: Request) {
       todayTransfer,
       totalAirtimePurchase,
       totalBonus,
+      totalTransferProfit,
+      totalDataProfit,
     };
 
     return NextResponse.json({ success: true, config: mergedConfig });

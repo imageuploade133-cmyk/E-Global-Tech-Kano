@@ -21,6 +21,8 @@ export interface AppConfig {
   totalBonus?: number;
   newDeviceDetectorEnabled?: boolean;
   maxKycUploadSizeMb?: number;
+  totalTransferProfit?: number;
+  totalDataProfit?: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -40,6 +42,8 @@ const DEFAULT_CONFIG: AppConfig = {
   totalBonus: 0,
   newDeviceDetectorEnabled: true,
   maxKycUploadSizeMb: 10,
+  totalTransferProfit: 0,
+  totalDataProfit: 0,
 };
 
 interface ConfigContextProps {
