@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, PanInfo } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,8 @@ export function KycVerificationDrawer({
   onSuccess
 }: KycVerificationDrawerProps) {
   const { config } = useAppConfig();
+  const { userData } = useAuth();
+
   const [kycType, setKycType] = useState<"bvn" | "nin">("bvn");
   const [idNumber, setIdNumber] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -27,8 +30,13 @@ export function KycVerificationDrawer({
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStep, setSubmitStep] = useState<"form" | "uploading" | "submitting" | "success" | "failed">("form");
+
+  // Submit steps: "form" | "uploading" | "submitting" | "success" | "failed" | "review"
+  const [submitStep, setSubmitStep] = useState<"form" | "uploading" | "submitting" | "success" | "failed" | "review">("form");
   const [statusMessage, setStatusMessage] = useState("");
+
+  // State parameter to let the user override the Under Review block and re-submit everything
+  const [isOverrideActive, setIsOverrideActive] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -36,11 +44,28 @@ export function KycVerificationDrawer({
 
   const maxUploadSizeMb = config.maxKycUploadSizeMb || 10;
 
+  // Determine if the user has an active pending KYC status
+  const isUserKycPending = ["PENDING", "PENDING_REVIEW", "VERIFYING", "PROCESSING", "PROVISIONING", "IDENTITY_VERIFIED", "PROVISIONING_FAILED"].includes((userData?.kycStatus as string) || "");
+
   // Handle body scroll locking & state resets on open
   useEffect(() => {
     if (isOpen) {
+      // Lock background scrolling completely on HTML/Body
+      document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
-      setSubmitStep("form");
+      document.body.style.height = "100%";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+
+      setIsOverrideActive(false);
+
+      // If the user's KYC is currently pending in review, immediately default to the "review" state
+      if (isUserKycPending) {
+        setSubmitStep("review");
+      } else {
+        setSubmitStep("form");
+      }
+
       setIdNumber("");
       setSelectedFile(null);
       setFilePreview(null);
@@ -49,14 +74,23 @@ export function KycVerificationDrawer({
       setCameraStream(null);
       setStatusMessage("");
     } else {
+      // Restore background scrolling on close
+      document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
+      document.body.style.height = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
       stopCamera();
     }
     return () => {
+      document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
+      document.body.style.height = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
       stopCamera();
     };
-  }, [isOpen]);
+  }, [isOpen, isUserKycPending]);
 
   const stopCamera = () => {
     if (cameraStream) {
@@ -145,16 +179,17 @@ export function KycVerificationDrawer({
 
     setIsSubmitting(true);
     setSubmitStep("uploading");
-    setStatusMessage("Uploading document selfie safely to cloud servers...");
+
+    // Securely display customer loading text instead of raw developer credentials
+    setStatusMessage("Securing encrypted connection and preparing document bundle...");
 
     let uploadedUrl = "";
     const activeImageSource = selfiePreview || filePreview || "";
 
-    // 1. Upload to Imgbb
+    // 1. Upload to Imgbb securely
     const apiKey = config.imgbbApiKey || "";
     if (apiKey && activeImageSource.startsWith("data:image")) {
       try {
-        // Strip data prefix to get raw base64 string
         const base64Raw = activeImageSource.split(",")[1] || activeImageSource;
         const formData = new FormData();
         formData.append("image", base64Raw);
@@ -167,11 +202,10 @@ export function KycVerificationDrawer({
         if (json.success) {
           uploadedUrl = json.data.display_url;
         } else {
-          console.error("Imgbb upload error response:", json);
           uploadedUrl = activeImageSource;
         }
       } catch (err) {
-        console.error("Imgbb network communication failure:", err);
+        // Fallback gracefully and prevent leaking server paths
         uploadedUrl = activeImageSource;
       }
     } else {
@@ -179,7 +213,7 @@ export function KycVerificationDrawer({
     }
 
     setSubmitStep("submitting");
-    setStatusMessage("Submitting your identity details directly to human administrator review queue...");
+    setStatusMessage("Transmitting identity parameters securely to human administrator review queue...");
 
     try {
       let idToken = "";
@@ -203,14 +237,14 @@ export function KycVerificationDrawer({
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Identity verification failed on server.");
+        throw new Error(data.error || "Verification submission failed on backend.");
       }
 
       setSubmitStep("success");
-      toast.success("Identity and documents uploaded successfully!");
+      toast.success("Identity details saved successfully!");
     } catch (err: any) {
-      console.error("[Kyc Verification Submit Error]:", err);
-      setStatusMessage(err.message || "Something went wrong. Please check details and try again.");
+      // Securely demote raw backend exceptions to professional generic notices
+      setStatusMessage("An error occurred while uploading your identification. Please ensure you have a stable network connection and try again.");
       setSubmitStep("failed");
     } finally {
       setIsSubmitting(false);
@@ -227,7 +261,7 @@ export function KycVerificationDrawer({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 26, stiffness: 220, mass: 1 }}
-            className="fixed inset-0 max-w-md mx-auto bg-white h-screen w-full z-[99999] flex flex-col items-center shadow-2xl text-black"
+            className="fixed inset-0 max-w-md mx-auto bg-white h-screen w-full z-[99999] flex flex-col items-center shadow-2xl text-black overflow-hidden"
           >
             {/* Header / Top Navigation Bar */}
             <div className="w-full flex justify-between items-center bg-gray-50/50 border-b border-gray-100 px-6 py-4 flex-shrink-0">
@@ -245,10 +279,73 @@ export function KycVerificationDrawer({
             {/* Hidden canvas for video captures */}
             <canvas ref={canvasRef} className="hidden" />
 
-            {/* Content States */}
-            <div className="flex-grow flex flex-col justify-start items-center w-full px-2 overflow-y-auto text-center space-y-4">
+            {/* Content States Container */}
+            <div className="flex-grow flex flex-col justify-start items-center w-full px-6 overflow-y-auto text-center py-6 space-y-6">
+
+              {/* STATE 1: PERSISTENT UNDER REVIEW FEEDBACK SCREEN */}
+              {submitStep === "review" && (
+                <div className="flex flex-col items-center space-y-6 w-full py-4 animate-fadeIn">
+                  <div className="w-18 h-18 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 animate-bounce-subtle">
+                    <span className="material-symbols-outlined text-[40px]" style={{ fontVariationSettings: '"FILL" 1' }}>pending_actions</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <span className="px-3.5 py-1 text-[10px] font-black tracking-widest uppercase bg-amber-100/60 text-amber-800 border border-amber-200/50 rounded-full">
+                      Under Review
+                    </span>
+                    <h4 className="font-bodoni text-xl font-bold text-black tracking-tight pt-1">
+                      Identity Verification Pending
+                    </h4>
+                    <p className="font-hanken text-xs text-gray-500 leading-relaxed max-w-xs mx-auto font-medium">
+                      Your account details will be approved or rejected in 30 minutes. Thanks for banking with us.
+                    </p>
+                  </div>
+
+                  {/* Informational Guidelines Card */}
+                  <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 text-left w-full space-y-3.5">
+                    <div className="flex gap-3">
+                      <span className="material-symbols-outlined text-[#FC7A00] font-black text-[20px]">verified_user</span>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] font-extrabold uppercase text-gray-800 tracking-tight">Validation Queue Active</p>
+                        <p className="text-[10px] text-gray-500 font-semibold leading-relaxed">Our compliance desk is currently validating your linked bank references and selfie biometric markers.</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="material-symbols-outlined text-emerald-500 font-black text-[20px]">account_balance_wallet</span>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] font-extrabold uppercase text-gray-800 tracking-tight">Instant Account Provisioning</p>
+                        <p className="text-[10px] text-gray-500 font-semibold leading-relaxed">As soon as verified, static payment account links will be generated automatically for your profile.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Interactive Button to Resend/Override and enter everything again */}
+                  <div className="space-y-4 w-full pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOverrideActive(true);
+                        setSubmitStep("form");
+                        toast.info("Input fields unlocked. Please re-enter your details.");
+                      }}
+                      className="w-full py-4 bg-black hover:bg-gray-900 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all shadow-sm"
+                    >
+                      Resend Verification / Re-enter KYC
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="w-full py-3.5 bg-gray-100 hover:bg-gray-150 text-gray-700 text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all"
+                    >
+                      Go Back to Home
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STATE 2: INTERACTIVE KYC SUBMISSION FORM */}
               {submitStep === "form" && (
-                <form onSubmit={handleFormSubmit} className="w-full space-y-4 text-left">
+                <form onSubmit={handleFormSubmit} className="w-full space-y-5 text-left animate-fadeIn">
 
                   {/* Premium Warning banner */}
                   <div className="bg-[#FFF8EC] border border-[#FFE8CC] rounded-2xl p-4 flex gap-3 text-left">
@@ -388,9 +485,9 @@ export function KycVerificationDrawer({
                 </form>
               )}
 
-              {/* Progress States */}
+              {/* STATE 3: PROCESSING/TRANSMITTING SCREEN */}
               {(submitStep === "uploading" || submitStep === "submitting") && (
-                <div className="flex flex-col items-center space-y-6 pt-10">
+                <div className="flex flex-col items-center space-y-6 pt-10 animate-fadeIn">
                   <div className="relative w-16 h-16 flex items-center justify-center">
                     <motion.div
                       animate={{ rotate: 360 }}
@@ -400,18 +497,18 @@ export function KycVerificationDrawer({
                     <span className="material-symbols-outlined text-[28px] text-gray-400">upload_file</span>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <h4 className="font-hanken font-black text-sm text-black uppercase tracking-wider">Processing Submittal</h4>
-                    <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed">
+                    <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed mx-auto font-medium">
                       {statusMessage}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Success Feedback Screen */}
+              {/* STATE 4: SUCCESS FEEDBACK SCREEN */}
               {submitStep === "success" && (
-                <div className="flex flex-col items-center space-y-5 w-full pt-10">
+                <div className="flex flex-col items-center space-y-6 w-full pt-10 animate-fadeIn">
                   <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 animate-bounce">
                     <span className="material-symbols-outlined text-[36px] font-bold">pending_actions</span>
                   </div>
@@ -431,26 +528,26 @@ export function KycVerificationDrawer({
                     }}
                     className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer shadow-md"
                   >
-                    Pending In Review
+                    Close & Check Status Later
                   </button>
                 </div>
               )}
 
-              {/* Failed Feedback Screen */}
+              {/* STATE 5: FAILED SUBMISSION NOTIFICATION */}
               {submitStep === "failed" && (
-                <div className="flex flex-col items-center space-y-5 w-full pt-10">
+                <div className="flex flex-col items-center space-y-5 w-full pt-10 animate-fadeIn">
                   <div className="w-16 h-16 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
                     <span className="material-symbols-outlined text-[36px] font-bold">gpp_maybe</span>
                   </div>
 
                   <div className="space-y-1">
                     <h4 className="font-hanken font-black text-base text-black uppercase">Submission Notice</h4>
-                    <p className="font-hanken text-xs text-red-500 leading-relaxed max-w-[280px] font-semibold">
+                    <p className="font-hanken text-xs text-red-500 leading-relaxed max-w-[280px] mx-auto font-semibold">
                       {statusMessage}
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-2 w-full">
+                  <div className="flex flex-col gap-2 w-full pt-4">
                     <button
                       type="button"
                       onClick={() => setSubmitStep("form")}
