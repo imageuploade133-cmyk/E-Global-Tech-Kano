@@ -355,6 +355,8 @@ export default function AdminPage() {
         toast.error(data.error || "Failed to process KYC verification.");
         if (action === "verify") {
           setPendingKycUser(prev => prev.map(u => u.uid === targetUid ? { ...u, kycStatus: "VERIFICATION_FAILED" as any } : u));
+        } else if (action === "approve" || action === "retry") {
+          setPendingKycUser(prev => prev.map(u => u.uid === targetUid ? { ...u, kycStatus: "PROVISIONING_FAILED" as any } : u));
         }
       }
     } catch {
