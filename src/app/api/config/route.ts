@@ -19,7 +19,16 @@ export async function GET() {
     }
     return NextResponse.json({ success: false, error: "Config document not found." }, { status: 404 });
   } catch (err: any) {
-    console.error("[Public Config API] Error:", err.message);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.warn("[Public Config API] Database connection offline or credentials missing. Falling back to default visual configuration.");
+    // Return robust default visual config fallback
+    const defaultPublicConfig = {
+      logoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+      supportPhone1: "+234 800 345 6225",
+      supportPhone2: "+234 901 234 5678",
+      supportEmail: "support@e-globaltechhub.com",
+      appVersion: "1.0.0",
+      newDeviceDetectorEnabled: true
+    };
+    return NextResponse.json({ success: true, config: defaultPublicConfig });
   }
 }

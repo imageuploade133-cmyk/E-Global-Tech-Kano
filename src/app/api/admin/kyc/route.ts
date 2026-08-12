@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth, mintFirebaseIdToken } from "@/lib/admin-auth";
+import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
@@ -186,6 +187,47 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: `Virtual account successfully provisioned on retry via ${provider}!`
+      });
+
+    } else if (action === "reset_kyc") {
+      if (uid === "mock-admin-uid") {
+        return NextResponse.json({
+          success: true,
+          message: "Mock User KYC status has been successfully reset to UNVERIFIED."
+        });
+      }
+
+      // Update Firestore user document
+      const userRef = adminDb.collection("users").doc(targetUid);
+      await userRef.update({
+        kycStatus: "UNVERIFIED",
+        kycHashedId: null,
+        kycVerifiedAt: null,
+        kycRejectedAt: null,
+        kycRejectionReason: "Administrative Reset",
+        bvn: null,
+        nin: null
+      });
+
+      // Clear matching document from kyc_submissions collection
+      try {
+        const subQuery = await adminDb.collection("kyc_submissions")
+          .where("userId", "==", targetUid)
+          .get();
+        const batch = adminDb.batch();
+        subQuery.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+      } catch (subErr: any) {
+        console.error(`[Admin KYC reset_kyc] Error deleting submissions:`, subErr.message);
+      }
+
+      console.log(`[Admin KYC reset_kyc] KYC status reset to UNVERIFIED for user ${targetUid}`);
+
+      return NextResponse.json({
+        success: true,
+        message: "User KYC status has been successfully reset to UNVERIFIED, requesting new submission."
       });
 
     } else {

@@ -28,6 +28,8 @@ export async function GET(req: Request) {
         kycStatus: "APPROVED",
         balance: 750000,
         bonusBalance: 12000,
+        usdBalance: 2500,
+        xofBalance: 320000,
         createdAt: new Date().toISOString()
       };
 
@@ -115,6 +117,21 @@ export async function GET(req: Request) {
     }
 
     const userData = userDoc.data();
+
+    // Fetch multi-currency wallet balances
+    let usdBalance = 0;
+    let xofBalance = 0;
+    try {
+      const [usdDoc, xofDoc] = await Promise.all([
+        adminDb.collection("wallets").doc(`${targetUid}_USD`).get(),
+        adminDb.collection("wallets").doc(`${targetUid}_XOF`).get()
+      ]);
+      if (usdDoc.exists) usdBalance = Number(usdDoc.data()?.balance) || 0;
+      if (xofDoc.exists) xofBalance = Number(xofDoc.data()?.balance) || 0;
+    } catch (walletErr: any) {
+      console.warn(`[Admin User History GET] Failed to fetch wallets for user=${targetUid}:`, walletErr.message);
+    }
+
     const sanitizedUser = {
       uid: targetUid,
       name: userData.name || userData.displayName || `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "SYSTEM USER",
@@ -124,6 +141,8 @@ export async function GET(req: Request) {
       kycStatus: userData.kycStatus || "UNVERIFIED",
       balance: userData.balance || 0,
       bonusBalance: userData.bonusBalance || userData.bonus || 0,
+      usdBalance,
+      xofBalance,
       createdAt: userData.createdAt || new Date().toISOString()
     };
 

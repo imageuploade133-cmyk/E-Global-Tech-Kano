@@ -18,6 +18,8 @@ interface UserProfile {
   kycStatus: string;
   balance: number;
   bonusBalance: number;
+  usdBalance?: number;
+  xofBalance?: number;
   createdAt: string;
 }
 
@@ -358,9 +360,9 @@ export default function AdminUserHistoryPage() {
               className="space-y-6"
             >
               {/* Profile Card Summary & Balances */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 {/* Profile card */}
-                <div className={cn("p-6 rounded-2xl border transition-colors duration-300 md:col-span-1 space-y-4", panelClass)}>
+                <div className={cn("p-5 rounded-2xl border transition-colors duration-300 md:col-span-1 space-y-4", panelClass)}>
                   <div className="border-b pb-3.5">
                     <h4 className="text-xs font-black uppercase tracking-wider text-[#FC7A00]">Account Summary</h4>
                     <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Enriched user profile meta-data</p>
@@ -387,7 +389,7 @@ export default function AdminUserHistoryPage() {
                         <p className="text-[10px] font-black uppercase text-gray-400">KYC Status</p>
                         <span className={cn(
                           "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider inline-block mt-0.5 border",
-                          targetUser.kycStatus === "APPROVED"
+                          targetUser.kycStatus === "APPROVED" || targetUser.kycStatus === "VERIFIED"
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                             : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                         )}>
@@ -405,25 +407,47 @@ export default function AdminUserHistoryPage() {
                 </div>
 
                 {/* Main Balance card */}
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/90 to-orange-600/90 border border-orange-400/30 text-white shadow-xs flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/90 to-orange-600/90 border border-orange-400/30 text-white shadow-xs flex flex-col justify-between">
                   <div>
-                    <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">Main Wallet Balance</p>
-                    <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none">
+                    <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">NGN Wallet Balance</p>
+                    <p className="font-mono text-xl font-black mt-2 leading-none">
                       ₦{targetUser.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>
                   </div>
-                  <p className="text-[9px] text-orange-200 font-bold uppercase tracking-wider mt-4">NGN Reserve Balance</p>
+                  <p className="text-[9px] text-orange-200 font-bold uppercase tracking-wider mt-3">NGN Reserve Balance</p>
+                </div>
+
+                {/* USD Balance card */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500/90 to-blue-600/90 border border-indigo-400/30 text-white shadow-xs flex flex-col justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-indigo-100 tracking-wider">USD Wallet Balance</p>
+                    <p className="font-mono text-xl font-black mt-2 leading-none">
+                      ${(targetUser.usdBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <p className="text-[9px] text-indigo-200 font-bold uppercase tracking-wider mt-3">USD Reserve Balance</p>
+                </div>
+
+                {/* XOF Balance card */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-fuchsia-500/90 to-pink-600/90 border border-fuchsia-400/30 text-white shadow-xs flex flex-col justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-fuchsia-100 tracking-wider">XOF Wallet Balance</p>
+                    <p className="font-mono text-xl font-black mt-2 leading-none">
+                      CFA{(targetUser.xofBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <p className="text-[9px] text-fuchsia-200 font-bold uppercase tracking-wider mt-3">XOF Reserve Balance</p>
                 </div>
 
                 {/* Bonus Balance card */}
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-teal-500/90 to-emerald-600/90 border border-teal-400/30 text-white shadow-xs flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-500/90 to-emerald-600/90 border border-teal-400/30 text-white shadow-xs flex flex-col justify-between">
                   <div>
                     <p className="text-[10px] font-black uppercase text-teal-100 tracking-wider">Bonus Wallet Balance</p>
-                    <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none">
+                    <p className="font-mono text-xl font-black mt-2 leading-none">
                       ₦{targetUser.bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>
                   </div>
-                  <p className="text-[9px] text-teal-200 font-bold uppercase tracking-wider mt-4">Commissions & Referrals</p>
+                  <p className="text-[9px] text-teal-200 font-bold uppercase tracking-wider mt-3">Commissions & Referrals</p>
                 </div>
               </div>
 

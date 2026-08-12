@@ -34,6 +34,9 @@ export async function GET(req: Request) {
           role: "admin",
           permissions: ["can_transact", "can_view_audit_logs", "can_manage_gateways"],
           balance: 750000,
+          usdBalance: 2500,
+          xofBalance: 320000,
+          bonusBalance: 15000,
           createdAt: new Date().toISOString()
         },
         {
@@ -44,6 +47,9 @@ export async function GET(req: Request) {
           role: "user",
           permissions: ["can_transact"],
           balance: 45000,
+          usdBalance: 120,
+          xofBalance: 45000,
+          bonusBalance: 2500,
           createdAt: new Date().toISOString()
         }
       ];
@@ -126,18 +132,43 @@ export async function GET(req: Request) {
       });
     }
 
-    const sanitizedUsers = users.map(u => {
+    const sanitizedUsers = await Promise.all(users.map(async u => {
+      const userUid = u.uid || u.id;
+
+      let usdBalance = 0;
+      let xofBalance = 0;
+      const bonusBalance = u.bonusBalance || 0;
+
+      try {
+        const [usdDoc, xofDoc] = await Promise.all([
+          adminDb.collection("wallets").doc(`${userUid}_USD`).get(),
+          adminDb.collection("wallets").doc(`${userUid}_XOF`).get()
+        ]);
+
+        if (usdDoc.exists) {
+          usdBalance = Number(usdDoc.data()?.balance) || 0;
+        }
+        if (xofDoc.exists) {
+          xofBalance = Number(xofDoc.data()?.balance) || 0;
+        }
+      } catch (walletErr: any) {
+        console.warn(`[Admin Users GET] Failed to fetch wallets for user=${userUid}:`, walletErr.message);
+      }
+
       return {
-        uid: u.uid || u.id,
+        uid: userUid,
         name: u.name || u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || "USER",
         email: u.email || "",
         phoneNumber: u.phoneNumber || "",
         role: u.role || "user",
         permissions: u.permissions || [],
         balance: u.balance || 0,
+        usdBalance,
+        xofBalance,
+        bonusBalance,
         createdAt: u.createdAt || new Date().toISOString()
       };
-    });
+    }));
 
     return NextResponse.json({ success: true, users: sanitizedUsers });
   } catch (err: unknown) {

@@ -561,7 +561,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isMockRoute = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+  const isMockRoute = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
   if (loading && !isMockRoute) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">

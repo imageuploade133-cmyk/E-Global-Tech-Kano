@@ -15,6 +15,9 @@ interface AdminUser {
   role: "admin" | "agent" | "user";
   permissions: string[];
   balance: number;
+  usdBalance?: number;
+  xofBalance?: number;
+  bonusBalance?: number;
   createdAt: string;
 }
 
@@ -1713,9 +1716,11 @@ export default function AdminPage() {
                                     <p className="text-[10px] font-mono text-gray-400 mt-0.5">{u.phoneNumber}</p>
                                   </div>
 
-                                  <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Balance</p>
-                                    <p className="font-mono text-xs font-black text-emerald-500 mt-0.5">₦{u.balance.toLocaleString()}</p>
+                                  <div className="text-right space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Balances</p>
+                                    <p className="font-mono text-[11px] font-black text-emerald-500 leading-none">₦{u.balance.toLocaleString()}</p>
+                                    <p className="font-mono text-[10px] font-extrabold text-blue-500 leading-none">${(u.usdBalance || 0).toLocaleString()}</p>
+                                    <p className="font-mono text-[9px] font-bold text-indigo-500 leading-none">CFA{(u.xofBalance || 0).toLocaleString()}</p>
                                   </div>
                                 </div>
 
@@ -1736,65 +1741,223 @@ export default function AdminPage() {
 
                                 {/* Edit Panel Drawer */}
                                 {isEditing && editingUser && (
-                                  <div className={cn("p-3 border rounded-xl space-y-3 transition-colors duration-300", isDark ? "bg-gray-800 border-gray-700" : "bg-white border border-gray-200")}>
-                                    <p className="text-[10px] font-black uppercase text-[#FC7A00]">Modify Privileges & Permissions</p>
+                                  <div className={cn("p-4 border rounded-xl space-y-4 transition-colors duration-300", isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200")}>
+                                    <div className="space-y-3.5">
+                                      <p className="text-[10px] font-black uppercase text-[#FC7A00]">Modify Privileges & Permissions</p>
 
-                                    <div className="space-y-1">
-                                      <label className="text-[9px] font-black uppercase text-gray-400">Change Role</label>
-                                      <select
-                                        value={editingUser.role}
-                                        onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as "admin" | "agent" | "user" })}
-                                        className={cn(
-                                          "w-full rounded-lg px-2.5 py-1.5 text-xs outline-none",
-                                          isDark ? "bg-gray-700 text-white border border-gray-600" : "bg-gray-50 text-black border border-gray-200"
-                                        )}
-                                      >
-                                        <option value="user">USER</option>
-                                        <option value="agent">AGENT</option>
-                                        <option value="admin">ADMIN</option>
-                                      </select>
-                                    </div>
+                                      <div className="space-y-1">
+                                        <label className="text-[9px] font-black uppercase text-gray-400">Change Role</label>
+                                        <select
+                                          value={editingUser.role}
+                                          onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as "admin" | "agent" | "user" })}
+                                          className={cn(
+                                            "w-full rounded-lg px-2.5 py-1.5 text-xs outline-none",
+                                            isDark ? "bg-gray-700 text-white border border-gray-600" : "bg-gray-50 text-black border border-gray-200"
+                                          )}
+                                        >
+                                          <option value="user">USER</option>
+                                          <option value="agent">AGENT</option>
+                                          <option value="admin">ADMIN</option>
+                                        </select>
+                                      </div>
 
-                                    <div className="space-y-2">
-                                      <label className="text-[9px] font-black uppercase text-gray-400 block">Manage Assigned Permissions</label>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        {PERMISSIONS_CATALOG.map(p => {
-                                          const isChecked = editingUser.permissions.includes(p.key);
-                                          return (
-                                            <label key={p.key} className={cn("flex items-center gap-1.5 cursor-pointer text-[10px] font-bold", isDark ? "text-gray-300" : "text-gray-600")}>
-                                              <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={() => {
-                                                  const updated = isChecked
-                                                    ? editingUser.permissions.filter(k => k !== p.key)
-                                                    : [...editingUser.permissions, p.key];
-                                                  setEditingUser({ ...editingUser, permissions: updated });
-                                                }}
-                                                className="rounded text-[#FC7A00] h-3 w-3 cursor-pointer"
-                                              />
-                                              <span>{p.label}</span>
-                                            </label>
-                                          );
-                                        })}
+                                      <div className="space-y-2">
+                                        <label className="text-[9px] font-black uppercase text-gray-400 block">Manage Assigned Permissions</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {PERMISSIONS_CATALOG.map(p => {
+                                            const isChecked = editingUser.permissions.includes(p.key);
+                                            return (
+                                              <label key={p.key} className={cn("flex items-center gap-1.5 cursor-pointer text-[10px] font-bold", isDark ? "text-gray-300" : "text-gray-600")}>
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isChecked}
+                                                  onChange={() => {
+                                                    const updated = isChecked
+                                                      ? editingUser.permissions.filter(k => k !== p.key)
+                                                      : [...editingUser.permissions, p.key];
+                                                    setEditingUser({ ...editingUser, permissions: updated });
+                                                  }}
+                                                  className="rounded text-[#FC7A00] h-3 w-3 cursor-pointer"
+                                                />
+                                                <span>{p.label}</span>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex justify-end gap-2 pt-2 border-t border-gray-150/10">
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingUser(null)}
+                                          className="px-3 py-1.5 bg-gray-500/10 hover:bg-gray-500/20 text-gray-400 hover:text-white text-[10px] font-black uppercase rounded-lg cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isUpdatingUser === u.uid}
+                                          onClick={() => handleSaveUserPermissions(editingUser)}
+                                          className="px-3 py-1.5 bg-black hover:bg-orange-500 text-white text-[10px] font-black uppercase rounded-lg cursor-pointer disabled:opacity-50"
+                                        >
+                                          {isUpdatingUser === u.uid ? <><ButtonSpinner /> Saving...</> : "Apply Changes"}
+                                        </button>
                                       </div>
                                     </div>
 
-                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100/10">
-                                      <button
-                                        type="button"
-                                        onClick={() => setEditingUser(null)}
-                                        className="px-3 py-1.5 bg-gray-500/10 hover:bg-gray-500/20 text-gray-400 hover:text-white text-[10px] font-black uppercase rounded-lg cursor-pointer"
-                                      >
-                                        Cancel
-                                      </button>
+                                    {/* administrative deposit sub-form */}
+                                    <div className={cn("p-3.5 rounded-xl border space-y-3 transition-colors duration-300", isDark ? "bg-gray-900 border-gray-850" : "bg-gray-50 border-gray-150")}>
+                                      <p className="text-[10px] font-black uppercase text-emerald-500">Secured Administrative Capital Deposit</p>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[9px] font-black uppercase text-gray-400">Currency</label>
+                                          <select
+                                            id={`deposit-currency-${u.uid}`}
+                                            className={cn(
+                                              "w-full rounded-lg px-2.5 py-2 text-xs outline-none",
+                                              isDark ? "bg-gray-800 text-white border border-gray-700" : "bg-white text-black border border-gray-250"
+                                            )}
+                                          >
+                                            <option value="NGN">NGN (₦)</option>
+                                            <option value="USD">USD ($)</option>
+                                            <option value="XOF">XOF (CFA)</option>
+                                          </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                          <label className="text-[9px] font-black uppercase text-gray-400">Amount to Credit</label>
+                                          <input
+                                            type="number"
+                                            id={`deposit-amount-${u.uid}`}
+                                            placeholder="e.g. 5000"
+                                            className={inputClass}
+                                          />
+                                        </div>
+                                      </div>
+
                                       <button
                                         type="button"
                                         disabled={isUpdatingUser === u.uid}
-                                        onClick={() => handleSaveUserPermissions(editingUser)}
-                                        className="px-3 py-1.5 bg-black hover:bg-orange-500 text-white text-[10px] font-black uppercase rounded-lg cursor-pointer disabled:opacity-50"
+                                        onClick={async () => {
+                                          const currencySelect = document.getElementById(`deposit-currency-${u.uid}`) as HTMLSelectElement;
+                                          const amountInput = document.getElementById(`deposit-amount-${u.uid}`) as HTMLInputElement;
+                                          const currency = currencySelect?.value || "NGN";
+                                          const amount = parseFloat(amountInput?.value || "0");
+
+                                          if (isNaN(amount) || amount <= 0) {
+                                            toast.error("Please enter a valid positive amount to deposit.");
+                                            return;
+                                          }
+
+                                          if (!window.confirm(`Are you sure you want to securely credit ${currency} ${amount.toLocaleString()} to user ${u.name}?`)) {
+                                            return;
+                                          }
+
+                                          setIsUpdatingUser(u.uid);
+                                          try {
+                                            let idToken = "mock-admin-token";
+                                            const isMock = sessionStorage.getItem("mock") === "true";
+                                            if (!isMock && user) {
+                                              idToken = await user.getIdToken();
+                                            }
+
+                                            const res = await fetch("/api/admin/deposit", {
+                                              method: "POST",
+                                              headers: {
+                                                "Content-Type": "application/json",
+                                                "Authorization": `Bearer ${idToken}`
+                                              },
+                                              body: JSON.stringify({
+                                                targetUid: u.uid,
+                                                amount,
+                                                currency
+                                              })
+                                            });
+
+                                            const data = await res.json();
+                                            if (res.ok && data.success) {
+                                              toast.success(data.message || "Capital credited successfully!");
+                                              if (amountInput) amountInput.value = "";
+
+                                              // Instantly update user's local balance in the directory listing
+                                              setUsersList(prev => prev.map(item => {
+                                                if (item.uid === u.uid) {
+                                                  if (currency === "NGN") {
+                                                    return { ...item, balance: item.balance + amount };
+                                                  } else if (currency === "USD") {
+                                                    return { ...item, usdBalance: (item.usdBalance || 0) + amount };
+                                                  } else if (currency === "XOF") {
+                                                    return { ...item, xofBalance: (item.xofBalance || 0) + amount };
+                                                  }
+                                                }
+                                                return item;
+                                              }));
+                                            } else {
+                                              toast.error(data.error || "Secured deposit operation failed.");
+                                            }
+                                          } catch {
+                                            toast.error("Connection error. Could not execute capital deposit.");
+                                          } finally {
+                                            setIsUpdatingUser(null);
+                                          }
+                                        }}
+                                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center disabled:opacity-50"
                                       >
-                                        {isUpdatingUser === u.uid ? <><ButtonSpinner /> Saving...</> : "Apply Changes"}
+                                        {isUpdatingUser === u.uid ? <><ButtonSpinner /> Processing...</> : "Verify & Credit Wallet"}
+                                      </button>
+                                    </div>
+
+                                    {/* kyc reset section */}
+                                    <div className={cn("p-3.5 rounded-xl border space-y-2 transition-colors duration-300", isDark ? "bg-gray-900 border-gray-850" : "bg-gray-50 border-gray-150")}>
+                                      <p className="text-[10px] font-black uppercase text-red-500">Advanced Identity Control</p>
+                                      <p className="text-[9px] text-gray-400 font-semibold leading-normal">
+                                        Resetting account KYC immediately demotes their status to UNVERIFIED, blocking all regulated actions until they submit their identity BVN/NIN documents again.
+                                      </p>
+                                      <button
+                                        type="button"
+                                        disabled={isUpdatingUser === u.uid}
+                                        onClick={async () => {
+                                          if (!window.confirm(`Are you absolutely sure you want to REMOVE KYC for ${u.name}? This will instantly suspend their access to regulated operations and request a fresh KYC submission!`)) {
+                                            return;
+                                          }
+
+                                          setIsUpdatingUser(u.uid);
+                                          try {
+                                            let idToken = "mock-admin-token";
+                                            const isMock = sessionStorage.getItem("mock") === "true";
+                                            if (!isMock && user) {
+                                              idToken = await user.getIdToken();
+                                            }
+
+                                            const res = await fetch("/api/admin/kyc", {
+                                              method: "POST",
+                                              headers: {
+                                                "Content-Type": "application/json",
+                                                "Authorization": `Bearer ${idToken}`
+                                              },
+                                              body: JSON.stringify({
+                                                action: "reset_kyc",
+                                                targetUid: u.uid
+                                              })
+                                            });
+
+                                            const data = await res.json();
+                                            if (res.ok && data.success) {
+                                              toast.success(data.message || "KYC status reset successfully!");
+                                              setEditingUser(null);
+                                            } else {
+                                              toast.error(data.error || "Failed to reset KYC status.");
+                                            }
+                                          } catch {
+                                            toast.error("Network error during administrative KYC reset.");
+                                          } finally {
+                                            setIsUpdatingUser(null);
+                                          }
+                                        }}
+                                        className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center disabled:opacity-50"
+                                      >
+                                        {isUpdatingUser === u.uid ? <><ButtonSpinner /> Resetting...</> : "Remove KYC & Force Re-verification"}
                                       </button>
                                     </div>
                                   </div>
@@ -2743,9 +2906,9 @@ export default function AdminPage() {
                       className="space-y-6"
                     >
                       {/* Profile Card Summary & Balances */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                         {/* Profile card */}
-                        <div className={cn("p-6 rounded-2xl border transition-colors duration-300 md:col-span-1 space-y-4", panelClass)}>
+                        <div className={cn("p-5 rounded-2xl border transition-colors duration-300 md:col-span-1 space-y-4", panelClass)}>
                           <div className="border-b pb-3.5">
                             <h4 className="text-xs font-black uppercase tracking-wider text-[#FC7A00]">Account Summary</h4>
                             <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Enriched user profile meta-data</p>
@@ -2772,7 +2935,7 @@ export default function AdminPage() {
                                 <p className="text-[10px] font-black uppercase text-gray-400">KYC Status</p>
                                 <span className={cn(
                                   "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider inline-block mt-0.5 border",
-                                  historyTargetUser.kycStatus === "APPROVED"
+                                  historyTargetUser.kycStatus === "APPROVED" || historyTargetUser.kycStatus === "VERIFIED"
                                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                     : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                                 )}>
@@ -2790,25 +2953,47 @@ export default function AdminPage() {
                         </div>
 
                         {/* Main Balance card */}
-                        <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/90 to-orange-600/90 border border-orange-400/30 text-white shadow-xs flex flex-col justify-between">
+                        <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/90 to-orange-600/90 border border-orange-400/30 text-white shadow-xs flex flex-col justify-between">
                           <div>
-                            <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">Main Wallet Balance</p>
-                            <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none">
+                            <p className="text-[10px] font-black uppercase text-orange-100 tracking-wider">NGN Wallet Balance</p>
+                            <p className="font-mono text-xl font-black mt-2 leading-none">
                               ₦{historyTargetUser.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </p>
                           </div>
-                          <p className="text-[9px] text-orange-200 font-bold uppercase tracking-wider mt-4">NGN Reserve Balance</p>
+                          <p className="text-[9px] text-orange-200 font-bold uppercase tracking-wider mt-3">NGN Reserve Balance</p>
+                        </div>
+
+                        {/* USD Balance card */}
+                        <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500/90 to-blue-600/90 border border-indigo-400/30 text-white shadow-xs flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-indigo-100 tracking-wider">USD Wallet Balance</p>
+                            <p className="font-mono text-xl font-black mt-2 leading-none">
+                              ${(historyTargetUser.usdBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <p className="text-[9px] text-indigo-200 font-bold uppercase tracking-wider mt-3">USD Reserve Balance</p>
+                        </div>
+
+                        {/* XOF Balance card */}
+                        <div className="p-5 rounded-2xl bg-gradient-to-br from-fuchsia-500/90 to-pink-600/90 border border-fuchsia-400/30 text-white shadow-xs flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-fuchsia-100 tracking-wider">XOF Wallet Balance</p>
+                            <p className="font-mono text-xl font-black mt-2 leading-none">
+                              CFA{(historyTargetUser.xofBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <p className="text-[9px] text-fuchsia-200 font-bold uppercase tracking-wider mt-3">XOF Reserve Balance</p>
                         </div>
 
                         {/* Bonus Balance card */}
-                        <div className="p-6 rounded-2xl bg-gradient-to-br from-teal-500/90 to-emerald-600/90 border border-teal-400/30 text-white shadow-xs flex flex-col justify-between">
+                        <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-500/90 to-emerald-600/90 border border-teal-400/30 text-white shadow-xs flex flex-col justify-between">
                           <div>
                             <p className="text-[10px] font-black uppercase text-teal-100 tracking-wider">Bonus Wallet Balance</p>
-                            <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none">
+                            <p className="font-mono text-xl font-black mt-2 leading-none">
                               ₦{historyTargetUser.bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </p>
                           </div>
-                          <p className="text-[9px] text-teal-200 font-bold uppercase tracking-wider mt-4">Commissions & Referrals</p>
+                          <p className="text-[9px] text-teal-200 font-bold uppercase tracking-wider mt-3">Commissions & Referrals</p>
                         </div>
                       </div>
 
