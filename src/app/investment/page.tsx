@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/lib/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import BannerSlideshow from "@/components/BannerSlideshow";
 
 interface InvestmentProduct {
   id: string;
@@ -662,6 +663,9 @@ export default function InvestmentPage() {
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
         <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
+          {/* Marketing Slide Banners */}
+          <BannerSlideshow page="investment" />
+
           {/* Header Title Section */}
           <div className="flex items-center gap-3 mb-6 animate-fade-in">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">

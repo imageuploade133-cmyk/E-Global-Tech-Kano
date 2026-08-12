@@ -1,0 +1,559 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/lib/AuthContext";
+import { useAppConfig } from "@/lib/ConfigContext";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+const ButtonSpinner = () => (
+  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
+
+interface BannerSlide {
+  id: string;
+  imageUrl: string;
+  title?: string;
+  description?: string;
+  targetPage: "all" | "bills" | "investment" | "referral";
+  link?: string;
+  createdAt: string;
+}
+
+export default function AdminBannersPage() {
+  const { user } = useAuth();
+  const { config } = useAppConfig();
+  const router = useRouter();
+
+  // Theme support
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("cpanel_theme");
+      if (cached === "dark" || cached === "light") {
+        setTheme(cached);
+      }
+    }
+  }, []);
+
+  const isDark = theme === "dark";
+  const panelClass = isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border border-gray-200 text-gray-800";
+  const inputClass = isDark
+    ? "bg-gray-800 border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2.5 text-xs outline-none transition-all w-full"
+    : "bg-white border border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2.5 text-xs outline-none transition-all w-full";
+  const labelClass = isDark ? "text-gray-300" : "text-gray-900";
+
+  // Admin lock validation
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminPin, setAdminPin] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  // Form states for new slide
+  const [imageUrl, setImageUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral">("all");
+  const [link, setLink] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // List states
+  const [banners, setBanners] = useState<BannerSlide[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(true);
+
+  // Check cookie-based admin session on mount
+  useEffect(() => {
+    const checkCPanelSession = async () => {
+      try {
+        const res = await fetch("/api/admin/auth/session");
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          setIsAdminUnlocked(true);
+          setAdminEmail(data.user.email);
+        }
+      } catch (err) {
+        console.warn("No active admin cookie session found on mount:", err);
+      }
+    };
+    checkCPanelSession();
+  }, []);
+
+  // Pre-fill admin email when user loads as fallback
+  useEffect(() => {
+    if (user?.email && !adminEmail) {
+      setAdminEmail(user.email);
+    }
+  }, [user, adminEmail]);
+
+  // Load banners list once unlocked
+  useEffect(() => {
+    if (isAdminUnlocked) {
+      fetchBanners();
+    }
+  }, [isAdminUnlocked]);
+
+  const fetchBanners = async () => {
+    setIsLoadingList(true);
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/banners", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBanners(data.banners || []);
+      } else {
+        toast.error(data.error || "Failed to load active banners.");
+      }
+    } catch {
+      toast.error("Network communication failure loading banners.");
+    } finally {
+      setIsLoadingList(false);
+    }
+  };
+
+  const handleAdminVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifyingPin(true);
+
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (isMock) {
+        setIsAdminUnlocked(true);
+        toast.success("Mock-Playtesting access granted to Banners!");
+        setIsVerifyingPin(false);
+        return;
+      }
+
+      const res = await fetch("/api/admin/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail.trim(), pin: adminPin.trim() })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsAdminUnlocked(true);
+        toast.success(data.message || "Identity PIN Verified. Access Granted!");
+      } else {
+        toast.error(data.error || "Invalid Email or Access PIN!");
+      }
+    } catch (err: any) {
+      toast.error("API connection error during verification.");
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const apiKey = config.imgbbApiKey || "";
+    if (!apiKey) {
+      toast.error("Imgbb API Key is missing. Please save an API key in the Branding Configurations under Settings tab.");
+      setIsUploading(false);
+      return;
+    }
+
+    toast.loading("Uploading banner image to ImgBB...");
+    try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: "POST",
+        body: formData
+      });
+      const json = await res.json();
+      toast.dismiss();
+
+      if (json.success) {
+        setImageUrl(json.data.display_url);
+        toast.success("Banner image uploaded successfully!");
+      } else {
+        toast.error(json.error?.message || "Failed to upload to ImgBB.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("ImgBB API connection error.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleAddBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!imageUrl.trim()) {
+      toast.error("Please upload or enter a banner image URL.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          imageUrl: imageUrl.trim(),
+          title: title.trim(),
+          description: description.trim(),
+          targetPage,
+          link: link.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Banner slide created successfully!");
+        setImageUrl("");
+        setTitle("");
+        setDescription("");
+        setLink("");
+        setTargetPage("all");
+        fetchBanners(); // Reload list
+      } else {
+        toast.error(data.error || "Failed to save banner slide.");
+      }
+    } catch {
+      toast.error("API connection error while saving banner.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteBanner = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this banner slide?")) {
+      return;
+    }
+
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch(`/api/admin/banners?id=${id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Banner slide deleted.");
+        fetchBanners(); // Reload list
+      } else {
+        toast.error(data.error || "Failed to delete banner slide.");
+      }
+    } catch {
+      toast.error("API connection error while deleting banner.");
+    }
+  };
+
+  const handleToggleTheme = () => {
+    const next = isDark ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("cpanel_theme", next);
+  };
+
+  if (!isAdminUnlocked) {
+    return (
+      <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800" style={{ marginTop: 0 }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6"
+        >
+          <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
+            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_maybe</span>
+          </div>
+
+          <div>
+            <h2 className="font-hanken font-extrabold text-2xl tracking-tight text-gray-900 leading-tight">Admin Gatekeeper</h2>
+            <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
+              Enter your administrative credentials to manage the active slideshow banners.
+            </p>
+          </div>
+
+          <form onSubmit={handleAdminVerify} className="w-full space-y-4">
+            <div className="space-y-1.5 text-left">
+              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Email Address</label>
+              <input
+                type="email"
+                required
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Access PIN</label>
+              <input
+                type="password"
+                maxLength={6}
+                value={adminPin}
+                onChange={(e) => setAdminPin(e.target.value)}
+                placeholder="Enter 4-digit Access PIN"
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isVerifyingPin}
+              className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isVerifyingPin ? <ButtonSpinner /> : "Verify Identity"}
+            </button>
+          </form>
+
+          <Link href="/cpanel" className="text-[11px] font-bold text-gray-400 hover:text-gray-900 uppercase tracking-widest transition-all">
+            ← Return to Control Panel
+          </Link>
+        </motion.div>
+      </main>
+    );
+  }
+
+  return (
+    <div className={cn("min-h-screen flex flex-col font-sans transition-colors duration-300", isDark ? "bg-gray-950 text-white" : "bg-gray-50 text-gray-800")}>
+
+      {/* Immersive Admin Header */}
+      <div role="banner" className={cn("sticky top-0 z-40 border-b transition-colors duration-300 px-6 py-4 flex items-center justify-between", isDark ? "bg-gray-950/80 backdrop-blur-md border-gray-850" : "bg-white/80 backdrop-blur-md border-gray-200")}>
+        <div className="flex items-center gap-3">
+          <Link href="/cpanel" className={cn("w-9 h-9 rounded-xl border flex items-center justify-center transition-all", isDark ? "bg-gray-900 border-gray-800 text-white hover:bg-gray-800" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50")}>
+            <span className="material-symbols-outlined text-[18px] font-bold">arrow_back</span>
+          </Link>
+          <div>
+            <h1 className="font-extrabold text-base tracking-tight leading-tight">Top Slide Banners</h1>
+            <p className="text-[10px] text-gray-400 font-semibold">Deploy and manage visual marketing campaigns across client screens.</p>
+          </div>
+        </div>
+
+        <button onClick={handleToggleTheme} className={cn("w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-amber-400 hover:bg-gray-800" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50")}>
+          <span className="material-symbols-outlined text-[20px]">{isDark ? "light_mode" : "dark_mode"}</span>
+        </button>
+      </div>
+
+      <div className="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Left Side: Create/Upload Slide Form */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className={cn("rounded-2xl p-5 border transition-all shadow-none", panelClass)}>
+            <div className={cn("border-b pb-3 mb-4 flex items-center gap-2", isDark ? "border-gray-800" : "border-gray-150")}>
+              <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
+              <h3 className="font-black text-xs uppercase tracking-wider">Add Banner Slide</h3>
+            </div>
+
+            <form onSubmit={handleAddBanner} className="space-y-4">
+
+              {/* Image Upload Input */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Image <span className="text-red-500">*</span></label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="https://..."
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className={inputClass}
+                  />
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                      disabled={isUploading}
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      className={cn("px-3 h-10 border rounded-xl flex items-center justify-center transition-all", isDark ? "bg-gray-850 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                    >
+                      {isUploading ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">Recommended size: 1200x400px (approx. 3:1 ratio) for crisp displays.</p>
+              </div>
+
+              {/* Title Input */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Caption Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 50% Off VTU Data Plan!"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Description Input */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Description</label>
+                <textarea
+                  placeholder="e.g. Enjoy cheap internet data on MTN, GLO, Airtel & 9mobile."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className={cn(inputClass, "h-16 resize-none")}
+                />
+              </div>
+
+              {/* Target Page Select */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Target Client Screens</label>
+                <select
+                  value={targetPage}
+                  onChange={(e) => setTargetPage(e.target.value as any)}
+                  className={cn(inputClass, "cursor-pointer font-bold")}
+                >
+                  <option value="all">All Pages (Carousel Loop)</option>
+                  <option value="bills">Bills / Utility Page</option>
+                  <option value="investment">Investment Page</option>
+                  <option value="referral">Referral Page</option>
+                </select>
+              </div>
+
+              {/* Action Redirect Link */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Redirect Link</label>
+                <input
+                  type="text"
+                  placeholder="e.g. /bills, /referrals, or external link"
+                  value={link}
+                  onChange={(e) => setLink(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              {/* Image Preview */}
+              {imageUrl && (
+                <div className="p-3 bg-black/10 border border-gray-150 rounded-2xl overflow-hidden relative">
+                  <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Slide Preview</p>
+                  <div className="aspect-[3/1] rounded-lg overflow-hidden border bg-white relative">
+                    <img src={imageUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSaving || isUploading}
+                className="w-full py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {isSaving ? <ButtonSpinner /> : "Deploy Banner Slide"}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Right Side: Active Slides & Overview */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className={cn("rounded-2xl p-5 border transition-all shadow-none", panelClass)}>
+            <div className={cn("border-b pb-3 mb-4 flex items-center justify-between", isDark ? "border-gray-800" : "border-gray-150")}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-orange-500 text-[20px]">view_carousel</span>
+                <h3 className="font-black text-xs uppercase tracking-wider">Active Slides ({banners.length})</h3>
+              </div>
+              <button
+                onClick={fetchBanners}
+                className={cn("p-1.5 border rounded-lg transition-all", isDark ? "border-gray-850 hover:bg-gray-850" : "border-gray-200 hover:bg-gray-50")}
+              >
+                <span className="material-symbols-outlined text-[16px] font-bold block">refresh</span>
+              </button>
+            </div>
+
+            {isLoadingList ? (
+              <div className="text-center py-20 text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+                <ButtonSpinner /> Loading Slide Banners...
+              </div>
+            ) : banners.length === 0 ? (
+              <div className={cn("text-center py-20 border border-dashed rounded-2xl flex flex-col items-center justify-center p-6 space-y-3", isDark ? "border-gray-800" : "border-gray-200")}>
+                <span className="material-symbols-outlined text-[36px] text-gray-400">landscape</span>
+                <p className="text-xs uppercase font-black text-gray-400">No Banners Deployed</p>
+                <p className="text-[11px] text-gray-500 font-semibold max-w-sm mx-auto leading-relaxed">Use the form on the left to upload or attach banner image slides. These will display in real-time as a responsive slideshow for end-users.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {banners.map((b) => (
+                  <div key={b.id} className={cn("p-4 border rounded-2xl flex flex-col md:flex-row gap-4 items-start md:items-center justify-between transition-all", isDark ? "border-gray-850 bg-gray-900/40 hover:bg-gray-850/30" : "border-gray-150 bg-gray-50/50 hover:bg-gray-100/30")}>
+
+                    {/* Thumbnail & Specs */}
+                    <div className="flex gap-4 flex-1 items-start min-w-0">
+                      <div className="w-24 h-12 rounded-lg border bg-white overflow-hidden flex-shrink-0">
+                        <img src={b.imageUrl} alt="Slide Thumbnail" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-extrabold text-xs uppercase tracking-tight text-orange-500 leading-tight select-all truncate">{b.title || "Untitled Slide"}</h4>
+                        <p className={cn("text-[10px] font-medium leading-relaxed truncate mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>{b.description || "No text description."}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
+                            b.targetPage === "all" && "bg-orange-500/10 border-orange-500/20 text-[#FC7A00]",
+                            b.targetPage === "bills" && "bg-indigo-500/10 border-indigo-500/20 text-indigo-500",
+                            b.targetPage === "investment" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
+                            b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500"
+                          )}>
+                            Page: {b.targetPage}
+                          </span>
+                          {b.link && (
+                            <span className={cn("px-2 py-0.5 rounded text-[8px] font-mono border max-w-[150px] truncate", isDark ? "bg-gray-850 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-600")}>
+                              Url: {b.link}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Delete trigger */}
+                    <button
+                      onClick={() => handleDeleteBanner(b.id)}
+                      className={cn("px-3.5 h-10 rounded-xl font-bold text-xs uppercase border tracking-wider transition-all flex items-center gap-1.5 cursor-pointer", isDark ? "bg-gray-850 border-gray-700 text-red-400 hover:bg-red-500/10 hover:border-red-500/30" : "bg-white border-gray-200 text-red-600 hover:bg-red-50 hover:border-red-100")}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

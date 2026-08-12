@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
+import BannerSlideshow from "@/components/BannerSlideshow";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 
@@ -759,6 +760,9 @@ export default function GenericBillPage() {
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
         <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
+          {/* Marketing Slide Banners */}
+          <BannerSlideshow page="bills" />
+
           {/* Title Row with Back History Button */}
           <div className="flex items-center gap-4 mb-5">
             <button
