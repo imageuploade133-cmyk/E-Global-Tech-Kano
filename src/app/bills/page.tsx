@@ -1049,7 +1049,7 @@ export default function GenericBillPage() {
                           }
 
                           return (
-                            <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                            <div className="grid grid-cols-2 gap-3 pr-1">
                               {filteredPlans.map((i) => {
                                 const isSelected = selectedItem?.id === i.id;
                                 const planInfo = parseDataPlan(i.name);
