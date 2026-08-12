@@ -1444,6 +1444,40 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Card 9: Total Transfer Profit */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-emerald-600/95 to-cyan-600/95 rounded-2xl p-6 border border-emerald-400/30 text-white shadow-xs hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="max-w-[75%] min-w-0">
+                        <p className="text-[10px] font-black uppercase text-emerald-100 tracking-wider">Total Transfer Profit</p>
+                        <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{config.totalTransferProfit?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || "0.00"}
+                        </p>
+                        <p className="text-[10px] text-emerald-200 font-bold uppercase tracking-wider mt-3">Admin Transfer Markups</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[24px]">currency_exchange</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 10: Total Data Profit */}
+                  <div className="relative group overflow-hidden bg-gradient-to-br from-fuchsia-500/90 to-pink-600/90 rounded-2xl p-6 border border-fuchsia-400/30 text-white shadow-xs hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="max-w-[75%] min-w-0">
+                        <p className="text-[10px] font-black uppercase text-fuchsia-100 tracking-wider">Total Data Profit</p>
+                        <p className="font-mono text-2xl sm:text-3xl font-black mt-2 leading-none tracking-tight break-all max-w-full overflow-hidden block">
+                          ₦{config.totalDataProfit?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || "0.00"}
+                        </p>
+                        <p className="text-[10px] text-fuchsia-200 font-bold uppercase tracking-wider mt-3">Admin Data Plan Markups</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-white flex-shrink-0">
+                        <span className="material-symbols-outlined text-[24px]">database</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1627,7 +1661,7 @@ export default function AdminPage() {
                             required
                             value={searchUserTerm}
                             onChange={(e) => setSearchUserTerm(e.target.value)}
-                            placeholder="Enter exact email address or complete phone prefix..."
+                            placeholder="Enter exact email, phone number, or 11-digit BVN..."
                             className={cn(
                               "w-full rounded-xl pl-9 pr-3 py-3 text-xs outline-none transition-all",
                               isDark ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500" : "bg-gray-50 border border-gray-200 text-black focus:border-[#FC7A00]"
@@ -2672,7 +2706,7 @@ export default function AdminPage() {
                         required
                         value={historySearchQuery}
                         onChange={(e) => setHistorySearchQuery(e.target.value)}
-                        placeholder="Enter exact email address or complete phone prefix (e.g. jules@example.com)"
+                        placeholder="Enter exact email, phone number, or 11-digit BVN (e.g. 12345678901)"
                         className={cn(
                           "w-full rounded-xl pl-9 pr-3 py-3 text-xs outline-none transition-all",
                           isDark ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500" : "bg-gray-50 border border-gray-200 text-black focus:border-[#FC7A00]"

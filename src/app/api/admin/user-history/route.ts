@@ -74,6 +74,7 @@ export async function GET(req: Request) {
         targetUid = userDoc.id;
       }
     } else {
+      // Search exactly by phone number first
       const phoneSnap = await adminDb.collection("users")
         .where("phoneNumber", "==", search)
         .limit(1)
@@ -82,25 +83,35 @@ export async function GET(req: Request) {
         userDoc = phoneSnap.docs[0];
         targetUid = userDoc.id;
       } else {
-        // Check phone variations
-        const variations = [
-          search,
-          `+234${search.startsWith("0") ? search.slice(1) : search}`,
-          `+227${search.startsWith("0") ? search.slice(1) : search}`,
-        ];
-        const phoneSnap2 = await adminDb.collection("users")
-          .where("phoneNumber", "in", variations)
+        // Search exactly by BVN
+        const bvnSnap = await adminDb.collection("users")
+          .where("bvn", "==", search)
           .limit(1)
           .get();
-        if (!phoneSnap2.empty) {
-          userDoc = phoneSnap2.docs[0];
+        if (!bvnSnap.empty) {
+          userDoc = bvnSnap.docs[0];
           targetUid = userDoc.id;
+        } else {
+          // Check phone variations
+          const variations = [
+            search,
+            `+234${search.startsWith("0") ? search.slice(1) : search}`,
+            `+227${search.startsWith("0") ? search.slice(1) : search}`,
+          ];
+          const phoneSnap2 = await adminDb.collection("users")
+            .where("phoneNumber", "in", variations)
+            .limit(1)
+            .get();
+          if (!phoneSnap2.empty) {
+            userDoc = phoneSnap2.docs[0];
+            targetUid = userDoc.id;
+          }
         }
       }
     }
 
     if (!userDoc) {
-      return NextResponse.json({ success: false, error: "No user found matching this email address or phone number." });
+      return NextResponse.json({ success: false, error: "No user found matching this email, phone number, or BVN." });
     }
 
     const userData = userDoc.data();

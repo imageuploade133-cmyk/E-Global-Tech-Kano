@@ -52,6 +52,7 @@ export async function GET(req: Request) {
         const filtered = mockUsers.filter(u =>
           u.email.toLowerCase().includes(searchTerm) ||
           u.phoneNumber.includes(searchTerm) ||
+          ((u as any).bvn && (u as any).bvn.includes(searchTerm)) ||
           u.name.toLowerCase().includes(searchTerm)
         );
         return NextResponse.json({ success: true, users: filtered });
@@ -76,15 +77,20 @@ export async function GET(req: Request) {
           users.push({ uid: doc.id, ...data });
         });
       } else {
-        // Query exactly by phoneNumber
-        const snap = await adminDb.collection("users")
-          .where("phoneNumber", "==", searchTerm)
-          .limit(5)
-          .get();
+        // Query exactly by phoneNumber or BVN in parallel
+        const queries = [
+          adminDb.collection("users").where("phoneNumber", "==", searchTerm).limit(5).get(),
+          adminDb.collection("users").where("bvn", "==", searchTerm).limit(5).get()
+        ];
 
-        snap.forEach(doc => {
-          const data = doc.data();
-          users.push({ uid: doc.id, ...data });
+        const snaps = await Promise.all(queries);
+        snaps.forEach(snap => {
+          snap.forEach(doc => {
+            const data = doc.data();
+            if (!users.some(u => u.uid === doc.id)) {
+              users.push({ uid: doc.id, ...data });
+            }
+          });
         });
 
         // Fallback: If phone prefix omitted or formatted differently, query by custom formats
@@ -101,7 +107,9 @@ export async function GET(req: Request) {
 
           querySnap.forEach(doc => {
             const data = doc.data();
-            users.push({ uid: doc.id, ...data });
+            if (!users.some(u => u.uid === doc.id)) {
+              users.push({ uid: doc.id, ...data });
+            }
           });
         }
       }
