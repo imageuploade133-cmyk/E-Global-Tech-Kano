@@ -28,7 +28,7 @@ interface PendingKycUser {
   phoneNumber: string;
   kycType: "bvn" | "nin";
   kycNumber: string;
-  kycStatus: "PENDING" | "PENDING_REVIEW" | "VERIFYING" | "IDENTITY_VERIFIED" | "VERIFICATION_FAILED" | "PROCESSING" | "PROVISIONING" | "VERIFIED" | "REJECTED" | "PROVISIONING_FAILED";
+  kycStatus: "PENDING" | "PENDING_REVIEW" | "VERIFYING" | "IDENTITY_VERIFIED" | "VERIFICATION_FAILED" | "PROCESSING" | "PROVISIONING" | "VERIFIED" | "REJECTED" | "PROVISIONING_FAILED" | "UNVERIFIED";
   submittedAt: string;
   capturedSelfie?: string;
   livenessChallenge?: string;
@@ -283,6 +283,46 @@ export default function AdminPage() {
   // Real-time pending count for sidebar badge
   const [kycPendingCount, setKycPendingCount] = useState(0);
 
+  // Tab & pagination state for low cost KYC desk
+  const [kycTab, setKycTab] = useState<"pending" | "verified_today" | "unverified">("pending");
+  const [kycLastDocId, setKycLastDocId] = useState("");
+  const [kycHasMore, setKycHasMore] = useState(false);
+  const [kycTotalCount, setKycTotalCount] = useState(0);
+
+  // Dedicated visual confirmation modal
+  const [adminActionModal, setAdminActionModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    actionLabel: string;
+    actionStyle: "danger" | "warning" | "success" | "info";
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    actionLabel: "",
+    actionStyle: "danger",
+    onConfirm: () => {}
+  });
+
+  const triggerAdminConfirm = (
+    title: string,
+    message: string,
+    actionLabel: string,
+    actionStyle: "danger" | "warning" | "success" | "info",
+    onConfirm: () => void
+  ) => {
+    setAdminActionModal({
+      isOpen: true,
+      title,
+      message,
+      actionLabel,
+      actionStyle,
+      onConfirm
+    });
+  };
+
   // Add user form states
   const [newUserForm, setNewUserForm] = useState({
     firstName: "",
@@ -335,8 +375,11 @@ export default function AdminPage() {
     }
   };
 
-  const fetchPendingKyc = async () => {
+  const fetchPendingKyc = async (isLoadMore: boolean = false, customTab?: "pending" | "verified_today" | "unverified") => {
     setIsLoadingKyc(true);
+    const activeTabToFetch = customTab || kycTab;
+    const lastDocIdToFetch = isLoadMore ? kycLastDocId : "";
+
     try {
       let idToken = "mock-admin-token";
       const isMock = sessionStorage.getItem("mock") === "true";
@@ -344,14 +387,21 @@ export default function AdminPage() {
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/admin/kyc", {
+      const res = await fetch(`/api/admin/kyc?tab=${activeTabToFetch}&limit=10&lastDocId=${lastDocIdToFetch}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`
         }
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setPendingKycUser(data.pendingUsers || []);
+        if (isLoadMore) {
+          setPendingKycUser(prev => [...prev, ...(data.pendingUsers || [])]);
+        } else {
+          setPendingKycUser(data.pendingUsers || []);
+        }
+        setKycLastDocId(data.lastDocId || "");
+        setKycHasMore(!!data.hasMore);
+        setKycTotalCount(data.totalCount || 0);
       } else {
         toast.error(data.error || "Failed to load waiting KYC approvals.");
       }
@@ -442,13 +492,16 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (isAdminUnlocked && (activeTab === "kyc" || kycPendingCount === 0)) {
-      fetchPendingKyc();
+      fetchPendingKyc(false, kycTab);
     }
-  }, [isAdminUnlocked, activeTab]);
+  }, [isAdminUnlocked, activeTab, kycTab]);
 
   useEffect(() => {
-    setKycPendingCount(pendingKycList.length);
-  }, [pendingKycList]);
+    // Only update the global sidebar badge count if tab is 'pending'
+    if (kycTab === "pending") {
+      setKycPendingCount(pendingKycList.length);
+    }
+  }, [pendingKycList, kycTab]);
 
   // Automatically trigger real-time metrics sync on load once authorized
   useEffect(() => {
@@ -727,34 +780,38 @@ export default function AdminPage() {
   };
 
   const handleDeleteBanner = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this banner slide?")) {
-      return;
-    }
+    triggerAdminConfirm(
+      "Delete Banner Slide?",
+      "Are you absolutely sure you want to permanently delete this visual marketing banner slide from user screens?",
+      "Delete Slide",
+      "danger",
+      async () => {
+        try {
+          const isMock = sessionStorage.getItem("mock") === "true";
+          let idToken = "mock-admin-token";
+          if (!isMock && user) {
+            idToken = await user.getIdToken();
+          }
 
-    try {
-      const isMock = sessionStorage.getItem("mock") === "true";
-      let idToken = "mock-admin-token";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
-      }
+          const res = await fetch(`/api/admin/banners?id=${id}`, {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Bearer ${idToken}`
+            }
+          });
 
-      const res = await fetch(`/api/admin/banners?id=${id}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${idToken}`
+          const data = await res.json();
+          if (res.ok && data.success) {
+            toast.success(data.message || "Banner slide deleted.");
+            fetchBanners(); // Reload list
+          } else {
+            toast.error(data.error || "Failed to delete banner slide.");
+          }
+        } catch {
+          toast.error("API connection error while deleting banner.");
         }
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(data.message || "Banner slide deleted.");
-        fetchBanners(); // Reload list
-      } else {
-        toast.error(data.error || "Failed to delete banner slide.");
       }
-    } catch {
-      toast.error("API connection error while deleting banner.");
-    }
+    );
   };
 
   const fetchUserHistory = async (customLimit?: number) => {
@@ -918,49 +975,53 @@ export default function AdminPage() {
   };
 
   const handleUnlinkWhatsapp = async () => {
-    if (!window.confirm("Are you absolutely sure you want to unlink and log out the WhatsApp sender instance? This will suspend all WhatsApp OTP dispatch systems immediately!")) {
-      return;
-    }
+    triggerAdminConfirm(
+      "Unlink WhatsApp Instance?",
+      "Are you absolutely sure you want to unlink and log out the WhatsApp sender instance? This will suspend all WhatsApp OTP dispatch systems immediately!",
+      "Unlink Instance",
+      "warning",
+      async () => {
+        setIsLinkingWhatsapp(true);
+        addWhatsappLog("Dispatching unlink payload to session manager...");
 
-    setIsLinkingWhatsapp(true);
-    addWhatsappLog("Dispatching unlink payload to session manager...");
+        try {
+          let idToken = "mock-admin-token";
+          const isMock = sessionStorage.getItem("mock") === "true";
+          if (!isMock && user) {
+            idToken = await user.getIdToken();
+          }
 
-    try {
-      let idToken = "mock-admin-token";
-      const isMock = sessionStorage.getItem("mock") === "true";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
+          const res = await fetch("/api/admin/whatsapp", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              action: "unlink"
+            })
+          });
+
+          const data = await res.json();
+          if (res.ok && data.success) {
+            setWhatsappStatus("UNLINKED");
+            setWhatsappPhoneNumber(null);
+            setWhatsappLinkedAt(null);
+            setWhatsappPairingCode(null);
+            addWhatsappLog("WhatsApp Session logged out and destroyed successfully.");
+            toast.success("WhatsApp Gateway instance unlinked successfully.");
+          } else {
+            toast.error(data.error || "Unlink request failed.");
+            addWhatsappLog(`[ERROR] Unlink failed: ${data.error}`);
+          }
+        } catch (err: any) {
+          toast.error("Network error unlinking WhatsApp instance.");
+          addWhatsappLog(`[ERROR] Unlink API error: ${err.message}`);
+        } finally {
+          setIsLinkingWhatsapp(false);
+        }
       }
-
-      const res = await fetch("/api/admin/whatsapp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          action: "unlink"
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setWhatsappStatus("UNLINKED");
-        setWhatsappPhoneNumber(null);
-        setWhatsappLinkedAt(null);
-        setWhatsappPairingCode(null);
-        addWhatsappLog("WhatsApp Session logged out and destroyed successfully.");
-        toast.success("WhatsApp Gateway instance unlinked successfully.");
-      } else {
-        toast.error(data.error || "Unlink request failed.");
-        addWhatsappLog(`[ERROR] Unlink failed: ${data.error}`);
-      }
-    } catch (err: any) {
-      toast.error("Network error unlinking WhatsApp instance.");
-      addWhatsappLog(`[ERROR] Unlink API error: ${err.message}`);
-    } finally {
-      setIsLinkingWhatsapp(false);
-    }
+    );
   };
 
   const handleSaveWhatsappApiConfig = async (e: React.FormEvent) => {
@@ -1213,6 +1274,50 @@ export default function AdminPage() {
     } finally {
       setIsUpdatingUser(null);
     }
+  };
+
+  const handleDeleteUnverifiedUser = async (targetUid: string, name: string) => {
+    triggerAdminConfirm(
+      "Purge User Profile?",
+      `Are you absolutely sure you want to permanently delete unverified user "${name.toUpperCase()}"? This action is IRREVERSIBLE and will permanently delete their auth credentials, database documents, and wallet records.`,
+      "Delete Permanently",
+      "danger",
+      async () => {
+        toast.loading("Purging unverified user from server databases...");
+        try {
+          let idToken = "mock-admin-token";
+          const isMock = sessionStorage.getItem("mock") === "true";
+          if (!isMock && user) {
+            idToken = await user.getIdToken();
+          }
+
+          const res = await fetch("/api/admin/kyc", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              action: "delete_unverified",
+              targetUid
+            })
+          });
+
+          const data = await res.json();
+          toast.dismiss();
+          if (res.ok && data.success) {
+            toast.success(data.message || "User profile permanently deleted.");
+            // Filter out of current list
+            setPendingKycUser(prev => prev.filter(u => u.uid !== targetUid));
+          } else {
+            toast.error(data.error || "Failed to delete user profile.");
+          }
+        } catch {
+          toast.dismiss();
+          toast.error("Network communication failure deleting user.");
+        }
+      }
+    );
   };
 
   const sidebarNavItems = [
@@ -2103,57 +2208,61 @@ export default function AdminPage() {
                                             return;
                                           }
 
-                                          if (!window.confirm(`Are you sure you want to securely credit ${currency} ${amount.toLocaleString()} to user ${u.name}?`)) {
-                                            return;
-                                          }
-
-                                          setIsUpdatingUser(u.uid);
-                                          try {
-                                            let idToken = "mock-admin-token";
-                                            const isMock = sessionStorage.getItem("mock") === "true";
-                                            if (!isMock && user) {
-                                              idToken = await user.getIdToken();
-                                            }
-
-                                            const res = await fetch("/api/admin/deposit", {
-                                              method: "POST",
-                                              headers: {
-                                                "Content-Type": "application/json",
-                                                "Authorization": `Bearer ${idToken}`
-                                              },
-                                              body: JSON.stringify({
-                                                targetUid: u.uid,
-                                                amount,
-                                                currency
-                                              })
-                                            });
-
-                                            const data = await res.json();
-                                            if (res.ok && data.success) {
-                                              toast.success(data.message || "Capital credited successfully!");
-                                              if (amountInput) amountInput.value = "";
-
-                                              // Instantly update user's local balance in the directory listing
-                                              setUsersList(prev => prev.map(item => {
-                                                if (item.uid === u.uid) {
-                                                  if (currency === "NGN") {
-                                                    return { ...item, balance: item.balance + amount };
-                                                  } else if (currency === "USD") {
-                                                    return { ...item, usdBalance: (item.usdBalance || 0) + amount };
-                                                  } else if (currency === "XOF") {
-                                                    return { ...item, xofBalance: (item.xofBalance || 0) + amount };
-                                                  }
+                                          triggerAdminConfirm(
+                                            "Confirm Secured Deposit?",
+                                            `Are you sure you want to securely credit ${currency} ${amount.toLocaleString()} to user "${u.name.toUpperCase()}"?`,
+                                            "Credit Wallet",
+                                            "success",
+                                            async () => {
+                                              setIsUpdatingUser(u.uid);
+                                              try {
+                                                let idToken = "mock-admin-token";
+                                                const isMock = sessionStorage.getItem("mock") === "true";
+                                                if (!isMock && user) {
+                                                  idToken = await user.getIdToken();
                                                 }
-                                                return item;
-                                              }));
-                                            } else {
-                                              toast.error(data.error || "Secured deposit operation failed.");
+
+                                                const res = await fetch("/api/admin/deposit", {
+                                                  method: "POST",
+                                                  headers: {
+                                                    "Content-Type": "application/json",
+                                                    "Authorization": `Bearer ${idToken}`
+                                                  },
+                                                  body: JSON.stringify({
+                                                    targetUid: u.uid,
+                                                    amount,
+                                                    currency
+                                                  })
+                                                });
+
+                                                const data = await res.json();
+                                                if (res.ok && data.success) {
+                                                  toast.success(data.message || "Capital credited successfully!");
+                                                  if (amountInput) amountInput.value = "";
+
+                                                  // Instantly update user's local balance in the directory listing
+                                                  setUsersList(prev => prev.map(item => {
+                                                    if (item.uid === u.uid) {
+                                                      if (currency === "NGN") {
+                                                        return { ...item, balance: item.balance + amount };
+                                                      } else if (currency === "USD") {
+                                                        return { ...item, usdBalance: (item.usdBalance || 0) + amount };
+                                                      } else if (currency === "XOF") {
+                                                        return { ...item, xofBalance: (item.xofBalance || 0) + amount };
+                                                      }
+                                                    }
+                                                    return item;
+                                                  }));
+                                                } else {
+                                                  toast.error(data.error || "Secured deposit operation failed.");
+                                                }
+                                              } catch {
+                                                toast.error("Connection error. Could not execute capital deposit.");
+                                              } finally {
+                                                setIsUpdatingUser(null);
+                                              }
                                             }
-                                          } catch {
-                                            toast.error("Connection error. Could not execute capital deposit.");
-                                          } finally {
-                                            setIsUpdatingUser(null);
-                                          }
+                                          );
                                         }}
                                         className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center disabled:opacity-50"
                                       >
@@ -2171,42 +2280,46 @@ export default function AdminPage() {
                                         type="button"
                                         disabled={isUpdatingUser === u.uid}
                                         onClick={async () => {
-                                          if (!window.confirm(`Are you absolutely sure you want to REMOVE KYC for ${u.name}? This will instantly suspend their access to regulated operations and request a fresh KYC submission!`)) {
-                                            return;
-                                          }
+                                          triggerAdminConfirm(
+                                            "Remove KYC Status?",
+                                            `Are you absolutely sure you want to REMOVE KYC for "${u.name.toUpperCase()}"? This will instantly suspend their access to regulated operations and request a fresh KYC submission!`,
+                                            "Remove KYC",
+                                            "danger",
+                                            async () => {
+                                              setIsUpdatingUser(u.uid);
+                                              try {
+                                                let idToken = "mock-admin-token";
+                                                const isMock = sessionStorage.getItem("mock") === "true";
+                                                if (!isMock && user) {
+                                                  idToken = await user.getIdToken();
+                                                }
 
-                                          setIsUpdatingUser(u.uid);
-                                          try {
-                                            let idToken = "mock-admin-token";
-                                            const isMock = sessionStorage.getItem("mock") === "true";
-                                            if (!isMock && user) {
-                                              idToken = await user.getIdToken();
+                                                const res = await fetch("/api/admin/kyc", {
+                                                  method: "POST",
+                                                  headers: {
+                                                    "Content-Type": "application/json",
+                                                    "Authorization": `Bearer ${idToken}`
+                                                  },
+                                                  body: JSON.stringify({
+                                                    action: "reset_kyc",
+                                                    targetUid: u.uid
+                                                  })
+                                                });
+
+                                                const data = await res.json();
+                                                if (res.ok && data.success) {
+                                                  toast.success(data.message || "KYC status reset successfully!");
+                                                  setEditingUser(null);
+                                                } else {
+                                                  toast.error(data.error || "Failed to reset KYC status.");
+                                                }
+                                              } catch {
+                                                toast.error("Network error during administrative KYC reset.");
+                                              } finally {
+                                                setIsUpdatingUser(null);
+                                              }
                                             }
-
-                                            const res = await fetch("/api/admin/kyc", {
-                                              method: "POST",
-                                              headers: {
-                                                "Content-Type": "application/json",
-                                                "Authorization": `Bearer ${idToken}`
-                                              },
-                                              body: JSON.stringify({
-                                                action: "reset_kyc",
-                                                targetUid: u.uid
-                                              })
-                                            });
-
-                                            const data = await res.json();
-                                            if (res.ok && data.success) {
-                                              toast.success(data.message || "KYC status reset successfully!");
-                                              setEditingUser(null);
-                                            } else {
-                                              toast.error(data.error || "Failed to reset KYC status.");
-                                            }
-                                          } catch {
-                                            toast.error("Network error during administrative KYC reset.");
-                                          } finally {
-                                            setIsUpdatingUser(null);
-                                          }
+                                          );
                                         }}
                                         className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center disabled:opacity-50"
                                       >
@@ -2254,35 +2367,64 @@ export default function AdminPage() {
                   <div className={cn("border-b pb-3 flex justify-between items-center flex-wrap gap-2", isDark ? "border-gray-800" : "border-gray-100")}>
                     <div>
                       <h3 className={cn("font-hanken font-extrabold text-sm uppercase", labelClass)}>
-                        KYC Pending Approvals Verification Desk
+                        KYC Verification Desk
                       </h3>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5 font-hanken">Authorize or decline BVN/NIN identity submittals with immediate notification dispatch</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5 font-hanken">Optimize pipeline reviews, load 10 lists at a time to reduce server costs</p>
                     </div>
 
                     <button
                       type="button"
                       disabled={isLoadingKyc}
-                      onClick={fetchPendingKyc}
+                      onClick={() => fetchPendingKyc(false, kycTab)}
                       className={cn(
                         "px-4 py-2 border hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer",
                         isDark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-600"
                       )}
                     >
-                      {isLoadingKyc ? <><ButtonSpinner /> Syncing Queue...</> : "Force Sync Queue"}
+                      {isLoadingKyc ? "Syncing..." : "Sync List"}
                     </button>
                   </div>
 
+                  {/* High Fidelity Tab Bar section for KYC Verification Queue */}
+                  <div className="flex p-1 bg-gray-200/80 dark:bg-gray-800 rounded-xl gap-1">
+                    {[
+                      { id: "pending", label: "Pending Approvals" },
+                      { id: "verified_today", label: "Verified Today" },
+                      { id: "unverified", label: "Unverified" }
+                    ].map((tabItem) => (
+                      <button
+                        key={tabItem.id}
+                        type="button"
+                        onClick={() => {
+                          setKycTab(tabItem.id as any);
+                          setKycLastDocId("");
+                          setPendingKycUser([]);
+                          fetchPendingKyc(false, tabItem.id as any);
+                        }}
+                        className={cn(
+                          "flex-1 py-2 rounded-lg text-xs font-hanken font-extrabold uppercase tracking-wide transition-all cursor-pointer text-center",
+                          kycTab === tabItem.id
+                            ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm border-0"
+                            : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"
+                        )}
+                      >
+                        {tabItem.label}
+                        {kycTab === tabItem.id && kycTotalCount > 0 && ` (${kycTotalCount})`}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="space-y-4 max-h-[550px] overflow-y-auto pr-1">
-                    {isLoadingKyc ? (
+                    {isLoadingKyc && pendingKycList.length === 0 ? (
                       <div className="text-center py-16 text-gray-400 uppercase tracking-widest font-bold text-xs">
-                        <ButtonSpinner /> Polling pending KYC documents...
+                        <ButtonSpinner /> Loading system records...
                       </div>
                     ) : pendingKycList.length === 0 ? (
                       <div className={cn("rounded-2xl p-8 text-center space-y-2 border transition-colors duration-300", isDark ? "bg-emerald-950/20 border-emerald-900/30 text-emerald-400" : "bg-emerald-50/20 border-emerald-100 text-emerald-800")}>
                         <span className="material-symbols-outlined text-[36px] text-emerald-500" style={{ fontVariationSettings: '"FILL" 1' }}>verified</span>
-                        <p className="font-black text-xs uppercase">All Clear!</p>
+                        <p className="font-black text-xs uppercase">No accounts found</p>
                         <p className={cn("text-[11px] font-semibold max-w-md mx-auto leading-relaxed", isDark ? "text-emerald-500/70" : "text-emerald-600/70")}>
-                          There are currently no waiting verification documents in the queue. All submissions have been processed successfully.
+                          There are currently no users found under the selected category list.
                         </p>
                       </div>
                     ) : (
@@ -2299,9 +2441,9 @@ export default function AdminPage() {
                                     "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
                                     (u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW") && "bg-orange-500/10 border border-orange-500/20 text-[#FC7A00]",
                                     (u.kycStatus === "PROCESSING" || u.kycStatus === "VERIFYING") && "bg-blue-500/10 border border-blue-500/20 text-blue-500 animate-pulse",
-                                    u.kycStatus === "IDENTITY_VERIFIED" && "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-bold",
+                                    u.kycStatus === "VERIFIED" && "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-bold",
                                     (u.kycStatus === "PROVISIONING_FAILED" || u.kycStatus === "VERIFICATION_FAILED") && "bg-red-500/10 border border-red-500/20 text-red-500",
-                                    u.kycStatus === "REJECTED" && "bg-gray-500/10 border border-gray-500/20 text-gray-500"
+                                    (u.kycStatus === "REJECTED" || u.kycStatus === "UNVERIFIED") && "bg-gray-500/10 border border-gray-500/20 text-gray-500"
                                   )}>
                                     {u.kycStatus}
                                   </span>
@@ -2340,7 +2482,7 @@ export default function AdminPage() {
 
                             {/* Verification actions & rejection feedback */}
                             <div className="w-full md:w-auto space-y-3 text-right">
-                              {u.kycStatus !== "REJECTED" && (
+                              {u.kycStatus !== "REJECTED" && u.kycStatus !== "VERIFIED" && u.kycStatus !== "UNVERIFIED" && (
                                 <div className="flex items-center gap-2 justify-end mb-2">
                                   <label className="text-[10px] font-black uppercase text-gray-400">Provider:</label>
                                   <select
@@ -2358,7 +2500,19 @@ export default function AdminPage() {
                                 </div>
                               )}
 
-                              <div className="flex gap-2 justify-end">
+                              <div className="flex gap-2 justify-end flex-wrap">
+                                {/* Admin can permanently delete unverified/pending/rejected users to clean database */}
+                                {u.kycStatus !== "VERIFIED" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteUnverifiedUser(u.uid, u.name)}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm justify-center"
+                                  >
+                                    <span className="material-symbols-outlined text-[14px]">delete_forever</span>
+                                    <span>Delete User</span>
+                                  </button>
+                                )}
+
                                 {(u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW" || u.kycStatus === "VERIFICATION_FAILED") && (
                                   <button
                                     type="button"
@@ -2394,7 +2548,7 @@ export default function AdminPage() {
                                 )}
                               </div>
 
-                              {u.kycStatus !== "REJECTED" && (
+                              {u.kycStatus !== "REJECTED" && u.kycStatus !== "VERIFIED" && u.kycStatus !== "UNVERIFIED" && (
                                 <div className="space-y-2 text-right">
                                   <input
                                     type="text"
@@ -2417,6 +2571,23 @@ export default function AdminPage() {
                           </div>
                         );
                       })
+                    )}
+
+                    {/* Pagination control triggered on demand to preserve low reads */}
+                    {kycHasMore && (
+                      <div className="pt-4 text-center">
+                        <button
+                          type="button"
+                          disabled={isLoadingKyc}
+                          onClick={() => fetchPendingKyc(true, kycTab)}
+                          className={cn(
+                            "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto",
+                            isDark ? "bg-gray-800 text-[#FC7A00] border border-gray-700 hover:bg-gray-750" : "bg-orange-50 text-[#FC7A00] border border-orange-100 hover:bg-orange-100/50"
+                          )}
+                        >
+                          {isLoadingKyc ? <ButtonSpinner /> : "Load More Users"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -3993,6 +4164,79 @@ export default function AdminPage() {
                   className="py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 transition-all cursor-pointer active:scale-95"
                 >
                   Yes, Lock
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Dedicated Visual Administrative Action Confirmation Model */}
+      <AnimatePresence>
+        {adminActionModal.isOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAdminActionModal(prev => ({ ...prev, isOpen: false }))}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[99999]"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 max-w-sm md:w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[32px] p-6 text-center shadow-2xl z-[100000] font-hanken"
+            >
+              {/* Dynamic Status Badge */}
+              <div className={cn(
+                "w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse border",
+                adminActionModal.actionStyle === "danger" && "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30 text-red-500",
+                adminActionModal.actionStyle === "warning" && "bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30 text-amber-500",
+                adminActionModal.actionStyle === "success" && "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30 text-emerald-500",
+                adminActionModal.actionStyle === "info" && "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-500"
+              )}>
+                <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  {adminActionModal.actionStyle === "danger" && "gpp_maybe"}
+                  {adminActionModal.actionStyle === "warning" && "warning"}
+                  {adminActionModal.actionStyle === "success" && "verified_user"}
+                  {adminActionModal.actionStyle === "info" && "info"}
+                </span>
+              </div>
+
+              <h4 className="font-extrabold text-base text-gray-900 dark:text-white leading-tight uppercase tracking-tight">
+                {adminActionModal.title}
+              </h4>
+              <p className="text-[11.5px] text-gray-500 dark:text-gray-400 mt-2.5 font-semibold leading-relaxed">
+                {adminActionModal.message}
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setAdminActionModal(prev => ({ ...prev, isOpen: false }))}
+                  className="py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminActionModal(prev => ({ ...prev, isOpen: false }));
+                    adminActionModal.onConfirm();
+                  }}
+                  className={cn(
+                    "py-3 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95",
+                    adminActionModal.actionStyle === "danger" && "bg-gradient-to-r from-red-500 to-red-600 hover:brightness-105",
+                    adminActionModal.actionStyle === "warning" && "bg-gradient-to-r from-amber-500 to-amber-600 hover:brightness-105",
+                    adminActionModal.actionStyle === "success" && "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:brightness-105",
+                    adminActionModal.actionStyle === "info" && "bg-gradient-to-r from-blue-500 to-blue-600 hover:brightness-105"
+                  )}
+                >
+                  {adminActionModal.actionLabel}
                 </button>
               </div>
             </motion.div>

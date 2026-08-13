@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth, mintFirebaseIdToken } from "@/lib/admin-auth";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminApp } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
@@ -27,6 +27,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const tab = searchParams.get("tab") || "pending"; // pending, verified_today, unverified
+    const limitVal = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10")));
+    const lastDocId = searchParams.get("lastDocId") || "";
+
     if (uid === "mock-admin-uid") {
       const mockPending = [
         {
@@ -36,38 +41,83 @@ export async function GET(req: Request) {
           phoneNumber: "+2348011223344",
           kycType: "bvn",
           kycNumber: "22233344455",
-          kycStatus: "PENDING",
+          kycStatus: tab === "pending" ? "PENDING" : (tab === "verified_today" ? "VERIFIED" : "UNVERIFIED"),
           submittedAt: new Date().toISOString(),
           capturedSelfie: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
-          livenessChallenge: "Smile & Blink"
+          livenessChallenge: "Smile & Blink",
+          kycVerifiedAt: new Date().toISOString()
         }
       ];
-      return NextResponse.json({ success: true, pendingUsers: mockPending });
+      return NextResponse.json({ success: true, pendingUsers: mockPending, hasMore: false, totalCount: 1 });
     }
 
-    const authHeader = req.headers.get("Authorization") || "";
-    let idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    let queryRef: FirebaseFirestore.Query = adminDb.collection("users");
 
-    if (!idToken && uid) {
-      idToken = await mintFirebaseIdToken(uid);
+    if (tab === "pending") {
+      queryRef = queryRef.where("kycStatus", "in", [
+        "PENDING", "PENDING_REVIEW", "VERIFYING", "IDENTITY_VERIFIED",
+        "VERIFICATION_FAILED", "PROCESSING", "PROVISIONING", "PROVISIONING_FAILED"
+      ]);
+    } else if (tab === "verified_today") {
+      queryRef = queryRef.where("kycStatus", "==", "VERIFIED");
+    } else {
+      queryRef = queryRef.where("kycStatus", "in", ["UNVERIFIED", "REJECTED"]);
     }
 
-    // Forward the GET request directly to Payment Gateway to retrieve real PENDING KYC list
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
-    const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/pending`, {
-      method: "GET",
-      headers: {
-        "x-api-key": gatewayApiKey,
-        "Authorization": `Bearer ${idToken}`
+    // Sort by a field that is always populated to make pagination predictable
+    queryRef = queryRef.orderBy("email", "asc");
+
+    // Total Count using fast count aggregation
+    let totalCount = 0;
+    try {
+      const countSnap = await queryRef.count().get();
+      totalCount = countSnap.data().count || 0;
+    } catch (countErr: any) {
+      console.warn("[Admin KYC count] failed:", countErr.message);
+    }
+
+    // Apply pagination bounds
+    let executionQuery = queryRef.limit(limitVal + 1); // fetch 1 extra to check hasMore
+
+    if (lastDocId) {
+      const lastDocSnap = await adminDb.collection("users").doc(lastDocId).get();
+      if (lastDocSnap.exists) {
+        executionQuery = executionQuery.startAfter(lastDocSnap);
       }
+    }
+
+    const snap = await executionQuery.get();
+
+    let docs = snap.docs;
+    const hasMore = docs.length > limitVal;
+    if (hasMore) {
+      docs = docs.slice(0, limitVal);
+    }
+
+    const pendingUsers = docs.map(doc => {
+      const data = doc.data();
+      return {
+        uid: doc.id,
+        name: data.name || `${data.firstName || ""} ${data.lastName || ""}`.trim() || "System User",
+        email: data.email || "",
+        phoneNumber: data.phoneNumber || "",
+        kycType: data.kycType || "bvn",
+        kycNumber: data.kycNumber || "",
+        kycStatus: data.kycStatus || "UNVERIFIED",
+        submittedAt: data.kycSubmittedAt || data.createdAt || new Date().toISOString(),
+        capturedSelfie: data.capturedSelfie || data.kycCapturedSelfie || null,
+        livenessChallenge: data.livenessChallenge || null,
+        kycVerifiedAt: data.kycVerifiedAt || null
+      };
     });
 
-    const result = await parseResponseJson(response, "Failed to query kyc queue from gateway.");
-    if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Failed to query kyc queue from gateway." }, { status: response.status });
-    }
-
-    return NextResponse.json({ success: true, pendingUsers: result.pendingUsers });
+    return NextResponse.json({
+      success: true,
+      pendingUsers,
+      hasMore,
+      totalCount,
+      lastDocId: docs.length > 0 ? docs[docs.length - 1].id : ""
+    });
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Admin KYC GET API] Error:", error.message);
@@ -228,6 +278,69 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: "User KYC status has been successfully reset to UNVERIFIED, requesting new submission."
+      });
+
+    } else if (action === "delete_unverified") {
+      if (uid === "mock-admin-uid") {
+        return NextResponse.json({
+          success: true,
+          message: "Mock Unverified User successfully deleted from system records."
+        });
+      }
+
+      // Read target user first to ensure they are indeed unverified (kycStatus !== 'VERIFIED')
+      const targetUserDoc = await adminDb.collection("users").doc(targetUid).get();
+      if (!targetUserDoc.exists) {
+        return NextResponse.json({ error: "User profile not found in system records." }, { status: 404 });
+      }
+
+      const targetData = targetUserDoc.data() || {};
+      if (targetData.kycStatus === "VERIFIED") {
+        return NextResponse.json({ error: "Access denied: Verified users cannot be deleted from the KYC Verification queue." }, { status: 403 });
+      }
+
+      if (targetData.role === "admin" || targetData.role === "SUPER_ADMIN") {
+        return NextResponse.json({ error: "Access denied: Administrative accounts cannot be deleted." }, { status: 403 });
+      }
+
+      // Delete from Firebase Auth
+      const { getAuth } = await import("firebase-admin/auth");
+      try {
+        await getAuth(adminApp).deleteUser(targetUid);
+      } catch (authErr: any) {
+        console.warn(`[Admin KYC delete_unverified] User not found or error in Firebase Auth:`, authErr.message);
+      }
+
+      // Delete user document from Firestore
+      await adminDb.collection("users").doc(targetUid).delete();
+
+      // Delete associated collections
+      try {
+        const batch = adminDb.batch();
+        // Delete wallets
+        const walletsQuery = await adminDb.collection("wallets")
+          .where("userId", "==", targetUid)
+          .get();
+        walletsQuery.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+
+        // Delete submissions
+        const subQuery = await adminDb.collection("kyc_submissions")
+          .where("userId", "==", targetUid)
+          .get();
+        subQuery.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+      } catch (colErr: any) {
+        console.warn(`[Admin KYC delete_unverified] Error deleting sub-collections:`, colErr.message);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Unverified user profile and associated data permanently purged from the server."
       });
 
     } else {
