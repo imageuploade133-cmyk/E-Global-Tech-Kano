@@ -663,25 +663,34 @@ export default function InvestmentPage() {
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
         <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
-          {/* Marketing Slide Banners */}
-          <BannerSlideshow page="investment" />
-
-          {/* Header Title Section */}
-          <div className="flex items-center gap-3 mb-6 animate-fade-in">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary text-[22px]">
-                trending_up
-              </span>
-            </div>
-            <div>
-              <h1 className="font-bodoni text-[20px] font-bold tracking-tight text-black">
-                Investment & Savings Center
-              </h1>
-              <p className="font-hanken text-[11px] text-gray-500 font-bold leading-none mt-1">
-                Lock capital, grow earnings, compounding yield
-              </p>
+          {/* Header Title Section with back button */}
+          <div className="flex items-center gap-4 mb-5 animate-fade-in">
+            <button
+              onClick={() => window.history.back()}
+              className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
+              title="Go Back"
+            >
+              <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+            </button>
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-primary text-[22px]">
+                  trending_up
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="font-bodoni text-[18px] min-[375px]:text-[20px] font-bold tracking-tight text-black truncate">
+                  Investment & Savings Center
+                </h1>
+                <p className="font-hanken text-[11px] text-gray-500 font-bold leading-none mt-1 truncate">
+                  Lock capital, grow earnings, compounding yield
+                </p>
+              </div>
             </div>
           </div>
+
+          {/* Marketing Slide Banners - displayed below page title and back history */}
+          <BannerSlideshow page="investment" />
 
           {/* Current Available Balance */}
           <div className="bg-gradient-to-br from-[#111] to-[#222] rounded-[24px] p-5 text-white mb-6 border border-white/5 shadow-md animate-fade-in">

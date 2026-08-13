@@ -808,9 +808,6 @@ export default function GenericBillPage() {
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
         <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
-          {/* Marketing Slide Banners */}
-          <BannerSlideshow page="bills" />
-
           {/* Title Row with Back History Button */}
           <div className="flex items-center gap-4 mb-5">
             <button
@@ -836,6 +833,9 @@ export default function GenericBillPage() {
               </div>
             </div>
           </div>
+
+          {/* Marketing Slide Banners - displayed below page title and back history */}
+          <BannerSlideshow page="bills" />
 
           <AnimatePresence mode="wait">
             {successReceipt ? (

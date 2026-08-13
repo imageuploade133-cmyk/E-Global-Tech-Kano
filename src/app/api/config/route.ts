@@ -13,7 +13,13 @@ export async function GET() {
         supportPhone2: data?.supportPhone2 || "+234 901 234 5678",
         supportEmail: data?.supportEmail || "support@e-globaltechhub.com",
         appVersion: data?.appVersion || "1.0.0",
-        newDeviceDetectorEnabled: data?.newDeviceDetectorEnabled !== false
+        newDeviceDetectorEnabled: data?.newDeviceDetectorEnabled !== false,
+        bannerOverlayFadeEnabled: data?.bannerOverlayFadeEnabled !== false,
+        bannerSlideIntervalSeconds: data?.bannerSlideIntervalSeconds || 5,
+        bannerBorderEnabled: data?.bannerBorderEnabled !== false,
+        bannerBorderColor: data?.bannerBorderColor || "#e5e7eb",
+        bannerBackgroundColor: data?.bannerBackgroundColor || "#111827",
+        bannerImageMode: data?.bannerImageMode || "cover"
       };
       return NextResponse.json({ success: true, config: publicConfig });
     }
@@ -27,7 +33,13 @@ export async function GET() {
       supportPhone2: "+234 901 234 5678",
       supportEmail: "support@e-globaltechhub.com",
       appVersion: "1.0.0",
-      newDeviceDetectorEnabled: true
+      newDeviceDetectorEnabled: true,
+      bannerOverlayFadeEnabled: true,
+      bannerSlideIntervalSeconds: 5,
+      bannerBorderEnabled: true,
+      bannerBorderColor: "#e5e7eb",
+      bannerBackgroundColor: "#111827",
+      bannerImageMode: "cover"
     };
     return NextResponse.json({ success: true, config: defaultPublicConfig });
   }

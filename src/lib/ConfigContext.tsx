@@ -23,6 +23,12 @@ export interface AppConfig {
   maxKycUploadSizeMb?: number;
   totalTransferProfit?: number;
   totalDataProfit?: number;
+  bannerOverlayFadeEnabled?: boolean;
+  bannerSlideIntervalSeconds?: number;
+  bannerBorderEnabled?: boolean;
+  bannerBorderColor?: string;
+  bannerBackgroundColor?: string;
+  bannerImageMode?: "cover" | "contain";
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -44,6 +50,12 @@ const DEFAULT_CONFIG: AppConfig = {
   maxKycUploadSizeMb: 10,
   totalTransferProfit: 0,
   totalDataProfit: 0,
+  bannerOverlayFadeEnabled: true,
+  bannerSlideIntervalSeconds: 5,
+  bannerBorderEnabled: true,
+  bannerBorderColor: "#e5e7eb",
+  bannerBackgroundColor: "#111827",
+  bannerImageMode: "cover",
 };
 
 interface ConfigContextProps {
