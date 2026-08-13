@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { useAppConfig } from "@/lib/ConfigContext";
 
 interface BannerSlide {
   id: string;
@@ -25,6 +26,15 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const autoplayRef = useRef<NodeJS.Timeout | null>(null);
+  const { config } = useAppConfig();
+
+  // Settings from ConfigContext (with safe defaults)
+  const overlayFadeEnabled = config.bannerOverlayFadeEnabled !== false;
+  const slideIntervalMs = (config.bannerSlideIntervalSeconds || 5) * 1000;
+  const borderEnabled = config.bannerBorderEnabled !== false;
+  const borderColor = config.bannerBorderColor || (isDark ? "#1f2937" : "#e5e7eb");
+  const backgroundColor = config.bannerBackgroundColor || "#111827";
+  const imageMode = config.bannerImageMode || "cover";
 
   useEffect(() => {
     const fetchSlides = async () => {
@@ -50,7 +60,7 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
     const startAutoplay = () => {
       autoplayRef.current = setInterval(() => {
         setCurrentIndex((prev) => (prev + 1) % slides.length);
-      }, 5000); // Transition every 5 seconds
+      }, slideIntervalMs);
     };
 
     startAutoplay();
@@ -60,7 +70,7 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
         clearInterval(autoplayRef.current);
       }
     };
-  }, [slides]);
+  }, [slides, slideIntervalMs]);
 
   const handleDotClick = (idx: number) => {
     setCurrentIndex(idx);
@@ -86,6 +96,10 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
 
   const activeSlide = slides[currentIndex];
 
+  const borderStyles = borderEnabled
+    ? { border: `1px solid ${borderColor}` }
+    : { border: "none" };
+
   return (
     <div className="w-full relative mb-6 select-none overflow-hidden rounded-2xl md:rounded-[24px]">
       <AnimatePresence mode="wait">
@@ -96,20 +110,26 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
           exit={{ opacity: 0, scale: 1.02 }}
           transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
           onClick={() => handleSlideClick(activeSlide)}
-          className={cn(
-            "w-full aspect-[3/1] min-h-[120px] max-h-[220px] md:max-h-[300px] bg-gray-900 flex items-center relative overflow-hidden rounded-2xl md:rounded-[24px] cursor-pointer group shadow-xs border transition-colors duration-300",
-            isDark ? "border-gray-800" : "border-gray-150"
-          )}
+          className="w-full aspect-[3/1] min-h-[120px] max-h-[220px] md:max-h-[300px] flex items-center relative overflow-hidden rounded-2xl md:rounded-[24px] cursor-pointer group shadow-xs transition-all duration-300"
+          style={{
+            backgroundColor: backgroundColor,
+            ...borderStyles,
+          }}
         >
           {/* Main Background Image */}
           <img
             src={activeSlide.imageUrl}
             alt={activeSlide.title || "Marketing Campaign"}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-[6s] group-hover:scale-105"
+            className={cn(
+              "absolute inset-0 w-full h-full transition-transform duration-[6s]",
+              imageMode === "contain" ? "object-contain" : "object-cover group-hover:scale-105"
+            )}
           />
 
           {/* Premium Dark Glassmorphic Vignette Backdrop Mask */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent flex flex-col justify-center p-6 md:p-10 text-left" />
+          {overlayFadeEnabled && (
+            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent flex flex-col justify-center p-6 md:p-10 text-left" />
+          )}
 
           {/* Slide Caption Texts */}
           <div className="relative z-10 max-w-[70%] space-y-1.5 md:space-y-2 select-text cursor-default">

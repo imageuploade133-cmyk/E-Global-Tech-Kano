@@ -189,6 +189,45 @@ export default function AdminPage() {
   const [bannerLink, setBannerLink] = useState("");
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
+  // Banner customize states
+  const [bannerOverlayFade, setBannerOverlayFade] = useState(config.bannerOverlayFadeEnabled !== false);
+  const [bannerSlideInterval, setBannerSlideInterval] = useState(config.bannerSlideIntervalSeconds || 5);
+  const [bannerBorderEnabled, setBannerBorderEnabled] = useState(config.bannerBorderEnabled !== false);
+  const [bannerBorderColor, setBannerBorderColor] = useState(config.bannerBorderColor || "#e5e7eb");
+  const [bannerBackgroundColor, setBannerBackgroundColor] = useState(config.bannerBackgroundColor || "#111827");
+  const [bannerImageMode, setBannerImageMode] = useState<"cover" | "contain">(config.bannerImageMode || "cover");
+  const [isSavingDisplaySettings, setIsSavingDisplaySettings] = useState(false);
+
+  // Sync customize state with config when config updates
+  useEffect(() => {
+    setBannerOverlayFade(config.bannerOverlayFadeEnabled !== false);
+    setBannerSlideInterval(config.bannerSlideIntervalSeconds || 5);
+    setBannerBorderEnabled(config.bannerBorderEnabled !== false);
+    setBannerBorderColor(config.bannerBorderColor || "#e5e7eb");
+    setBannerBackgroundColor(config.bannerBackgroundColor || "#111827");
+    setBannerImageMode(config.bannerImageMode || "cover");
+  }, [config]);
+
+  const handleSaveDisplaySettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingDisplaySettings(true);
+    try {
+      await updateConfig({
+        bannerOverlayFadeEnabled: bannerOverlayFade,
+        bannerSlideIntervalSeconds: bannerSlideInterval,
+        bannerBorderEnabled: bannerBorderEnabled,
+        bannerBorderColor: bannerBorderColor,
+        bannerBackgroundColor: bannerBackgroundColor,
+        bannerImageMode: bannerImageMode,
+      });
+      toast.success("Banner display settings updated successfully!");
+    } catch {
+      toast.error("Failed to save banner display configurations.");
+    } finally {
+      setIsSavingDisplaySettings(false);
+    }
+  };
+
   // Mobile navigation drawer toggle (App-like slide menu)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -3377,8 +3416,131 @@ export default function AdminPage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Create Banners Form */}
-                  <div className="lg:col-span-1">
+                  {/* Create Banners Form & Display customizer */}
+                  <div className="lg:col-span-1 space-y-6">
+                    {/* Display configurations customizer inside Cpanel tab */}
+                    <div className={cn("rounded-2xl p-5 border transition-all shadow-none", panelClass)}>
+                      <div className={cn("border-b pb-3 mb-4 flex items-center gap-2", isDark ? "border-gray-800" : "border-gray-150")}>
+                        <span className="material-symbols-outlined text-orange-500 text-[20px]">tune</span>
+                        <h3 className="font-black text-xs uppercase tracking-wider">Display Settings</h3>
+                      </div>
+
+                      <form onSubmit={handleSaveDisplaySettings} className="space-y-4">
+                        {/* Remove overlay fade */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Remove Overlay Fade</span>
+                          <button
+                            type="button"
+                            onClick={() => setBannerOverlayFade(!bannerOverlayFade)}
+                            className={cn(
+                              "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
+                              !bannerOverlayFade
+                                ? "bg-orange-500/10 border-orange-500/20 text-[#FC7A00]"
+                                : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-700"
+                            )}
+                          >
+                            {!bannerOverlayFade ? "Fade Removed" : "Fade Active"}
+                          </button>
+                        </div>
+
+                        {/* Slider interval */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slideshow Interval (Seconds)</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={60}
+                            value={bannerSlideInterval}
+                            onChange={(e) => setBannerSlideInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                            className={inputClass}
+                          />
+                        </div>
+
+                        {/* Border Toggle */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Remove Border</span>
+                          <button
+                            type="button"
+                            onClick={() => setBannerBorderEnabled(!bannerBorderEnabled)}
+                            className={cn(
+                              "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
+                              !bannerBorderEnabled
+                                ? "bg-orange-500/10 border-orange-500/20 text-[#FC7A00]"
+                                : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-700"
+                            )}
+                          >
+                            {!bannerBorderEnabled ? "Border Removed" : "Border Active"}
+                          </button>
+                        </div>
+
+                        {/* Border Color */}
+                        {bannerBorderEnabled && (
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Border Color Hex</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="#e5e7eb"
+                                value={bannerBorderColor}
+                                onChange={(e) => setBannerBorderColor(e.target.value)}
+                                className={inputClass}
+                              />
+                              <input
+                                type="color"
+                                value={bannerBorderColor.startsWith("#") ? bannerBorderColor : "#e5e7eb"}
+                                onChange={(e) => setBannerBorderColor(e.target.value)}
+                                className="w-10 h-10 rounded-xl cursor-pointer border-0 p-0 overflow-hidden shrink-0"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Background Color */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Background Color Hex</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="#111827"
+                              value={bannerBackgroundColor}
+                              onChange={(e) => setBannerBackgroundColor(e.target.value)}
+                              className={inputClass}
+                            />
+                            <input
+                              type="color"
+                              value={bannerBackgroundColor.startsWith("#") ? bannerBackgroundColor : "#111827"}
+                              onChange={(e) => setBannerBackgroundColor(e.target.value)}
+                              className="w-10 h-10 rounded-xl cursor-pointer border-0 p-0 overflow-hidden shrink-0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Image Size Mode (Contain vs Cover) */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Image Size Mode</label>
+                          <select
+                            value={bannerImageMode}
+                            onChange={(e) => setBannerImageMode(e.target.value as "cover" | "contain")}
+                            className={cn(inputClass, "cursor-pointer font-bold")}
+                          >
+                            <option value="cover">Zoom / Crop to Screen Size (Cover)</option>
+                            <option value="contain">Keep Image Aspect Ratio (Don&apos;t Cut Off)</option>
+                          </select>
+                          <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">
+                            Selecting &quot;Keep Image Aspect Ratio&quot; ensures the full image is rendered in the screen size without any cutoffs or zooming.
+                          </p>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isSavingDisplaySettings}
+                          className="w-full py-3 bg-black hover:brightness-110 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                          {isSavingDisplaySettings ? <ButtonSpinner /> : "Save Display Settings"}
+                        </button>
+                      </form>
+                    </div>
+
                     <div className={cn("rounded-2xl p-5 border transition-all shadow-none", panelClass)}>
                       <div className="border-b pb-3 mb-4 flex items-center gap-2" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
                         <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
