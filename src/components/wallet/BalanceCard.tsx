@@ -406,7 +406,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // Single Transfer states
-  const [trfBank, setTrfBank] = useState<{ id: string; name: string; code?: string } | null>(null);
+  const [trfBank, setTrfBank] = useState<{ id: string; name: string; code?: string; logoUrl?: string | null } | null>(null);
   const [trfAccount, setTrfAccount] = useState("");
   const [trfAccountName, setTrfAccountName] = useState("");
   const [isResolvingAccount, setIsResolvingAccount] = useState(false);
@@ -2976,9 +2976,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             onClick={() => setShowTrfBankSelector(true)}
                             className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-extrabold text-black flex items-center justify-between cursor-pointer transition-all hover:bg-gray-100/50"
                           >
-                            <span className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
-                              {trfBank ? trfBank.name : "Choose bank..."}
+                            <span className="flex items-center gap-3">
+                              {trfBank ? (
+                                <BankLogo name={trfBank.name} logoUrl={trfBank.logoUrl} />
+                              ) : (
+                                <div className="w-11 h-11 rounded-full border border-gray-200 flex items-center justify-center bg-gray-100 text-gray-400 flex-shrink-0">
+                                  <span className="material-symbols-outlined text-[18px]">account_balance</span>
+                                </div>
+                              )}
+                              <span>{trfBank ? trfBank.name : "Choose bank..."}</span>
                             </span>
                             <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
                           </button>
@@ -3106,9 +3112,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       {/* Display Detected Bank after successful automatic discovery or manual selection */}
                       {trfBank && trfAccountName && (
                         <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between text-left animate-fade-in">
-                          <div>
-                            <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Detected Bank</span>
-                            <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfBank.name}</p>
+                          <div className="flex items-center gap-3">
+                            <BankLogo name={trfBank.name} logoUrl={trfBank.logoUrl} />
+                            <div>
+                              <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Detected Bank</span>
+                              <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfBank.name}</p>
+                            </div>
                           </div>
                           <button
                             type="button"
