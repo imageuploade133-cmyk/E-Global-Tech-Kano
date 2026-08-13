@@ -99,7 +99,7 @@ export default function AdminPage() {
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "investments" | "history">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "banners" | "investments" | "history">("dashboard");
 
   // Fixed Deposit States
   const [fdList, setFdList] = useState<any[]>([]);
@@ -176,6 +176,17 @@ export default function AdminPage() {
     `[${new Date().toLocaleTimeString()}] WhatsApp Gateway engine ready.`,
     `[${new Date().toLocaleTimeString()}] Idle: Waiting for administrator action...`
   ]);
+
+  // Slide Banner States
+  const [banners, setBanners] = useState<any[]>([]);
+  const [isLoadingBanners, setIsLoadingBanners] = useState(false);
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+  const [bannerImageUrl, setBannerImageUrl] = useState("");
+  const [bannerTitle, setBannerTitle] = useState("");
+  const [bannerDescription, setBannerDescription] = useState("");
+  const [bannerTargetPage, setBannerTargetPage] = useState<"all" | "bills" | "investment" | "referral">("all");
+  const [bannerLink, setBannerLink] = useState("");
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
   // Mobile navigation drawer toggle (App-like slide menu)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -542,6 +553,157 @@ export default function AdminPage() {
       fetchGlobalMargins();
     }
   }, [isAdminUnlocked, activeTab]);
+
+  const fetchBanners = async () => {
+    setIsLoadingBanners(true);
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/banners", {
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBanners(data.banners || []);
+      } else {
+        toast.error(data.error || "Failed to load active banners.");
+      }
+    } catch {
+      toast.error("Network communication failure loading banners.");
+    } finally {
+      setIsLoadingBanners(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdminUnlocked && activeTab === "banners") {
+      fetchBanners();
+    }
+  }, [isAdminUnlocked, activeTab]);
+
+  const handleBannerFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingBanner(true);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const apiKey = config.imgbbApiKey || "";
+    if (!apiKey) {
+      toast.error("Imgbb API Key is missing. Please save an API key in the Branding Configurations under Settings tab.");
+      setIsUploadingBanner(false);
+      return;
+    }
+
+    toast.loading("Uploading banner image to ImgBB...");
+    try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: "POST",
+        body: formData
+      });
+      const json = await res.json();
+      toast.dismiss();
+
+      if (json.success) {
+        setBannerImageUrl(json.data.display_url);
+        toast.success("Banner image uploaded successfully!");
+      } else {
+        toast.error(json.error?.message || "Failed to upload to ImgBB.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("ImgBB API connection error.");
+    } finally {
+      setIsUploadingBanner(false);
+    }
+  };
+
+  const handleAddBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerImageUrl.trim()) {
+      toast.error("Please upload or enter a banner image URL.");
+      return;
+    }
+
+    setIsSavingBanner(true);
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          imageUrl: bannerImageUrl.trim(),
+          title: bannerTitle.trim(),
+          description: bannerDescription.trim(),
+          targetPage: bannerTargetPage,
+          link: bannerLink.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Banner slide created successfully!");
+        setBannerImageUrl("");
+        setBannerTitle("");
+        setBannerDescription("");
+        setBannerLink("");
+        setBannerTargetPage("all");
+        fetchBanners(); // Reload list
+      } else {
+        toast.error(data.error || "Failed to save banner slide.");
+      }
+    } catch {
+      toast.error("API connection error while saving banner.");
+    } finally {
+      setIsSavingBanner(false);
+    }
+  };
+
+  const handleDeleteBanner = async (id: string) => {
+    if (!confirm("Are you sure you want to permanently delete this banner slide?")) {
+      return;
+    }
+
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch(`/api/admin/banners?id=${id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${idToken}`
+        }
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Banner slide deleted.");
+        fetchBanners(); // Reload list
+      } else {
+        toast.error(data.error || "Failed to delete banner slide.");
+      }
+    } catch {
+      toast.error("API connection error while deleting banner.");
+    }
+  };
 
   const fetchGlobalInvestments = async () => {
     setIsLoadingFd(true);
@@ -973,6 +1135,7 @@ export default function AdminPage() {
     { id: "settings", label: "Branding", icon: "diamond" },
     { id: "whatsapp", label: "WhatsApp Link", icon: "hub" },
     { id: "profit", label: "Commission Markups", icon: "tune" },
+    { id: "banners", label: "Slide Banners", icon: "photo_library" },
     { id: "investments", label: "Fixed Deposits", icon: "savings" },
     { id: "history", label: "User Ledger Audits", icon: "history" },
   ];
@@ -1260,6 +1423,7 @@ export default function AdminPage() {
               {activeTab === "settings" && "Dynamic Visual Settings Manager"}
               {activeTab === "whatsapp" && "WhatsApp API Gateway Link"}
               {activeTab === "profit" && "Global Commission Markups Manager"}
+              {activeTab === "banners" && "Interactive Slide Banners Manager"}
               {activeTab === "investments" && "Secure Fixed Deposits Auditing Panel"}
               {activeTab === "history" && "User Ledger Audits & History Logs"}
             </h2>
@@ -3137,6 +3301,221 @@ export default function AdminPage() {
                     </div>
                   )}
                 </AnimatePresence>
+              </motion.div>
+            )}
+
+            {/* Tab 6.5: Deploy and Manage Slide Banners */}
+            {activeTab === "banners" && (
+              <motion.div
+                key="banners-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6 animate-fadeIn text-left"
+              >
+                <div className={cn(
+                  "p-5 rounded-2xl border text-left flex items-start gap-3.5 transition-colors duration-300",
+                  isDark ? "bg-[#FC7A00]/10 border-[#FC7A00]/20 text-[#FC7A00]" : "bg-orange-50 border-orange-200 text-orange-900"
+                )}>
+                  <div className="w-10 h-10 rounded-xl bg-[#FC7A00]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="material-symbols-outlined text-[24px]">view_carousel</span>
+                  </div>
+                  <div>
+                    <h4 className={cn("font-hanken font-extrabold text-sm uppercase", isDark ? "text-white" : "text-gray-900")}>
+                      Interactive Marketing Carousels
+                    </h4>
+                    <p className="text-[11px] leading-relaxed mt-0.5 font-semibold text-gray-500">
+                      Deploy slide banners targeted directly to key sections (Bills VTU, Investments, and Referrals). These slides feature real-time automatic carousel transitions, custom caption overlays, action buttons, and full responsive support for any device viewport.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Create Banners Form */}
+                  <div className="lg:col-span-1">
+                    <div className={cn("rounded-2xl p-5 border transition-all shadow-none", panelClass)}>
+                      <div className="border-b pb-3 mb-4 flex items-center gap-2" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+                        <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
+                        <h3 className="font-black text-xs uppercase tracking-wider">Add Banner Slide</h3>
+                      </div>
+
+                      <form onSubmit={handleAddBanner} className="space-y-4">
+                        {/* Image input with ImgBB upload helper */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Image Url <span className="text-red-500">*</span></label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              required
+                              placeholder="https://..."
+                              value={bannerImageUrl}
+                              onChange={(e) => setBannerImageUrl(e.target.value)}
+                              className={inputClass}
+                            />
+                            <div className="relative">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleBannerFileUpload}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                disabled={isUploadingBanner}
+                              />
+                              <button
+                                type="button"
+                                disabled={isUploadingBanner}
+                                className={cn("px-3 h-[42px] border rounded-xl flex items-center justify-center transition-all", isDark ? "bg-gray-850 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                              >
+                                {isUploadingBanner ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Title */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Caption Title</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Cheap MTN SME Plans!"
+                            value={bannerTitle}
+                            onChange={(e) => setBannerTitle(e.target.value)}
+                            className={inputClass}
+                          />
+                        </div>
+
+                        {/* Description */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Description Caption</label>
+                          <textarea
+                            placeholder="e.g. Get 1GB for as low as ₦250..."
+                            value={bannerDescription}
+                            onChange={(e) => setBannerDescription(e.target.value)}
+                            className={cn(inputClass, "h-16 resize-none")}
+                          />
+                        </div>
+
+                        {/* Target Page */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Target Screen Location</label>
+                          <select
+                            value={bannerTargetPage}
+                            onChange={(e) => setBannerTargetPage(e.target.value as any)}
+                            className={cn(inputClass, "cursor-pointer font-bold")}
+                          >
+                            <option value="all">All Pages (Carousel Loop)</option>
+                            <option value="bills">Bills / Utility Page</option>
+                            <option value="investment">Investment Page</option>
+                            <option value="referral">Referral Page</option>
+                          </select>
+                        </div>
+
+                        {/* Action Link */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Redirect URL</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. /bills, /referrals, or external link"
+                            value={bannerLink}
+                            onChange={(e) => setBannerLink(e.target.value)}
+                            className={inputClass}
+                          />
+                        </div>
+
+                        {/* Thumbnail Preview */}
+                        {bannerImageUrl && (
+                          <div className="p-3 bg-black/10 border border-gray-150 rounded-2xl overflow-hidden relative">
+                            <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Slide Preview</p>
+                            <div className="aspect-[3/1] rounded-lg overflow-hidden border bg-white relative">
+                              <img src={bannerImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                            </div>
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={isSavingBanner || isUploadingBanner}
+                          className="w-full py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                          {isSavingBanner ? <ButtonSpinner /> : "Deploy Banner Slide"}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Active Banner Slides List */}
+                  <div className="lg:col-span-2">
+                    <div className={cn("rounded-2xl p-5 border transition-all shadow-none h-full", panelClass)}>
+                      <div className="border-b pb-3 mb-4 flex items-center justify-between" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-orange-500 text-[20px]">view_carousel</span>
+                          <h3 className="font-black text-xs uppercase tracking-wider">Active Slides ({banners.length})</h3>
+                        </div>
+                        <button
+                          onClick={fetchBanners}
+                          className={cn("p-1.5 border rounded-lg transition-all", isDark ? "border-gray-800 hover:bg-gray-800" : "border-gray-250 hover:bg-gray-50")}
+                        >
+                          <span className="material-symbols-outlined text-[16px] font-bold block">refresh</span>
+                        </button>
+                      </div>
+
+                      {isLoadingBanners ? (
+                        <div className="text-center py-20 text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+                          <ButtonSpinner /> Loading Slide Banners...
+                        </div>
+                      ) : banners.length === 0 ? (
+                        <div className="text-center py-20 border border-dashed rounded-2xl flex flex-col items-center justify-center p-6 space-y-3" style={{ borderColor: isDark ? "#1f2937" : "#d1d5db" }}>
+                          <span className="material-symbols-outlined text-[36px] text-gray-400">landscape</span>
+                          <p className="text-xs uppercase font-black text-gray-400">No Banners Deployed</p>
+                          <p className="text-[11px] text-gray-500 font-semibold max-w-sm mx-auto leading-relaxed">
+                            Use the form on the left to upload or attach banner image slides. These will display in real-time as a responsive slideshow for end-users.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {banners.map((b) => (
+                            <div key={b.id} className={cn("p-4 border rounded-2xl flex flex-col md:flex-row gap-4 items-start md:items-center justify-between transition-all", isDark ? "border-gray-800 bg-gray-900/40 hover:bg-gray-850/30" : "border-gray-150 bg-gray-50/50 hover:bg-gray-100/30")}>
+                              {/* Thumbnail & Specs */}
+                              <div className="flex gap-4 flex-1 items-start min-w-0">
+                                <div className="w-24 h-12 rounded-lg border bg-white overflow-hidden flex-shrink-0">
+                                  <img src={b.imageUrl} alt="Slide Thumbnail" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-extrabold text-xs uppercase tracking-tight text-orange-500 leading-tight select-all truncate">{b.title || "Untitled Slide"}</h4>
+                                  <p className={cn("text-[10px] font-medium leading-relaxed truncate mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>{b.description || "No text description."}</p>
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    <span className={cn(
+                                      "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border",
+                                      b.targetPage === "all" && "bg-orange-500/10 border-orange-500/20 text-[#FC7A00]",
+                                      b.targetPage === "bills" && "bg-indigo-500/10 border-indigo-500/20 text-indigo-500",
+                                      b.targetPage === "investment" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
+                                      b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500"
+                                    )}>
+                                      Page: {b.targetPage}
+                                    </span>
+                                    {b.link && (
+                                      <span className={cn("px-2 py-0.5 rounded text-[8px] font-mono border max-w-[150px] truncate", isDark ? "bg-gray-850 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-600")}>
+                                        Url: {b.link}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Delete trigger */}
+                              <button
+                                onClick={() => handleDeleteBanner(b.id)}
+                                className={cn("px-3.5 h-10 rounded-xl font-bold text-xs uppercase border tracking-wider transition-all flex items-center gap-1.5 cursor-pointer", isDark ? "bg-gray-850 border-gray-700 text-red-400 hover:bg-red-500/10 hover:border-red-500/30" : "bg-white border-gray-200 text-red-600 hover:bg-red-50 hover:border-red-100")}
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
 
