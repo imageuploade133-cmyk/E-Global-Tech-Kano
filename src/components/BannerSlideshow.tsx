@@ -35,6 +35,10 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
   const borderColor = config.bannerBorderColor || (isDark ? "#1f2937" : "#e5e7eb");
   const backgroundColor = config.bannerBackgroundColor || "#111827";
   const imageMode = config.bannerImageMode || "cover";
+  const slideEffect = config.bannerSlideEffect || "fade";
+  const imagePosition = config.bannerImagePosition || "center";
+  const heightMobile = config.bannerHeightMobile || 150;
+  const heightDesktop = config.bannerHeightDesktop || 220;
 
   useEffect(() => {
     const fetchSlides = async () => {
@@ -100,77 +104,117 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
     ? { border: `1px solid ${borderColor}` }
     : { border: "none" };
 
+  // To solve the "blinking" issue, we remove mode="wait" so old and new slides cross-transition simultaneously.
+  // We use absolute positioning inside a relative container to hold the height constant during transitions.
+  // The transition variants change based on slideEffect settings:
+  const slideVariants = {
+    initial: (effect: string) => ({
+      opacity: 0,
+      x: effect === "slide" ? "100%" : 0,
+      scale: effect === "slide" ? 1 : 0.98,
+    }),
+    animate: {
+      opacity: 1,
+      x: 0,
+      scale: 1,
+    },
+    exit: (effect: string) => ({
+      opacity: 0,
+      x: effect === "slide" ? "-100%" : 0,
+      scale: effect === "slide" ? 1 : 1.02,
+    }),
+  };
+
   return (
-    <div className="w-full relative mb-6 select-none overflow-hidden rounded-2xl md:rounded-[24px]">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.02 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-          onClick={() => handleSlideClick(activeSlide)}
-          className="w-full aspect-[3/1] min-h-[120px] max-h-[220px] md:max-h-[300px] flex items-center relative overflow-hidden rounded-2xl md:rounded-[24px] cursor-pointer group shadow-xs transition-all duration-300"
-          style={{
-            backgroundColor: backgroundColor,
-            ...borderStyles,
-          }}
-        >
-          {/* Main Background Image */}
-          <img
-            src={activeSlide.imageUrl}
-            alt={activeSlide.title || "Marketing Campaign"}
-            className={cn(
-              "absolute inset-0 w-full h-full transition-transform duration-[6s]",
-              imageMode === "contain" ? "object-contain" : "object-cover group-hover:scale-105"
-            )}
-          />
+    <div
+      className="w-full relative mb-6 select-none overflow-hidden rounded-2xl md:rounded-[24px] shadow-xs"
+      style={{
+        backgroundColor: backgroundColor,
+        ...borderStyles,
+        height: `${heightMobile}px`,
+      }}
+    >
+      {/* Responsive height adjustments on desktop screens */}
+      <style jsx global>{`
+        @media (min-width: 768px) {
+          .banner-slideshow-container {
+            height: ${heightDesktop}px !important;
+          }
+        }
+      `}</style>
 
-          {/* Premium Dark Glassmorphic Vignette Backdrop Mask */}
-          {overlayFadeEnabled && (
-            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent flex flex-col justify-center p-6 md:p-10 text-left" />
-          )}
+      <div className="banner-slideshow-container w-full h-full relative overflow-hidden rounded-2xl md:rounded-[24px]">
+        <AnimatePresence initial={false} custom={slideEffect}>
+          <motion.div
+            key={currentIndex}
+            custom={slideEffect}
+            variants={slideVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
+            onClick={() => handleSlideClick(activeSlide)}
+            className="absolute inset-0 w-full h-full flex items-center cursor-pointer group overflow-hidden rounded-2xl md:rounded-[24px]"
+          >
+            {/* Main Background Image */}
+            <img
+              src={activeSlide.imageUrl}
+              alt={activeSlide.title || "Marketing Campaign"}
+              className={cn(
+                "absolute inset-0 w-full h-full transition-transform duration-[6s]",
+                imageMode === "contain" ? "object-contain" : "object-cover group-hover:scale-105"
+              )}
+              style={{
+                objectPosition: imagePosition,
+              }}
+            />
 
-          {/* Slide Caption Texts */}
-          <div className="relative z-10 max-w-[70%] space-y-1.5 md:space-y-2 select-text cursor-default">
-            {activeSlide.title && (
-              <motion.h3
-                initial={{ y: 8, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.1, duration: 0.3 }}
-                className="font-hanken font-black text-sm min-[360px]:text-base md:text-xl text-white uppercase tracking-tight leading-tight select-none pointer-events-none"
-              >
-                {activeSlide.title}
-              </motion.h3>
-            )}
-            {activeSlide.description && (
-              <motion.p
-                initial={{ y: 8, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.3 }}
-                className="font-hanken text-[10px] min-[360px]:text-xs md:text-sm text-gray-200/90 font-semibold leading-snug select-none pointer-events-none"
-              >
-                {activeSlide.description}
-              </motion.p>
+            {/* Premium Dark Glassmorphic Vignette Backdrop Mask */}
+            {overlayFadeEnabled && (
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent flex flex-col justify-center p-6 md:p-10 text-left" />
             )}
 
-            {/* Optional Interactive CTA Button */}
-            {activeSlide.link && (
-              <motion.div
-                initial={{ y: 8, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.3, duration: 0.3 }}
-                className="pt-1 select-none pointer-events-none"
-              >
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[9px] min-[360px]:text-[10px] uppercase rounded-full shadow-lg shadow-orange-500/10 active:scale-95 transition-all">
-                  <span>Learn More</span>
-                  <span className="material-symbols-outlined text-[11px] font-bold">arrow_forward</span>
-                </span>
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
-      </AnimatePresence>
+            {/* Slide Caption Texts */}
+            <div className="relative z-10 max-w-[70%] space-y-1.5 md:space-y-2 select-text cursor-default pl-6 md:pl-10">
+              {activeSlide.title && (
+                <motion.h3
+                  initial={{ y: 8, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.3 }}
+                  className="font-hanken font-black text-sm min-[360px]:text-base md:text-xl text-white uppercase tracking-tight leading-tight select-none pointer-events-none"
+                >
+                  {activeSlide.title}
+                </motion.h3>
+              )}
+              {activeSlide.description && (
+                <motion.p
+                  initial={{ y: 8, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.3 }}
+                  className="font-hanken text-[10px] min-[360px]:text-xs md:text-sm text-gray-200/90 font-semibold leading-snug select-none pointer-events-none"
+                >
+                  {activeSlide.description}
+                </motion.p>
+              )}
+
+              {/* Optional Interactive CTA Button */}
+              {activeSlide.link && (
+                <motion.div
+                  initial={{ y: 8, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                  className="pt-1 select-none pointer-events-none"
+                >
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[9px] min-[360px]:text-[10px] uppercase rounded-full shadow-lg shadow-orange-500/10 active:scale-95 transition-all">
+                    <span>Learn More</span>
+                    <span className="material-symbols-outlined text-[11px] font-bold">arrow_forward</span>
+                  </span>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       {/* Slide Indicators Dots (Only if multiple slides exist) */}
       {slides.length > 1 && (

@@ -19,7 +19,11 @@ export async function GET() {
         bannerBorderEnabled: data?.bannerBorderEnabled !== false,
         bannerBorderColor: data?.bannerBorderColor || "#e5e7eb",
         bannerBackgroundColor: data?.bannerBackgroundColor || "#111827",
-        bannerImageMode: data?.bannerImageMode || "cover"
+        bannerImageMode: data?.bannerImageMode || "cover",
+        bannerSlideEffect: data?.bannerSlideEffect || "fade",
+        bannerImagePosition: data?.bannerImagePosition || "center",
+        bannerHeightMobile: data?.bannerHeightMobile || 150,
+        bannerHeightDesktop: data?.bannerHeightDesktop || 220
       };
       return NextResponse.json({ success: true, config: publicConfig });
     }
@@ -39,7 +43,11 @@ export async function GET() {
       bannerBorderEnabled: true,
       bannerBorderColor: "#e5e7eb",
       bannerBackgroundColor: "#111827",
-      bannerImageMode: "cover"
+      bannerImageMode: "cover",
+      bannerSlideEffect: "fade",
+      bannerImagePosition: "center",
+      bannerHeightMobile: 150,
+      bannerHeightDesktop: 220
     };
     return NextResponse.json({ success: true, config: defaultPublicConfig });
   }

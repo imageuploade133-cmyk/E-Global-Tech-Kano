@@ -29,6 +29,10 @@ export interface AppConfig {
   bannerBorderColor?: string;
   bannerBackgroundColor?: string;
   bannerImageMode?: "cover" | "contain";
+  bannerSlideEffect?: "fade" | "slide";
+  bannerImagePosition?: string;
+  bannerHeightMobile?: number;
+  bannerHeightDesktop?: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -56,6 +60,10 @@ const DEFAULT_CONFIG: AppConfig = {
   bannerBorderColor: "#e5e7eb",
   bannerBackgroundColor: "#111827",
   bannerImageMode: "cover",
+  bannerSlideEffect: "fade",
+  bannerImagePosition: "center",
+  bannerHeightMobile: 150,
+  bannerHeightDesktop: 220,
 };
 
 interface ConfigContextProps {

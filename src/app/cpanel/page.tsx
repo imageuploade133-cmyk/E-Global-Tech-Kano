@@ -196,6 +196,10 @@ export default function AdminPage() {
   const [bannerBorderColor, setBannerBorderColor] = useState(config.bannerBorderColor || "#e5e7eb");
   const [bannerBackgroundColor, setBannerBackgroundColor] = useState(config.bannerBackgroundColor || "#111827");
   const [bannerImageMode, setBannerImageMode] = useState<"cover" | "contain">(config.bannerImageMode || "cover");
+  const [bannerSlideEffect, setBannerSlideEffect] = useState<"fade" | "slide">(config.bannerSlideEffect || "fade");
+  const [bannerImagePosition, setBannerImagePosition] = useState(config.bannerImagePosition || "center");
+  const [bannerHeightMobile, setBannerHeightMobile] = useState(config.bannerHeightMobile || 150);
+  const [bannerHeightDesktop, setBannerHeightDesktop] = useState(config.bannerHeightDesktop || 220);
   const [isSavingDisplaySettings, setIsSavingDisplaySettings] = useState(false);
 
   // Sync customize state with config when config updates
@@ -206,6 +210,10 @@ export default function AdminPage() {
     setBannerBorderColor(config.bannerBorderColor || "#e5e7eb");
     setBannerBackgroundColor(config.bannerBackgroundColor || "#111827");
     setBannerImageMode(config.bannerImageMode || "cover");
+    setBannerSlideEffect(config.bannerSlideEffect || "fade");
+    setBannerImagePosition(config.bannerImagePosition || "center");
+    setBannerHeightMobile(config.bannerHeightMobile || 150);
+    setBannerHeightDesktop(config.bannerHeightDesktop || 220);
   }, [config]);
 
   const handleSaveDisplaySettings = async (e: React.FormEvent) => {
@@ -219,6 +227,10 @@ export default function AdminPage() {
         bannerBorderColor: bannerBorderColor,
         bannerBackgroundColor: bannerBackgroundColor,
         bannerImageMode: bannerImageMode,
+        bannerSlideEffect: bannerSlideEffect,
+        bannerImagePosition: bannerImagePosition,
+        bannerHeightMobile: bannerHeightMobile,
+        bannerHeightDesktop: bannerHeightDesktop,
       });
       toast.success("Banner display settings updated successfully!");
     } catch {
@@ -3515,6 +3527,61 @@ export default function AdminPage() {
                           </div>
                         </div>
 
+                        {/* Slide Effect */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Transition Effect</label>
+                          <select
+                            value={bannerSlideEffect}
+                            onChange={(e) => setBannerSlideEffect(e.target.value as "fade" | "slide")}
+                            className={cn(inputClass, "cursor-pointer font-bold")}
+                          >
+                            <option value="fade">Seamless Cross-Fade (No Blinking)</option>
+                            <option value="slide">Smooth Slide-In (Right-to-Left)</option>
+                          </select>
+                        </div>
+
+                        {/* Crop Height Mobile */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Mobile Height (px)</label>
+                          <input
+                            type="number"
+                            min={80}
+                            max={400}
+                            value={bannerHeightMobile}
+                            onChange={(e) => setBannerHeightMobile(Math.max(80, parseInt(e.target.value) || 120))}
+                            className={inputClass}
+                          />
+                        </div>
+
+                        {/* Crop Height Desktop */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Desktop Height (px)</label>
+                          <input
+                            type="number"
+                            min={100}
+                            max={600}
+                            value={bannerHeightDesktop}
+                            onChange={(e) => setBannerHeightDesktop(Math.max(100, parseInt(e.target.value) || 200))}
+                            className={inputClass}
+                          />
+                        </div>
+
+                        {/* Crop Align position */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Image Crop Alignment (Position)</label>
+                          <select
+                            value={bannerImagePosition}
+                            onChange={(e) => setBannerImagePosition(e.target.value)}
+                            className={cn(inputClass, "cursor-pointer font-bold")}
+                          >
+                            <option value="center">Center</option>
+                            <option value="top">Top</option>
+                            <option value="bottom">Bottom</option>
+                            <option value="left">Left</option>
+                            <option value="right">Right</option>
+                          </select>
+                        </div>
+
                         {/* Image Size Mode (Contain vs Cover) */}
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Image Size Mode</label>
@@ -3523,7 +3590,7 @@ export default function AdminPage() {
                             onChange={(e) => setBannerImageMode(e.target.value as "cover" | "contain")}
                             className={cn(inputClass, "cursor-pointer font-bold")}
                           >
-                            <option value="cover">Zoom / Crop to Screen Size (Cover)</option>
+                            <option value="cover">Crop to Screen Size (Cover - Adjust Height/Alignment above)</option>
                             <option value="contain">Keep Image Aspect Ratio (Don&apos;t Cut Off)</option>
                           </select>
                           <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">
