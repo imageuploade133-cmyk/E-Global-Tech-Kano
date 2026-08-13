@@ -12,6 +12,7 @@ export interface BankDoc {
   is_active: boolean;
   createdAt: string;
   updatedAt: string;
+  logoUrl?: string | null;
 }
 
 // In-memory cache for fast subsequent lookups
@@ -156,6 +157,7 @@ export class BankService {
         country: bank.country || "NG",
         type: bank.type || "NG",
         is_active: bank.is_active !== undefined ? !!bank.is_active : true,
+        logoUrl: bank.logoUrl || null,
         createdAt: bank.createdAt || nowStr,
         updatedAt: nowStr,
       };
