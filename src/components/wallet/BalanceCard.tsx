@@ -18,6 +18,49 @@ interface BalanceCardProps {
   isLoading?: boolean;
 }
 
+interface BankLogoProps {
+  name: string;
+  logoUrl?: string | null;
+}
+
+const BankLogo: React.FC<BankLogoProps> = ({ name, logoUrl }) => {
+  const [hasError, setHasError] = useState(false);
+  const initials = name.substring(0, 2).toUpperCase();
+  const colors = [
+    "bg-orange-100 text-orange-700 border-orange-200",
+    "bg-emerald-100 text-emerald-700 border-emerald-200",
+    "bg-blue-100 text-blue-700 border-blue-200",
+    "bg-purple-100 text-purple-700 border-purple-200",
+    "bg-rose-100 text-rose-700 border-rose-200",
+    "bg-amber-100 text-amber-700 border-amber-200",
+  ];
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) {
+    sum += name.charCodeAt(i);
+  }
+  const logoColorClass = colors[sum % colors.length];
+
+  if (logoUrl && !hasError) {
+    return (
+      <div className="w-11 h-11 rounded-full border border-gray-100 flex items-center justify-center overflow-hidden bg-white flex-shrink-0">
+        <img
+          src={logoUrl}
+          alt={`${name} logo`}
+          className="w-full h-full object-contain p-1.5"
+          loading="lazy"
+          onError={() => setHasError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
+      {initials}
+    </div>
+  );
+};
+
 
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName, isLoading }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -332,7 +375,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [searchQuery, setSearchQuery] = useState("");
 
   // Dynamic Bank Discovery States
-  const [banksList, setBanksList] = useState<Array<{ id: string; name: string; code?: string }>>([]);
+  const [banksList, setBanksList] = useState<Array<{ id: string; name: string; code?: string; logoUrl?: string | null }>>([]);
   const [isBanksLoading, setIsBanksLoading] = useState(false);
   const [selectedBank, setSelectedBank] = useState<{ id: string; name: string; code?: string } | null>(null);
   const [ussdErrorMessage, setUssdErrorMessage] = useState("");
@@ -2579,21 +2622,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       <p className="py-8 text-center text-gray-400 font-hanken text-xs font-semibold">No banks matched.</p>
                     ) : (
                       filteredBanks.map((bank) => {
-                        const initials = bank.name.substring(0, 2).toUpperCase();
-                        const colors = [
-                          "bg-orange-100 text-orange-700 border-orange-200",
-                          "bg-emerald-100 text-emerald-700 border-emerald-200",
-                          "bg-blue-100 text-blue-700 border-blue-200",
-                          "bg-purple-100 text-purple-700 border-purple-200",
-                          "bg-rose-100 text-rose-700 border-rose-200",
-                          "bg-amber-100 text-amber-700 border-amber-200",
-                        ];
-                        let sum = 0;
-                        for (let i = 0; i < bank.name.length; i++) {
-                          sum += bank.name.charCodeAt(i);
-                        }
-                        const logoColorClass = colors[sum % colors.length];
-
                         return (
                           <button
                             key={bank.id}
@@ -2601,9 +2629,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             onClick={() => handleBankSelect(bank)}
                             className="w-full p-3.5 rounded-2xl bg-white flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none premium-gradient-border"
                           >
-                            <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
-                              {initials}
-                            </div>
+                            <BankLogo name={bank.name} logoUrl={bank.logoUrl} />
                             <div className="min-w-0 flex-1">
                               <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
                             </div>
@@ -3425,21 +3451,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               ) : (
                                 <div className="flex-1 overflow-y-auto space-y-2.5 px-1 pr-1.5 pt-2.5 no-scrollbar pb-6">
                                   {filteredTrfBanks.map((bank) => {
-                                    const initials = bank.name.substring(0, 2).toUpperCase();
-                                    const colors = [
-                                      "bg-orange-100 text-orange-700 border-orange-200",
-                                      "bg-emerald-100 text-emerald-700 border-emerald-200",
-                                      "bg-blue-100 text-blue-700 border-blue-200",
-                                      "bg-purple-100 text-purple-700 border-purple-200",
-                                      "bg-rose-100 text-rose-700 border-rose-200",
-                                      "bg-amber-100 text-amber-700 border-amber-200",
-                                    ];
-                                    let sum = 0;
-                                    for (let i = 0; i < bank.name.length; i++) {
-                                      sum += bank.name.charCodeAt(i);
-                                    }
-                                    const logoColorClass = colors[sum % colors.length];
-
                                     return (
                                       <button
                                         key={bank.id}
@@ -3455,9 +3466,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                         }}
                                         className="w-full p-3.5 rounded-2xl bg-white flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none premium-gradient-border"
                                       >
-                                        <div className={`w-11 h-11 rounded-full border flex items-center justify-center text-xs font-black tracking-tighter flex-shrink-0 ${logoColorClass}`}>
-                                          {initials}
-                                        </div>
+                                        <BankLogo name={bank.name} logoUrl={bank.logoUrl} />
                                         <div className="min-w-0 flex-1">
                                           <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
                                         </div>
