@@ -1,0 +1,215 @@
+==============================================================================================================================
+BANK CODE | BANK NAME                                    | LOGO FOUND | LOGO URL                  | STATUS
+==============================================================================================================================
+110072    | 78 Finance Company Ltd (Bank78)              | YES        | /bank-logos/110072.png    | VERIFIED
+120001    | 9mobile 9Payment Service Bank                | YES        | /bank-logos/120001.png    | VERIFIED
+404       | Abbey Mortgage Bank                          | YES        | /bank-logos/404.png       | VERIFIED
+51204     | Above Only MFB                               | YES        | /bank-logos/51204.png     | VERIFIED
+51312     | Abulesoro MFB                                | YES        | /bank-logos/51312.png     | VERIFIED
+044       | Access Bank                                  | YES        | /bank-logos/044.png       | VERIFIED
+063       | Access Bank (Diamond)                        | YES        | /bank-logos/063.png       | VERIFIED
+602       | Accion Microfinance Bank                     | YES        | /bank-logos/602.png       | VERIFIED
+50315     | Aella MFB                                    | YES        | /bank-logos/50315.png     | VERIFIED
+90077     | AG Mortgage Bank                             | YES        | /bank-logos/90077.png     | VERIFIED
+50036     | Ahmadu Bello University Microfinance Bank    | YES        | /bank-logos/50036.png     | VERIFIED
+120004    | Airtel Smartcash PSB                         | YES        | /bank-logos/120004.png    | VERIFIED
+51336     | AKU Microfinance Bank                        | YES        | /bank-logos/51336.png     | VERIFIED
+090561    | Akuchukwu Microfinance Bank Limited          | YES        | /bank-logos/090561.png    | VERIFIED
+035A      | ALAT by WEMA                                 | YES        | /bank-logos/035A.png      | VERIFIED
+090629    | Amegy Microfinance Bank                      | YES        | /bank-logos/090629.png    | VERIFIED
+50926     | Amju Unique MFB                              | YES        | /bank-logos/50926.png     | VERIFIED
+645       | Amucha MFB                                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+645       | Amucha Microfinance Bank                     | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50083     | Aramoko MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+401       | ASO Savings and Loans                        | YES        | /bank-logos/401.png       | VERIFIED
+50092     | Assets Microfinance Bank                     | YES        | /bank-logos/50092.png     | VERIFIED
+MFB50094  | Astrapolaris MFB LTD                         | YES        | /bank-logos/MFB50094.png  | VERIFIED
+090478    | AVUENEGBE MICROFINANCE BANK                  | YES        | /bank-logos/090478.png    | VERIFIED
+51351     | AWACASH MICROFINANCE BANK                    | YES        | /bank-logos/51351.png     | VERIFIED
+51337     | AZTEC MICROFINANCE BANK LIMITED              | YES        | /bank-logos/51337.png     | VERIFIED
+51229     | Bainescredit MFB                             | YES        | /bank-logos/51229.png     | VERIFIED
+50117     | Banc Corp Microfinance Bank                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51341     | BANKLY MFB                                   | YES        | /bank-logos/51341.png     | VERIFIED
+MFB50992  | Baobab Microfinance Bank                     | YES        | /bank-logos/MFB50992.png  | VERIFIED
+51100     | BellBank Microfinance Bank                   | YES        | /bank-logos/51100.png     | VERIFIED
+51267     | Benysta Microfinance Bank Limited            | YES        | /bank-logos/51267.png     | VERIFIED
+50123     | Beststar Microfinance Bank                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50931     | Bowen Microfinance Bank                      | YES        | /bank-logos/50931.png     | VERIFIED
+FC40163   | Branch International Finance Company Limited | YES        | /bank-logos/FC40163.png   | VERIFIED
+565       | Carbon                                       | YES        | /bank-logos/565.png       | VERIFIED
+51353     | Cashbridge Microfinance Bank Limited         | YES        | /bank-logos/51353.png     | VERIFIED
+865       | CASHCONNECT MFB                              | YES        | /bank-logos/865.png       | VERIFIED
+50823     | CEMCS Microfinance Bank                      | YES        | /bank-logos/50823.png     | VERIFIED
+50171     | Chanelle Microfinance Bank Limited           | YES        | /bank-logos/50171.png     | VERIFIED
+312       | Chikum Microfinance bank                     | YES        | /bank-logos/312.png       | VERIFIED
+023       | Citibank Nigeria                             | YES        | /bank-logos/023.png       | VERIFIED
+070027    | CITYCODE MORTAGE BANK                        | YES        | /bank-logos/070027.png    | VERIFIED
+50910     | Consumer Microfinance Bank                   | YES        | /bank-logos/50910.png     | VERIFIED
+50204     | Corestep MFB                                 | YES        | /bank-logos/50204.png     | VERIFIED
+559       | Coronation Merchant Bank                     | YES        | /bank-logos/559.png       | VERIFIED
+FC40128   | County Finance Limited                       | YES        | /bank-logos/FC40128.png   | VERIFIED
+51297     | Crescent MFB                                 | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+090560    | Crust Microfinance Bank                      | YES        | /bank-logos/090560.png    | VERIFIED
+51334     | Davenport MICROFINANCE BANK                  | YES        | /bank-logos/51334.png     | VERIFIED
+50162     | Dot Microfinance Bank                        | YES        | /bank-logos/50162.png     | VERIFIED
+050       | Ecobank Nigeria                              | YES        | /bank-logos/050.png       | VERIFIED
+50263     | Ekimogun MFB                                 | YES        | /bank-logos/50263.png     | VERIFIED
+098       | Ekondo Microfinance Bank                     | YES        | /bank-logos/098.png       | VERIFIED
+090678    | EXCEL FINANCE BANK                           | YES        | /bank-logos/090678.png    | VERIFIED
+50126     | Eyowo                                        | YES        | /bank-logos/50126.png     | VERIFIED
+51318     | Fairmoney Microfinance Bank                  | YES        | /bank-logos/51318.png     | VERIFIED
+50298     | Fedeth MFB                                   | YES        | /bank-logos/50298.png     | VERIFIED
+070       | Fidelity Bank                                | YES        | /bank-logos/070.png       | VERIFIED
+51314     | Firmus MFB                                   | YES        | /bank-logos/51314.png     | VERIFIED
+011       | First Bank of Nigeria                        | YES        | /bank-logos/011.png       | VERIFIED
+214       | First City Monument Bank                     | YES        | /bank-logos/214.png       | VERIFIED
+090164    | FIRST ROYAL MICROFINANCE BANK                | YES        | /bank-logos/090164.png    | VERIFIED
+413       | FirstTrust Mortgage Bank Nigeria             | YES        | /bank-logos/413.png       | VERIFIED
+501       | FSDH Merchant Bank Limited                   | YES        | /bank-logos/501.png       | VERIFIED
+832       | FUTMINNA MICROFINANCE BANK                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+MFB51093  | Garun Mallam MFB                             | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+812       | Gateway Mortgage Bank LTD                    | YES        | /bank-logos/812.png       | VERIFIED
+00103     | Globus Bank                                  | YES        | /bank-logos/00103.png     | VERIFIED
+090574    | Goldman MFB                                  | YES        | /bank-logos/090574.png    | VERIFIED
+100022    | GoMoney                                      | YES        | /bank-logos/100022.png    | VERIFIED
+090664    | GOOD SHEPHERD MICROFINANCE BANK              | YES        | /bank-logos/090664.png    | VERIFIED
+50739     | Goodnews Microfinance Bank                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+562       | Greenwich Merchant Bank                      | YES        | /bank-logos/562.png       | VERIFIED
+51276     | GROOMING MICROFINANCE BANK                   | YES        | /bank-logos/51276.png     | VERIFIED
+058       | Guaranty Trust Bank                          | YES        | /bank-logos/058.png       | VERIFIED
+51251     | Hackman Microfinance Bank                    | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50383     | Hasal Microfinance Bank                      | YES        | /bank-logos/50383.png     | VERIFIED
+120002    | HopePSB                                      | YES        | /bank-logos/120002.png    | VERIFIED
+51211     | IBANK Microfinance Bank                      | YES        | /bank-logos/51211.png     | VERIFIED
+51244     | Ibile Microfinance Bank                      | YES        | /bank-logos/51244.png     | VERIFIED
+50439     | Ikoyi Osun MFB                               | YES        | /bank-logos/50439.png     | VERIFIED
+50442     | Ilaro Poly Microfinance Bank                 | YES        | /bank-logos/50442.png     | VERIFIED
+50453     | Imowo MFB                                    | YES        | /bank-logos/50453.png     | VERIFIED
+415       | IMPERIAL HOMES MORTAGE BANK                  | YES        | /bank-logos/415.png       | VERIFIED
+50457     | Infinity MFB                                 | YES        | /bank-logos/50457.png     | VERIFIED
+090701    | ISUA MFB                                     | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+301       | Jaiz Bank                                    | YES        | /bank-logos/301.png       | VERIFIED
+50502     | Kadpoly MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51308     | KANOPOLY MFB                                 | YES        | /bank-logos/51308.png     | VERIFIED
+082       | Keystone Bank                                | YES        | /bank-logos/082.png       | VERIFIED
+100025    | KONGAPAY (Kongapay Technologies Limited)(formerly Zinternet) | YES        | /bank-logos/100025.png    | VERIFIED
+50200     | Kredi Money MFB LTD                          | YES        | /bank-logos/50200.png     | VERIFIED
+50211     | Kuda Bank                                    | YES        | /bank-logos/50211.png     | VERIFIED
+90052     | Lagos Building Investment Company Plc.       | YES        | /bank-logos/90052.png     | VERIFIED
+50549     | Links MFB                                    | YES        | /bank-logos/50549.png     | VERIFIED
+031       | Living Trust Mortgage Bank                   | YES        | /bank-logos/031.png       | VERIFIED
+50491     | LOMA MFB                                     | YES        | /bank-logos/50491.png     | VERIFIED
+303       | Lotus Bank                                   | YES        | /bank-logos/303.png       | VERIFIED
+090171    | MAINSTREET MICROFINANCE BANK                 | YES        | /bank-logos/090171.png    | VERIFIED
+50563     | Mayfair MFB                                  | YES        | /bank-logos/50563.png     | VERIFIED
+50304     | Mint MFB                                     | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+946       | Money Master PSB                             | YES        | /bank-logos/946.png       | VERIFIED
+50515     | Moniepoint MFB                               | YES        | /bank-logos/50515.png     | VERIFIED
+120003    | MTN Momo PSB                                 | YES        | /bank-logos/120003.png    | VERIFIED
+090190    | MUTUAL BENEFITS MICROFINANCE BANK            | YES        | /bank-logos/090190.png    | VERIFIED
+090679    | NDCC MICROFINANCE BANK                       | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51361     | NET MICROFINANCE BANK                        | YES        | /bank-logos/51361.png     | VERIFIED
+51142     | Nigerian Navy Microfinance Bank Limited      | YES        | /bank-logos/51142.png     | VERIFIED
+561       | NOVA BANK                                    | YES        | /bank-logos/561.png       | VERIFIED
+50629     | NPF MICROFINANCE BANK                        | YES        | /bank-logos/50629.png     | VERIFIED
+50697     | OLUCHUKWU MICROFINANCE BANK LTD              | YES        | /bank-logos/50697.png     | VERIFIED
+999992    | OPay Digital Services Limited (OPay)         | YES        | /bank-logos/999992.png    | VERIFIED
+107       | Optimus Bank Limited                         | YES        | /bank-logos/107.png       | VERIFIED
+100002    | Paga                                         | YES        | /bank-logos/100002.png    | VERIFIED
+999991    | PalmPay                                      | YES        | /bank-logos/999991.png    | VERIFIED
+104       | Parallex Bank                                | YES        | /bank-logos/104.png       | VERIFIED
+311       | Parkway - ReadyCash                          | YES        | /bank-logos/311.png       | VERIFIED
+090680    | PATHFINDER MICROFINANCE BANK LIMITED         | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+100039    | Paystack-Titan                               | YES        | /bank-logos/100039.png    | VERIFIED
+50743     | Peace Microfinance Bank                      | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51226     | PECANTRUST MICROFINANCE BANK LIMITED         | YES        | /bank-logos/51226.png     | VERIFIED
+51146     | Personal Trust MFB                           | YES        | /bank-logos/51146.png     | VERIFIED
+50746     | Petra Mircofinance Bank Plc                  | YES        | /bank-logos/50746.png     | VERIFIED
+050021    | PFI FINANCE COMPANY LIMITED                  | YES        | /bank-logos/050021.png    | VERIFIED
+268       | Platinum Mortgage Bank                       | YES        | /bank-logos/268.png       | VERIFIED
+00716     | Pocket App                                   | YES        | /bank-logos/00716.png     | VERIFIED
+076       | Polaris Bank                                 | YES        | /bank-logos/076.png       | VERIFIED
+50864     | Polyunwana MFB                               | YES        | /bank-logos/50864.png     | VERIFIED
+105       | PremiumTrust Bank                            | YES        | /bank-logos/105.png       | VERIFIED
+50739     | Prospa Capital Microfinance Bank             | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+050023    | PROSPERIS FINANCE LIMITED                    | YES        | /bank-logos/050023.png    | VERIFIED
+101       | Providus Bank                                | YES        | /bank-logos/101.png       | VERIFIED
+51293     | QuickFund MFB                                | YES        | /bank-logos/51293.png     | VERIFIED
+502       | Rand Merchant Bank                           | YES        | /bank-logos/502.png       | VERIFIED
+090496    | RANDALPHA MICROFINANCE BANK                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+90067     | Refuge Mortgage Bank                         | YES        | /bank-logos/90067.png     | VERIFIED
+50761     | REHOBOTH MICROFINANCE BANK                   | YES        | /bank-logos/50761.png     | VERIFIED
+50994     | Rephidim Microfinance Bank                   | YES        | /bank-logos/50994.png     | VERIFIED
+51286     | Rigo Microfinance Bank Limited               | YES        | /bank-logos/51286.png     | VERIFIED
+50767     | ROCKSHIELD MICROFINANCE BANK                 | YES        | /bank-logos/50767.png     | VERIFIED
+125       | Rubies MFB                                   | YES        | /bank-logos/125.png       | VERIFIED
+51113     | Safe Haven MFB                               | YES        | /bank-logos/51113.png     | VERIFIED
+951113    | Safe Haven Microfinance Bank Limited         | YES        | /bank-logos/951113.png    | VERIFIED
+40165     | SAGE GREY FINANCE LIMITED                    | YES        | /bank-logos/40165.png     | VERIFIED
+50582     | Shield MFB                                   | YES        | /bank-logos/50582.png     | VERIFIED
+106       | Signature Bank Ltd                           | YES        | /bank-logos/106.png       | VERIFIED
+51062     | Solid Allianze MFB                           | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50800     | Solid Rock MFB                               | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51310     | Sparkle Microfinance Bank                    | YES        | /bank-logos/51310.png     | VERIFIED
+221       | Stanbic IBTC Bank                            | YES        | /bank-logos/221.png       | VERIFIED
+068       | Standard Chartered Bank                      | YES        | /bank-logos/068.png       | VERIFIED
+090162    | STANFORD MICROFINANCE BANK                   | YES        | /bank-logos/090162.png    | VERIFIED
+50809     | STATESIDE MICROFINANCE BANK                  | YES        | /bank-logos/50809.png     | VERIFIED
+51253     | Stellas MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+232       | Sterling Bank                                | YES        | /bank-logos/232.png       | VERIFIED
+100       | Suntrust Bank                                | YES        | /bank-logos/100.png       | VERIFIED
+50968     | Supreme MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+302       | TAJ Bank                                     | YES        | /bank-logos/302.png       | VERIFIED
+51269     | Tangerine Money                              | YES        | /bank-logos/51269.png     | VERIFIED
+000304    | The Alternative bank                         | YES        | /bank-logos/000304.png    | VERIFIED
+102       | Titan Bank                                   | YES        | /bank-logos/102.png       | VERIFIED
+090708    | TransPay MFB                                 | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50840     | U&C Microfinance Bank Ltd (U AND C MFB)      | YES        | /bank-logos/50840.png     | VERIFIED
+090706    | UCEE MFB                                     | YES        | /bank-logos/090706.png    | VERIFIED
+51322     | Uhuru MFB                                    | YES        | /bank-logos/51322.png     | VERIFIED
+50870     | Unaab Microfinance Bank Limited              | YES        | /bank-logos/50870.png     | VERIFIED
+50871     | Unical MFB                                   | YES        | /bank-logos/50871.png     | VERIFIED
+51316     | Unilag Microfinance Bank                     | YES        | /bank-logos/51316.png     | VERIFIED
+032       | Union Bank of Nigeria                        | YES        | /bank-logos/032.png       | VERIFIED
+033       | United Bank For Africa                       | YES        | /bank-logos/033.png       | VERIFIED
+215       | Unity Bank                                   | YES        | /bank-logos/215.png       | VERIFIED
+50894     | Uzondu Microfinance Bank Awka Anambra State  | YES        | /bank-logos/50894.png     | VERIFIED
+050020    | Vale Finance Limited                         | YES        | /bank-logos/050020.png    | VERIFIED
+566       | VFD Microfinance Bank Limited                | YES        | /bank-logos/566.png       | VERIFIED
+51355     | Waya Microfinance Bank                       | YES        | /bank-logos/51355.png     | VERIFIED
+035       | Wema Bank                                    | YES        | /bank-logos/035.png       | VERIFIED
+594       | Yes MFB                                      | YES        | /bank-logos/594.png       | VERIFIED
+057       | Zenith Bank                                  | YES        | /bank-logos/057.png       | VERIFIED
+057       | Zenith Bank                                  | YES        | /bank-logos/057.png       | VERIFIED
+==============================================================================================================================
+AUDIT SUMMARY:
+------------------------------------------------------------------------------------------------------------------------------
+A. Total number of banks returned by Flutterwave configuration: 180
+B. Number with verified logos: 157
+C. Number still using fallback: 23
+------------------------------------------------------------------------------------------------------------------------------
+D. Complete list of banks still without verified logos:
+   - [645] Amucha MFB
+   - [645] Amucha Microfinance Bank
+   - [50083] Aramoko MFB
+   - [50117] Banc Corp Microfinance Bank
+   - [50123] Beststar Microfinance Bank
+   - [51297] Crescent MFB
+   - [832] FUTMINNA MICROFINANCE BANK
+   - [MFB51093] Garun Mallam MFB
+   - [50739] Goodnews Microfinance Bank
+   - [51251] Hackman Microfinance Bank
+   - [090701] ISUA MFB
+   - [50502] Kadpoly MFB
+   - [50304] Mint MFB
+   - [090679] NDCC MICROFINANCE BANK
+   - [090680] PATHFINDER MICROFINANCE BANK LIMITED
+   - [50743] Peace Microfinance Bank
+   - [50739] Prospa Capital Microfinance Bank
+   - [090496] RANDALPHA MICROFINANCE BANK
+   - [51062] Solid Allianze MFB
+   - [50800] Solid Rock MFB
+   - [51253] Stellas MFB
+   - [50968] Supreme MFB
+   - [090708] TransPay MFB
+==============================================================================================================================
