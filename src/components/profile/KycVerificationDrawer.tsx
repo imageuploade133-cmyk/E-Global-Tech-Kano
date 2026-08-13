@@ -508,16 +508,28 @@ export function KycVerificationDrawer({
 
               {/* STATE 4: SUCCESS FEEDBACK SCREEN */}
               {submitStep === "success" && (
-                <div className="flex flex-col items-center space-y-6 w-full pt-10 animate-fadeIn">
-                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 animate-bounce">
-                    <span className="material-symbols-outlined text-[36px] font-bold">pending_actions</span>
+                <div className="flex flex-col items-center justify-center space-y-8 w-full py-16 px-4 animate-fadeIn flex-grow">
+                  <div className="w-20 h-20 rounded-full bg-orange-50 border-2 border-orange-100 flex items-center justify-center text-[#FC7A00] animate-bounce-subtle shadow-md shadow-orange-500/10">
+                    <span className="material-symbols-outlined text-[42px]" style={{ fontVariationSettings: '"FILL" 1' }}>pending_actions</span>
                   </div>
 
-                  <div className="space-y-2">
-                    <h4 className="font-hanken font-black text-lg text-black uppercase tracking-tight">Pending In Review</h4>
-                    <p className="font-hanken text-xs text-gray-600 leading-relaxed max-w-[300px] mx-auto font-semibold">
+                  <div className="space-y-3.5 text-center">
+                    <span className="px-3.5 py-1 text-[10px] font-black tracking-widest uppercase bg-orange-100 text-[#FC7A00] border border-orange-200/50 rounded-full">
+                      Submitted Successfully
+                    </span>
+                    <h4 className="font-bodoni text-2xl font-bold text-black tracking-tight pt-1">Pending In Review</h4>
+                    <p className="font-hanken text-xs text-gray-500 leading-relaxed max-w-[280px] mx-auto font-semibold">
                       Your account will be approved or rejected in 30 minutes. Thanks for banking with us.
                     </p>
+                  </div>
+
+                  <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 text-left w-full space-y-3.5">
+                    <div className="flex gap-3">
+                      <span className="material-symbols-outlined text-orange-500 text-[18px]">verified_user</span>
+                      <p className="text-[10px] text-gray-500 font-bold leading-normal">
+                        Our administrative compliance team is currently reviewing your identity document and facial live biometric reference.
+                      </p>
+                    </div>
                   </div>
 
                   <button
@@ -526,7 +538,7 @@ export function KycVerificationDrawer({
                       onClose();
                       onSuccess();
                     }}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer shadow-md"
+                    className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] active:scale-95 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md shadow-orange-500/10 transition-all"
                   >
                     Close & Check Status Later
                   </button>

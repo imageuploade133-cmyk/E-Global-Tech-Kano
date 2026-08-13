@@ -1381,17 +1381,14 @@ export default function GenericBillPage() {
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
               />
 
-              {/* Bottom Sheet Keypad matching LOGIN PIN PAGE styling (no shadow, clean grid, shuffle) */}
+              {/* Fullscreen Keypad matching LOGIN PIN PAGE styling (no shadow, clean grid, shuffle) */}
               <motion.div
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black h-[85dvh] flex flex-col justify-between"
+                className="fixed inset-0 max-w-md mx-auto bg-white z-[99999] p-6 pb-8 shadow-none text-black h-screen flex flex-col justify-between rounded-none"
               >
-                {/* Drag handle */}
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-3 mx-auto cursor-grab" />
-
                 <div className="w-full flex items-center justify-between border-b border-gray-100 pb-3">
                   <div className="w-8" />
                   <h3 className="font-hanken font-bold text-base text-black text-center uppercase tracking-wide">
