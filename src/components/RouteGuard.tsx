@@ -148,6 +148,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   // Real-time server-side version mismatch update controller (Bypasses caching on Ctrl+F5)
   useEffect(() => {
+    const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+    if (isMock) return;
     if (typeof window === "undefined" || !config?.appVersion) return;
 
     const serverVersion = config.appVersion;

@@ -29,6 +29,14 @@ interface BillItem {
 
 const AIRTIME_PRESETS = [100, 200, 500, 1000, 2000, 5000];
 
+// Global flat micro spinner
+const ButtonSpinner = () => (
+  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
+
 export default function GenericBillPage() {
   const { userData, user } = useAuth();
   const searchParams = useSearchParams();
@@ -78,6 +86,9 @@ export default function GenericBillPage() {
   const [isItemsLoading, setIsItemsLoading] = useState<boolean>(false);
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [isPaying, setIsPaying] = useState<boolean>(false);
+
+  // Checkout Modal State
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
 
   // PIN Pad Modal States
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
@@ -129,7 +140,7 @@ export default function GenericBillPage() {
 
   // Prevent background scrolling while pay bills PIN keypad modal is active
   useEffect(() => {
-    if (isPinModalOpen) {
+    if (isPinModalOpen || isCheckoutModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -137,7 +148,7 @@ export default function GenericBillPage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isPinModalOpen]);
+  }, [isPinModalOpen, isCheckoutModalOpen]);
 
   // Fetch billers when pageCategory changes
   useEffect(() => {
@@ -151,9 +162,36 @@ export default function GenericBillPage() {
       setValidatedName("");
 
       try {
-        const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+        const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+        if (isMock) {
+          if (pageCategory === "AIRTIME" || pageCategory === "DATA") {
+            setBillers([
+              { id: 1, name: "MTN Network", biller_code: "mtn", logo: "" },
+              { id: 2, name: "GLO Network", biller_code: "glo", logo: "" },
+              { id: 3, name: "AIRTEL Network", biller_code: "airtel", logo: "" },
+              { id: 4, name: "9MOBILE Network", biller_code: "9mobile", logo: "" }
+            ]);
+          } else if (pageCategory === "UTILITY") {
+            setBillers([
+              { id: 1, name: "IKEDC Electricity", biller_code: "ikedc", logo: "" },
+              { id: 2, name: "EKEDC Electricity", biller_code: "ekedc", logo: "" }
+            ]);
+          } else if (pageCategory === "CABLE") {
+            setBillers([
+              { id: 1, name: "DStv", biller_code: "dstv", logo: "" },
+              { id: 2, name: "GOtv", biller_code: "gotv", logo: "" }
+            ]);
+          } else if (pageCategory === "WAEC") {
+            setBillers([
+              { id: 1, name: "WAEC Council", biller_code: "waec", logo: "" }
+            ]);
+          }
+          setIsBillersLoading(false);
+          return;
+        }
+
         let idToken = "mock-token";
-        if (!isMock && user) {
+        if (user) {
           try {
             idToken = await user.getIdToken();
           } catch (tokErr) {
@@ -162,7 +200,6 @@ export default function GenericBillPage() {
         }
         const authHeaders = { "Authorization": `Bearer ${idToken}` };
 
-        // Option 1 Design: If category is Airtime or Data, query networks directly from Payment Gateway!
         if (pageCategory === "AIRTIME" || pageCategory === "DATA") {
           const res = await fetch("/api/vtu/networks", { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load networks from gateway.");
@@ -175,7 +212,6 @@ export default function GenericBillPage() {
           }));
           setBillers(networkList);
         } else if (pageCategory === "UTILITY") {
-          // Option 1 Design: Expose standard Nigerian Electricity companies directly via Clubkonnect integration!
           const companies = ["IKEDC", "EKEDC", "AEDC", "KEDCO", "PHED", "JED", "EEDC", "IBEDC", "KAEDCO"];
           const discoList = companies.map((name, index) => ({
             id: index + 1,
@@ -185,7 +221,6 @@ export default function GenericBillPage() {
           }));
           setBillers(discoList);
         } else if (pageCategory === "CABLE") {
-          // Expose supported Cable TV providers directly via Clubkonnect integration!
           const providers = ["DStv", "GOtv", "StarTimes"];
           const providerList = providers.map((name, index) => ({
             id: index + 1,
@@ -195,7 +230,6 @@ export default function GenericBillPage() {
           }));
           setBillers(providerList);
         } else if (pageCategory === "WAEC") {
-          // Expose WAEC Virtual Provider for the card interface selector
           const providerList = [{
             id: 1,
             name: "WAEC Council",
@@ -204,7 +238,6 @@ export default function GenericBillPage() {
           }];
           setBillers(providerList);
         } else {
-          // Standard other bill payments from Flutterwave path
           const apiCategory = pageCategory;
           const res = await fetch(`/api/bills/billers?category=${apiCategory}`);
           if (!res.ok) throw new Error("Failed to load billing providers.");
@@ -220,7 +253,7 @@ export default function GenericBillPage() {
       }
     }
     fetchBillers();
-  }, [pageCategory]);
+  }, [pageCategory, user]);
 
   // Fetch items/packages when selectedBiller changes
   useEffect(() => {
@@ -231,15 +264,45 @@ export default function GenericBillPage() {
     async function fetchItems() {
       setIsItemsLoading(true);
       setSelectedItem(null);
-      setActiveDataTab("ALL"); // Reset tab back to default on provider swap
+      setActiveDataTab("ALL");
       setCustomerId("");
       setCustomAmount("");
       setValidatedName("");
 
       try {
         const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+        if (isMock) {
+          if (pageCategory === "DATA") {
+            setItems([
+              { id: 1, biller_code: currentBiller.biller_code, name: "1 GB - 30 days (SME)", item_code: "sme_1gb", amount: 461, is_fixed_amount: true },
+              { id: 2, biller_code: currentBiller.biller_code, name: "2 GB - 30 days (SME)", item_code: "sme_2gb", amount: 922, is_fixed_amount: true },
+              { id: 3, biller_code: currentBiller.biller_code, name: "5 GB - 30 days (SME)", item_code: "sme_5gb", amount: 2306, is_fixed_amount: true },
+              { id: 4, biller_code: currentBiller.biller_code, name: "125MB - 1 day (Awoof Data)", item_code: "awoof_125", amount: 97, is_fixed_amount: true },
+              { id: 5, biller_code: currentBiller.biller_code, name: "2.5GB - Weekend Plan - [Sat & Sun]", item_code: "weekend_25", amount: 485, is_fixed_amount: true }
+            ]);
+          } else if (pageCategory === "AIRTIME") {
+            setItems([{ id: 1, biller_code: currentBiller.biller_code, name: `${currentBiller.name} Airtime topup`, item_code: "airtime", amount: 0, is_fixed_amount: false }]);
+          } else if (pageCategory === "UTILITY") {
+            setItems([
+              { id: 1, biller_code: currentBiller.biller_code, name: "Prepaid Meter Bill Payment", item_code: "prepaid", amount: 0, is_fixed_amount: false },
+              { id: 2, biller_code: currentBiller.biller_code, name: "Postpaid Meter Bill Payment", item_code: "postpaid", amount: 0, is_fixed_amount: false }
+            ]);
+          } else if (pageCategory === "CABLE") {
+            setItems([
+              { id: 1, biller_code: currentBiller.biller_code, name: "GOtv Max", item_code: "gotv_max", amount: 4850, is_fixed_amount: true },
+              { id: 2, biller_code: currentBiller.biller_code, name: "GOtv Jolli", item_code: "gotv_jolli", amount: 3300, is_fixed_amount: true }
+            ]);
+          } else if (pageCategory === "WAEC") {
+            setItems([
+              { id: 1, biller_code: currentBiller.biller_code, name: "WAEC Result Checker PIN", item_code: "waec_checker", amount: 3500, is_fixed_amount: true }
+            ]);
+          }
+          setIsItemsLoading(false);
+          return;
+        }
+
         let idToken = "mock-token";
-        if (!isMock && user) {
+        if (user) {
           try {
             idToken = await user.getIdToken();
           } catch (tokErr) {
@@ -249,7 +312,6 @@ export default function GenericBillPage() {
         const authHeaders = { "Authorization": `Bearer ${idToken}` };
 
         if (pageCategory === "DATA") {
-          // Dynamic Option 1 Data Plan loading directly from S2S Payment Gateway cache!
           const res = await fetch(`/api/vtu/data/plans?network=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load data plans from gateway.");
           const data = await res.json();
@@ -263,7 +325,6 @@ export default function GenericBillPage() {
           }));
           setItems(planList);
         } else if (pageCategory === "AIRTIME") {
-          // Pre-populate single customizable manual amount item for Airtime
           setItems([{
             id: 1,
             biller_code: currentBiller.biller_code,
@@ -273,7 +334,6 @@ export default function GenericBillPage() {
             is_fixed_amount: false,
           }]);
         } else if (pageCategory === "UTILITY") {
-          // Pre-populate Prepaid and Postpaid options for Electricity bill payment
           setItems([
             {
               id: 1,
@@ -293,7 +353,6 @@ export default function GenericBillPage() {
             }
           ]);
         } else if (pageCategory === "CABLE") {
-          // Fetch Cable TV bouquets/packages dynamically from secure Next.js route!
           const res = await fetch(`/api/vtu/cable/packages?provider=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load bouquets from gateway.");
           const data = await res.json();
@@ -307,7 +366,6 @@ export default function GenericBillPage() {
           }));
           setItems(packageList);
         } else if (pageCategory === "WAEC") {
-          // Fetch WAEC products dynamically from secure Next.js route!
           const res = await fetch(`/api/vtu/waec/products`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load WAEC products.");
           const data = await res.json();
@@ -321,7 +379,6 @@ export default function GenericBillPage() {
           }));
           setItems(productList);
         } else {
-          // Standard other bill payments from Flutterwave path
           const res = await fetch(`/api/bills/items?biller_code=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load packages.");
           const data = await res.json();
@@ -336,7 +393,7 @@ export default function GenericBillPage() {
       }
     }
     fetchItems();
-  }, [selectedBiller]);
+  }, [selectedBiller, pageCategory, user]);
 
   // Parse details for data plan presentation
   const parseDataPlan = (name: string) => {
@@ -350,7 +407,6 @@ export default function GenericBillPage() {
     if (sizeMatch && gbSize) {
       cleanedName = name.replace(sizeMatch[0], "").replace(/\([^)]+\)/, "").trim();
     }
-    // Clean up brand prefixes
     cleanedName = cleanedName.replace(/^(MTN|GLO|Airtel|9mobile|Smile|Spectranet)\s+(Mobile\s+)?(Data\s+)?(Plan\s+)?/i, "");
 
     return {
@@ -364,23 +420,18 @@ export default function GenericBillPage() {
   const getDataPlanCategory = (plan: BillItem): string => {
     const nameLower = plan.name.toLowerCase();
 
-    // Weekend Plan check
     if (nameLower.includes("weekend") || nameLower.includes("sat & sun") || nameLower.includes("[sun]")) {
       return "WEEKEND";
     }
-    // 1GB check (Exact 1GB or SME 1GB or popular small sized plans)
     if (nameLower.includes("1 gb") || nameLower.includes("1gb") || nameLower.includes("1000 mb") || nameLower.includes("1000mb")) {
       return "1GB";
     }
-    // Daily Plan check
     if (nameLower.includes("1 day") || nameLower.includes("2 day") || nameLower.includes("daily") || nameLower.includes("awoof") || nameLower.includes("awooof")) {
       return "DAILY";
     }
-    // Weekly Plan check
     if (nameLower.includes("7 days") || nameLower.includes("14 days") || nameLower.includes("weekly")) {
       return "WEEKLY";
     }
-    // Default/Fallback is Monthly/More
     return "MONTHLY";
   };
 
@@ -407,10 +458,8 @@ export default function GenericBillPage() {
     try {
       let res;
       if (pageCategory === "UTILITY") {
-        // Direct validation via S2S Payment Gateway validate meter endpoint!
         res = await fetch(`/api/vtu/electricity/validate?provider=${selectedBiller.biller_code}&meterNo=${customerId}&meterType=${selectedItem.item_code}`);
       } else if (pageCategory === "CABLE") {
-        // Direct validation via S2S Payment Gateway validate Smartcard/IUC number endpoint!
         res = await fetch(`/api/vtu/cable/validate?provider=${selectedBiller.biller_code}&smartCardNo=${customerId}`);
       } else {
         res = await fetch("/api/bills/validate", {
@@ -444,7 +493,7 @@ export default function GenericBillPage() {
     }
   };
 
-  // Submit trigger
+  // Submit trigger - Opens Pin Keypad Modal
   const handlePayTrigger = () => {
     if (!selectedBiller || !selectedItem || !customerId) {
       toast.error("Please fill out all billing details.");
@@ -467,7 +516,6 @@ export default function GenericBillPage() {
       return;
     }
 
-    // Secure local simulation block to show upfront dynamic rules and guide the user
     if (walletTypeSelected === "BONUS") {
       const typeUpper = (pageCategory || "").toUpperCase();
       if (typeUpper === "AIRTIME") {
@@ -498,12 +546,12 @@ export default function GenericBillPage() {
       }
     }
 
-    // Open PIN pad modal
+    // Open PIN pad modal and close checkout modal
     setEnteredPin("");
     setIsPinModalOpen(true);
   };
 
-  // PIN entry handlers matching Login page
+  // PIN entry handlers
   const handlePinPress = (num: string) => {
     if (enteredPin.length < 4) {
       const nextPin = enteredPin + num;
@@ -524,12 +572,15 @@ export default function GenericBillPage() {
   const executePayment = async (pin: string) => {
     setIsPaying(true);
     setIsPinModalOpen(false);
+    setIsCheckoutModalOpen(false);
     toast.loading("Verifying your transaction PIN securely...");
 
     try {
-      let idToken = await user?.getIdToken();
+      let idToken = "mock-token";
+      if (user && typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
 
-      // Step 1: Securely verify user's transaction PIN against parent authentication system first
       const pinVerifyRes = await fetch("/api/auth/pin", {
         method: "POST",
         headers: {
@@ -546,7 +597,6 @@ export default function GenericBillPage() {
 
       toast.loading("Processing your VTU transaction with gateway...");
 
-      // Step 2: Route request directly S2S to Payment Gateway VTU endpoints (Option 1)
       const isData = pageCategory === "DATA";
       const isAirtime = pageCategory === "AIRTIME";
       const isUtility = pageCategory === "UTILITY";
@@ -596,10 +646,11 @@ export default function GenericBillPage() {
           body: JSON.stringify(payload),
         });
 
-        // Automatic Firebase ID Token refresh retry on 401 Unauthorized
         if (res.status === 401) {
           console.log("[VTU Pay] Auth token expired or invalid, forcing refresh and retrying S2S...");
-          idToken = await user?.getIdToken(true);
+          if (user && typeof user.getIdToken === "function") {
+            idToken = await user.getIdToken(true);
+          }
 
           res = await fetch(endpoint, {
             method: "POST",
@@ -618,7 +669,6 @@ export default function GenericBillPage() {
           throw new Error(data.message || data.error || "Failed to process VTU transaction.");
         }
 
-        // Success VTU
         setSuccessReceipt({
           reference: data.requestId,
           tx_ref: data.orderId || data.requestId,
@@ -627,7 +677,6 @@ export default function GenericBillPage() {
         });
         toast.success("VTU transaction completed successfully!");
       } else {
-        // Standard other bill payments from Flutterwave path
         let res = await fetch("/api/bills/pay", {
           method: "POST",
           headers: {
@@ -646,10 +695,11 @@ export default function GenericBillPage() {
           }),
         });
 
-        // Automatic Firebase ID Token refresh retry on 401 Unauthorized
         if (res.status === 401) {
           console.log("[Bills Pay] Auth token expired or invalid, forcing refresh and retrying...");
-          idToken = await user?.getIdToken(true);
+          if (user && typeof user.getIdToken === "function") {
+            idToken = await user.getIdToken(true);
+          }
 
           res = await fetch("/api/bills/pay", {
             method: "POST",
@@ -677,7 +727,6 @@ export default function GenericBillPage() {
           throw new Error(data.error || "Failed to process bill payment.");
         }
 
-        // Success standard bill
         setSuccessReceipt(data.data);
         toast.success("Bill payment processed successfully!");
       }
@@ -713,7 +762,6 @@ export default function GenericBillPage() {
     }
   };
 
-  // Sort and group packages by amount ascending for robust design
   const sortedItems = [...items].sort((a, b) => a.amount - b.amount);
 
   if (pagePreloading) {
@@ -913,16 +961,10 @@ export default function GenericBillPage() {
                 </button>
               </motion.div>
             ) : (
-              // --- FORM AND INPUT CONTAINER ---
-              <motion.div
-                key="bill-form"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="premium-gradient-card premium-gradient-border p-6 shadow-none space-y-6"
-              >
-                {/* Step 1: Select Biller Provider */}
-                <div className="space-y-3 text-left font-hanken">
+              // --- FORM AND INPUT CONTAINER Restructured to have separate network and plan cards ---
+              <div className="space-y-6">
+                {/* Standalone Network Selection Card */}
+                <div className="premium-gradient-card premium-gradient-border p-6 shadow-none space-y-4">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
                     Choose Network / Provider
                   </label>
@@ -940,7 +982,13 @@ export default function GenericBillPage() {
                           <button
                             key={b.id}
                             type="button"
-                            onClick={() => setSelectedBiller(b)}
+                            onClick={() => {
+                              setSelectedBiller(b);
+                              setSelectedItem(null);
+                              setCustomerId("");
+                              setCustomAmount("");
+                              setValidatedName("");
+                            }}
                             className={`p-3 rounded-2xl border text-left transition-all duration-300 flex items-center gap-3 cursor-pointer shadow-none ${
                               isSelected
                                 ? "bg-orange-50/50 border-[#FC7A00]"
@@ -967,18 +1015,17 @@ export default function GenericBillPage() {
                   )}
                 </div>
 
-                {/* Step 2: Select Package / Plan */}
+                {/* Standalone Plan Selection Card below Network Card */}
                 {selectedBiller && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="space-y-3 text-left border-t border-gray-100 pt-5"
+                    className="premium-gradient-card premium-gradient-border p-6 shadow-none space-y-4"
                   >
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
                       Choose Plan / Package
                     </label>
                     {isItemsLoading ? (
-                      /* --- HIGH FIDELITY SKELETON LOADER --- */
                       <div className="grid grid-cols-2 gap-3.5">
                         {[1, 2, 3, 4].map((i) => (
                           <div key={i} className="h-28 bg-gray-50 border border-gray-150 rounded-2xl animate-pulse flex flex-col justify-between p-3.5">
@@ -992,14 +1039,11 @@ export default function GenericBillPage() {
                         ))}
                       </div>
                     ) : sortedItems.length === 0 ? (
-                      /* --- EMPTY STATE --- */
                       <div className="py-8 text-center text-gray-400 font-hanken text-xs font-semibold">
                         No plans available from this provider.
                       </div>
                     ) : pageCategory === "DATA" ? (
-                      /* --- HIGH FIDELITY DATA PLANS GRID WITH TABS --- */
                       <div className="space-y-4">
-                        {/* Horizontal Custom Tabs Container */}
                         <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin no-scrollbar">
                           {[
                             { id: "ALL", label: "All Plans" },
@@ -1037,7 +1081,6 @@ export default function GenericBillPage() {
                           })}
                         </div>
 
-                        {/* List grid filtered by active data categorization tab */}
                         {(() => {
                           const filteredPlans = sortedItems.filter((item) => {
                             if (activeDataTab === "ALL") return true;
@@ -1065,6 +1108,9 @@ export default function GenericBillPage() {
                                     onClick={() => {
                                       setSelectedItem(i);
                                       setCustomAmount(i.amount.toString());
+                                      setCustomerId("");
+                                      setValidatedName("");
+                                      setIsCheckoutModalOpen(true);
                                     }}
                                     className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-[120px] transition-all duration-300 cursor-pointer shadow-none ${
                                       isSelected
@@ -1103,7 +1149,7 @@ export default function GenericBillPage() {
                       </div>
                     ) : (
                       /* Standard package selector (e.g. Airtime, Cable, Utility) */
-                      <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 no-scrollbar">
+                      <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1 no-scrollbar">
                         {sortedItems.map((i) => {
                           const isSelected = selectedItem?.id === i.id;
                           return (
@@ -1113,6 +1159,9 @@ export default function GenericBillPage() {
                               onClick={() => {
                                 setSelectedItem(i);
                                 setCustomAmount("");
+                                setCustomerId("");
+                                setValidatedName("");
+                                setIsCheckoutModalOpen(true);
                               }}
                               className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all duration-300 cursor-pointer shadow-none ${
                                 isSelected
@@ -1142,322 +1191,285 @@ export default function GenericBillPage() {
                     )}
                   </motion.div>
                 )}
-
-                {/* Step 3: Enter Customer ID (Decoder/Meter/Phone) */}
-                {selectedItem && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="space-y-4 border-t border-gray-100 pt-5"
-                  >
-                    {/* Wallet Selector Toggles (Only for Airtime & Data) */}
-                    {(pageCategory === "AIRTIME" || pageCategory === "DATA") && (
-                      <div className="space-y-3 pb-3 text-left font-hanken">
-                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
-                          Select Payment Wallet
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setWalletTypeSelected("MAIN")}
-                            className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
-                              walletTypeSelected === "MAIN"
-                                ? "bg-orange-50/50 border-[#FC7A00]"
-                                : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
-                            }`}
-                          >
-                            <div>
-                              <span className="font-bold text-[10px] text-gray-400 uppercase">Main Wallet</span>
-                              <p className="font-hanken text-xs font-black text-black mt-1">Real Balance</p>
-                            </div>
-                            <span className="font-mono text-xs font-bold text-[#FC7A00] mt-3">
-                              ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setWalletTypeSelected("BONUS")}
-                            className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
-                              walletTypeSelected === "BONUS"
-                                ? "bg-orange-50/50 border-[#FC7A00]"
-                                : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
-                            }`}
-                          >
-                            <div>
-                              <span className="font-bold text-[10px] text-gray-400 uppercase">Bonus Wallet</span>
-                              <p className="font-hanken text-xs font-black text-black mt-1">Reward Balance</p>
-                            </div>
-                            <span className="font-mono text-xs font-bold text-emerald-600 mt-3">
-                              ₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </span>
-                          </button>
-                        </div>
-                        <p className="text-[9.5px] text-gray-400 font-bold uppercase tracking-wide leading-none mt-1">
-                          Bonus wallet is only applicable for Airtime topups and Mobile Data plans.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="space-y-1.5 text-left border-t border-gray-100 pt-4">
-                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                        {getCustomerFieldLabel()}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
-                          value={customerId}
-                          onChange={(e) => setCustomerId(e.target.value)}
-                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                        />
-                        {/* Validation Action inside input if applicable */}
-                        {customerId.length >= 6 && (
-                          <button
-                            type="button"
-                            onClick={handleValidateCustomer}
-                            disabled={isValidating}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#FFF0E0] hover:bg-[#FFE0CC] text-primary text-[10px] font-black uppercase px-3 py-2 rounded-xl active:scale-95 transition-all"
-                          >
-                            {isValidating ? "Validating..." : "Verify"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Validated Name Banner */}
-                    {validatedName && (
-                      <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-left">
-                        <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">
-                          Verified Recipient Owner
-                        </p>
-                        <p className="font-hanken text-xs font-black text-emerald-700 uppercase mt-0.5">
-                          {validatedName}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Step 4: Handle Amount & Pricing selectors */}
-                    {pageCategory === "AIRTIME" ? (
-                      /* --- LUXURY AIRTIME SELECT PRESET & DYNAMIC PRICE INPUT --- */
-                      <div className="space-y-4 text-left">
-                        <div>
-                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                            Quick Select Amount (NGN)
-                          </label>
-                          <div className="grid grid-cols-3 gap-2 mt-1.5">
-                            {AIRTIME_PRESETS.map((preset) => {
-                              const isSelected = Number(customAmount) === preset;
-                              return (
-                                <button
-                                  key={preset}
-                                  type="button"
-                                  onClick={() => setCustomAmount(preset.toString())}
-                                  className={`py-3.5 rounded-2xl border font-mono font-black text-[12px] text-center active:scale-95 transition-all cursor-pointer shadow-none ${
-                                    isSelected
-                                      ? "bg-[#FC7A00]/10 border-[#FC7A00] text-black"
-                                      : "bg-white border-gray-150 hover:bg-gray-50 text-gray-800"
-                                  }`}
-                                >
-                                  ₦{preset.toLocaleString()}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5 pt-1">
-                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                            Or Enter Amount (NGN)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
-                              ₦
-                            </span>
-                            <input
-                              type="number"
-                              pattern="[0-9]*"
-                              inputMode="numeric"
-                              placeholder="Enter top-up amount manually (Min: ₦100)"
-                              value={customAmount}
-                              onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full bg-white border border-black rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                            />
-                          </div>
-                          {isAirtimeInvalid && customAmount !== "" && (
-                            <p className="text-[10px] text-rose-500 font-bold text-left mt-1.5">
-                              Airtime amount must be between ₦100 and ₦50,000.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ) : pageCategory === "DATA" ? (
-                      /* --- LUXURY MOBILE DATA STANDARD PLAN PRICE --- */
-                      <div className="space-y-3.5 text-left">
-                        <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 flex items-center justify-between text-left">
-                          <div>
-                            <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
-                              Plan Package Price
-                            </p>
-                            <p className="font-hanken text-xs font-semibold text-gray-500 mt-0.5">
-                              Standard price for {selectedItem.name}
-                            </p>
-                          </div>
-                          <p className="font-mono font-black text-lg text-black">
-                            ₦{selectedItem?.amount.toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Fallback generic categories */
-                      !selectedItem.is_fixed_amount ? (
-                        <div className="space-y-1.5 text-left">
-                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                            Enter Payment Amount (NGN)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
-                              ₦
-                            </span>
-                            <input
-                              type="number"
-                              pattern="[0-9]*"
-                              inputMode="numeric"
-                              placeholder="Amount (e.g. 2000)"
-                              value={customAmount}
-                              onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                              className="w-full bg-white border border-black rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 text-left flex items-center justify-between">
-                          <div>
-                            <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">
-                              Package Fixed Amount
-                            </p>
-                            <p className="font-hanken text-xs font-semibold text-gray-500 mt-0.5">
-                              Set by provider network
-                            </p>
-                          </div>
-                          <p className="font-mono font-black text-lg text-black">
-                            ₦{selectedItem?.amount.toLocaleString()}
-                          </p>
-                        </div>
-                      )
-                    )}
-
-                    {/* Balance Preview Badge */}
-                    <div className="bg-gray-50 rounded-xl p-3 flex justify-between items-center text-[11px] font-hanken">
-                      <span className="font-semibold text-gray-500">Available Wallet Balance</span>
-                      <span className="font-mono font-bold text-black">₦{balance.toLocaleString()}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handlePayTrigger}
-                      disabled={isPaying || !customerId || (pageCategory === "AIRTIME" && isAirtimeInvalid) || (finalAmount <= 0)}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                    >
-                      {isPaying ? "Processing..." : `Proceed to Pay (₦${finalAmount.toLocaleString()})`}
-                    </button>
-                  </motion.div>
-                )}
-              </motion.div>
+              </div>
             )}
           </AnimatePresence>
         </main>
 
-        {/* Dynamic transaction PIN verification keypad */}
+        {/* Dynamic high-fidelity checkout bottom-sheet modal */}
         <AnimatePresence>
-          {isPinModalOpen && (
+          {isCheckoutModalOpen && selectedItem && selectedBiller && (
             <>
               {/* Backdrop */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setIsPinModalOpen(false)}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+                onClick={() => setIsCheckoutModalOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000]"
               />
 
-              {/* Fullscreen Keypad matching LOGIN PIN PAGE styling (no shadow, clean grid, shuffle) */}
+              {/* Bottom Sheet Review & Checkout panel */}
               <motion.div
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-                className="fixed inset-0 max-w-md mx-auto bg-white z-[99999] p-6 pb-8 shadow-none text-black h-screen flex flex-col justify-between rounded-none"
+                transition={{ type: "spring", damping: 30, stiffness: 280 }}
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[1001] p-6 pb-8 shadow-2xl text-black max-h-[85dvh] overflow-y-auto custom-scrollbar"
               >
-                <div className="w-full flex items-center justify-between border-b border-gray-100 pb-3">
-                  <div className="w-8" />
-                  <h3 className="font-hanken font-bold text-base text-black text-center uppercase tracking-wide">
-                    Enter Access PIN
+                {/* Drag handle */}
+                <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-4 mx-auto" />
+
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                  <h3 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    Review VTU Order
                   </h3>
                   <button
                     type="button"
-                    onClick={() => setIsPinModalOpen(false)}
-                    className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                    onClick={() => setIsCheckoutModalOpen(false)}
+                    className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer shadow-none"
                   >
                     <span className="material-symbols-outlined text-[16px] font-bold">close</span>
                   </button>
                 </div>
 
-                <div className="flex-grow flex flex-col items-center justify-center space-y-6">
+                <div className="space-y-5">
+                  {/* Selected Plan overview detail card */}
+                  <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-400 font-bold uppercase">Provider</span>
+                      <span className="font-black text-black">{selectedBiller.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-400 font-bold uppercase">Plan Package</span>
+                      <span className="font-black text-black text-right max-w-[200px] truncate">{selectedItem.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2 mt-2">
+                      <span className="text-gray-400 font-bold uppercase">Price</span>
+                      <span className="font-mono font-black text-primary text-sm">
+                        ₦{finalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Payment Source Selection Toggle (Only for Airtime & Data) */}
+                  {(pageCategory === "AIRTIME" || pageCategory === "DATA") && (
+                    <div className="space-y-2 text-left font-hanken">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                        Select Payment Wallet
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setWalletTypeSelected("MAIN")}
+                          className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
+                            walletTypeSelected === "MAIN"
+                              ? "bg-orange-50/50 border-[#FC7A00]"
+                              : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                          }`}
+                        >
+                          <div>
+                            <span className="font-bold text-[8.5px] text-gray-400 uppercase">Main Wallet</span>
+                            <p className="font-mono text-xs font-bold text-black mt-1">₦{balance.toLocaleString()}</p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setWalletTypeSelected("BONUS")}
+                          className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
+                            walletTypeSelected === "BONUS"
+                              ? "bg-orange-50/50 border-[#FC7A00]"
+                              : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                          }`}
+                        >
+                          <div>
+                            <span className="font-bold text-[8.5px] text-gray-400 uppercase">Bonus Wallet</span>
+                            <p className="font-mono text-xs font-bold text-emerald-600 mt-1">₦{bonusBalance.toLocaleString()}</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recipient Details Input Field */}
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                      {getCustomerFieldLabel()}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
+                        value={customerId}
+                        onChange={(e) => setCustomerId(e.target.value)}
+                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                      />
+                      {customerId.length >= 6 && (
+                        <button
+                          type="button"
+                          onClick={handleValidateCustomer}
+                          disabled={isValidating}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#FFF0E0] hover:bg-[#FFE0CC] text-primary text-[10px] font-black uppercase px-3 py-2 rounded-xl active:scale-95 transition-all"
+                        >
+                          {isValidating ? "Validating..." : "Verify"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {validatedName && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-left">
+                      <p className="text-[8px] font-black uppercase text-emerald-600 tracking-wider">
+                        Verified Recipient Owner
+                      </p>
+                      <p className="font-hanken text-xs font-black text-emerald-700 uppercase mt-0.5">
+                        {validatedName}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Manual custom Amount field if not fixed amount */}
+                  {!selectedItem.is_fixed_amount && (
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                        Enter Custom Payment Amount (NGN)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-base text-gray-400">
+                          ₦
+                        </span>
+                        <input
+                          type="number"
+                          pattern="[0-9]*"
+                          inputMode="numeric"
+                          placeholder="Amount (e.g. 2000)"
+                          value={customAmount}
+                          onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
+                          className="w-full bg-white border border-black rounded-2xl pl-9 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                        />
+                      </div>
+                      {isAirtimeInvalid && customAmount !== "" && (
+                        <p className="text-[10px] text-rose-500 font-bold text-left mt-1">
+                          Airtime amount must be between ₦100 and ₦50,000.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Proceed to checkout trigger */}
+                  <button
+                    type="button"
+                    onClick={handlePayTrigger}
+                    disabled={isPaying || !customerId || (pageCategory === "AIRTIME" && isAirtimeInvalid) || (finalAmount <= 0)}
+                    className="w-full py-4 mt-2 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl border border-white/10 cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                  >
+                    Proceed to Pay (₦{finalAmount.toLocaleString()})
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Dynamic transaction PIN verification keypad - Full Screen Modal Design */}
+        <AnimatePresence>
+          {isPinModalOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 280 }}
+              className="fixed inset-0 bg-white z-[99999] p-6 flex flex-col justify-between text-black max-w-md mx-auto"
+            >
+              {/* Back / Close button */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <button
+                  type="button"
+                  onClick={() => setIsPinModalOpen(false)}
+                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer shadow-none"
+                  title="Close Pin Pad"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+                </button>
+                <h3 className="font-hanken font-black text-sm text-black uppercase tracking-wider">
+                  Secure Verification
+                </h3>
+                <div className="w-10" />
+              </div>
+
+              {/* Central Details and dots */}
+              <div className="flex-grow flex flex-col items-center justify-center space-y-8 py-8">
+                {/* Visual Lock Badge */}
+                <div className="w-16 h-16 bg-orange-50 border border-orange-100 text-primary rounded-full flex items-center justify-center shadow-sm">
+                  <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: '"FILL" 1' }}>lock</span>
+                </div>
+
+                <div className="text-center space-y-2">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Order Payout Settlement</p>
+                  <p className="font-mono text-3xl font-black text-black">
+                    ₦{finalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-gray-500 font-semibold max-w-[260px] mx-auto leading-relaxed mt-1">
+                    Paying <span className="font-bold text-black">{selectedBiller?.name}</span> for <span className="font-bold text-black">{selectedItem?.name}</span>
+                  </p>
+                </div>
+
+                <div className="space-y-4 w-full flex flex-col items-center">
                   <p className="font-hanken text-[11px] text-gray-400 text-center max-w-[240px]">
                     Provide your highly secure 4-digit Access PIN to approve this debit transaction.
                   </p>
 
-                  {/* Dot indicator indicators matching login page */}
-                  <div className="flex justify-center gap-4 py-1">
+                  {/* Dot indicator indicators */}
+                  <div className="flex justify-center gap-4 py-2">
                     {[0, 1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
-                          enteredPin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
+                        className={`w-4.5 h-4.5 rounded-full border-2 transition-all duration-300 ${
+                          enteredPin.length > i ? "bg-black border-black scale-110 shadow-sm" : "bg-transparent border-gray-200"
                         }`}
                       />
                     ))}
                   </div>
-
-                  {/* PIN Grid keypad matching Login Page exactly (shuffled) */}
-                  <div className="grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-5 w-full max-w-[260px] min-[360px]:max-w-[290px] justify-items-center">
-                    {keypadNumbers.slice(0, 9).map((num) => (
-                      <motion.button
-                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
-                        key={num}
-                        type="button"
-                        onClick={() => handlePinPress(num)}
-                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all"
-                      >
-                        {num}
-                      </motion.button>
-                    ))}
-                    <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18" />
-                    {keypadNumbers[9] !== undefined && (
-                      <motion.button
-                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
-                        onClick={() => handlePinPress(keypadNumbers[9])}
-                        type="button"
-                        className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all"
-                      >
-                        {keypadNumbers[9]}
-                      </motion.button>
-                    )}
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      onClick={handlePinDelete}
-                      type="button"
-                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-black cursor-pointer active:text-rose-500 transition-all"
-                    >
-                      <span className="material-symbols-outlined text-[22px] min-[360px]:text-[24px]">backspace</span>
-                    </motion.button>
-                  </div>
                 </div>
 
-                <div className="h-4" />
-              </motion.div>
-            </>
+                {/* Shuffled PIN keypad */}
+                <div className="grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-5 w-full max-w-[260px] min-[360px]:max-w-[290px] justify-items-center">
+                  {keypadNumbers.slice(0, 9).map((num) => (
+                    <motion.button
+                      whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+                      key={num}
+                      type="button"
+                      onClick={() => handlePinPress(num)}
+                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all hover:border-black"
+                    >
+                      {num}
+                    </motion.button>
+                  ))}
+                  <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18" />
+                  {keypadNumbers[9] !== undefined && (
+                    <motion.button
+                      whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+                      onClick={() => handlePinPress(keypadNumbers[9])}
+                      type="button"
+                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all hover:border-black"
+                    >
+                      {keypadNumbers[9]}
+                    </motion.button>
+                  )}
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handlePinDelete}
+                    type="button"
+                    className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-black cursor-pointer active:text-rose-500 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[22px] min-[360px]:text-[24px]">backspace</span>
+                  </motion.button>
+                </div>
+              </div>
+
+              <div className="h-4" />
+            </motion.div>
           )}
         </AnimatePresence>
 
