@@ -11,6 +11,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden: Account verification is required to perform financial transactions." }, { status: 403 });
     }
 
+    // Mock-playtesting offline bypass
+    if (uid === "mock-uid" || uid === "mock-admin-uid") {
+      return NextResponse.json({
+        success: true,
+        message: "WAEC Pin Purchase Successful (Mock Mode)",
+        pins: [
+          { pin: "554488223311", serial: "WR20269988" }
+        ],
+        reference: "mock-waec-ref-998877",
+      });
+    }
+
     const idToken = req.headers.get("Authorization")?.split("Bearer ")[1] || "mock-token";
 
     const body = await req.json();
