@@ -57,3 +57,6 @@ verification/screenshots/error.png
 
 # Standalone payment gateway repository
 /payment-gateway/
+
+# Bank logos static assets
+/public/bank-logos/
