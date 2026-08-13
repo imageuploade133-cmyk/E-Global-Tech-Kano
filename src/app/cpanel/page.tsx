@@ -111,6 +111,7 @@ export default function AdminPage() {
   const [historyTransactions, setHistoryTransactions] = useState<any[]>([]);
   const [historyInvestments, setHistoryInvestments] = useState<any[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState(20);
 
   // Check cookie-based admin session on mount
   useEffect(() => {
@@ -705,6 +706,41 @@ export default function AdminPage() {
     }
   };
 
+  const fetchUserHistory = async (customLimit?: number) => {
+    const limitVal = customLimit || historyLimit;
+    setIsHistoryLoading(true);
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch(`/api/admin/user-history?search=${encodeURIComponent(historySearchQuery.trim())}&limit=${limitVal}`, {
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (!data.user) {
+          toast.error(data.error || "No matching account found.");
+          setHistoryTargetUser(null);
+        } else {
+          setHistoryTargetUser(data.user);
+          setHistoryTransactions(data.transactions || []);
+          setHistoryInvestments(data.investments || []);
+        }
+      } else {
+        toast.error(data.error || "Failed to parse query.");
+      }
+    } catch {
+      toast.error("Network communication failure searching user profile.");
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
   const fetchGlobalInvestments = async () => {
     setIsLoadingFd(true);
     try {
@@ -1269,7 +1305,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Sidebar Navigation inside drawer */}
-                <nav className="p-4 space-y-1.5 flex flex-col gap-1">
+                <nav className="p-4 space-y-1.5 flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1 max-h-[calc(100vh-160px)]">
                   {sidebarNavItems.map((item) => {
                     const isActive = activeTab === item.id;
                     return (
@@ -1363,7 +1399,7 @@ export default function AdminPage() {
           </div>
 
           {/* Navigation links */}
-          <nav className="p-4 space-y-1.5 flex flex-col gap-1 md:overflow-visible">
+          <nav className="p-4 space-y-1.5 flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1 max-h-[calc(100vh-160px)]">
             {sidebarNavItems.map((item) => {
               const isActive = activeTab === item.id;
               return (
@@ -2987,42 +3023,12 @@ export default function AdminPage() {
                         toast.warning("Please enter a user email or phone prefix to search.");
                         return;
                       }
-
-                      setIsHistoryLoading(true);
+                      setHistoryLimit(20);
                       setHistoryTargetUser(null);
                       setHistoryTransactions([]);
                       setHistoryInvestments([]);
-
-                      try {
-                        const isMock = sessionStorage.getItem("mock") === "true";
-                        let idToken = "mock-admin-token";
-                        if (!isMock && user) {
-                          idToken = await user.getIdToken();
-                        }
-
-                        const res = await fetch(`/api/admin/user-history?search=${encodeURIComponent(historySearchQuery.trim())}`, {
-                          headers: {
-                            "Authorization": `Bearer ${idToken}`,
-                          },
-                        });
-                        const data = await res.json();
-                        if (res.ok && data.success) {
-                          if (!data.user) {
-                            toast.error(data.error || "No matching account found.");
-                          } else {
-                            setHistoryTargetUser(data.user);
-                            setHistoryTransactions(data.transactions || []);
-                            setHistoryInvestments(data.investments || []);
-                            toast.success("User timeline populated!");
-                          }
-                        } else {
-                          toast.error(data.error || "Failed to parse query.");
-                        }
-                      } catch {
-                        toast.error("Network communication failure searching user profile.");
-                      } finally {
-                        setIsHistoryLoading(false);
-                      }
+                      await fetchUserHistory(20);
+                      toast.success("User timeline populated!");
                     }}
                     className="flex gap-2"
                   >
@@ -3232,6 +3238,26 @@ export default function AdminPage() {
                             </table>
                           )}
                         </div>
+
+                        {historyTransactions.length >= historyLimit && (
+                          <div className="pt-4 text-center border-t" style={{ borderColor: isDark ? "#1f2937" : "#e5e7eb" }}>
+                            <button
+                              type="button"
+                              disabled={isHistoryLoading}
+                              onClick={async () => {
+                                const nextLimit = historyLimit + 20;
+                                setHistoryLimit(nextLimit);
+                                await fetchUserHistory(nextLimit);
+                              }}
+                              className={cn(
+                                "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto",
+                                isDark ? "bg-gray-800 text-[#FC7A00] border border-gray-700 hover:bg-gray-750" : "bg-orange-50 text-[#FC7A00] border border-orange-100 hover:bg-orange-100/50"
+                              )}
+                            >
+                              {isHistoryLoading ? <ButtonSpinner /> : "Load More Logs"}
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Fixed Deposits list card */}
@@ -3288,6 +3314,26 @@ export default function AdminPage() {
                               </tbody>
                             </table>
                           </div>
+
+                          {historyInvestments.length >= historyLimit && (
+                            <div className="pt-4 text-center border-t" style={{ borderColor: isDark ? "#1f2937" : "#e5e7eb" }}>
+                              <button
+                                type="button"
+                                disabled={isHistoryLoading}
+                                onClick={async () => {
+                                  const nextLimit = historyLimit + 20;
+                                  setHistoryLimit(nextLimit);
+                                  await fetchUserHistory(nextLimit);
+                                }}
+                                className={cn(
+                                  "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto",
+                                  isDark ? "bg-gray-800 text-[#FC7A00] border border-gray-700 hover:bg-gray-750" : "bg-orange-50 text-[#FC7A00] border border-orange-100 hover:bg-orange-100/50"
+                                )}
+                              >
+                                {isHistoryLoading ? <ButtonSpinner /> : "Load More Deposits"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </motion.div>
