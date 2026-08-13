@@ -146,11 +146,13 @@ export async function GET(req: Request) {
       createdAt: userData.createdAt || new Date().toISOString()
     };
 
-    // 2. Fetch all transaction records securely from Firestore matching targetUid
+    const limitParam = Math.max(1, Number(searchParams.get("limit")) || 20);
+
+    // 2. Fetch transaction records securely from Firestore matching targetUid (limited to low cost count)
     const txSnapshot = await adminDb.collection("transactions")
       .where("userId", "==", targetUid)
       .orderBy("createdAt", "desc")
-      .limit(100) // Caps at 100 to save database read costs and prevent memory exhaustion
+      .limit(limitParam)
       .get();
 
     const transactions: any[] = [];
@@ -167,10 +169,11 @@ export async function GET(req: Request) {
       });
     });
 
-    // 3. Fetch all investment records securely from Firestore matching targetUid
+    // 3. Fetch investment records securely from Firestore matching targetUid (limited to low cost count)
     const invSnapshot = await adminDb.collection("investments")
       .where("userId", "==", targetUid)
       .orderBy("createdAt", "desc")
+      .limit(limitParam)
       .get();
 
     const investments: any[] = [];

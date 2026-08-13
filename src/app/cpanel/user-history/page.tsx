@@ -118,19 +118,11 @@ export default function AdminUserHistoryPage() {
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [investments, setInvestments] = useState<InvestmentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState(20);
 
-  const handleSearchSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) {
-      toast.warning("Please enter a user email or phone prefix to search.");
-      return;
-    }
-
+  const fetchUserHistory = async (customLimit?: number) => {
+    const limitVal = customLimit || historyLimit;
     setIsLoading(true);
-    setTargetUser(null);
-    setTransactions([]);
-    setInvestments([]);
-
     try {
       const isMock = sessionStorage.getItem("mock") === "true";
       let idToken = "mock-admin-token";
@@ -138,7 +130,7 @@ export default function AdminUserHistoryPage() {
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch(`/api/admin/user-history?search=${encodeURIComponent(searchQuery.trim())}`, {
+      const res = await fetch(`/api/admin/user-history?search=${encodeURIComponent(searchQuery.trim())}&limit=${limitVal}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`,
         },
@@ -147,11 +139,11 @@ export default function AdminUserHistoryPage() {
       if (res.ok && data.success) {
         if (!data.user) {
           toast.error(data.error || "No matching account found.");
+          setTargetUser(null);
         } else {
           setTargetUser(data.user);
           setTransactions(data.transactions || []);
           setInvestments(data.investments || []);
-          toast.success("User timeline populated!");
         }
       } else {
         toast.error(data.error || "Failed to parse query.");
@@ -161,6 +153,20 @@ export default function AdminUserHistoryPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) {
+      toast.warning("Please enter a user email or phone prefix to search.");
+      return;
+    }
+    setHistoryLimit(20);
+    setTargetUser(null);
+    setTransactions([]);
+    setInvestments([]);
+    await fetchUserHistory(20);
+    toast.success("User timeline populated!");
   };
 
   const handleAdminVerify = async (e: React.FormEvent) => {
@@ -520,6 +526,26 @@ export default function AdminUserHistoryPage() {
                     </table>
                   )}
                 </div>
+
+                {transactions.length >= historyLimit && (
+                  <div className="pt-4 text-center border-t" style={{ borderColor: isDark ? "#1f2937" : "#e5e7eb" }}>
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={async () => {
+                        const nextLimit = historyLimit + 20;
+                        setHistoryLimit(nextLimit);
+                        await fetchUserHistory(nextLimit);
+                      }}
+                      className={cn(
+                        "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto",
+                        isDark ? "bg-gray-800 text-[#FC7A00] border border-gray-700 hover:bg-gray-750" : "bg-orange-50 text-[#FC7A00] border border-orange-100 hover:bg-orange-100/50"
+                      )}
+                    >
+                      {isLoading ? <ButtonSpinner /> : "Load More Logs"}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Fixed Deposits list card */}
@@ -576,6 +602,26 @@ export default function AdminUserHistoryPage() {
                       </tbody>
                     </table>
                   </div>
+
+                  {investments.length >= historyLimit && (
+                    <div className="pt-4 text-center border-t" style={{ borderColor: isDark ? "#1f2937" : "#e5e7eb" }}>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={async () => {
+                          const nextLimit = historyLimit + 20;
+                          setHistoryLimit(nextLimit);
+                          await fetchUserHistory(nextLimit);
+                        }}
+                        className={cn(
+                          "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto",
+                          isDark ? "bg-gray-800 text-[#FC7A00] border border-gray-700 hover:bg-gray-750" : "bg-orange-50 text-[#FC7A00] border border-orange-100 hover:bg-orange-100/50"
+                        )}
+                      >
+                        {isLoading ? <ButtonSpinner /> : "Load More Deposits"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>
