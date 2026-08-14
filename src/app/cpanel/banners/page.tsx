@@ -21,7 +21,7 @@ interface BannerSlide {
   imageUrl: string;
   title?: string;
   description?: string;
-  targetPage: "all" | "bills" | "investment" | "referral";
+  targetPage: "all" | "bills" | "investment" | "referral" | "transfer";
   link?: string;
   createdAt: string;
 }
@@ -60,7 +60,7 @@ export default function AdminBannersPage() {
   const [imageUrl, setImageUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral">("all");
+  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer">("all");
   const [link, setLink] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -621,7 +621,7 @@ export default function AdminBannersPage() {
                   <div className="relative">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*, image/gif, image/svg+xml, .gif, .svg"
                       onChange={handleFileUpload}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                       disabled={isUploading}
@@ -673,6 +673,7 @@ export default function AdminBannersPage() {
                   <option value="bills">Bills / Utility Page</option>
                   <option value="investment">Investment Page</option>
                   <option value="referral">Referral Page</option>
+                  <option value="transfer">Secure Transfer Drawer</option>
                 </select>
               </div>
 
@@ -754,7 +755,8 @@ export default function AdminBannersPage() {
                             b.targetPage === "all" && "bg-orange-500/10 border-orange-500/20 text-[#FC7A00]",
                             b.targetPage === "bills" && "bg-indigo-500/10 border-indigo-500/20 text-indigo-500",
                             b.targetPage === "investment" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
-                            b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500"
+                            b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500",
+                            b.targetPage === "transfer" && "bg-blue-500/10 border-blue-500/20 text-blue-500"
                           )}>
                             Page: {b.targetPage}
                           </span>

@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
+import BannerSlideshow from "@/components/BannerSlideshow";
 
 interface BalanceCardProps {
   balance: number;
@@ -3495,6 +3496,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           </>
                         )}
                       </AnimatePresence>
+                      <div className="mt-4 flex-shrink-0">
+                        <BannerSlideshow page="transfer" />
+                      </div>
                 </motion.div>
               )}
 
