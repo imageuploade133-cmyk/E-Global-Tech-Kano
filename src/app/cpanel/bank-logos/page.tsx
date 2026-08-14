@@ -1,0 +1,419 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface BankItem {
+  id: string;
+  name: string;
+  code: string;
+  country?: string;
+  type?: string;
+  logoUrl?: string | null;
+}
+
+function ButtonSpinner() {
+  return (
+    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+  );
+}
+
+export default function CpanelBankLogosPage() {
+  const router = RouterHook();
+  const [isDark, setIsDark] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [banks, setBanks] = useState<BankItem[]>([]);
+  const [isLoadingBanks, setIsLoadingBanks] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [imgbbApiKey, setImgbbApiKey] = useState("");
+
+  // Track editing inputs & uploading states per bankId
+  const [editingLogos, setEditingLogos] = useState<Record<string, string>>({});
+  const [uploadingBankId, setUploadingBankId] = useState<string | null>(null);
+  const [savingBankId, setSavingBankId] = useState<string | null>(null);
+
+  function RouterHook() {
+    try {
+      return useRouter();
+    } catch {
+      return { push: () => {} };
+    }
+  }
+
+  // Theme Syncing
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("cpanel_theme");
+      if (cached === "dark") {
+        setIsDark(true);
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
+      }
+      return next;
+    });
+  };
+
+  // Auth & Session Check
+  useEffect(() => {
+    async function checkSession() {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      if (isMock) {
+        setIsLoadingSession(false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/admin/auth/session");
+        const data = await res.json();
+        if (!data.authenticated) {
+          toast.error("Session expired. Please log in.");
+          router.push("/cpanel");
+          return;
+        }
+      } catch (err) {
+        console.error("Session check failed:", err);
+      } finally {
+        setIsLoadingSession(false);
+      }
+    }
+    checkSession();
+  }, [router]);
+
+  // Fetch Admin App Config for ImgBB Key
+  useEffect(() => {
+    async function fetchConfig() {
+      try {
+        const res = await fetch("/api/admin/config");
+        const data = await res.json();
+        if (data.config?.imgbbApiKey) {
+          setImgbbApiKey(data.config.imgbbApiKey);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch admin config:", err);
+      }
+    }
+    fetchConfig();
+  }, []);
+
+  // Fetch Banks List
+  const fetchBanks = async (query = searchQuery) => {
+    setIsLoadingBanks(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const headers = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const res = await fetch(`/api/admin/bank-logos?search=${encodeURIComponent(query)}`, { headers });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.banks)) {
+        setBanks(data.banks);
+        // Initialize editingLogos map
+        const logoMap: Record<string, string> = {};
+        data.banks.forEach((b: BankItem) => {
+          logoMap[b.id] = b.logoUrl || "";
+        });
+        setEditingLogos(logoMap);
+      } else {
+        toast.error(data.error || "Failed to load banks directory.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error fetching banks list.");
+    } finally {
+      setIsLoadingBanks(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isLoadingSession) {
+      fetchBanks("");
+    }
+  }, [isLoadingSession]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchBanks(searchQuery);
+  };
+
+  // Upload file to ImgBB
+  const handleFileUpload = async (bankId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!imgbbApiKey) {
+      toast.error("ImgBB API key is not configured in Admin Settings. Please set it under CPanel Settings.");
+      return;
+    }
+
+    setUploadingBankId(bankId);
+    toast.loading(`Uploading logo image for bank...`, { id: `upload-${bankId}` });
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbApiKey}`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (json.success && json.data?.url) {
+        const uploadedUrl = json.data.url;
+        setEditingLogos((prev) => ({ ...prev, [bankId]: uploadedUrl }));
+        toast.success("Logo image uploaded successfully!", { id: `upload-${bankId}` });
+      } else {
+        toast.error(json.error?.message || "Failed to upload image to ImgBB.", { id: `upload-${bankId}` });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Image upload failed.", { id: `upload-${bankId}` });
+    } finally {
+      setUploadingBankId(null);
+    }
+  };
+
+  // Save bank logo to Firestore
+  const handleSaveLogo = async (bankId: string) => {
+    const newLogoUrl = editingLogos[bankId] || "";
+    setSavingBankId(bankId);
+
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const authHeader = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const res = await fetch("/api/admin/bank-logos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ bankId, logoUrl: newLogoUrl }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Bank logo saved successfully!");
+        setBanks((prev) =>
+          prev.map((b) => (b.id === bankId ? { ...b, logoUrl: newLogoUrl } : b))
+        );
+      } else {
+        toast.error(data.error || "Failed to save bank logo.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error saving logo.");
+    } finally {
+      setSavingBankId(null);
+    }
+  };
+
+  const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
+  const panelClass = isDark ? "bg-[#131927] border-gray-800" : "bg-white border-gray-200 shadow-sm";
+  const inputClass = isDark
+    ? "bg-gray-900/80 border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00]"
+    : "bg-white border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00]";
+
+  if (isLoadingSession) {
+    return (
+      <div className={cn("min-h-screen flex items-center justify-center p-6", bgClass)}>
+        <div className="flex flex-col items-center gap-3">
+          <ButtonSpinner />
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Verifying Admin Access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("min-h-screen p-4 md:p-8 font-hanken transition-colors duration-300", bgClass)}>
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Top Header */}
+        <div className={cn("p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/cpanel"
+              className={cn("w-10 h-10 rounded-xl border flex items-center justify-center transition-all", isDark ? "bg-gray-900 border-gray-800 text-white hover:bg-gray-800" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100")}
+            >
+              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-orange-500 text-[22px]">account_balance</span>
+                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Bank Logos Manager</h1>
+              </div>
+              <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
+                Upload and customize high-resolution logo assets for all supported banks.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={cn("px-3 h-10 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-yellow-400" : "bg-gray-100 border-gray-200 text-gray-700")}
+            >
+              <span className="material-symbols-outlined text-[18px]">{isDark ? "light_mode" : "dark_mode"}</span>
+              <span className="hidden sm:inline">{isDark ? "Light Mode" : "Dark Mode"}</span>
+            </button>
+            <Link
+              href="/cpanel"
+              className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">dashboard</span>
+              <span>Control Panel</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Search Bar & Stats */}
+        <div className={cn("p-5 rounded-2xl border flex flex-col md:flex-row items-center justify-between gap-4", panelClass)}>
+          <form onSubmit={handleSearchSubmit} className="flex-1 w-full flex items-center gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">search</span>
+              <input
+                type="text"
+                placeholder="Search bank name or bank code (e.g. GTBank, 058, Opay)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={cn("w-full h-11 pl-10 pr-4 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-5 h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+            >
+              Search
+            </button>
+          </form>
+
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest">
+            <span>Total Banks:</span>
+            <span className="px-2.5 py-1 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-lg">{banks.length}</span>
+          </div>
+        </div>
+
+        {/* Banks Directory List */}
+        {isLoadingBanks ? (
+          <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
+            <ButtonSpinner />
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Banks Directory...</p>
+          </div>
+        ) : banks.length === 0 ? (
+          <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
+            <span className="material-symbols-outlined text-[42px] text-gray-400">account_balance_wallet</span>
+            <p className="text-xs font-black uppercase text-gray-400">No Banks Found</p>
+            <p className="text-[11px] text-gray-500 max-w-md mx-auto">No banks matched your search query. Try searching with a different bank name or code.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {banks.map((bank) => {
+              const currentUrl = editingLogos[bank.id] || "";
+              const trimmedCode = (bank.code || "").trim();
+              const paddedCode = trimmedCode && /^\d+$/.test(trimmedCode) ? trimmedCode.padStart(3, "0") : trimmedCode;
+              const previewUrl = currentUrl || (paddedCode ? `/bank-logos/${paddedCode}.png` : null);
+              const isUploading = uploadingBankId === bank.id;
+              const isSaving = savingBankId === bank.id;
+
+              return (
+                <div key={bank.id} className={cn("p-5 rounded-2xl border flex flex-col justify-between space-y-4 transition-all", panelClass)}>
+                  {/* Bank Info Header */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-xl border border-gray-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                      {previewUrl ? (
+                        <img
+                          src={previewUrl}
+                          alt={bank.name}
+                          className="w-full h-full object-contain p-1"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <span className="text-xs font-black text-gray-600">{bank.name.substring(0, 2).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-extrabold text-xs uppercase tracking-tight truncate leading-tight">{bank.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                          Code: {bank.code}
+                        </span>
+                        <span className="text-[10px] font-mono text-gray-400 truncate">ID: {bank.id}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Logo Upload Form */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Logo Image URL or File</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Paste image URL (https://...)"
+                        value={currentUrl}
+                        onChange={(e) => setEditingLogos((prev) => ({ ...prev, [bank.id]: e.target.value }))}
+                        className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
+                      />
+                      <div className="relative flex-shrink-0">
+                        <input
+                          type="file"
+                          accept="image/*, image/png, image/jpeg, image/webp, image/svg+xml"
+                          onChange={(e) => handleFileUpload(bank.id, e)}
+                          disabled={isUploading}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                        />
+                        <button
+                          type="button"
+                          disabled={isUploading}
+                          className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                          title="Upload image file to ImgBB"
+                        >
+                          {isUploading ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200/40">
+                    {currentUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingLogos((prev) => ({ ...prev, [bank.id]: "" }))}
+                        className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider"
+                      >
+                        Clear Custom Logo
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Using Default Asset</span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleSaveLogo(bank.id)}
+                      disabled={isSaving || isUploading}
+                      className="px-4 h-9 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                    >
+                      {isSaving ? (
+                        <ButtonSpinner />
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[16px]">save</span>
+                          <span>Save</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
