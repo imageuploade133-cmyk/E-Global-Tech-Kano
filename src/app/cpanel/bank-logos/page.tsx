@@ -109,7 +109,7 @@ export default function CpanelBankLogosPage() {
     setIsLoadingBanks(true);
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
-      const headers = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch(`/api/admin/bank-logos?search=${encodeURIComponent(query)}`, { headers });
       const data = await res.json();
       if (data.success && Array.isArray(data.banks)) {
@@ -185,7 +185,7 @@ export default function CpanelBankLogosPage() {
 
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
-      const authHeader = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bank-logos", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },

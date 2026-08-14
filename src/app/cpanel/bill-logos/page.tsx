@@ -136,7 +136,7 @@ export default function CpanelBillLogosPage() {
     setIsLoading(true);
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
-      const headers = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bill-logos", { headers });
       const data = await res.json();
 
@@ -222,7 +222,7 @@ export default function CpanelBillLogosPage() {
 
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
-      const authHeader = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bill-logos", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader },
