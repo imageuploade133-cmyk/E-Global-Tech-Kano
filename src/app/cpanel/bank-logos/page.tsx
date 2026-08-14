@@ -74,7 +74,7 @@ export default function CpanelBankLogosPage() {
       try {
         const res = await fetch("/api/admin/auth/session");
         const data = await res.json();
-        if (!data.authenticated) {
+        if (!res.ok || !data.success) {
           toast.error("Session expired. Please log in.");
           router.push("/cpanel");
           return;
