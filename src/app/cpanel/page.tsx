@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
@@ -1325,6 +1326,8 @@ export default function AdminPage() {
     { id: "users", label: "Users & Permissions", icon: "group" },
     { id: "kyc", label: "KYC Approvals", icon: "verified_user" },
     { id: "settings", label: "Branding", icon: "diamond" },
+    { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos" },
+    { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos" },
     { id: "whatsapp", label: "WhatsApp Link", icon: "hub" },
     { id: "profit", label: "Commission Markups", icon: "tune" },
     { id: "banners", label: "Slide Banners", icon: "photo_library" },
@@ -1464,6 +1467,22 @@ export default function AdminPage() {
                 <nav className="p-4 space-y-1.5 flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1 max-h-[calc(100vh-160px)]">
                   {sidebarNavItems.map((item) => {
                     const isActive = activeTab === item.id;
+                    if (item.href) {
+                      return (
+                        <Link
+                          key={item.id}
+                          href={item.href}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={cn(
+                            "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                            isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                          )}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                          <span className="flex-1 text-left">{item.label}</span>
+                        </Link>
+                      );
+                    }
                     return (
                       <button
                         key={item.id}
@@ -1558,6 +1577,21 @@ export default function AdminPage() {
           <nav className="p-4 space-y-1.5 flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1 max-h-[calc(100vh-160px)]">
             {sidebarNavItems.map((item) => {
               const isActive = activeTab === item.id;
+              if (item.href) {
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                      isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                    {!isSidebarMinimized && <span className="flex-1 text-left">{item.label}</span>}
+                  </Link>
+                );
+              }
               return (
                 <button
                   key={item.id}
