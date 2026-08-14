@@ -1,4 +1,6 @@
 ==============================================================================================================================
+REPEATABLE LOGO AUDIT REPORT (FLUTTERWAVE BASELINE)
+==============================================================================================================================
 BANK CODE | BANK NAME                                    | LOGO FOUND | LOGO URL                  | STATUS
 ==============================================================================================================================
 110072    | 78 Finance Company Ltd (Bank78)              | YES        | /bank-logos/110072.png    | VERIFIED
@@ -18,9 +20,9 @@ BANK CODE | BANK NAME                                    | LOGO FOUND | LOGO URL
 035A      | ALAT by WEMA                                 | YES        | /bank-logos/035A.png      | VERIFIED
 090629    | Amegy Microfinance Bank                      | YES        | /bank-logos/090629.png    | VERIFIED
 50926     | Amju Unique MFB                              | YES        | /bank-logos/50926.png     | VERIFIED
-645       | Amucha MFB                                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
-645       | Amucha Microfinance Bank                     | NO         | N/A                       | FALLBACK (Placeholder in JSON)
-50083     | Aramoko MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+645       | Amucha MFB                                   | NO         | N/A                       | FALLBACK (No static logo file)
+645       | Amucha Microfinance Bank                     | NO         | N/A                       | FALLBACK (No static logo file)
+50083     | Aramoko MFB                                  | NO         | N/A                       | FALLBACK (No static logo file)
 401       | ASO Savings and Loans                        | YES        | /bank-logos/401.png       | VERIFIED
 50092     | Assets Microfinance Bank                     | YES        | /bank-logos/50092.png     | VERIFIED
 MFB50094  | Astrapolaris MFB LTD                         | YES        | /bank-logos/MFB50094.png  | VERIFIED
@@ -28,12 +30,12 @@ MFB50094  | Astrapolaris MFB LTD                         | YES        | /bank-lo
 51351     | AWACASH MICROFINANCE BANK                    | YES        | /bank-logos/51351.png     | VERIFIED
 51337     | AZTEC MICROFINANCE BANK LIMITED              | YES        | /bank-logos/51337.png     | VERIFIED
 51229     | Bainescredit MFB                             | YES        | /bank-logos/51229.png     | VERIFIED
-50117     | Banc Corp Microfinance Bank                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50117     | Banc Corp Microfinance Bank                  | NO         | N/A                       | FALLBACK (No static logo file)
 51341     | BANKLY MFB                                   | YES        | /bank-logos/51341.png     | VERIFIED
 MFB50992  | Baobab Microfinance Bank                     | YES        | /bank-logos/MFB50992.png  | VERIFIED
 51100     | BellBank Microfinance Bank                   | YES        | /bank-logos/51100.png     | VERIFIED
 51267     | Benysta Microfinance Bank Limited            | YES        | /bank-logos/51267.png     | VERIFIED
-50123     | Beststar Microfinance Bank                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50123     | Beststar Microfinance Bank                   | NO         | N/A                       | FALLBACK (No static logo file)
 50931     | Bowen Microfinance Bank                      | YES        | /bank-logos/50931.png     | VERIFIED
 FC40163   | Branch International Finance Company Limited | YES        | /bank-logos/FC40163.png   | VERIFIED
 565       | Carbon                                       | YES        | /bank-logos/565.png       | VERIFIED
@@ -48,7 +50,7 @@ FC40163   | Branch International Finance Company Limited | YES        | /bank-lo
 50204     | Corestep MFB                                 | YES        | /bank-logos/50204.png     | VERIFIED
 559       | Coronation Merchant Bank                     | YES        | /bank-logos/559.png       | VERIFIED
 FC40128   | County Finance Limited                       | YES        | /bank-logos/FC40128.png   | VERIFIED
-51297     | Crescent MFB                                 | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51297     | Crescent MFB                                 | NO         | N/A                       | FALLBACK (No static logo file)
 090560    | Crust Microfinance Bank                      | YES        | /bank-logos/090560.png    | VERIFIED
 51334     | Davenport MICROFINANCE BANK                  | YES        | /bank-logos/51334.png     | VERIFIED
 50162     | Dot Microfinance Bank                        | YES        | /bank-logos/50162.png     | VERIFIED
@@ -66,18 +68,18 @@ FC40128   | County Finance Limited                       | YES        | /bank-lo
 090164    | FIRST ROYAL MICROFINANCE BANK                | YES        | /bank-logos/090164.png    | VERIFIED
 413       | FirstTrust Mortgage Bank Nigeria             | YES        | /bank-logos/413.png       | VERIFIED
 501       | FSDH Merchant Bank Limited                   | YES        | /bank-logos/501.png       | VERIFIED
-832       | FUTMINNA MICROFINANCE BANK                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
-MFB51093  | Garun Mallam MFB                             | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+832       | FUTMINNA MICROFINANCE BANK                   | NO         | N/A                       | FALLBACK (No static logo file)
+MFB51093  | Garun Mallam MFB                             | NO         | N/A                       | FALLBACK (No static logo file)
 812       | Gateway Mortgage Bank LTD                    | YES        | /bank-logos/812.png       | VERIFIED
 00103     | Globus Bank                                  | YES        | /bank-logos/00103.png     | VERIFIED
 090574    | Goldman MFB                                  | YES        | /bank-logos/090574.png    | VERIFIED
 100022    | GoMoney                                      | YES        | /bank-logos/100022.png    | VERIFIED
 090664    | GOOD SHEPHERD MICROFINANCE BANK              | YES        | /bank-logos/090664.png    | VERIFIED
-50739     | Goodnews Microfinance Bank                   | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50739     | Goodnews Microfinance Bank                   | NO         | N/A                       | FALLBACK (No static logo file)
 562       | Greenwich Merchant Bank                      | YES        | /bank-logos/562.png       | VERIFIED
 51276     | GROOMING MICROFINANCE BANK                   | YES        | /bank-logos/51276.png     | VERIFIED
 058       | Guaranty Trust Bank                          | YES        | /bank-logos/058.png       | VERIFIED
-51251     | Hackman Microfinance Bank                    | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51251     | Hackman Microfinance Bank                    | NO         | N/A                       | FALLBACK (No static logo file)
 50383     | Hasal Microfinance Bank                      | YES        | /bank-logos/50383.png     | VERIFIED
 120002    | HopePSB                                      | YES        | /bank-logos/120002.png    | VERIFIED
 51211     | IBANK Microfinance Bank                      | YES        | /bank-logos/51211.png     | VERIFIED
@@ -87,9 +89,9 @@ MFB51093  | Garun Mallam MFB                             | NO         | N/A     
 50453     | Imowo MFB                                    | YES        | /bank-logos/50453.png     | VERIFIED
 415       | IMPERIAL HOMES MORTAGE BANK                  | YES        | /bank-logos/415.png       | VERIFIED
 50457     | Infinity MFB                                 | YES        | /bank-logos/50457.png     | VERIFIED
-090701    | ISUA MFB                                     | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+090701    | ISUA MFB                                     | NO         | N/A                       | FALLBACK (No static logo file)
 301       | Jaiz Bank                                    | YES        | /bank-logos/301.png       | VERIFIED
-50502     | Kadpoly MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50502     | Kadpoly MFB                                  | NO         | N/A                       | FALLBACK (No static logo file)
 51308     | KANOPOLY MFB                                 | YES        | /bank-logos/51308.png     | VERIFIED
 082       | Keystone Bank                                | YES        | /bank-logos/082.png       | VERIFIED
 100025    | KONGAPAY (Kongapay Technologies Limited)(formerly Zinternet) | YES        | /bank-logos/100025.png    | VERIFIED
@@ -102,12 +104,12 @@ MFB51093  | Garun Mallam MFB                             | NO         | N/A     
 303       | Lotus Bank                                   | YES        | /bank-logos/303.png       | VERIFIED
 090171    | MAINSTREET MICROFINANCE BANK                 | YES        | /bank-logos/090171.png    | VERIFIED
 50563     | Mayfair MFB                                  | YES        | /bank-logos/50563.png     | VERIFIED
-50304     | Mint MFB                                     | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50304     | Mint MFB                                     | NO         | N/A                       | FALLBACK (No static logo file)
 946       | Money Master PSB                             | YES        | /bank-logos/946.png       | VERIFIED
 50515     | Moniepoint MFB                               | YES        | /bank-logos/50515.png     | VERIFIED
 120003    | MTN Momo PSB                                 | YES        | /bank-logos/120003.png    | VERIFIED
 090190    | MUTUAL BENEFITS MICROFINANCE BANK            | YES        | /bank-logos/090190.png    | VERIFIED
-090679    | NDCC MICROFINANCE BANK                       | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+090679    | NDCC MICROFINANCE BANK                       | NO         | N/A                       | FALLBACK (No static logo file)
 51361     | NET MICROFINANCE BANK                        | YES        | /bank-logos/51361.png     | VERIFIED
 51142     | Nigerian Navy Microfinance Bank Limited      | YES        | /bank-logos/51142.png     | VERIFIED
 561       | NOVA BANK                                    | YES        | /bank-logos/561.png       | VERIFIED
@@ -119,9 +121,9 @@ MFB51093  | Garun Mallam MFB                             | NO         | N/A     
 999991    | PalmPay                                      | YES        | /bank-logos/999991.png    | VERIFIED
 104       | Parallex Bank                                | YES        | /bank-logos/104.png       | VERIFIED
 311       | Parkway - ReadyCash                          | YES        | /bank-logos/311.png       | VERIFIED
-090680    | PATHFINDER MICROFINANCE BANK LIMITED         | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+090680    | PATHFINDER MICROFINANCE BANK LIMITED         | NO         | N/A                       | FALLBACK (No static logo file)
 100039    | Paystack-Titan                               | YES        | /bank-logos/100039.png    | VERIFIED
-50743     | Peace Microfinance Bank                      | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50743     | Peace Microfinance Bank                      | NO         | N/A                       | FALLBACK (No static logo file)
 51226     | PECANTRUST MICROFINANCE BANK LIMITED         | YES        | /bank-logos/51226.png     | VERIFIED
 51146     | Personal Trust MFB                           | YES        | /bank-logos/51146.png     | VERIFIED
 50746     | Petra Mircofinance Bank Plc                  | YES        | /bank-logos/50746.png     | VERIFIED
@@ -131,12 +133,12 @@ MFB51093  | Garun Mallam MFB                             | NO         | N/A     
 076       | Polaris Bank                                 | YES        | /bank-logos/076.png       | VERIFIED
 50864     | Polyunwana MFB                               | YES        | /bank-logos/50864.png     | VERIFIED
 105       | PremiumTrust Bank                            | YES        | /bank-logos/105.png       | VERIFIED
-50739     | Prospa Capital Microfinance Bank             | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50739     | Prospa Capital Microfinance Bank             | NO         | N/A                       | FALLBACK (No static logo file)
 050023    | PROSPERIS FINANCE LIMITED                    | YES        | /bank-logos/050023.png    | VERIFIED
 101       | Providus Bank                                | YES        | /bank-logos/101.png       | VERIFIED
 51293     | QuickFund MFB                                | YES        | /bank-logos/51293.png     | VERIFIED
 502       | Rand Merchant Bank                           | YES        | /bank-logos/502.png       | VERIFIED
-090496    | RANDALPHA MICROFINANCE BANK                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+090496    | RANDALPHA MICROFINANCE BANK                  | NO         | N/A                       | FALLBACK (No static logo file)
 90067     | Refuge Mortgage Bank                         | YES        | /bank-logos/90067.png     | VERIFIED
 50761     | REHOBOTH MICROFINANCE BANK                   | YES        | /bank-logos/50761.png     | VERIFIED
 50994     | Rephidim Microfinance Bank                   | YES        | /bank-logos/50994.png     | VERIFIED
@@ -148,22 +150,22 @@ MFB51093  | Garun Mallam MFB                             | NO         | N/A     
 40165     | SAGE GREY FINANCE LIMITED                    | YES        | /bank-logos/40165.png     | VERIFIED
 50582     | Shield MFB                                   | YES        | /bank-logos/50582.png     | VERIFIED
 106       | Signature Bank Ltd                           | YES        | /bank-logos/106.png       | VERIFIED
-51062     | Solid Allianze MFB                           | NO         | N/A                       | FALLBACK (Placeholder in JSON)
-50800     | Solid Rock MFB                               | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51062     | Solid Allianze MFB                           | NO         | N/A                       | FALLBACK (No static logo file)
+50800     | Solid Rock MFB                               | NO         | N/A                       | FALLBACK (No static logo file)
 51310     | Sparkle Microfinance Bank                    | YES        | /bank-logos/51310.png     | VERIFIED
 221       | Stanbic IBTC Bank                            | YES        | /bank-logos/221.png       | VERIFIED
 068       | Standard Chartered Bank                      | YES        | /bank-logos/068.png       | VERIFIED
 090162    | STANFORD MICROFINANCE BANK                   | YES        | /bank-logos/090162.png    | VERIFIED
 50809     | STATESIDE MICROFINANCE BANK                  | YES        | /bank-logos/50809.png     | VERIFIED
-51253     | Stellas MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+51253     | Stellas MFB                                  | NO         | N/A                       | FALLBACK (No static logo file)
 232       | Sterling Bank                                | YES        | /bank-logos/232.png       | VERIFIED
 100       | Suntrust Bank                                | YES        | /bank-logos/100.png       | VERIFIED
-50968     | Supreme MFB                                  | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+50968     | Supreme MFB                                  | NO         | N/A                       | FALLBACK (No static logo file)
 302       | TAJ Bank                                     | YES        | /bank-logos/302.png       | VERIFIED
 51269     | Tangerine Money                              | YES        | /bank-logos/51269.png     | VERIFIED
 000304    | The Alternative bank                         | YES        | /bank-logos/000304.png    | VERIFIED
 102       | Titan Bank                                   | YES        | /bank-logos/102.png       | VERIFIED
-090708    | TransPay MFB                                 | NO         | N/A                       | FALLBACK (Placeholder in JSON)
+090708    | TransPay MFB                                 | NO         | N/A                       | FALLBACK (No static logo file)
 50840     | U&C Microfinance Bank Ltd (U AND C MFB)      | YES        | /bank-logos/50840.png     | VERIFIED
 090706    | UCEE MFB                                     | YES        | /bank-logos/090706.png    | VERIFIED
 51322     | Uhuru MFB                                    | YES        | /bank-logos/51322.png     | VERIFIED
@@ -184,11 +186,14 @@ MFB51093  | Garun Mallam MFB                             | NO         | N/A     
 ==============================================================================================================================
 AUDIT SUMMARY:
 ------------------------------------------------------------------------------------------------------------------------------
-A. Total number of banks returned by Flutterwave configuration: 180
-B. Number with verified logos: 157
-C. Number still using fallback: 23
+1. Total Flutterwave banks found: 180
+2. Total verified logos: 157
+3. Total missing logos: 23
+4. Total self-hosted logos: 157
+5. Duplicate bank codes detected: 3
+6. Source mode: LOCAL BACKEND CACHE
 ------------------------------------------------------------------------------------------------------------------------------
-D. Complete list of banks still without verified logos:
+7. List of remaining missing logos:
    - [645] Amucha MFB
    - [645] Amucha Microfinance Bank
    - [50083] Aramoko MFB
