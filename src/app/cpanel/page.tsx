@@ -185,7 +185,7 @@ export default function AdminPage() {
   const [bannerImageUrl, setBannerImageUrl] = useState("");
   const [bannerTitle, setBannerTitle] = useState("");
   const [bannerDescription, setBannerDescription] = useState("");
-  const [bannerTargetPage, setBannerTargetPage] = useState<"all" | "bills" | "investment" | "referral">("all");
+  const [bannerTargetPage, setBannerTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer">("all");
   const [bannerLink, setBannerLink] = useState("");
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
@@ -3852,6 +3852,7 @@ export default function AdminPage() {
                             <option value="bills">Bills / Utility Page</option>
                             <option value="investment">Investment Page</option>
                             <option value="referral">Referral Page</option>
+                            <option value="transfer">Secure Transfer Drawer</option>
                           </select>
                         </div>
 
@@ -3934,7 +3935,8 @@ export default function AdminPage() {
                                       b.targetPage === "all" && "bg-orange-500/10 border-orange-500/20 text-[#FC7A00]",
                                       b.targetPage === "bills" && "bg-indigo-500/10 border-indigo-500/20 text-indigo-500",
                                       b.targetPage === "investment" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
-                                      b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500"
+                                      b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500",
+                                      b.targetPage === "transfer" && "bg-blue-500/10 border-blue-500/20 text-blue-500"
                                     )}>
                                       Page: {b.targetPage}
                                     </span>

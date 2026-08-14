@@ -11,12 +11,12 @@ interface BannerSlide {
   imageUrl: string;
   title?: string;
   description?: string;
-  targetPage: "all" | "bills" | "investment" | "referral";
+  targetPage: "all" | "bills" | "investment" | "referral" | "transfer";
   link?: string;
 }
 
 interface BannerSlideshowProps {
-  page: "bills" | "investment" | "referral";
+  page: "bills" | "investment" | "referral" | "transfer";
   isDark?: boolean;
 }
 
