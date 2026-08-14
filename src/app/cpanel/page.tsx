@@ -6,6 +6,28 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+const C_BILLERS = [
+  { name: "MTN Network", code: "mtn" },
+  { name: "GLO Network", code: "glo" },
+  { name: "Airtel Network", code: "airtel" },
+  { name: "9Mobile Network", code: "9mobile" },
+  { name: "IKEDC Electricity", code: "ikedc" },
+  { name: "EKEDC Electricity", code: "ekedc" },
+  { name: "AEDC Electricity", code: "aedc" },
+  { name: "KEDCO Electricity", code: "kedco" },
+  { name: "PHED Electricity", code: "phed" },
+  { name: "JED Electricity", code: "jed" },
+  { name: "EEDC Electricity", code: "eedc" },
+  { name: "IBEDC Electricity", code: "ibedc" },
+  { name: "KAEDCO Electricity", code: "kaedco" },
+  { name: "DStv", code: "dstv" },
+  { name: "GOtv", code: "gotv" },
+  { name: "StarTimes", code: "startimes" },
+  { name: "WAEC Council", code: "waec" }
+];
 
 interface AdminUser {
   uid: string;
@@ -99,7 +121,128 @@ export default function AdminPage() {
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "banners" | "investments" | "history">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "banners" | "investments" | "history" | "logos">("dashboard");
+
+  // Logo Overrides States
+  const [logoTab, setLogoTab] = useState<"banks" | "billers">("banks");
+  const [logoSearchQuery, setLogoSearchQuery] = useState("");
+  const [logoBanksOverrides, setLogoBanksOverrides] = useState<Record<string, string>>({});
+  const [logoBillersOverrides, setLogoBillersOverrides] = useState<Record<string, string>>({});
+  const [logoUploadingCode, setLogoUploadingCode] = useState<string | null>(null);
+  const [logoAllBanksList, setLogoAllBanksList] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isAdminUnlocked) {
+      const fetchLogoBanks = async () => {
+        try {
+          const res = await fetch("/api/banks");
+          if (res.ok) {
+            const data = await res.json();
+            setLogoAllBanksList(data);
+          }
+        } catch (err) {
+          console.warn("Failed to fetch banks for logos manager:", err);
+        }
+      };
+      fetchLogoBanks();
+    }
+  }, [isAdminUnlocked]);
+
+  useEffect(() => {
+    if (isAdminUnlocked) {
+      const fetchOverrides = async () => {
+        try {
+          const docSnap = await getDoc(doc(db, "config", "logos"));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.banks) setLogoBanksOverrides(data.banks);
+            if (data.billers) setLogoBillersOverrides(data.billers);
+          }
+        } catch (err) {
+          console.warn("Failed to fetch config/logos overrides:", err);
+        }
+      };
+      fetchOverrides();
+    }
+  }, [isAdminUnlocked]);
+
+  const handleCustomLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: "banks" | "billers", itemCode: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoUploadingCode(itemCode);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const apiKey = config.imgbbApiKey || "0d1a390cb385b632d952db08a3479005";
+    toast.loading(`Uploading custom logo for ${itemCode} to ImgBB...`);
+
+    try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: "POST",
+        body: formData
+      });
+      const json = await res.json();
+      toast.dismiss();
+
+      if (json.success) {
+        const imgUrl = json.data.display_url;
+
+        const newOverrides = type === "banks"
+          ? { ...logoBanksOverrides, [itemCode]: imgUrl }
+          : { ...logoBillersOverrides, [itemCode]: imgUrl };
+
+        if (type === "banks") {
+          setLogoBanksOverrides(newOverrides);
+        } else {
+          setLogoBillersOverrides(newOverrides);
+        }
+
+        await setDoc(doc(db, "config", "logos"), {
+          banks: type === "banks" ? newOverrides : logoBanksOverrides,
+          billers: type === "billers" ? newOverrides : logoBillersOverrides
+        }, { merge: true });
+
+        toast.success(`Custom logo for ${itemCode} successfully saved!`);
+      } else {
+        toast.error(json.error?.message || "Failed to upload to ImgBB.");
+      }
+    } catch (err) {
+      toast.dismiss();
+      toast.error("ImgBB API connection error.");
+    } finally {
+      setLogoUploadingCode(null);
+    }
+  };
+
+  const handleRemoveLogoOverride = async (type: "banks" | "billers", itemCode: string) => {
+    if (!confirm(`Are you sure you want to remove the custom logo override for ${itemCode}?`)) return;
+
+    try {
+      const updatedOverrides = { ... (type === "banks" ? logoBanksOverrides : logoBillersOverrides) };
+      delete updatedOverrides[itemCode];
+
+      if (type === "banks") {
+        setLogoBanksOverrides(updatedOverrides);
+      } else {
+        setLogoBillersOverrides(updatedOverrides);
+      }
+
+      await setDoc(doc(db, "config", "logos"), {
+        banks: type === "banks" ? updatedOverrides : logoBanksOverrides,
+        billers: type === "billers" ? updatedOverrides : logoBillersOverrides
+      }, { merge: true });
+
+      toast.success(`Override logo for ${itemCode} successfully cleared.`);
+    } catch {
+      toast.error("Failed to remove logo override.");
+    }
+  };
+
+  const logoFilteredBanks = logoAllBanksList.filter((b: any) =>
+    b.name?.toLowerCase().includes(logoSearchQuery.toLowerCase()) ||
+    b.code?.toLowerCase().includes(logoSearchQuery.toLowerCase())
+  );
 
   // Fixed Deposit States
   const [fdList, setFdList] = useState<any[]>([]);
@@ -1330,6 +1473,7 @@ export default function AdminPage() {
     { id: "banners", label: "Slide Banners", icon: "photo_library" },
     { id: "investments", label: "Fixed Deposits", icon: "savings" },
     { id: "history", label: "User Ledger Audits", icon: "history" },
+    { id: "logos", label: "Brand & Bill Logos", icon: "image" },
   ];
 
   if (!isAdminUnlocked) {
@@ -1618,6 +1762,7 @@ export default function AdminPage() {
               {activeTab === "banners" && "Interactive Slide Banners Manager"}
               {activeTab === "investments" && "Secure Fixed Deposits Auditing Panel"}
               {activeTab === "history" && "User Ledger Audits & History Logs"}
+              {activeTab === "logos" && "Brand & Biller Logos Manager"}
             </h2>
             <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider font-hanken">Enterprise System Suite</p>
           </div>
@@ -3218,6 +3363,180 @@ export default function AdminPage() {
                       {isSavingMargins ? <><ButtonSpinner /> Saving changes...</> : "Save Markup configurations"}
                     </button>
                   </form>
+                )}
+              </motion.div>
+            )}
+
+            {/* Tab 10: Brand & Biller Logos Manager Override Panel */}
+            {activeTab === "logos" && (
+              <motion.div
+                key="logos-view"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="space-y-6"
+              >
+                {/* Immersive Sub-header */}
+                <div className={cn("flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl border transition-all duration-300", panelClass)}>
+                  <div className="space-y-1">
+                    <h3 className="font-hanken font-extrabold text-sm uppercase">Branding Assets Overrides</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Upload custom logos for billers/networks and missing banks</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLogoTab("banks")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                        logoTab === "banks"
+                          ? "bg-[#FC7A00]/10 border-[#FC7A00]/30 text-[#FC7A00]"
+                          : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                      }`}
+                    >
+                      Bank Logos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLogoTab("billers")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                        logoTab === "billers"
+                          ? "bg-[#FC7A00]/10 border-[#FC7A00]/30 text-[#FC7A00]"
+                          : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                      }`}
+                    >
+                      Biller / Provider Logos
+                    </button>
+                  </div>
+                </div>
+
+                {logoTab === "banks" ? (
+                  // Bank Logos view
+                  <div className={cn("rounded-3xl p-6 border transition-all duration-300 space-y-6", panelClass)}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                      <div className="space-y-1">
+                        <h4 className="font-hanken font-extrabold text-xs uppercase tracking-wide">Banks Directory Logo Overrides</h4>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Search and override logos for any supported bank</p>
+                      </div>
+                      <div className="w-full md:w-80">
+                        <input
+                          type="text"
+                          placeholder="Search banks by name or code..."
+                          value={logoSearchQuery}
+                          onChange={(e) => setLogoSearchQuery(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2 no-scrollbar">
+                      {logoFilteredBanks.map((bank: any) => {
+                        const code = bank.code ? String(bank.code).trim().padStart(3, "0") : "";
+                        const currentCustomLogo = logoBanksOverrides[code];
+                        return (
+                          <div key={bank.id} className={cn("p-4 border rounded-2xl flex items-center justify-between gap-4 transition-all", isDark ? "border-gray-850 hover:bg-gray-850/30" : "border-gray-150 hover:bg-gray-50/50")}>
+                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                              <div className="w-11 h-11 rounded-full border border-gray-100 flex items-center justify-center bg-white overflow-hidden shrink-0 shadow-sm">
+                                <img
+                                  src={currentCustomLogo || `/bank-logos/${code}.png`}
+                                  alt={bank.name}
+                                  className="w-full h-full object-contain p-1.5"
+                                  onError={(e) => {
+                                    (e.target as any).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(bank.name)}&background=f97316&color=fff&bold=true`;
+                                  }}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className={cn("font-hanken text-xs font-black truncate leading-tight uppercase", isDark ? "text-white" : "text-gray-900")}>{bank.name}</p>
+                                <p className="font-mono text-[9px] text-[#FC7A00] font-bold uppercase tracking-wider mt-1">Code: {code} {currentCustomLogo && "• CUSTOM OVERRIDE"}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <label className={cn("relative cursor-pointer px-3 py-2 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100")}>
+                                {logoUploadingCode === code ? "Uploading..." : "Upload Logo"}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  disabled={!!logoUploadingCode}
+                                  onChange={(e) => handleCustomLogoUpload(e, "banks", code)}
+                                  className="hidden"
+                                />
+                              </label>
+                              {currentCustomLogo && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLogoOverride("banks", code)}
+                                  className={cn("p-2 border rounded-xl transition-all cursor-pointer", isDark ? "border-gray-750 hover:bg-gray-800 text-red-400" : "border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-100 hover:text-red-500")}
+                                  title="Remove Override"
+                                >
+                                  <span className="material-symbols-outlined text-[16px] block">delete</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  // Biller Logos view
+                  <div className={cn("rounded-3xl p-6 border transition-all duration-300 space-y-6", panelClass)}>
+                    <div className="space-y-1 border-b border-gray-100 pb-4">
+                      <h4 className="font-hanken font-extrabold text-xs uppercase tracking-wide">Biller / Operator Logo Overrides</h4>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Upload custom logos for mobile networks, utility discos, and WAEC board</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {C_BILLERS.map((biller) => {
+                        const currentCustomLogo = logoBillersOverrides[biller.code];
+                        return (
+                          <div key={biller.code} className={cn("p-4 border rounded-2xl flex items-center justify-between gap-4 transition-all", isDark ? "border-gray-850 hover:bg-gray-850/30" : "border-gray-150 hover:bg-gray-50/50")}>
+                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                              <div className="w-11 h-11 rounded-xl border border-gray-100 flex items-center justify-center bg-white overflow-hidden shrink-0 shadow-sm">
+                                {currentCustomLogo ? (
+                                  <img
+                                    src={currentCustomLogo}
+                                    alt={biller.name}
+                                    className="w-full h-full object-contain p-1.5"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-400">
+                                    {biller.name.substring(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={cn("font-hanken text-xs font-black truncate leading-tight uppercase", isDark ? "text-white" : "text-gray-900")}>{biller.name}</p>
+                                <p className="font-mono text-[9px] text-[#FC7A00] font-bold uppercase tracking-wider mt-1">Code: {biller.code} {currentCustomLogo && "• CUSTOM OVERRIDE"}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <label className={cn("relative cursor-pointer px-3 py-2 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100")}>
+                                {logoUploadingCode === biller.code ? "Uploading..." : "Upload Logo"}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  disabled={!!logoUploadingCode}
+                                  onChange={(e) => handleCustomLogoUpload(e, "billers", biller.code)}
+                                  className="hidden"
+                                />
+                              </label>
+                              {currentCustomLogo && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLogoOverride("billers", biller.code)}
+                                  className={cn("p-2 border rounded-xl transition-all cursor-pointer", isDark ? "border-gray-750 hover:bg-gray-800 text-red-400" : "border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-100 hover:text-red-500")}
+                                  title="Remove Override"
+                                >
+                                  <span className="material-symbols-outlined text-[16px] block">delete</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </motion.div>
             )}

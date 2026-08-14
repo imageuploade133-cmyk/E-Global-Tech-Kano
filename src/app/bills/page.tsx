@@ -10,6 +10,18 @@ import { toast } from "sonner";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { db } from "@/lib/firebase";
+
+const DEFAULT_BILLER_LOGOS: Record<string, string> = {
+  mtn: "https://upload.wikimedia.org/wikipedia/commons/9/93/New-mtn-logo.png",
+  glo: "https://upload.wikimedia.org/wikipedia/commons/8/86/Globacom_Limited_Logo.svg",
+  airtel: "https://upload.wikimedia.org/wikipedia/commons/3/3a/Airtel_logo-in.svg",
+  "9mobile": "https://upload.wikimedia.org/wikipedia/commons/0/07/9mobile_Logo.png",
+  dstv: "https://upload.wikimedia.org/wikipedia/commons/e/ec/DSTV_Logo.png",
+  gotv: "https://upload.wikimedia.org/wikipedia/en/e/ed/Gotv_logo.png",
+  startimes: "https://upload.wikimedia.org/wikipedia/commons/c/ca/Startimes_logo.png",
+  waec: "https://upload.wikimedia.org/wikipedia/en/2/23/Waec_logo.png",
+};
 
 interface Biller {
   id: number;
@@ -44,6 +56,7 @@ export default function GenericBillPage() {
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
   const [pagePreloading, setPagePreloading] = useState(true);
+  const [logoOverrides, setLogoOverrides] = useState<any>(null);
 
   useEffect(() => {
     try {
@@ -55,6 +68,21 @@ export default function GenericBillPage() {
       setPagePreloading(false);
     }, 1200);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    async function loadLogoOverrides() {
+      try {
+        const { doc, getDoc } = await import("firebase/firestore");
+        const docSnap = await getDoc(doc(db, "config", "logos"));
+        if (docSnap.exists()) {
+          setLogoOverrides(docSnap.data());
+        }
+      } catch (err) {
+        console.error("Error loading logo overrides:", err);
+      }
+    }
+    loadLogoOverrides();
   }, []);
 
   // Wallet Balance sync
@@ -978,6 +1006,8 @@ export default function GenericBillPage() {
                     <div className="grid grid-cols-2 gap-3">
                       {billers.map((b) => {
                         const isSelected = selectedBiller?.id === b.id;
+                        const finalLogoUrl = logoOverrides?.billers?.[b.biller_code.toLowerCase()] || DEFAULT_BILLER_LOGOS[b.biller_code.toLowerCase()];
+
                         return (
                           <button
                             key={b.id}
@@ -995,11 +1025,37 @@ export default function GenericBillPage() {
                                 : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
                             }`}
                           >
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm tracking-tight flex-shrink-0 ${
-                              isSelected ? "bg-primary text-white" : "bg-gray-200 text-gray-600"
-                            }`}>
-                              {b.name.substring(0, 2).toUpperCase()}
-                            </div>
+                            {finalLogoUrl ? (
+                              <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white border border-gray-150 overflow-hidden flex-shrink-0 relative">
+                                <img
+                                  src={finalLogoUrl}
+                                  alt={b.name}
+                                  loading="lazy"
+                                  className="w-full h-full object-contain p-1"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    const sibling = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (sibling) {
+                                      sibling.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                                <div
+                                  style={{ display: 'none' }}
+                                  className={`absolute inset-0 w-full h-full flex items-center justify-center font-bold text-sm tracking-tight ${
+                                    isSelected ? "bg-primary text-white" : "bg-gray-200 text-gray-600"
+                                  }`}
+                                >
+                                  {b.name.substring(0, 2).toUpperCase()}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm tracking-tight flex-shrink-0 ${
+                                isSelected ? "bg-primary text-white" : "bg-gray-200 text-gray-600"
+                              }`}>
+                                {b.name.substring(0, 2).toUpperCase()}
+                              </div>
+                            )}
                             <div className="min-w-0 flex-1">
                               <p className="font-hanken text-[11px] font-extrabold text-black truncate leading-tight">
                                 {b.name}

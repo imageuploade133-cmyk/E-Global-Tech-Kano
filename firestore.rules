@@ -120,7 +120,7 @@ service cloud.firestore {
     }
 
     // Config parameters: allow read to all logged-in users, write restricted only to administrators
-    match /config/app {
+    match /config/{configId} {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
