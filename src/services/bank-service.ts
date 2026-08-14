@@ -13,6 +13,7 @@ export interface BankDoc {
   createdAt: string;
   updatedAt: string;
   logoUrl?: string | null;
+  isTop?: boolean;
 }
 
 // In-memory cache for fast subsequent lookups
@@ -206,7 +207,13 @@ export class BankService {
       });
     }
 
-    // Sort alphabetically by name
-    return list.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort: Pinned/Top banks first (alphabetically among themselves), then remaining banks alphabetically by name
+    return list.sort((a, b) => {
+      const aTop = !!a.isTop;
+      const bTop = !!b.isTop;
+      if (aTop && !bTop) return -1;
+      if (!aTop && bTop) return 1;
+      return a.name.localeCompare(b.name);
+    });
   }
 }

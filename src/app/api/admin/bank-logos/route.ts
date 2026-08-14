@@ -30,36 +30,36 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { bankId, logoUrl } = body;
+    const { bankId, logoUrl, isTop } = body;
 
     if (!bankId) {
       return NextResponse.json({ error: "Missing required parameter: bankId" }, { status: 400 });
     }
 
-    if (typeof logoUrl !== "string") {
-      return NextResponse.json({ error: "Invalid parameter: logoUrl must be a string." }, { status: 400 });
+    const updatePayload: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (typeof logoUrl === "string") {
+      updatePayload.logoUrl = logoUrl.trim() || null;
     }
 
-    const cleanLogoUrl = logoUrl.trim();
+    if (typeof isTop === "boolean") {
+      updatePayload.isTop = isTop;
+    }
 
     // Update in Firestore
     const bankRef = adminDb.collection("banks").doc(bankId);
-    await bankRef.set(
-      {
-        logoUrl: cleanLogoUrl || null,
-        updatedAt: new Date().toISOString()
-      },
-      { merge: true }
-    );
+    await bankRef.set(updatePayload, { merge: true });
 
-    // Clear memory cache so all clients immediately receive updated logoUrl
+    // Clear memory cache so all clients immediately receive updated bank details
     BankService.clearCache();
 
     return NextResponse.json({
       success: true,
-      message: "Bank logo updated successfully!",
+      message: "Bank settings updated successfully!",
       bankId,
-      logoUrl: cleanLogoUrl
+      ...updatePayload
     });
   } catch (err: unknown) {
     const error = err as Error;
