@@ -104,9 +104,12 @@ export default function CpanelBankLogosPage() {
     fetchConfig();
   }, []);
 
+  const [hasSearched, setHasSearched] = useState(false);
+
   // Fetch Banks List
   const fetchBanks = async (query = searchQuery) => {
     setIsLoadingBanks(true);
+    setHasSearched(true);
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
       const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
@@ -115,9 +118,11 @@ export default function CpanelBankLogosPage() {
       if (data.success && Array.isArray(data.banks)) {
         setBanks(data.banks);
         // Initialize editingLogos map
-        const logoMap: Record<string, string> = {};
+        const logoMap: Record<string, string> = { ...editingLogos };
         data.banks.forEach((b: BankItem) => {
-          logoMap[b.id] = b.logoUrl || "";
+          if (logoMap[b.id] === undefined) {
+            logoMap[b.id] = b.logoUrl || "";
+          }
         });
         setEditingLogos(logoMap);
       } else {
@@ -130,9 +135,10 @@ export default function CpanelBankLogosPage() {
     }
   };
 
+  // LOW-COST: Do NOT auto-fetch all banks on page load. Require explicit search or button click to save reads.
   useEffect(() => {
     if (!isLoadingSession) {
-      fetchBanks("");
+      setIsLoadingBanks(false);
     }
   }, [isLoadingSession]);
 
@@ -300,6 +306,24 @@ export default function CpanelBankLogosPage() {
           <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
             <ButtonSpinner />
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Banks Directory...</p>
+          </div>
+        ) : !hasSearched ? (
+          <div className={cn("p-12 rounded-2xl border text-center space-y-4", panelClass)}>
+            <span className="material-symbols-outlined text-[48px] text-orange-500">search</span>
+            <div>
+              <p className="text-xs font-black uppercase text-gray-400">Low-Read Directory Mode</p>
+              <p className="text-[11px] text-gray-500 max-w-md mx-auto mt-1">
+                To keep database reads low, enter a bank name or code (e.g., &quot;058&quot;, &quot;GTBank&quot;, &quot;Opay&quot;) above or click below to load all banks on demand.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => fetchBanks("")}
+              className="px-5 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer inline-flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[18px]">list</span>
+              <span>Load All Banks</span>
+            </button>
           </div>
         ) : banks.length === 0 ? (
           <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>

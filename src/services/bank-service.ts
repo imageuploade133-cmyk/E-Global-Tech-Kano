@@ -195,7 +195,15 @@ export class BankService {
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase().trim();
-      list = list.filter((b) => b.name.toLowerCase().includes(q));
+      // Remove leading zeros for flexible bank code matching (e.g. "058" matching "58" or "058")
+      const strippedQ = q.replace(/^0+/, "");
+
+      list = list.filter((b) => {
+        const nameMatch = b.name.toLowerCase().includes(q);
+        const codeMatch = b.code.toLowerCase().includes(q) || (strippedQ.length > 0 && b.code.toLowerCase().includes(strippedQ));
+        const idMatch = b.id.toLowerCase().includes(q);
+        return nameMatch || codeMatch || idMatch;
+      });
     }
 
     // Sort alphabetically by name
