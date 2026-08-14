@@ -13,6 +13,7 @@ interface BankItem {
   country?: string;
   type?: string;
   logoUrl?: string | null;
+  isTop?: boolean;
 }
 
 function ButtonSpinner() {
@@ -30,10 +31,11 @@ export default function CpanelBankLogosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [imgbbApiKey, setImgbbApiKey] = useState("");
 
-  // Track editing inputs & uploading states per bankId
+  // Track editing inputs & uploading/toggling states per bankId
   const [editingLogos, setEditingLogos] = useState<Record<string, string>>({});
   const [uploadingBankId, setUploadingBankId] = useState<string | null>(null);
   const [savingBankId, setSavingBankId] = useState<string | null>(null);
+  const [togglingBankId, setTogglingBankId] = useState<string | null>(null);
 
   function RouterHook() {
     try {
@@ -181,6 +183,43 @@ export default function CpanelBankLogosPage() {
       toast.error(err.message || "Image upload failed.", { id: `upload-${bankId}` });
     } finally {
       setUploadingBankId(null);
+    }
+  };
+
+  // Toggle Bank Pin to Top position
+  const handleToggleTop = async (bankId: string, currentIsTop?: boolean) => {
+    const nextIsTop = !currentIsTop;
+    setTogglingBankId(bankId);
+
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const res = await fetch("/api/admin/bank-logos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ bankId, isTop: nextIsTop }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(nextIsTop ? "Bank pinned to Top!" : "Bank unpinned from Top.");
+        setBanks((prev) => {
+          const updated = prev.map((b) => (b.id === bankId ? { ...b, isTop: nextIsTop } : b));
+          return updated.sort((a, b) => {
+            const aTop = !!a.isTop;
+            const bTop = !!b.isTop;
+            if (aTop && !bTop) return -1;
+            if (!aTop && bTop) return 1;
+            return a.name.localeCompare(b.name);
+          });
+        });
+      } else {
+        toast.error(data.error || "Failed to update top bank status.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error setting top bank.");
+    } finally {
+      setTogglingBankId(null);
     }
   };
 
@@ -344,30 +383,63 @@ export default function CpanelBankLogosPage() {
               return (
                 <div key={bank.id} className={cn("p-5 rounded-2xl border flex flex-col justify-between space-y-4 transition-all", panelClass)}>
                   {/* Bank Info Header */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-xl border border-gray-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0 relative">
-                      {previewUrl ? (
-                        <img
-                          src={previewUrl}
-                          alt={bank.name}
-                          className="w-full h-full object-contain p-1"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = "none";
-                          }}
-                        />
-                      ) : (
-                        <span className="text-xs font-black text-gray-600">{bank.name.substring(0, 2).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-extrabold text-xs uppercase tracking-tight truncate leading-tight">{bank.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
-                          Code: {bank.code}
-                        </span>
-                        <span className="text-[10px] font-mono text-gray-400 truncate">ID: {bank.id}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="w-12 h-12 rounded-xl border border-gray-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                        {previewUrl ? (
+                          <img
+                            src={previewUrl}
+                            alt={bank.name}
+                            className="w-full h-full object-contain p-1"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <span className="text-xs font-black text-gray-600">{bank.name.substring(0, 2).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-extrabold text-xs uppercase tracking-tight truncate leading-tight">{bank.name}</h3>
+                          {bank.isTop && (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500 text-white flex items-center gap-0.5">
+                              <span className="material-symbols-outlined text-[10px]">push_pin</span>
+                              <span>TOP</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                            Code: {bank.code}
+                          </span>
+                          <span className="text-[10px] font-mono text-gray-400 truncate">ID: {bank.id}</span>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Pin / Unpin Button */}
+                    <button
+                      type="button"
+                      disabled={togglingBankId === bank.id}
+                      onClick={() => handleToggleTop(bank.id, bank.isTop)}
+                      className={cn(
+                        "h-8 px-2.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 shrink-0 cursor-pointer",
+                        bank.isTop
+                          ? "bg-amber-500/15 border-amber-500/30 text-amber-500 hover:bg-amber-500/25"
+                          : isDark ? "bg-gray-800 border-gray-700 text-gray-400 hover:text-white" : "bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200"
+                      )}
+                      title={bank.isTop ? "Unpin bank from Top position" : "Pin bank to Top position for users"}
+                    >
+                      {togglingBankId === bank.id ? (
+                        <ButtonSpinner />
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: bank.isTop ? '"FILL" 1' : '"FILL" 0' }}>push_pin</span>
+                          <span>{bank.isTop ? "Top" : "Pin"}</span>
+                        </>
+                      )}
+                    </button>
                   </div>
 
                   {/* Logo Upload Form */}
