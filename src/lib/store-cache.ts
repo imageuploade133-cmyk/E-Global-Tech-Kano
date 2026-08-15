@@ -18,6 +18,11 @@ export interface StoreSlide {
   link: string;
 }
 
+export interface StoreSettings {
+  borderColor?: string;
+  hideBorders?: boolean;
+}
+
 export interface CartItem {
   product: StoreItem;
   quantity: number;
@@ -27,17 +32,14 @@ const CACHE_KEY = "e_tech_store_cache";
 const CART_KEY = "e_tech_store_cart";
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache TTL for low Firestore reads
 
-// Memory cache for active session
-let memoryStoreCache: { items: StoreItem[]; slides: StoreSlide[]; timestamp: number } | null = null;
+let memoryStoreCache: { items: StoreItem[]; slides: StoreSlide[]; settings: StoreSettings; timestamp: number } | null = null;
 const memoryProductDetails = new Map<string, StoreItem>();
 
-export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[] } | null => {
-  // Check memory cache first
+export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[]; settings: StoreSettings } | null => {
   if (memoryStoreCache && (Date.now() - memoryStoreCache.timestamp < CACHE_TTL_MS)) {
-    return { items: memoryStoreCache.items, slides: memoryStoreCache.slides };
+    return { items: memoryStoreCache.items, slides: memoryStoreCache.slides, settings: memoryStoreCache.settings };
   }
 
-  // Fallback to sessionStorage
   if (typeof window !== "undefined") {
     try {
       const raw = sessionStorage.getItem(CACHE_KEY);
@@ -45,7 +47,7 @@ export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[] } |
         const parsed = JSON.parse(raw);
         if (parsed && (Date.now() - parsed.timestamp < CACHE_TTL_MS)) {
           memoryStoreCache = parsed;
-          return { items: parsed.items, slides: parsed.slides };
+          return { items: parsed.items, slides: parsed.slides, settings: parsed.settings || {} };
         }
       }
     } catch {
@@ -56,11 +58,10 @@ export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[] } |
   return null;
 };
 
-export const setCachedStore = (items: StoreItem[], slides: StoreSlide[]) => {
-  const cacheData = { items, slides, timestamp: Date.now() };
+export const setCachedStore = (items: StoreItem[], slides: StoreSlide[], settings: StoreSettings = {}) => {
+  const cacheData = { items, slides, settings, timestamp: Date.now() };
   memoryStoreCache = cacheData;
 
-  // Pre-populate product details cache
   items.forEach((item) => {
     memoryProductDetails.set(item.id, item);
   });
@@ -91,7 +92,6 @@ export const getCachedProductDetail = (id: string): StoreItem | null => {
   return null;
 };
 
-// Persistent Cart Helper Functions
 export const getSavedCart = (): CartItem[] => {
   if (typeof window === "undefined") return [];
   try {

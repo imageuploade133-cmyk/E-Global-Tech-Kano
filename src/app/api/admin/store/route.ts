@@ -16,6 +16,7 @@ export async function GET(req: Request) {
       success: true,
       items: data.items || [],
       slides: data.slides || [],
+      settings: data.settings || { borderColor: "#FC7A00", hideBorders: false },
     });
   } catch (err: unknown) {
     const error = err as Error;
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { action, item, slide, itemId, slideId } = body;
+    const { action, item, slide, itemId, slideId, settings } = body;
 
     const docRef = adminDb.collection("config").doc("store_data");
     const docSnap = await docRef.get();
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
 
     let items = Array.isArray(existingData.items) ? [...existingData.items] : [];
     let slides = Array.isArray(existingData.slides) ? [...existingData.slides] : [];
+    let currentSettings = existingData.settings || { borderColor: "#FC7A00", hideBorders: false };
 
     const now = new Date().toISOString();
 
@@ -83,6 +85,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "slideId is required for deletion." }, { status: 400 });
       }
       slides = slides.filter((s: any) => s.id !== slideId);
+    } else if (action === "update_settings") {
+      if (!settings) {
+        return NextResponse.json({ error: "settings payload is required." }, { status: 400 });
+      }
+      currentSettings = {
+        borderColor: (settings.borderColor || "#FC7A00").trim(),
+        hideBorders: Boolean(settings.hideBorders),
+      };
     } else {
       return NextResponse.json({ error: "Invalid action specified." }, { status: 400 });
     }
@@ -91,6 +101,7 @@ export async function POST(req: Request) {
       {
         items,
         slides,
+        settings: currentSettings,
         updatedAt: now,
       },
       { merge: true }
@@ -101,6 +112,7 @@ export async function POST(req: Request) {
       message: "Store data updated successfully!",
       items,
       slides,
+      settings: currentSettings,
     });
   } catch (err: unknown) {
     const error = err as Error;
