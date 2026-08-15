@@ -13,6 +13,10 @@ interface BannerSlide {
   description?: string;
   targetPage: "all" | "bills" | "investment" | "referral" | "transfer";
   link?: string;
+  customWidth?: number | null;
+  customHeight?: number | null;
+  isCrop?: boolean;
+  isHidden?: boolean;
 }
 
 interface BannerSlideshowProps {
@@ -39,6 +43,7 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
   const imagePosition = config.bannerImagePosition || "center";
   const heightMobile = config.bannerHeightMobile || 150;
   const heightDesktop = config.bannerHeightDesktop || 220;
+  const showIndicators = config.bannerShowIndicators !== false;
 
   useEffect(() => {
     const fetchSlides = async () => {
@@ -104,6 +109,12 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
     ? { border: `1px solid ${borderColor}` }
     : { border: "none" };
 
+  // Determine slide container height and mode overrides
+  const effectiveHeightMobile = activeSlide.customHeight || heightMobile;
+  const effectiveHeightDesktop = activeSlide.customHeight || heightDesktop;
+  const effectiveWidth = activeSlide.customWidth ? `${activeSlide.customWidth}px` : "100%";
+  const isSlideCrop = activeSlide.isCrop !== false; // default true (cover)
+
   // To solve the "blinking" issue, we remove mode="wait" so old and new slides cross-transition simultaneously.
   // We use absolute positioning inside a relative container to hold the height constant during transitions.
   // The transition variants change based on slideEffect settings:
@@ -127,18 +138,20 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
 
   return (
     <div
-      className="w-full relative mb-6 select-none overflow-hidden rounded-2xl md:rounded-[24px] shadow-xs"
+      className="relative mb-6 select-none overflow-hidden rounded-2xl md:rounded-[24px] shadow-xs mx-auto"
       style={{
         backgroundColor: backgroundColor,
         ...borderStyles,
-        height: `${heightMobile}px`,
+        height: `${effectiveHeightMobile}px`,
+        width: effectiveWidth,
+        maxWidth: "100%",
       }}
     >
       {/* Responsive height adjustments on desktop screens */}
       <style jsx global>{`
         @media (min-width: 768px) {
           .banner-slideshow-container {
-            height: ${heightDesktop}px !important;
+            height: ${effectiveHeightDesktop}px !important;
           }
         }
       `}</style>
@@ -162,7 +175,7 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
               alt={activeSlide.title || "Marketing Campaign"}
               className={cn(
                 "absolute inset-0 w-full h-full transition-transform duration-[6s]",
-                imageMode === "contain" ? "object-contain" : "object-cover group-hover:scale-105"
+                (!isSlideCrop || imageMode === "contain") ? "object-contain" : "object-cover group-hover:scale-105"
               )}
               style={{
                 objectPosition: imagePosition,
@@ -216,8 +229,8 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
         </AnimatePresence>
       </div>
 
-      {/* Slide Indicators Dots (Only if multiple slides exist) */}
-      {slides.length > 1 && (
+      {/* Slide Indicators Dots (Only if multiple slides exist and showIndicators is enabled) */}
+      {slides.length > 1 && showIndicators && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 p-1.5 bg-black/35 backdrop-blur-xs rounded-full">
           {slides.map((_, idx) => {
             const isSelected = currentIndex === idx;

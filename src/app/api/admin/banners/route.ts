@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { imageUrl, title, description, targetPage, link } = body;
+    const { id, imageUrl, title, description, targetPage, link, customWidth, customHeight, isCrop, isHidden } = body;
 
     if (!imageUrl || !imageUrl.trim()) {
       return NextResponse.json({ error: "Image URL is required for the banner slide." }, { status: 400 });
@@ -48,10 +48,26 @@ export async function POST(req: Request) {
       description: (description || "").trim(),
       targetPage,
       link: (link || "").trim(),
-      createdAt: new Date().toISOString()
+      customWidth: typeof customWidth === "number" ? customWidth : null,
+      customHeight: typeof customHeight === "number" ? customHeight : null,
+      isCrop: isCrop !== undefined ? Boolean(isCrop) : true,
+      isHidden: isHidden !== undefined ? Boolean(isHidden) : false,
+      updatedAt: new Date().toISOString()
     };
 
-    const docRef = await adminDb.collection("banners").add(bannerDoc);
+    if (id) {
+      await adminDb.collection("banners").doc(id).set(bannerDoc, { merge: true });
+      return NextResponse.json({
+        success: true,
+        message: "Banner slide updated successfully!",
+        banner: { id, ...bannerDoc }
+      });
+    }
+
+    const docRef = await adminDb.collection("banners").add({
+      ...bannerDoc,
+      createdAt: new Date().toISOString()
+    });
 
     return NextResponse.json({
       success: true,
