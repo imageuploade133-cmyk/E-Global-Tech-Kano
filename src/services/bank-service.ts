@@ -151,19 +151,22 @@ export class BankService {
       const bankId = bank.id?.toString() || bank.code;
       const bankRef = adminDb.collection("banks").doc(bankId);
 
-      const bankDoc: BankDoc = {
+      const bankData: Record<string, any> = {
         id: bankId,
         name: bank.name || "Unknown Bank",
         code: bank.code.trim(),
         country: bank.country || "NG",
         type: bank.type || "NG",
         is_active: bank.is_active !== undefined ? !!bank.is_active : true,
-        logoUrl: bank.logoUrl || null,
         createdAt: bank.createdAt || nowStr,
         updatedAt: nowStr,
       };
 
-      batch.set(bankRef, bankDoc, { merge: true });
+      if (bank.logoUrl) {
+        bankData.logoUrl = bank.logoUrl;
+      }
+
+      batch.set(bankRef, bankData, { merge: true });
       currentCount++;
       totalSaved++;
 
