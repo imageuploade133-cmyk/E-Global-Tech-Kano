@@ -1326,6 +1326,8 @@ export default function AdminPage() {
     { id: "users", label: "Users & Permissions", icon: "group" },
     { id: "kyc", label: "KYC Approvals", icon: "verified_user" },
     { id: "settings", label: "Branding", icon: "diamond" },
+    { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze" },
+    { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits" },
     { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos" },
     { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos" },
     { id: "whatsapp", label: "WhatsApp Link", icon: "hub" },

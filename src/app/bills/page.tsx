@@ -150,7 +150,7 @@ export default function GenericBillPage() {
     };
   }, [isPinModalOpen, isCheckoutModalOpen]);
 
-  // Fetch billers when pageCategory changes
+  // Fetch billers and custom logo overrides when pageCategory changes
   useEffect(() => {
     async function fetchBillers() {
       setIsBillersLoading(true);
@@ -162,30 +162,46 @@ export default function GenericBillPage() {
       setValidatedName("");
 
       try {
+        // Fetch custom bill logo overrides from backend
+        let customLogos: Record<string, string> = {};
+        try {
+          const logosRes = await fetch("/api/bills/logos");
+          const logosData = await logosRes.json();
+          if (logosData.success && logosData.logos) {
+            customLogos = logosData.logos;
+          }
+        } catch {
+          console.warn("Custom bill logos fetch fallback.");
+        }
+
         const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
         if (isMock) {
+          let list: Biller[] = [];
           if (pageCategory === "AIRTIME" || pageCategory === "DATA") {
-            setBillers([
-              { id: 1, name: "MTN Network", biller_code: "mtn", logo: "" },
-              { id: 2, name: "GLO Network", biller_code: "glo", logo: "" },
-              { id: 3, name: "AIRTEL Network", biller_code: "airtel", logo: "" },
-              { id: 4, name: "9MOBILE Network", biller_code: "9mobile", logo: "" }
-            ]);
+            list = [
+              { id: 1, name: "MTN Network", biller_code: "mtn", logo: customLogos["mtn"] || "" },
+              { id: 2, name: "GLO Network", biller_code: "glo", logo: customLogos["glo"] || "" },
+              { id: 3, name: "AIRTEL Network", biller_code: "airtel", logo: customLogos["airtel"] || "" },
+              { id: 4, name: "9MOBILE Network", biller_code: "9mobile", logo: customLogos["9mobile"] || "" }
+            ];
           } else if (pageCategory === "UTILITY") {
-            setBillers([
-              { id: 1, name: "IKEDC Electricity", biller_code: "ikedc", logo: "" },
-              { id: 2, name: "EKEDC Electricity", biller_code: "ekedc", logo: "" }
-            ]);
+            list = [
+              { id: 1, name: "IKEDC Electricity", biller_code: "ikedc", logo: customLogos["ikedc"] || "" },
+              { id: 2, name: "EKEDC Electricity", biller_code: "ekedc", logo: customLogos["ekedc"] || "" },
+              { id: 3, name: "KEDCO Electricity", biller_code: "kedco", logo: customLogos["kedco"] || "" }
+            ];
           } else if (pageCategory === "CABLE") {
-            setBillers([
-              { id: 1, name: "DStv", biller_code: "dstv", logo: "" },
-              { id: 2, name: "GOtv", biller_code: "gotv", logo: "" }
-            ]);
+            list = [
+              { id: 1, name: "DStv", biller_code: "dstv", logo: customLogos["dstv"] || "" },
+              { id: 2, name: "GOtv", biller_code: "gotv", logo: customLogos["gotv"] || "" },
+              { id: 3, name: "StarTimes", biller_code: "startimes", logo: customLogos["startimes"] || "" }
+            ];
           } else if (pageCategory === "WAEC") {
-            setBillers([
-              { id: 1, name: "WAEC Council", biller_code: "waec", logo: "" }
-            ]);
+            list = [
+              { id: 1, name: "WAEC Council", biller_code: "waec", logo: customLogos["waec"] || "" }
+            ];
           }
+          setBillers(list);
           setIsBillersLoading(false);
           return;
         }
@@ -204,37 +220,46 @@ export default function GenericBillPage() {
           const res = await fetch("/api/vtu/networks", { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load networks from gateway.");
           const data = await res.json();
-          const networkList = (data.networks || []).map((name: string, index: number) => ({
-            id: index + 1,
-            name: `${name} Network`,
-            biller_code: name,
-            logo: "",
-          }));
+          const networkList = (data.networks || []).map((name: string, index: number) => {
+            const codeKey = name.toLowerCase();
+            return {
+              id: index + 1,
+              name: `${name} Network`,
+              biller_code: name,
+              logo: customLogos[codeKey] || "",
+            };
+          });
           setBillers(networkList);
         } else if (pageCategory === "UTILITY") {
           const companies = ["IKEDC", "EKEDC", "AEDC", "KEDCO", "PHED", "JED", "EEDC", "IBEDC", "KAEDCO"];
-          const discoList = companies.map((name, index) => ({
-            id: index + 1,
-            name: `${name} Electricity`,
-            biller_code: name,
-            logo: "",
-          }));
+          const discoList = companies.map((name, index) => {
+            const codeKey = name.toLowerCase();
+            return {
+              id: index + 1,
+              name: `${name} Electricity`,
+              biller_code: name,
+              logo: customLogos[codeKey] || "",
+            };
+          });
           setBillers(discoList);
         } else if (pageCategory === "CABLE") {
           const providers = ["DStv", "GOtv", "StarTimes"];
-          const providerList = providers.map((name, index) => ({
-            id: index + 1,
-            name: name,
-            biller_code: name.toLowerCase(),
-            logo: "",
-          }));
+          const providerList = providers.map((name, index) => {
+            const codeKey = name.toLowerCase();
+            return {
+              id: index + 1,
+              name: name,
+              biller_code: codeKey,
+              logo: customLogos[codeKey] || "",
+            };
+          });
           setBillers(providerList);
         } else if (pageCategory === "WAEC") {
           const providerList = [{
             id: 1,
             name: "WAEC Council",
             biller_code: "waec",
-            logo: "",
+            logo: customLogos["waec"] || "",
           }];
           setBillers(providerList);
         } else {
@@ -242,7 +267,11 @@ export default function GenericBillPage() {
           const res = await fetch(`/api/bills/billers?category=${apiCategory}`);
           if (!res.ok) throw new Error("Failed to load billing providers.");
           const data = await res.json();
-          setBillers(data.data || []);
+          const loadedBillers = (data.data || []).map((b: Biller) => ({
+            ...b,
+            logo: customLogos[b.biller_code.toLowerCase()] || b.logo || "",
+          }));
+          setBillers(loadedBillers);
         }
       } catch (err: unknown) {
         const error = err as Error;
@@ -995,10 +1024,21 @@ export default function GenericBillPage() {
                                 : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
                             }`}
                           >
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm tracking-tight flex-shrink-0 ${
-                              isSelected ? "bg-primary text-white" : "bg-gray-200 text-gray-600"
+                            <div className={`w-10 h-10 rounded-xl border border-gray-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0 relative ${
+                              isSelected ? "border-[#FC7A00]" : ""
                             }`}>
-                              {b.name.substring(0, 2).toUpperCase()}
+                              {b.logo ? (
+                                <img
+                                  src={b.logo}
+                                  alt={b.name}
+                                  className="w-full h-full object-contain p-1"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <span className="font-extrabold text-xs text-gray-700">{b.name.substring(0, 2).toUpperCase()}</span>
+                              )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-hanken text-[11px] font-extrabold text-black truncate leading-tight">

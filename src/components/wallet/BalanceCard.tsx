@@ -42,10 +42,10 @@ const BankLogo: React.FC<BankLogoProps> = ({ name, code, logoUrl }) => {
   }
   const logoColorClass = colors[sum % colors.length];
 
-  // Primary: Prioritize local static bank logo file by code
+  // Primary: Prioritize custom logoUrl saved by admin in Firestore first, then fall back to local static path by code
   const trimmed = String(code || "").trim();
   const paddedCode = trimmed && /^\d+$/.test(trimmed) ? trimmed.padStart(3, "0") : trimmed;
-  const resolvedLogoUrl = paddedCode ? `/bank-logos/${paddedCode}.png` : (logoUrl || null);
+  const resolvedLogoUrl = logoUrl || (paddedCode ? `/bank-logos/${paddedCode}.png` : null);
 
   if (resolvedLogoUrl && !hasError) {
     return (
