@@ -201,6 +201,7 @@ export default function AdminPage() {
   const [bannerImagePosition, setBannerImagePosition] = useState(config.bannerImagePosition || "center");
   const [bannerHeightMobile, setBannerHeightMobile] = useState(config.bannerHeightMobile || 150);
   const [bannerHeightDesktop, setBannerHeightDesktop] = useState(config.bannerHeightDesktop || 220);
+  const [bannerTransferPosition, setBannerTransferPosition] = useState<"top" | "bottom">(config.bannerTransferPosition || "top");
   const [isSavingDisplaySettings, setIsSavingDisplaySettings] = useState(false);
 
   // Sync customize state with config when config updates
@@ -215,6 +216,7 @@ export default function AdminPage() {
     setBannerImagePosition(config.bannerImagePosition || "center");
     setBannerHeightMobile(config.bannerHeightMobile || 150);
     setBannerHeightDesktop(config.bannerHeightDesktop || 220);
+    setBannerTransferPosition(config.bannerTransferPosition || "top");
   }, [config]);
 
   const handleSaveDisplaySettings = async (e: React.FormEvent) => {
@@ -232,6 +234,7 @@ export default function AdminPage() {
         bannerImagePosition: bannerImagePosition,
         bannerHeightMobile: bannerHeightMobile,
         bannerHeightDesktop: bannerHeightDesktop,
+        bannerTransferPosition: bannerTransferPosition,
       });
       toast.success("Banner display settings updated successfully!");
     } catch {
@@ -3804,6 +3807,19 @@ export default function AdminPage() {
                           <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">
                             Selecting &quot;Keep Image Aspect Ratio&quot; ensures the full image is rendered in the screen size without any cutoffs or zooming.
                           </p>
+                        </div>
+
+                        {/* Transfer Drawer Position Selector */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Transfer Drawer Banner Location</label>
+                          <select
+                            value={bannerTransferPosition}
+                            onChange={(e) => setBannerTransferPosition(e.target.value as "top" | "bottom")}
+                            className={cn(inputClass, "cursor-pointer font-bold")}
+                          >
+                            <option value="top">Top of Transfer Drawer</option>
+                            <option value="bottom">Bottom of Transfer Drawer</option>
+                          </select>
                         </div>
 
                         <button
