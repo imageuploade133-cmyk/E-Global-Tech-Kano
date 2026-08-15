@@ -523,8 +523,20 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <>
-                  <h2 className="font-hanken font-bold text-xl text-black tracking-tight leading-none">{userName}</h2>
-                  <p className="font-hanken text-xs text-gray-400 font-semibold mt-1 leading-none">{userEmail}</p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-hanken font-bold text-xl text-black tracking-tight leading-none">{userName}</h2>
+                    <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-[#FC7A00]/10 text-[#FC7A00] border border-[#FC7A00]/30 rounded-full">
+                      {userData?.kycStatus === "VERIFIED" ? "Tier 3 VIP" : "Tier 1 Standard"}
+                    </span>
+                  </div>
+                  <p className="font-hanken text-xs text-gray-400 font-semibold mt-1.5 leading-none">{userEmail}</p>
+
+                  {(userData?.isFrozen || userData?.status === "FROZEN") && (
+                    <div className="mt-2.5 px-3 py-1 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-1.5 text-rose-600 text-[10.5px] font-extrabold">
+                      <span className="material-symbols-outlined text-[14px]">ac_unit</span>
+                      <span>Account Suspended / Frozen</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
