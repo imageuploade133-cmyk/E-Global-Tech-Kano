@@ -1,0 +1,765 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface StoreItem {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  imageUrl: string;
+  inStock: boolean;
+  createdAt: string;
+}
+
+interface StoreSlide {
+  id: string;
+  imageUrl: string;
+  title: string;
+  subtitle: string;
+  link: string;
+  createdAt: string;
+}
+
+function ButtonSpinner() {
+  return (
+    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+  );
+}
+
+export default function CpanelStorePage() {
+  const router = useRouter();
+  const [isDark, setIsDark] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [activeTab, setActiveTab] = useState<"items" | "slides">("items");
+  const [imgbbApiKey, setImgbbApiKey] = useState("");
+
+  // Data states
+  const [items, setItems] = useState<StoreItem[]>([]);
+  const [slides, setSlides] = useState<StoreSlide[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // New Item Form
+  const [itemTitle, setItemTitle] = useState("");
+  const [itemDescription, setItemDescription] = useState("");
+  const [itemPrice, setItemPrice] = useState("");
+  const [itemCategory, setItemCategory] = useState("Hardware");
+  const [itemImageUrl, setItemImageUrl] = useState("");
+  const [itemInStock, setItemInStock] = useState(true);
+  const [isUploadingItemImage, setIsUploadingItemImage] = useState(false);
+  const [isSavingItem, setIsSavingItem] = useState(false);
+
+  // New Slide Form
+  const [slideImageUrl, setSlideImageUrl] = useState("");
+  const [slideTitle, setSlideTitle] = useState("");
+  const [slideSubtitle, setSlideSubtitle] = useState("");
+  const [slideLink, setSlideLink] = useState("");
+  const [isUploadingSlideImage, setIsUploadingSlideImage] = useState(false);
+  const [isSavingSlide, setIsSavingSlide] = useState(false);
+
+  // Deleting item/slide ID
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Theme Syncing
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("cpanel_theme");
+      if (cached === "dark") {
+        setIsDark(true);
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
+      }
+      return next;
+    });
+  };
+
+  // Auth & Session Check
+  useEffect(() => {
+    async function checkSession() {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      if (isMock) {
+        setIsLoadingSession(false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/admin/auth/session");
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          toast.error("Session expired. Please log in.");
+          router.push("/cpanel");
+          return;
+        }
+      } catch (err) {
+        console.error("Session check failed:", err);
+      } finally {
+        setIsLoadingSession(false);
+      }
+    }
+    checkSession();
+  }, [router]);
+
+  // Fetch Admin App Config for ImgBB Key
+  useEffect(() => {
+    async function fetchConfig() {
+      try {
+        const res = await fetch("/api/admin/config");
+        const data = await res.json();
+        if (data.config?.imgbbApiKey) {
+          setImgbbApiKey(data.config.imgbbApiKey);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch admin config:", err);
+      }
+    }
+    fetchConfig();
+  }, []);
+
+  // Fetch Store Data
+  const fetchStoreData = async () => {
+    setIsLoading(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const res = await fetch("/api/admin/store", { headers });
+      const data = await res.json();
+
+      if (data.success) {
+        setItems(data.items || []);
+        setSlides(data.slides || []);
+      } else {
+        toast.error(data.error || "Failed to load store data.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error fetching store data.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isLoadingSession) {
+      fetchStoreData();
+    }
+  }, [isLoadingSession]);
+
+  // Upload file to ImgBB helper
+  const uploadImageToImgBB = async (file: File, setUrl: (url: string) => void, setUploading: (u: boolean) => void) => {
+    if (!imgbbApiKey) {
+      toast.error("ImgBB API key is not configured. Please set it in Admin Branding Settings.");
+      return;
+    }
+
+    setUploading(true);
+    toast.loading("Uploading image to ImgBB...", { id: "img-upload" });
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbApiKey}`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (json.success && json.data?.url) {
+        setUrl(json.data.url);
+        toast.success("Image uploaded successfully!", { id: "img-upload" });
+      } else {
+        toast.error(json.error?.message || "Image upload failed.", { id: "img-upload" });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error uploading image.", { id: "img-upload" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Add Item Submit
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemTitle.trim()) {
+      toast.error("Item title is required.");
+      return;
+    }
+
+    setIsSavingItem(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "add_item",
+          item: {
+            title: itemTitle,
+            description: itemDescription,
+            price: parseFloat(itemPrice) || 0,
+            category: itemCategory,
+            imageUrl: itemImageUrl,
+            inStock: itemInStock,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Store item added successfully!");
+        setItems(data.items || []);
+        setItemTitle("");
+        setItemDescription("");
+        setItemPrice("");
+        setItemImageUrl("");
+      } else {
+        toast.error(data.error || "Failed to add store item.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error adding store item.");
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  // Delete Item
+  const handleDeleteItem = async (itemId: string) => {
+    setDeletingId(itemId);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "delete_item",
+          itemId,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Store item deleted.");
+        setItems(data.items || []);
+      } else {
+        toast.error(data.error || "Failed to delete item.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error deleting item.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Add Slide Submit
+  const handleAddSlide = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!slideImageUrl.trim()) {
+      toast.error("Slide image URL is required.");
+      return;
+    }
+
+    setIsSavingSlide(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "add_slide",
+          slide: {
+            imageUrl: slideImageUrl,
+            title: slideTitle,
+            subtitle: slideSubtitle,
+            link: slideLink,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Store slide image added successfully!");
+        setSlides(data.slides || []);
+        setSlideImageUrl("");
+        setSlideTitle("");
+        setSlideSubtitle("");
+        setSlideLink("");
+      } else {
+        toast.error(data.error || "Failed to add slide image.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error adding slide image.");
+    } finally {
+      setIsSavingSlide(false);
+    }
+  };
+
+  // Delete Slide
+  const handleDeleteSlide = async (slideId: string) => {
+    setDeletingId(slideId);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "delete_slide",
+          slideId,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Store slide image deleted.");
+        setSlides(data.slides || []);
+      } else {
+        toast.error(data.error || "Failed to delete slide image.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error deleting slide image.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
+  const panelClass = isDark ? "bg-[#131927] border-gray-800" : "bg-white border-gray-200 shadow-sm";
+  const inputClass = isDark
+    ? "bg-gray-900/80 border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00]"
+    : "bg-white border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00]";
+
+  if (isLoadingSession) {
+    return (
+      <div className={cn("min-h-screen flex items-center justify-center p-6", bgClass)}>
+        <div className="flex flex-col items-center gap-3">
+          <ButtonSpinner />
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Verifying Admin Access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("min-h-screen p-4 md:p-8 font-hanken transition-colors duration-300", bgClass)}>
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Top Header */}
+        <div className={cn("p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/cpanel"
+              className={cn("w-10 h-10 rounded-xl border flex items-center justify-center transition-all", isDark ? "bg-gray-900 border-gray-800 text-white hover:bg-gray-800" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100")}
+            >
+              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-orange-500 text-[22px]">storefront</span>
+                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Storefront Manager</h1>
+              </div>
+              <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
+                Add products, gear, memberships, and customize Store slideshow banners for end-users.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={cn("px-3 h-10 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-yellow-400" : "bg-gray-100 border-gray-200 text-gray-700")}
+            >
+              <span className="material-symbols-outlined text-[18px]">{isDark ? "light_mode" : "dark_mode"}</span>
+              <span className="hidden sm:inline">{isDark ? "Light Mode" : "Dark Mode"}</span>
+            </button>
+            <Link
+              href="/cpanel"
+              className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">dashboard</span>
+              <span>Control Panel</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Navigation Tabs (Products vs Slides) */}
+        <div className="flex items-center gap-3 border-b border-gray-200/40 pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("items")}
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2",
+              activeTab === "items"
+                ? "bg-[#FC7A00] text-white shadow-sm"
+                : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">inventory_2</span>
+            <span>Store Products ({items.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("slides")}
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2",
+              activeTab === "slides"
+                ? "bg-[#FC7A00] text-white shadow-sm"
+                : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">view_carousel</span>
+            <span>Store Slides ({slides.length})</span>
+          </button>
+        </div>
+
+        {/* TAB 1: Store Items Form & Grid */}
+        {activeTab === "items" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Add Item Form */}
+            <div className={cn("p-5 rounded-2xl border space-y-4 lg:col-span-1 h-fit", panelClass)}>
+              <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
+                <span className="material-symbols-outlined text-orange-500 text-[20px]">add_box</span>
+                <h3 className="font-extrabold text-xs uppercase tracking-wider">Add Store Product</h3>
+              </div>
+
+              <form onSubmit={handleAddItem} className="space-y-3.5">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Title</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. E-Tech POS Terminal V2"
+                    value={itemTitle}
+                    onChange={(e) => setItemTitle(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Category</label>
+                  <select
+                    value={itemCategory}
+                    onChange={(e) => setItemCategory(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer", inputClass)}
+                  >
+                    <option value="Hardware">Hardware & POS</option>
+                    <option value="Memberships">Memberships & VIP</option>
+                    <option value="E-Tech Gear">E-Tech Gear & Merchandise</option>
+                    <option value="Subscriptions">Software Subscriptions</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Price (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 35000"
+                    value={itemPrice}
+                    onChange={(e) => setItemPrice(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Image URL or File</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Paste image URL (https://...)"
+                      value={itemImageUrl}
+                      onChange={(e) => setItemImageUrl(e.target.value)}
+                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
+                    />
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadImageToImgBB(file, setItemImageUrl, setIsUploadingItemImage);
+                        }}
+                        disabled={isUploadingItemImage}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingItemImage}
+                        className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                      >
+                        {isUploadingItemImage ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Description</label>
+                  <textarea
+                    placeholder="Enter short details about this item..."
+                    value={itemDescription}
+                    onChange={(e) => setItemDescription(e.target.value)}
+                    className={cn("w-full h-20 p-3 rounded-xl text-xs font-semibold outline-none border transition-all resize-none", inputClass)}
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={itemInStock}
+                    onChange={(e) => setItemInStock(e.target.checked)}
+                    className="w-4 h-4 text-[#FC7A00] rounded"
+                  />
+                  <span className="text-xs font-bold uppercase text-gray-400">In Stock for Ordering</span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isSavingItem || isUploadingItemImage}
+                  className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {isSavingItem ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">add</span>}
+                  <span>Add Product</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Items Grid */}
+            <div className="lg:col-span-2 space-y-4">
+              {isLoading ? (
+                <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
+                  <ButtonSpinner />
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Storefront Products...</p>
+                </div>
+              ) : items.length === 0 ? (
+                <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
+                  <span className="material-symbols-outlined text-[48px] text-gray-400">inventory_2</span>
+                  <p className="text-xs font-black uppercase text-gray-400">No Store Products Added</p>
+                  <p className="text-[11px] text-gray-500 max-w-md mx-auto">Use the form on the left to create and display items for end-users on the Store page.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {items.map((item) => {
+                    const isDeleting = deletingId === item.id;
+                    return (
+                      <div key={item.id} className={cn("p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition-all", panelClass)}>
+                        <div className="space-y-3">
+                          <div className="w-full h-36 rounded-xl border border-gray-200/50 bg-white overflow-hidden relative flex items-center justify-center">
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="material-symbols-outlined text-[48px] text-gray-300">storefront</span>
+                            )}
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-black/70 text-white backdrop-blur-xs">
+                              {item.category}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{item.title}</h4>
+                              <span className="font-mono font-black text-sm text-[#FC7A00]">₦{item.price.toLocaleString()}</span>
+                            </div>
+                            <p className="text-[10.5px] text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{item.description || "No description provided."}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-200/40">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
+                            item.inStock ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"
+                          )}>
+                            {item.inStock ? "IN STOCK" : "OUT OF STOCK"}
+                          </span>
+
+                          <button
+                            type="button"
+                            disabled={isDeleting}
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                          >
+                            {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">delete</span>}
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 2: Store Slides Form & List */}
+        {activeTab === "slides" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Add Slide Form */}
+            <div className={cn("p-5 rounded-2xl border space-y-4 lg:col-span-1 h-fit", panelClass)}>
+              <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
+                <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
+                <h3 className="font-extrabold text-xs uppercase tracking-wider">Add Store Banner Slide</h3>
+              </div>
+
+              <form onSubmit={handleAddSlide} className="space-y-3.5">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Image URL or File</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Paste image URL (https://...)"
+                      value={slideImageUrl}
+                      onChange={(e) => setSlideImageUrl(e.target.value)}
+                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
+                    />
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadImageToImgBB(file, setSlideImageUrl, setIsUploadingSlideImage);
+                        }}
+                        disabled={isUploadingSlideImage}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingSlideImage}
+                        className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                      >
+                        {isUploadingSlideImage ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Exclusive E-Tech Gear!"
+                    value={slideTitle}
+                    onChange={(e) => setSlideTitle(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Subtitle / Caption</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Get 20% discount on all POS hardware."
+                    value={slideSubtitle}
+                    onChange={(e) => setSlideSubtitle(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Target Action Link (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. /store, /support, or https://..."
+                    value={slideLink}
+                    onChange={(e) => setSlideLink(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSavingSlide || isUploadingSlideImage}
+                  className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {isSavingSlide ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>}
+                  <span>Add Slide Banner</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Slides List */}
+            <div className="lg:col-span-2 space-y-4">
+              {isLoading ? (
+                <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
+                  <ButtonSpinner />
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Store Slides...</p>
+                </div>
+              ) : slides.length === 0 ? (
+                <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
+                  <span className="material-symbols-outlined text-[48px] text-gray-400">view_carousel</span>
+                  <p className="text-xs font-black uppercase text-gray-400">No Store Slides Added</p>
+                  <p className="text-[11px] text-gray-500 max-w-md mx-auto">Upload slideshow banner images to showcase store promotions to end-users.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {slides.map((slide) => {
+                    const isDeleting = deletingId === slide.id;
+                    return (
+                      <div key={slide.id} className={cn("p-4 rounded-2xl border flex flex-col md:flex-row gap-4 items-center justify-between transition-all", panelClass)}>
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className="w-28 h-16 rounded-xl border border-gray-200/50 bg-white overflow-hidden flex-shrink-0 relative">
+                            <img src={slide.imageUrl} alt={slide.title || "Slide"} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{slide.title || "Untitled Slide"}</h4>
+                            <p className="text-[11px] text-gray-400 font-medium truncate mt-0.5">{slide.subtitle || "No subtitle provided."}</p>
+                            {slide.link && (
+                              <p className="text-[10px] font-mono text-orange-500 truncate mt-1">Link: {slide.link}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isDeleting}
+                          onClick={() => handleDeleteSlide(slide.id)}
+                          className="px-4 h-9 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0"
+                        >
+                          {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">delete</span>}
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
