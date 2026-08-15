@@ -2926,9 +2926,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   className="space-y-4 text-left flex-1 flex flex-col"
                 >
                   {/* Top Slide Menu Banner */}
-                  <div className="flex-shrink-0">
-                    <BannerSlideshow page="transfer" />
-                  </div>
+                  {config.bannerTransferPosition !== "bottom" && (
+                    <div className="flex-shrink-0">
+                      <BannerSlideshow page="transfer" />
+                    </div>
+                  )}
 
                   {/* Single/Bulk Toggle Button Bar */}
                   <div className="grid grid-cols-2 p-1 bg-gray-100/80 rounded-full mb-3 border border-gray-200/50 flex-shrink-0">
@@ -3501,6 +3503,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           </>
                         )}
                       </AnimatePresence>
+
+                  {/* Bottom Slide Menu Banner */}
+                  {config.bannerTransferPosition === "bottom" && (
+                    <div className="mt-4 flex-shrink-0">
+                      <BannerSlideshow page="transfer" />
+                    </div>
+                  )}
                 </motion.div>
               )}
 

@@ -33,6 +33,7 @@ export interface AppConfig {
   bannerImagePosition?: string;
   bannerHeightMobile?: number;
   bannerHeightDesktop?: number;
+  bannerTransferPosition?: "top" | "bottom";
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -64,6 +65,7 @@ const DEFAULT_CONFIG: AppConfig = {
   bannerImagePosition: "center",
   bannerHeightMobile: 150,
   bannerHeightDesktop: 220,
+  bannerTransferPosition: "top",
 };
 
 interface ConfigContextProps {
