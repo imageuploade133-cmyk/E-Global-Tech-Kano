@@ -2048,6 +2048,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 <span className="font-label-sm text-[8px] min-[360px]:text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF] font-bold truncate">
                   E-TECH GLOBAL HUB
                 </span>
+                {/* Account Tier Level Badge */}
+                <span className="ml-1 px-1.5 py-0.5 text-[7px] min-[360px]:text-[8px] font-black uppercase tracking-wider bg-white/15 text-white rounded-md border border-white/20 backdrop-blur-xs flex-shrink-0">
+                  {userData?.kycStatus === "VERIFIED" ? "Tier 3 VIP" : "Tier 1"}
+                </span>
               </div>
             </div>
             {/* SIM Chip Icon */}
@@ -2191,6 +2195,27 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </div>
         </div>
       </div>
+
+      {/* Frozen Account Alert Notice Banner */}
+      {(userData?.isFrozen || userData?.status === "FROZEN") && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3.5 p-3.5 bg-rose-500/10 border-[1.5px] border-rose-500/40 rounded-xl flex items-center gap-3 text-left relative overflow-hidden select-none shadow-sm"
+        >
+          <div className="w-9 h-9 rounded-full bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-600 flex-shrink-0">
+            <span className="material-symbols-outlined text-[20px] font-black animate-pulse">ac_unit</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="font-hanken font-extrabold text-xs text-rose-700 uppercase tracking-wide flex items-center gap-1.5">
+              Account Suspended / Frozen
+            </h4>
+            <p className="font-hanken text-[11px] text-rose-600 font-bold mt-0.5 leading-snug">
+              {(userData?.freezeMessage as string) || "Dear Customer please Contact Us or Visit Our Office for assistance"}
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Action Buttons Below Card */}
       <div className="mt-4 min-[360px]:mt-5 flex gap-2 min-[360px]:gap-3 select-none w-full">
