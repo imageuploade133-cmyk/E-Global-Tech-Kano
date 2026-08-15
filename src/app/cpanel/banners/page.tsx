@@ -25,6 +25,8 @@ interface BannerSlide {
   link?: string;
   customWidth?: number | null;
   customHeight?: number | null;
+  mobileHeight?: number | null;
+  desktopHeight?: number | null;
   isCrop?: boolean;
   isHidden?: boolean;
   createdAt: string;
@@ -339,6 +341,8 @@ export default function AdminBannersPage() {
           link: editingSlide.link,
           customWidth: editingSlide.customWidth,
           customHeight: editingSlide.customHeight,
+          mobileHeight: editingSlide.mobileHeight,
+          desktopHeight: editingSlide.desktopHeight,
           isCrop: editingSlide.isCrop,
           isHidden: editingSlide.isHidden,
         })
@@ -864,9 +868,9 @@ export default function AdminBannersPage() {
                               Hidden
                             </span>
                           )}
-                          {(b.customWidth || b.customHeight) && (
+                          {(b.customWidth || b.mobileHeight || b.desktopHeight || b.customHeight) && (
                             <span className={cn("px-2 py-0.5 rounded text-[8px] font-mono border", isDark ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-gray-100 border-gray-200 text-gray-700")}>
-                              Size: {b.customWidth || "Auto"}x{b.customHeight || "Auto"}
+                              H(Mob): {b.mobileHeight || b.customHeight || "Global"}px | W: {b.customWidth ? `${b.customWidth}px` : "100%"}
                             </span>
                           )}
                         </div>
@@ -995,25 +999,53 @@ export default function AdminBannersPage() {
                   />
                 </div>
 
-                {/* Custom Dimensions (Width & Height) */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Dedicated Per-Slide Height Customization (Mobile & Desktop) */}
+                <div className="p-3.5 bg-orange-500/5 border border-orange-500/20 rounded-2xl space-y-3">
+                  <p className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">stay_current_portrait</span>
+                    Per-Slide Mobile Height & Width (Overriding Global Defaults)
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Mobile Height (10 - 500 px)</label>
+                      <input
+                        type="number"
+                        min={10}
+                        max={600}
+                        placeholder={`Global (${config.bannerHeightMobile || 150}px)`}
+                        value={editingSlide.mobileHeight ?? editingSlide.customHeight ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value ? parseInt(e.target.value) : null;
+                          setEditingSlide({ ...editingSlide, mobileHeight: val, customHeight: val });
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Desktop Height (px)</label>
+                      <input
+                        type="number"
+                        min={50}
+                        max={800}
+                        placeholder={`Global (${config.bannerHeightDesktop || 220}px)`}
+                        value={editingSlide.desktopHeight ?? ""}
+                        onChange={(e) => setEditingSlide({ ...editingSlide, desktopHeight: e.target.value ? parseInt(e.target.value) : null })}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Custom Width (px / blank = auto)</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Container Width (px / blank = 100% full width)</label>
                     <input
                       type="number"
-                      placeholder="Auto"
+                      min={10}
+                      max={1200}
+                      placeholder="Full Width (100%)"
                       value={editingSlide.customWidth ?? ""}
                       onChange={(e) => setEditingSlide({ ...editingSlide, customWidth: e.target.value ? parseInt(e.target.value) : null })}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Custom Height (px / blank = auto)</label>
-                    <input
-                      type="number"
-                      placeholder="Auto"
-                      value={editingSlide.customHeight ?? ""}
-                      onChange={(e) => setEditingSlide({ ...editingSlide, customHeight: e.target.value ? parseInt(e.target.value) : null })}
                       className={inputClass}
                     />
                   </div>

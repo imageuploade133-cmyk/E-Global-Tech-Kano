@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { id, imageUrl, title, description, targetPage, link, customWidth, customHeight, isCrop, isHidden } = body;
+    const { id, imageUrl, title, description, targetPage, link, customWidth, customHeight, mobileHeight, desktopHeight, isCrop, isHidden } = body;
 
     if (!imageUrl || !imageUrl.trim()) {
       return NextResponse.json({ error: "Image URL is required for the banner slide." }, { status: 400 });
@@ -50,6 +50,8 @@ export async function POST(req: Request) {
       link: (link || "").trim(),
       customWidth: typeof customWidth === "number" ? customWidth : null,
       customHeight: typeof customHeight === "number" ? customHeight : null,
+      mobileHeight: typeof mobileHeight === "number" ? mobileHeight : null,
+      desktopHeight: typeof desktopHeight === "number" ? desktopHeight : null,
       isCrop: isCrop !== undefined ? Boolean(isCrop) : true,
       isHidden: isHidden !== undefined ? Boolean(isHidden) : false,
       updatedAt: new Date().toISOString()
