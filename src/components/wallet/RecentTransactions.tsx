@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { TransactionReceipt, Transaction } from "./TransactionReceipt";
+import { TransactionIcon } from "./TransactionIcon";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
@@ -34,7 +35,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
   const [loading, setLoading] = useState(true);
   const hasPushedState = React.useRef(false);
 
-  // Fetch live user transactions, filtering for DEPOSIT and TRANSFER only (2 items)
+  // Fetch live user transactions (top 5 recent activities)
   useEffect(() => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (isMock || !user) {
@@ -44,12 +45,11 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
     }
 
     setLoading(true);
-    // Fetch top 30 transactions to ensure we have enough to find 2 deposits/transfers
     const q = query(
       collection(db, "transactions"),
       where("userId", "==", user.uid),
       orderBy("createdAt", "desc"),
-      limit(30)
+      limit(5)
     );
 
     const unsubscribe = onSnapshot(
@@ -74,12 +74,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           });
         });
 
-        // Filter for Deposit and Transfer transactions, then limit to exactly 2
-        const filtered = list.filter(
-          (tx) => tx.type === "DEPOSIT" || tx.type === "TRANSFER" || tx.type === "CASHOUT"
-        ).slice(0, 2);
-
-        setTransactions(filtered);
+        setTransactions(list.slice(0, 3));
         setLoading(false);
       },
       (error) => {
@@ -185,19 +180,13 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
                 />
 
                 <div className="flex items-center gap-4 min-w-0">
-                  {/* Glossy Backdrop Blurred Gradient icon container */}
-                  <div
-                    className={cn(
-                      "w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border",
-                      isDeposit
-                        ? "bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600 border-emerald-200/50"
-                        : "bg-gradient-to-br from-[#FFF2E6] to-[#FFE4CC] text-[#FC7A00] border-[#FFE4CC]/50"
-                    )}
-                  >
-                    <span className="material-symbols-outlined text-[20px] font-black">
-                      {isDeposit ? "south_west" : "north_east"}
-                    </span>
-                  </div>
+                  <TransactionIcon
+                    type={tx.type}
+                    description={tx.description}
+                    recipientName={tx.recipientName}
+                    bankName={tx.bankName}
+                    className="w-11 h-11"
+                  />
 
                   <div className="min-w-0">
                     <p className="font-hanken font-extrabold text-[13px] text-gray-900 leading-tight truncate">
