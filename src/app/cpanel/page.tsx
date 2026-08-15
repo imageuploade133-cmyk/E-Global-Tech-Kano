@@ -822,6 +822,7 @@ export default function AdminPage() {
           customHeight: editingSlide.customHeight,
           mobileHeight: editingSlide.mobileHeight,
           desktopHeight: editingSlide.desktopHeight,
+          marginBottom: editingSlide.marginBottom,
           isCrop: editingSlide.isCrop,
           isHidden: editingSlide.isHidden,
         })

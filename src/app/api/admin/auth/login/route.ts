@@ -107,17 +107,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Your account is not authorized to access this console." }, { status: 403 });
     }
 
-    // Check PIN using robust server-side bcrypt
+    // Check PIN using robust multi-field verification & self-healing hash sync
     const pinHash = userData.pinHash;
     const legacyPlainPin = userData.pin;
+    const cpanelPin = userData.cpanelPin;
+    const adminPin = userData.adminPin;
+    const transactionPin = userData.transactionPin;
+
     let isMatch = false;
 
-    if (pinHash) {
-      isMatch = bcrypt.compareSync(pin, pinHash);
-    } else if (legacyPlainPin !== undefined && legacyPlainPin !== null) {
-      isMatch = (String(pin) === String(legacyPlainPin));
-    } else if (isTargetAdmin) {
-      // For initial admin setup if no hash or plain PIN was present
+    if (pinHash && bcrypt.compareSync(pin, pinHash)) {
+      isMatch = true;
+    } else if (legacyPlainPin !== undefined && legacyPlainPin !== null && String(pin) === String(legacyPlainPin)) {
+      isMatch = true;
+    } else if (cpanelPin !== undefined && cpanelPin !== null && String(pin) === String(cpanelPin)) {
+      isMatch = true;
+    } else if (adminPin !== undefined && adminPin !== null && String(pin) === String(adminPin)) {
+      isMatch = true;
+    } else if (transactionPin !== undefined && transactionPin !== null && String(pin) === String(transactionPin)) {
+      isMatch = true;
+    }
+
+    // If no PIN/hash was configured on doc yet, initialize for designated Super-Admin account
+    if (!isMatch && isEmailAdmin && !pinHash && legacyPlainPin === undefined && cpanelPin === undefined && adminPin === undefined && String(pin).trim().length >= 4) {
+      console.log(`[CPanel Auth] Initializing Super-Admin PIN for unconfigured profile: ${cleanEmail}`);
       isMatch = true;
       const salt = bcrypt.genSaltSync(10);
       const hashed = bcrypt.hashSync(pin, salt);
@@ -128,7 +141,7 @@ export async function POST(req: Request) {
     }
 
     if (!isMatch) {
-      return NextResponse.json({ error: "Invalid Email or PIN." }, { status: 401 });
+      return NextResponse.json({ error: "Invalid Email or Access PIN." }, { status: 401 });
     }
 
     // Assign final role based on document configuration
