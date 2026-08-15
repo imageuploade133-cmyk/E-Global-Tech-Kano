@@ -132,6 +132,27 @@ export async function POST(req: Request) {
       }
 
       const userData = userDoc.data() || {};
+
+      // Server-side Account Freeze Check (Blocks hacker bypasses)
+      if (userData.isFrozen) {
+        const freezeMsg = userData.freezeMessage || "Dear Customer please Contact Us or Visit Our Office for assistance";
+        return {
+          success: false,
+          error: freezeMsg,
+        };
+      }
+
+      // Server-side Account Transfer Limits Validation
+      if (!userData.unlimitedTransfers) {
+        const maxSingle = Number(userData.maxSingleTransferLimit) || 200000;
+        if (trfAmount > maxSingle) {
+          return {
+            success: false,
+            error: `Transfer amount exceeds your single transaction limit of ₦${maxSingle.toLocaleString()}. Contact support to upgrade your limits.`,
+          };
+        }
+      }
+
       const pinHash = userData.pinHash;
       const currentPlainPin = userData.pin;
       const lockedUntil = userData.lockedUntil;

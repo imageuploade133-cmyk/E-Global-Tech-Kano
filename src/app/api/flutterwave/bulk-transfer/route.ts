@@ -88,6 +88,16 @@ export async function POST(req: Request) {
       const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
 
       const userData = userDoc.data() || {};
+
+      // Server-side Account Freeze Check (Blocks hacker bypasses)
+      if (userData.isFrozen) {
+        const freezeMsg = userData.freezeMessage || "Dear Customer please Contact Us or Visit Our Office for assistance";
+        return {
+          success: false,
+          error: freezeMsg,
+        };
+      }
+
       const pinHash = userData.pinHash;
       const currentPlainPin = userData.pin;
       const lockedUntil = userData.lockedUntil;
