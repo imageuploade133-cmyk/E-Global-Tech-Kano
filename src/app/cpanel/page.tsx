@@ -744,6 +744,44 @@ export default function AdminPage() {
     }
   };
 
+  const handleEditBannerFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingSlide) return;
+
+    setIsUploadingBanner(true);
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const apiKey = config.imgbbApiKey || "";
+    if (!apiKey) {
+      toast.error("Imgbb API Key is missing. Please save an API key in visual branding settings.");
+      setIsUploadingBanner(false);
+      return;
+    }
+
+    toast.loading("Uploading slide image to ImgBB...");
+    try {
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: "POST",
+        body: formData
+      });
+      const json = await res.json();
+      toast.dismiss();
+
+      if (json.success) {
+        setEditingSlide({ ...editingSlide, imageUrl: json.data.display_url });
+        toast.success("Slide image changed successfully!");
+      } else {
+        toast.error(json.error?.message || "Failed to upload image to ImgBB.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("ImgBB API connection error.");
+    } finally {
+      setIsUploadingBanner(false);
+    }
+  };
+
   const handleAddBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bannerImageUrl.trim()) {
@@ -4179,17 +4217,45 @@ export default function AdminPage() {
                         </div>
 
                         <form onSubmit={handleUpdateSlideSave} className="space-y-4 text-left">
-                          {/* Image Preview & URL */}
+                          {/* Image Preview & URL with File Upload Button */}
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Image URL</label>
-                            <input
-                              type="text"
-                              required
-                              value={editingSlide.imageUrl}
-                              onChange={(e) => setEditingSlide({ ...editingSlide, imageUrl: e.target.value })}
-                              className={inputClass}
-                            />
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Image URL / Upload New File</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                required
+                                value={editingSlide.imageUrl}
+                                onChange={(e) => setEditingSlide({ ...editingSlide, imageUrl: e.target.value })}
+                                className={inputClass}
+                              />
+                              <div className="relative">
+                                <input
+                                  type="file"
+                                  accept="image/*, image/gif, image/svg+xml, .gif, .svg"
+                                  onChange={handleEditBannerFileUpload}
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                  disabled={isUploadingBanner}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={isUploadingBanner}
+                                  className={cn("px-3 h-[42px] border rounded-xl flex items-center justify-center transition-all", isDark ? "bg-gray-850 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                                >
+                                  {isUploadingBanner ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                                </button>
+                              </div>
+                            </div>
                           </div>
+
+                          {/* Live Image Thumbnail Preview */}
+                          {editingSlide.imageUrl && (
+                            <div className="p-2 bg-black/10 border border-gray-200/40 rounded-xl overflow-hidden relative">
+                              <p className="text-[8.5px] font-black uppercase text-gray-400 mb-1">Slide Image Preview</p>
+                              <div className="aspect-[3/1] rounded-lg overflow-hidden border bg-white relative">
+                                <img src={editingSlide.imageUrl} alt="Slide Preview" className="w-full h-full object-cover" />
+                              </div>
+                            </div>
+                          )}
 
                           {/* Title & Target Page */}
                           <div className="grid grid-cols-2 gap-3">
