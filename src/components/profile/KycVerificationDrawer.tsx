@@ -6,6 +6,7 @@ import { useAppConfig } from "@/lib/ConfigContext";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { uploadImageSecurely } from "@/lib/image-upload";
 
 interface KycVerificationDrawerProps {
   isOpen: boolean;
@@ -186,26 +187,21 @@ export function KycVerificationDrawer({
     let uploadedUrl = "";
     const activeImageSource = selfiePreview || filePreview || "";
 
-    // 1. Upload to Imgbb securely
-    const apiKey = config.imgbbApiKey || "";
-    if (apiKey && activeImageSource.startsWith("data:image")) {
+    // 1. Upload to Imgbb securely via upload-image API
+    if (activeImageSource.startsWith("data:image")) {
       try {
-        const base64Raw = activeImageSource.split(",")[1] || activeImageSource;
-        const formData = new FormData();
-        formData.append("image", base64Raw);
-
-        const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        const res = await fetch("/api/upload-image", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: activeImageSource, purpose: "kyc_document" }),
         });
         const json = await res.json();
-        if (json.success) {
-          uploadedUrl = json.data.display_url;
+        if (res.ok && json.success && json.url) {
+          uploadedUrl = json.url;
         } else {
           uploadedUrl = activeImageSource;
         }
       } catch (err) {
-        // Fallback gracefully and prevent leaking server paths
         uploadedUrl = activeImageSource;
       }
     } else {

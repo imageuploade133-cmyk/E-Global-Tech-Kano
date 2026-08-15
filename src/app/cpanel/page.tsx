@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { uploadImageSecurely } from "@/lib/image-upload";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -711,34 +712,20 @@ export default function AdminPage() {
     if (!file) return;
 
     setIsUploadingBanner(true);
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const apiKey = config.imgbbApiKey || "";
-    if (!apiKey) {
-      toast.error("Imgbb API Key is missing. Please save an API key in the Branding Configurations under Settings tab.");
-      setIsUploadingBanner(false);
-      return;
-    }
-
-    toast.loading("Uploading banner image to ImgBB...");
+    toast.loading("Uploading banner image securely...");
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-        method: "POST",
-        body: formData
-      });
-      const json = await res.json();
+      const result = await uploadImageSecurely(file, "cpanel_banner");
       toast.dismiss();
 
-      if (json.success) {
-        setBannerImageUrl(json.data.display_url);
-        toast.success("Banner image uploaded successfully!");
+      if (result.success && result.url) {
+        setBannerImageUrl(result.url);
+        toast.success("Banner image uploaded and verified successfully!");
       } else {
-        toast.error(json.error?.message || "Failed to upload to ImgBB.");
+        toast.error(result.error || "Failed to upload banner image.");
       }
-    } catch {
+    } catch (err: any) {
       toast.dismiss();
-      toast.error("ImgBB API connection error.");
+      toast.error(err.message || "Banner image upload failed.");
     } finally {
       setIsUploadingBanner(false);
     }
@@ -1257,36 +1244,23 @@ export default function AdminPage() {
     if (!file) return;
 
     setIsUploadingLogo(true);
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const key = apiKeyInput || "";
-    if (!key) {
-      toast.error("Imgbb API Key is missing. Please enter and save an API key under Branding Configurations.");
-      setIsUploadingLogo(false);
-      return;
-    }
-    toast.loading("Uploading app logo to Imgbb servers...");
+    toast.loading("Uploading app logo securely...");
 
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${key}`, {
-        method: "POST",
-        body: formData,
-      });
-      const json = await res.json();
+      const result = await uploadImageSecurely(file, "app_logo");
       toast.dismiss();
 
-      if (json.success) {
-        const uploadedUrl = json.data.display_url;
+      if (result.success && result.url) {
+        const uploadedUrl = result.url;
         setLogoInput(uploadedUrl);
         updateConfig({ logoUrl: uploadedUrl });
         toast.success("App logo successfully uploaded and updated!");
       } else {
-        toast.error(json.error?.message || "Failed to upload logo image to Imgbb!");
+        toast.error(result.error || "Failed to upload logo image!");
       }
-    } catch {
+    } catch (err: any) {
       toast.dismiss();
-      toast.error("Imgbb API communication failure. Confirm internet connection and API token.");
+      toast.error(err.message || "App logo upload failed.");
     } finally {
       setIsUploadingLogo(false);
     }

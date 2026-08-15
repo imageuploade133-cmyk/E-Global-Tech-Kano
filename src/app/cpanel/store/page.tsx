@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { uploadImageSecurely } from "@/lib/image-upload";
 
 interface StoreItem {
   id: string;
@@ -172,29 +173,16 @@ export default function CpanelStorePage() {
 
   // Upload file to ImgBB helper
   const uploadImageToImgBB = async (file: File, setUrl: (url: string) => void, setUploading: (u: boolean) => void) => {
-    if (!imgbbApiKey) {
-      toast.error("ImgBB API key is not configured. Please set it in Admin Branding Settings.");
-      return;
-    }
-
     setUploading(true);
-    toast.loading("Uploading image to ImgBB...", { id: "img-upload" });
+    toast.loading("Uploading image securely...", { id: "img-upload" });
 
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbApiKey}`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const json = await res.json();
-      if (json.success && json.data?.url) {
-        setUrl(json.data.url);
-        toast.success("Image uploaded successfully!", { id: "img-upload" });
+      const result = await uploadImageSecurely(file, "store_product");
+      if (result.success && result.url) {
+        setUrl(result.url);
+        toast.success("Image uploaded and verified successfully!", { id: "img-upload" });
       } else {
-        toast.error(json.error?.message || "Image upload failed.", { id: "img-upload" });
+        toast.error(result.error || "Image upload failed.", { id: "img-upload" });
       }
     } catch (err: any) {
       toast.error(err.message || "Network error uploading image.", { id: "img-upload" });

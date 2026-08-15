@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { uploadImageSecurely } from "@/lib/image-upload";
 
 interface BillerItem {
   code: string;
@@ -177,35 +178,21 @@ export default function CpanelBillLogosPage() {
     }
   }, [isLoadingSession]);
 
-  // Upload file to ImgBB
+  // Upload file to ImgBB securely
   const handleFileUpload = async (code: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!imgbbApiKey) {
-      toast.error("ImgBB API key is not configured in Admin Settings. Please set it under CPanel Settings.");
-      return;
-    }
 
     setUploadingCode(code);
     toast.loading(`Uploading logo image for ${code.toUpperCase()}...`, { id: `upload-${code}` });
 
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbApiKey}`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const json = await res.json();
-      if (json.success && json.data?.url) {
-        const uploadedUrl = json.data.url;
-        setLogoMap((prev) => ({ ...prev, [code.toLowerCase()]: uploadedUrl }));
-        toast.success("Logo image uploaded successfully!", { id: `upload-${code}` });
+      const result = await uploadImageSecurely(file, "bill_logo");
+      if (result.success && result.url) {
+        setLogoMap((prev) => ({ ...prev, [code.toLowerCase()]: result.url! }));
+        toast.success("Logo image uploaded and verified successfully!", { id: `upload-${code}` });
       } else {
-        toast.error(json.error?.message || "Failed to upload image to ImgBB.", { id: `upload-${code}` });
+        toast.error(result.error || "Failed to upload image.", { id: `upload-${code}` });
       }
     } catch (err: any) {
       toast.error(err.message || "Image upload failed.", { id: `upload-${code}` });
