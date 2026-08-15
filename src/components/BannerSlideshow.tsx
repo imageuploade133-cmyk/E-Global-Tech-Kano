@@ -17,6 +17,7 @@ interface BannerSlide {
   customHeight?: number | null;
   mobileHeight?: number | null;
   desktopHeight?: number | null;
+  marginBottom?: number | null;
   isCrop?: boolean;
   isHidden?: boolean;
 }
@@ -111,10 +112,11 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
     ? { border: `1px solid ${borderColor}` }
     : { border: "none" };
 
-  // Determine slide container height and mode overrides (per-slide setting takes precedence over global fallback)
+  // Determine slide container height, bottom margin, and mode overrides (per-slide setting takes precedence over global fallback)
   const effectiveHeightMobile = activeSlide.mobileHeight || activeSlide.customHeight || heightMobile;
   const effectiveHeightDesktop = activeSlide.desktopHeight || activeSlide.customHeight || heightDesktop;
   const effectiveWidth = activeSlide.customWidth ? `${activeSlide.customWidth}px` : "100%";
+  const effectiveMarginBottom = activeSlide.marginBottom !== undefined && activeSlide.marginBottom !== null ? activeSlide.marginBottom : 24; // default mb-6 (24px)
   const isSlideCrop = activeSlide.isCrop !== false; // default true (cover)
 
   // To solve the "blinking" issue, we remove mode="wait" so old and new slides cross-transition simultaneously.
@@ -140,13 +142,14 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
 
   return (
     <div
-      className="relative mb-6 select-none overflow-hidden rounded-2xl md:rounded-[24px] shadow-xs mx-auto"
+      className="relative select-none overflow-hidden rounded-2xl md:rounded-[24px] shadow-xs mx-auto"
       style={{
         backgroundColor: backgroundColor,
         ...borderStyles,
         height: `${effectiveHeightMobile}px`,
         width: effectiveWidth,
         maxWidth: "100%",
+        marginBottom: `${effectiveMarginBottom}px`,
       }}
     >
       {/* Responsive height adjustments on desktop screens */}
