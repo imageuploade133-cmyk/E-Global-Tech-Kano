@@ -15,6 +15,7 @@ import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { useRouter } from "next/navigation";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
+import { uploadImageSecurely } from "@/lib/image-upload";
 import { handleAppSignOut } from "@/lib/logout-util";
 
 const LIMIT_CATEGORIES = [
@@ -272,34 +273,21 @@ export default function ProfilePage() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const key = config.imgbbApiKey || "";
-    if (!key) {
-      toast.error("Configuration Error: Imgbb API key is not configured in the Cpanel. Please contact support.");
-      return;
-    }
-    toast.loading("Uploading user avatar directly to Imgbb storage...");
+    toast.loading("Uploading profile avatar securely...");
 
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${key}`, {
-        method: "POST",
-        body: formData,
-      });
-      const json = await res.json();
+      const result = await uploadImageSecurely(file, "profile_avatar");
       toast.dismiss();
 
-      if (json.success) {
-        const uploadedUrl = json.data.display_url;
-        await updateUserData({ photoURL: uploadedUrl });
+      if (result.success && result.url) {
+        await updateUserData({ photoURL: result.url });
         toast.success("Profile avatar successfully uploaded and updated!");
       } else {
-        toast.error(json.error?.message || "Failed to upload avatar image to Imgbb!");
+        toast.error(result.error || "Failed to upload avatar image!");
       }
-    } catch {
+    } catch (err: any) {
       toast.dismiss();
-      toast.error("Imgbb API communication failure. Please verify internet connectivity.");
+      toast.error(err.message || "Avatar image upload failed.");
     }
   };
 

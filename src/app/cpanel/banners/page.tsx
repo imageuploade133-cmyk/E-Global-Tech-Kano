@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { uploadImageSecurely } from "@/lib/image-upload";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -232,34 +233,21 @@ export default function AdminBannersPage() {
     if (!file) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("image", file);
+    toast.loading("Uploading banner image securely...");
 
-    const apiKey = config.imgbbApiKey || "";
-    if (!apiKey) {
-      toast.error("Imgbb API Key is missing. Please save an API key in the Branding Configurations under Settings tab.");
-      setIsUploading(false);
-      return;
-    }
-
-    toast.loading("Uploading banner image to ImgBB...");
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-        method: "POST",
-        body: formData
-      });
-      const json = await res.json();
+      const result = await uploadImageSecurely(file, "banner");
       toast.dismiss();
 
-      if (json.success) {
-        setImageUrl(json.data.display_url);
-        toast.success("Banner image uploaded successfully!");
+      if (result.success && result.url) {
+        setImageUrl(result.url);
+        toast.success("Banner image uploaded and verified successfully!");
       } else {
-        toast.error(json.error?.message || "Failed to upload to ImgBB.");
+        toast.error(result.error || "Failed to upload banner image.");
       }
-    } catch {
+    } catch (err: any) {
       toast.dismiss();
-      toast.error("ImgBB API connection error.");
+      toast.error(err.message || "Banner image upload failed.");
     } finally {
       setIsUploading(false);
     }

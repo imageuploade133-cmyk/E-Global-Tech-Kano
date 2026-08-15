@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { uploadImageSecurely } from "@/lib/image-upload";
 
 interface BankItem {
   id: string;
@@ -34,6 +35,7 @@ export default function CpanelBankLogosPage() {
   // Track editing inputs & uploading/toggling states per bankId
   const [editingLogos, setEditingLogos] = useState<Record<string, string>>({});
   const [uploadingBankId, setUploadingBankId] = useState<string | null>(null);
+  const [isRepairingLogos, setIsRepairingLogos] = useState(false);
   const [savingBankId, setSavingBankId] = useState<string | null>(null);
   const [togglingBankId, setTogglingBankId] = useState<string | null>(null);
 
@@ -149,35 +151,21 @@ export default function CpanelBankLogosPage() {
     fetchBanks(searchQuery);
   };
 
-  // Upload file to ImgBB
+  // Upload file to ImgBB securely
   const handleFileUpload = async (bankId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!imgbbApiKey) {
-      toast.error("ImgBB API key is not configured in Admin Settings. Please set it under CPanel Settings.");
-      return;
-    }
 
     setUploadingBankId(bankId);
     toast.loading(`Uploading logo image for bank...`, { id: `upload-${bankId}` });
 
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbApiKey}`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const json = await res.json();
-      if (json.success && json.data?.url) {
-        const uploadedUrl = json.data.url;
-        setEditingLogos((prev) => ({ ...prev, [bankId]: uploadedUrl }));
-        toast.success("Logo image uploaded successfully!", { id: `upload-${bankId}` });
+      const result = await uploadImageSecurely(file, "bank_logo");
+      if (result.success && result.url) {
+        setEditingLogos((prev) => ({ ...prev, [bankId]: result.url! }));
+        toast.success("Logo image uploaded and verified successfully!", { id: `upload-${bankId}` });
       } else {
-        toast.error(json.error?.message || "Failed to upload image to ImgBB.", { id: `upload-${bankId}` });
+        toast.error(result.error || "Failed to upload image.", { id: `upload-${bankId}` });
       }
     } catch (err: any) {
       toast.error(err.message || "Image upload failed.", { id: `upload-${bankId}` });
@@ -250,6 +238,34 @@ export default function CpanelBankLogosPage() {
       toast.error(err.message || "Network error saving logo.");
     } finally {
       setSavingBankId(null);
+    }
+  };
+
+  const handleRepairLogos = async () => {
+    setIsRepairingLogos(true);
+    toast.loading("Running logo health check and repair scan...", { id: "repair-logos" });
+
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const res = await fetch("/api/admin/bank-logos/repair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Health Check Complete! Scanned: ${data.scanned}, Healthy: ${data.healthy}, Repaired: ${data.repaired}, Needs Repair: ${data.needsRepair}`, { id: "repair-logos", duration: 6000 });
+        if (banks.length > 0) {
+          fetchBanks(searchQuery);
+        }
+      } else {
+        toast.error(data.error || "Repair process failed.", { id: "repair-logos" });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error running logo repair.", { id: "repair-logos" });
+    } finally {
+      setIsRepairingLogos(false);
     }
   };
 

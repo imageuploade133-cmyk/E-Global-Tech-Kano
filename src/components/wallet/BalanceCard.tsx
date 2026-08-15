@@ -23,10 +23,12 @@ interface BankLogoProps {
   name: string;
   code?: string;
   logoUrl?: string | null;
+  logoBackupUrl?: string | null;
 }
 
-const BankLogo: React.FC<BankLogoProps> = ({ name, code, logoUrl }) => {
-  const [hasError, setHasError] = useState(false);
+const BankLogo: React.FC<BankLogoProps> = ({ name, code, logoUrl, logoBackupUrl }) => {
+  const [attemptIndex, setAttemptIndex] = useState(0);
+
   const initials = name.substring(0, 2).toUpperCase();
   const colors = [
     "bg-orange-100 text-orange-700 border-orange-200",
@@ -42,20 +44,26 @@ const BankLogo: React.FC<BankLogoProps> = ({ name, code, logoUrl }) => {
   }
   const logoColorClass = colors[sum % colors.length];
 
-  // Primary: Prioritize custom logoUrl saved by admin in Firestore first, then fall back to local static path by code
   const trimmed = String(code || "").trim();
   const paddedCode = trimmed && /^\d+$/.test(trimmed) ? trimmed.padStart(3, "0") : trimmed;
-  const resolvedLogoUrl = logoUrl || (paddedCode ? `/bank-logos/${paddedCode}.png` : null);
+  const staticPath = paddedCode ? `/bank-logos/${paddedCode}.png` : null;
 
-  if (resolvedLogoUrl && !hasError) {
+  const candidateUrls: string[] = [];
+  if (logoUrl) candidateUrls.push(logoUrl);
+  if (logoBackupUrl && logoBackupUrl !== logoUrl) candidateUrls.push(logoBackupUrl);
+  if (staticPath && !candidateUrls.includes(staticPath)) candidateUrls.push(staticPath);
+
+  const activeUrl = candidateUrls[attemptIndex];
+
+  if (activeUrl) {
     return (
       <div className="w-11 h-11 rounded-full border border-gray-100 flex items-center justify-center overflow-hidden bg-white flex-shrink-0">
         <img
-          src={resolvedLogoUrl}
+          src={activeUrl}
           alt={`${name} logo`}
           className="w-full h-full object-contain p-1.5"
           loading="lazy"
-          onError={() => setHasError(true)}
+          onError={() => setAttemptIndex((prev) => prev + 1)}
         />
       </div>
     );
@@ -2661,7 +2669,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             onClick={() => handleBankSelect(bank)}
                             className="w-full p-3.5 rounded-2xl bg-white flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none premium-gradient-border"
                           >
-                            <BankLogo name={bank.name} code={bank.code} logoUrl={bank.logoUrl} />
+                            <BankLogo name={bank.name} code={bank.code} logoUrl={bank.logoUrl} logoBackupUrl={(bank as any).logoBackupUrl} />
                             <div className="min-w-0 flex-1">
                               <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
                             </div>
@@ -3017,7 +3025,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           >
                             <span className="flex items-center gap-3">
                               {trfBank ? (
-                                <BankLogo name={trfBank.name} code={trfBank.code} logoUrl={trfBank.logoUrl} />
+                                <BankLogo name={trfBank.name} code={trfBank.code} logoUrl={trfBank.logoUrl} logoBackupUrl={(trfBank as any).logoBackupUrl} />
                               ) : (
                                 <div className="w-11 h-11 rounded-full border border-gray-200 flex items-center justify-center bg-gray-100 text-gray-400 flex-shrink-0">
                                   <span className="material-symbols-outlined text-[18px]">account_balance</span>
@@ -3152,7 +3160,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       {trfBank && trfAccountName && (
                         <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between text-left animate-fade-in">
                           <div className="flex items-center gap-3">
-                            <BankLogo name={trfBank.name} code={trfBank.code} logoUrl={trfBank.logoUrl} />
+                            <BankLogo name={trfBank.name} code={trfBank.code} logoUrl={trfBank.logoUrl} logoBackupUrl={(trfBank as any).logoBackupUrl} />
                             <div>
                               <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Detected Bank</span>
                               <p className="font-hanken text-xs font-extrabold text-black uppercase mt-0.5">{trfBank.name}</p>
@@ -3514,7 +3522,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                         }}
                                         className="w-full p-3.5 rounded-2xl bg-white flex items-center gap-3.5 transition-all duration-300 text-left cursor-pointer shadow-none premium-gradient-border"
                                       >
-                                        <BankLogo name={bank.name} code={bank.code} logoUrl={bank.logoUrl} />
+                                        <BankLogo name={bank.name} code={bank.code} logoUrl={bank.logoUrl} logoBackupUrl={(bank as any).logoBackupUrl} />
                                         <div className="min-w-0 flex-1">
                                           <p className="font-hanken text-[12px] font-black text-black leading-tight truncate">{bank.name}</p>
                                         </div>
