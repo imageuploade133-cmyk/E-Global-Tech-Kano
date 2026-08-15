@@ -26,6 +26,11 @@ interface StoreSlide {
   createdAt: string;
 }
 
+interface StoreSettings {
+  borderColor?: string;
+  hideBorders?: boolean;
+}
+
 function ButtonSpinner() {
   return (
     <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -36,12 +41,13 @@ export default function CpanelStorePage() {
   const router = useRouter();
   const [isDark, setIsDark] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const [activeTab, setActiveTab] = useState<"items" | "slides">("items");
+  const [activeTab, setActiveTab] = useState<"items" | "slides" | "settings">("items");
   const [imgbbApiKey, setImgbbApiKey] = useState("");
 
   // Data states
   const [items, setItems] = useState<StoreItem[]>([]);
   const [slides, setSlides] = useState<StoreSlide[]>([]);
+  const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false });
   const [isLoading, setIsLoading] = useState(true);
 
   // New Item Form
@@ -61,6 +67,11 @@ export default function CpanelStorePage() {
   const [slideLink, setSlideLink] = useState("");
   const [isUploadingSlideImage, setIsUploadingSlideImage] = useState(false);
   const [isSavingSlide, setIsSavingSlide] = useState(false);
+
+  // Store Settings Form
+  const [borderColor, setBorderColor] = useState("#FC7A00");
+  const [hideBorders, setHideBorders] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Deleting item/slide ID
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -138,6 +149,11 @@ export default function CpanelStorePage() {
       if (data.success) {
         setItems(data.items || []);
         setSlides(data.slides || []);
+        if (data.settings) {
+          setSettings(data.settings);
+          setBorderColor(data.settings.borderColor || "#FC7A00");
+          setHideBorders(Boolean(data.settings.hideBorders));
+        }
       } else {
         toast.error(data.error || "Failed to load store data.");
       }
@@ -184,6 +200,42 @@ export default function CpanelStorePage() {
       toast.error(err.message || "Network error uploading image.", { id: "img-upload" });
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Save Store Settings
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "update_settings",
+          settings: {
+            borderColor,
+            hideBorders,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Storefront border settings updated!");
+        if (data.settings) setSettings(data.settings);
+      } else {
+        toast.error(data.error || "Failed to update store settings.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error updating settings.");
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -383,7 +435,7 @@ export default function CpanelStorePage() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Storefront Manager</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Add products, gear, memberships, and customize Store slideshow banners for end-users.
+                Add products, gear, memberships, customize store slide banners, and configure border styles.
               </p>
             </div>
           </div>
@@ -407,13 +459,13 @@ export default function CpanelStorePage() {
           </div>
         </div>
 
-        {/* Navigation Tabs (Products vs Slides) */}
-        <div className="flex items-center gap-3 border-b border-gray-200/40 pb-2">
+        {/* Navigation Tabs (Products vs Slides vs Settings) */}
+        <div className="flex items-center gap-3 border-b border-gray-200/40 pb-2 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab("items")}
             className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2",
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
               activeTab === "items"
                 ? "bg-[#FC7A00] text-white shadow-sm"
                 : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -427,7 +479,7 @@ export default function CpanelStorePage() {
             type="button"
             onClick={() => setActiveTab("slides")}
             className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2",
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
               activeTab === "slides"
                 ? "bg-[#FC7A00] text-white shadow-sm"
                 : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -435,6 +487,20 @@ export default function CpanelStorePage() {
           >
             <span className="material-symbols-outlined text-[18px]">view_carousel</span>
             <span>Store Slides ({slides.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("settings")}
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
+              activeTab === "settings"
+                ? "bg-[#FC7A00] text-white shadow-sm"
+                : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">settings</span>
+            <span>Store Settings</span>
           </button>
         </div>
 
@@ -756,6 +822,80 @@ export default function CpanelStorePage() {
               )}
             </div>
 
+          </div>
+        )}
+
+        {/* TAB 3: Storefront Settings */}
+        {activeTab === "settings" && (
+          <div className="max-w-xl mx-auto">
+            <div className={cn("p-6 rounded-2xl border space-y-5", panelClass)}>
+              <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
+                <span className="material-symbols-outlined text-orange-500 text-[22px]">palette</span>
+                <div>
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Product Card Styling</h3>
+                  <p className="text-[10.5px] text-gray-400">Configure border color or completely hide card borders for public storefront users.</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveSettings} className="space-y-4">
+                {/* Product Border Color */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Card Border Color</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={borderColor}
+                      onChange={(e) => setBorderColor(e.target.value)}
+                      className="w-12 h-10 rounded-xl border border-gray-300 p-1 cursor-pointer bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={borderColor}
+                      onChange={(e) => setBorderColor(e.target.value)}
+                      placeholder="#FC7A00"
+                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-mono font-bold uppercase outline-none border transition-all", inputClass)}
+                    />
+                  </div>
+
+                  {/* Preset Colors */}
+                  <div className="flex items-center gap-2 pt-1">
+                    {["#FC7A00", "#000000", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6", "#E5E7EB"].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setBorderColor(c)}
+                        className="w-6 h-6 rounded-full border-2 border-white shadow-xs cursor-pointer transition-transform hover:scale-110"
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hide Product Borders Toggle */}
+                <label className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200/50 bg-gray-50/50 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={hideBorders}
+                    onChange={(e) => setHideBorders(e.target.checked)}
+                    className="w-4 h-4 text-[#FC7A00] rounded"
+                  />
+                  <div>
+                    <span className="text-xs font-extrabold uppercase text-gray-800 block">Hide Card Borders Completely</span>
+                    <span className="text-[10px] text-gray-400 font-medium">When checked, storefront product cards render without any border line.</span>
+                  </div>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isSavingSettings}
+                  className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {isSavingSettings ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">save</span>}
+                  <span>Save Store Settings</span>
+                </button>
+              </form>
+            </div>
           </div>
         )}
 

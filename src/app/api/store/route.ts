@@ -10,10 +10,11 @@ export async function GET() {
       success: true,
       items: data.items || [],
       slides: data.slides || [],
+      settings: data.settings || { borderColor: "#FC7A00", hideBorders: false },
     });
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Store GET Error]:", error.message);
-    return NextResponse.json({ success: true, items: [], slides: [] });
+    return NextResponse.json({ success: true, items: [], slides: [], settings: { borderColor: "#FC7A00", hideBorders: false } });
   }
 }

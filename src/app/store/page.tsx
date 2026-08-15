@@ -11,6 +11,7 @@ import Image from "next/image";
 import {
   StoreItem,
   StoreSlide,
+  StoreSettings,
   CartItem,
   getCachedStore,
   setCachedStore,
@@ -26,6 +27,7 @@ export default function StorePage() {
 
   const [items, setItems] = useState<StoreItem[]>([]);
   const [slides, setSlides] = useState<StoreSlide[]>([]);
+  const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false });
   const [isLoading, setIsLoading] = useState(true);
 
   // Search & Filter state
@@ -37,7 +39,7 @@ export default function StorePage() {
   const [activeProduct, setActiveProduct] = useState<StoreItem | null>(null);
   const [productQuantity, setProductQuantity] = useState(1);
 
-  // Cart state & Cart drawer
+  // Full screen Cart modal state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
@@ -60,6 +62,7 @@ export default function StorePage() {
       if (cached) {
         setItems(cached.items);
         setSlides(cached.slides);
+        setSettings(cached.settings || {});
         setIsLoading(false);
         return;
       }
@@ -71,9 +74,11 @@ export default function StorePage() {
         if (data.success) {
           const fetchedItems: StoreItem[] = data.items || [];
           const fetchedSlides: StoreSlide[] = data.slides || [];
+          const fetchedSettings: StoreSettings = data.settings || {};
           setItems(fetchedItems);
           setSlides(fetchedSlides);
-          setCachedStore(fetchedItems, fetchedSlides);
+          setSettings(fetchedSettings);
+          setCachedStore(fetchedItems, fetchedSlides, fetchedSettings);
         }
       } catch (err) {
         console.error("Failed to load store data:", err);
@@ -95,7 +100,6 @@ export default function StorePage() {
 
   // Open Full Screen Product Modal with zero re-reads if cached
   const handleOpenProductModal = (item: StoreItem) => {
-    // Read from client cache first
     const cachedItem = getCachedProductDetail(item.id) || item;
     setActiveProduct(cachedItem);
     setProductQuantity(1);
@@ -159,6 +163,9 @@ export default function StorePage() {
 
     return matchesCategory && matchesQuery;
   });
+
+  const customBorderColor = settings.borderColor || "#FC7A00";
+  const hideBorders = Boolean(settings.hideBorders);
 
   return (
     <RouteGuard>
@@ -338,7 +345,12 @@ export default function StorePage() {
                 <motion.div
                   key={item.id}
                   whileTap={{ scale: 0.98 }}
-                  className="bg-white rounded-2xl border border-gray-150 p-3.5 flex flex-col justify-between space-y-3 shadow-xs hover:border-[#FC7A00] transition-all cursor-pointer group relative"
+                  style={{
+                    borderColor: hideBorders ? "transparent" : customBorderColor,
+                  }}
+                  className={`bg-white rounded-2xl p-3.5 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative border ${
+                    hideBorders ? "border-transparent" : ""
+                  }`}
                   onClick={() => handleOpenProductModal(item)}
                 >
                   <div className="space-y-2.5">
@@ -438,91 +450,110 @@ export default function StorePage() {
         <AnimatePresence>
           {activeProduct && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-white z-[100000] flex flex-col text-black overflow-y-auto"
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="fixed inset-0 bg-white z-[100001] flex flex-col text-black overflow-hidden"
             >
-              {/* Full Screen Header Bar */}
-              <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-gray-150 px-5 py-4 flex items-center justify-between z-10">
+              {/* Ultra Polished App Header Bar */}
+              <div className="sticky top-0 bg-white border-b border-gray-150 px-5 py-4 flex items-center justify-between z-10 shadow-3xs">
                 <button
                   type="button"
                   onClick={() => setActiveProduct(null)}
-                  className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-700 hover:text-black active:scale-90 transition-all cursor-pointer"
+                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
-                <h2 className="font-hanken font-bold text-sm uppercase tracking-wide text-gray-900 truncate max-w-[200px]">
-                  Product Overview
-                </h2>
+                <div className="text-center">
+                  <h2 className="font-hanken font-extrabold text-sm uppercase tracking-wide text-black truncate max-w-[200px]">
+                    {activeProduct.title}
+                  </h2>
+                  <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
+                    {activeProduct.category}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(true)}
-                  className="relative w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-800 cursor-pointer"
+                  className="relative w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-800 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
                   {totalCartItems > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border border-white">
+                    <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border border-white">
                       {totalCartItems}
                     </span>
                   )}
                 </button>
               </div>
 
-              {/* Full Screen Modal Content */}
-              <div className="p-5 max-w-md mx-auto w-full space-y-6 pb-32">
-                {/* Large Product Showcase Image */}
-                <div className="w-full h-64 rounded-3xl bg-gray-50 border border-gray-150 overflow-hidden relative flex items-center justify-center p-4">
+              {/* Full Screen Scrollable Showcase Body */}
+              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-6 custom-scrollbar pb-32">
+                {/* Hero Showcase Product Image Backdrop */}
+                <div className="w-full h-72 rounded-[28px] bg-gradient-to-b from-gray-50 to-gray-100/60 border border-gray-200 overflow-hidden relative flex items-center justify-center p-6 shadow-xs">
                   {activeProduct.imageUrl ? (
                     <Image
                       src={activeProduct.imageUrl}
                       alt={activeProduct.title}
                       fill
-                      className="object-contain p-2"
+                      className="object-contain p-3"
                       unoptimized
                     />
                   ) : (
-                    <span className="material-symbols-outlined text-[64px] text-gray-300">storefront</span>
+                    <span className="material-symbols-outlined text-[72px] text-gray-300">storefront</span>
                   )}
-                  <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-black/80 text-white backdrop-blur-xs">
-                    {activeProduct.category}
-                  </span>
-                  <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-black uppercase ${activeProduct.inStock ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+
+                  <div className="absolute top-4 left-4 flex gap-2">
+                    <span className="px-3 py-1 rounded-full text-[9.5px] font-black uppercase bg-black/80 text-white backdrop-blur-xs">
+                      {activeProduct.category}
+                    </span>
+                  </div>
+
+                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[9.5px] font-black uppercase ${
+                    activeProduct.inStock ? "bg-emerald-500 text-white shadow-xs" : "bg-red-500 text-white shadow-xs"
+                  }`}>
                     {activeProduct.inStock ? "In Stock" : "Out of Stock"}
                   </span>
                 </div>
 
-                {/* Product Meta */}
-                <div className="space-y-2">
-                  <h1 className="font-bodoni font-bold text-xl text-black leading-tight uppercase">
+                {/* Product Title & Price Badge */}
+                <div className="space-y-2 border-b border-gray-150 pb-4">
+                  <h1 className="font-bodoni font-bold text-2xl text-black leading-tight uppercase">
                     {activeProduct.title}
                   </h1>
-                  <p className="font-mono text-2xl font-black text-[#FC7A00]">
-                    ₦{activeProduct.price.toLocaleString()}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-2xl font-black text-[#FC7A00]">
+                      ₦{activeProduct.price.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full">
+                      Verified Genuine
+                    </span>
+                  </div>
                 </div>
 
-                {/* Description */}
-                <div className="space-y-2 p-4 bg-gray-50 border border-gray-150 rounded-2xl">
-                  <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider text-gray-500">
-                    Description & Specifications
-                  </h3>
+                {/* Description Box */}
+                <div className="space-y-2.5 p-4 bg-gray-50 border border-gray-150 rounded-2xl">
+                  <div className="flex items-center gap-1.5 text-gray-500">
+                    <span className="material-symbols-outlined text-[18px]">info</span>
+                    <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider">
+                      Product Description
+                    </h3>
+                  </div>
                   <p className="font-hanken text-xs text-gray-700 leading-relaxed font-medium">
-                    {activeProduct.description}
+                    {activeProduct.description || "Premium hardware product engineered with high reliability and full warranty support."}
                   </p>
                 </div>
 
-                {/* Quantity Control Selector */}
+                {/* Quantity Controls */}
                 <div className="space-y-2">
-                  <span className="font-hanken text-xs font-bold uppercase tracking-wider text-gray-500">
+                  <span className="font-hanken text-xs font-bold uppercase tracking-wider text-gray-500 block">
                     Select Quantity
                   </span>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 p-2 rounded-2xl w-fit">
                     <button
                       type="button"
                       onClick={() => setProductQuantity((q) => Math.max(1, q - 1))}
-                      className="w-11 h-11 rounded-xl border border-gray-300 bg-gray-100 font-bold text-lg flex items-center justify-center active:scale-90 cursor-pointer"
+                      className="w-10 h-10 rounded-xl border border-gray-300 bg-white font-bold text-lg flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
                     >
                       -
                     </button>
@@ -530,178 +561,185 @@ export default function StorePage() {
                     <button
                       type="button"
                       onClick={() => setProductQuantity((q) => q + 1)}
-                      className="w-11 h-11 rounded-xl border border-gray-300 bg-gray-100 font-bold text-lg flex items-center justify-center active:scale-90 cursor-pointer"
+                      className="w-10 h-10 rounded-xl border border-gray-300 bg-white font-bold text-lg flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
                     >
                       +
                     </button>
                   </div>
                 </div>
+              </div>
 
-                {/* Action Buttons */}
-                <div className="pt-4 border-t border-gray-150 space-y-3">
-                  <button
-                    type="button"
-                    disabled={!activeProduct.inStock}
-                    onClick={() => {
-                      handleAddToCart(activeProduct, productQuantity);
-                    }}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-                    <span>Add to Cart • ₦{(activeProduct.price * productQuantity).toLocaleString()}</span>
-                  </button>
+              {/* Fixed Bottom Action Bar */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-150 flex gap-2.5 shadow-lg z-20">
+                <button
+                  type="button"
+                  disabled={!activeProduct.inStock}
+                  onClick={() => {
+                    handleAddToCart(activeProduct, productQuantity);
+                  }}
+                  className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+                  <span>Add to Cart</span>
+                </button>
 
-                  <button
-                    type="button"
-                    disabled={!activeProduct.inStock}
-                    onClick={() => {
-                      handleAddToCart(activeProduct, productQuantity);
-                      setActiveProduct(null);
-                      setIsCartOpen(true);
-                    }}
-                    className="w-full py-3.5 bg-black hover:bg-gray-900 disabled:bg-gray-300 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">bolt</span>
-                    <span>Buy Now & Checkout</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={!activeProduct.inStock}
+                  onClick={() => {
+                    handleAddToCart(activeProduct, productQuantity);
+                    setActiveProduct(null);
+                    setIsCartOpen(true);
+                  }}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[18px]">bolt</span>
+                  <span>Buy Now • ₦{(activeProduct.price * productQuantity).toLocaleString()}</span>
+                </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Slide-out Cart Drawer Modal */}
+        {/* Full Screen Shopping Cart Modal (App-like UX overlay sitting above all modals) */}
         <AnimatePresence>
           {isCartOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsCartOpen(false)}
-                className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[99998]"
-              />
-
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 280 }}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 text-black max-h-[85vh] flex flex-col"
-              >
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-4 mx-auto flex-shrink-0" />
-
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4 flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[22px] text-[#FC7A00]">shopping_bag</span>
-                    <h3 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
-                      Your Shopping Cart
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsCartOpen(false)}
-                    className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] font-bold">close</span>
-                  </button>
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="fixed inset-0 bg-white z-[100002] flex flex-col text-black overflow-hidden"
+            >
+              {/* App-like Top Sticky Header Bar */}
+              <div className="sticky top-0 bg-white border-b border-gray-150 px-5 py-4 flex items-center justify-between z-10 shadow-3xs">
+                <button
+                  type="button"
+                  onClick={() => setIsCartOpen(false)}
+                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+                </button>
+                <div className="text-center">
+                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    Shopping Cart
+                  </h2>
+                  <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
+                    {totalCartItems} {totalCartItems === 1 ? "Item" : "Items"} Selected
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCartOpen(false)}
+                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
+                </button>
+              </div>
 
-                {/* Cart Items List */}
-                <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 custom-scrollbar">
-                  {cart.length === 0 ? (
-                    <div className="py-12 flex flex-col items-center text-center space-y-2">
+              {/* Scrollable Cart Items List */}
+              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-36">
+                {cart.length === 0 ? (
+                  <div className="py-20 flex flex-col items-center text-center space-y-3">
+                    <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
                       <span className="material-symbols-outlined text-[48px] text-gray-300">remove_shopping_cart</span>
-                      <p className="font-hanken font-bold text-xs text-gray-400 uppercase tracking-widest">
-                        Your cart is empty
-                      </p>
-                      <p className="font-hanken text-[11px] text-gray-400">Add products from the store to continue.</p>
                     </div>
-                  ) : (
-                    cart.map(({ product, quantity }) => (
-                      <div
-                        key={product.id}
-                        className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 rounded-xl border border-gray-200 bg-white overflow-hidden relative flex-shrink-0">
-                            {product.imageUrl ? (
-                              <Image src={product.imageUrl} alt={product.title} fill className="object-cover" unoptimized />
-                            ) : (
-                              <span className="material-symbols-outlined text-[24px] text-gray-400 p-2">storefront</span>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-extrabold text-xs uppercase text-black truncate">{product.title}</h4>
-                            <p className="font-mono font-bold text-xs text-[#FC7A00] mt-0.5">
-                              ₦{product.price.toLocaleString()}
-                            </p>
-                          </div>
+                    <h3 className="font-bodoni font-bold text-lg text-black">Your Cart is Empty</h3>
+                    <p className="font-hanken text-xs text-gray-400 max-w-xs leading-relaxed">
+                      Explore storefront hardware and gear to add items to your cart.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsCartOpen(false)}
+                      className="mt-2 px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-xs"
+                    >
+                      Browse Products
+                    </button>
+                  </div>
+                ) : (
+                  cart.map(({ product, quantity }) => (
+                    <div
+                      key={product.id}
+                      className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between gap-3 shadow-3xs"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-14 h-14 rounded-xl border border-gray-200 bg-white overflow-hidden relative flex-shrink-0">
+                          {product.imageUrl ? (
+                            <Image src={product.imageUrl} alt={product.title} fill className="object-cover" unoptimized />
+                          ) : (
+                            <span className="material-symbols-outlined text-[28px] text-gray-400 p-2">storefront</span>
+                          )}
                         </div>
-
-                        {/* Item Quantity Controls */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateCartQuantity(product.id, -1)}
-                            className="w-7 h-7 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer"
-                          >
-                            -
-                          </button>
-                          <span className="font-mono font-black text-xs w-4 text-center">{quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateCartQuantity(product.id, 1)}
-                            className="w-7 h-7 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer"
-                          >
-                            +
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFromCart(product.id)}
-                            className="p-1 text-gray-400 hover:text-red-500 transition-colors ml-1"
-                            title="Remove item"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
+                        <div className="min-w-0">
+                          <h4 className="font-extrabold text-xs uppercase text-black truncate">{product.title}</h4>
+                          <p className="font-mono font-bold text-xs text-[#FC7A00] mt-0.5">
+                            ₦{product.price.toLocaleString()}
+                          </p>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
 
-                {/* Cart Summary & Order Action */}
-                {cart.length > 0 && (
-                  <div className="pt-4 border-t border-gray-150 mt-4 space-y-3 flex-shrink-0">
-                    <div className="flex justify-between items-center text-xs font-bold">
-                      <span className="text-gray-500 uppercase tracking-wider">Subtotal ({totalCartItems} items)</span>
-                      <span className="font-mono text-base font-black text-black">₦{cartSubtotal.toLocaleString()}</span>
+                      {/* Item Quantity Controls */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCartQuantity(product.id, -1)}
+                          className="w-8 h-8 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                        >
+                          -
+                        </button>
+                        <span className="font-mono font-black text-xs w-4 text-center">{quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCartQuantity(product.id, 1)}
+                          className="w-8 h-8 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFromCart(product.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors ml-1 cursor-pointer"
+                          title="Remove item"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        toast.success("Redirecting order to VIP Support desk...");
-                        setIsCartOpen(false);
-                        window.location.href = "/support";
-                      }}
-                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">support_agent</span>
-                      <span>Checkout via VIP Desk</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => updateCart([])}
-                      className="w-full text-center text-[10px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider cursor-pointer transition-colors"
-                    >
-                      Clear Shopping Cart
-                    </button>
-                  </div>
+                  ))
                 )}
-              </motion.div>
-            </>
+              </div>
+
+              {/* Fixed Bottom Checkout Action Bar */}
+              {cart.length > 0 && (
+                <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-150 space-y-3 shadow-lg z-20 max-w-md mx-auto">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-gray-500 uppercase tracking-wider">Subtotal ({totalCartItems} items)</span>
+                    <span className="font-mono text-lg font-black text-black">₦{cartSubtotal.toLocaleString()}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.success("Redirecting order to VIP Support desk...");
+                      setIsCartOpen(false);
+                      window.location.href = "/support";
+                    }}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">support_agent</span>
+                    <span>Checkout via VIP Desk</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => updateCart([])}
+                    className="w-full text-center text-[10px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider cursor-pointer transition-colors"
+                  >
+                    Clear Shopping Cart
+                  </button>
+                </div>
+              )}
+            </motion.div>
           )}
         </AnimatePresence>
 
