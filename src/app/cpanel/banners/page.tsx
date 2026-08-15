@@ -85,6 +85,7 @@ export default function AdminBannersPage() {
   const [bannerHeightDesktop, setBannerHeightDesktop] = useState(config.bannerHeightDesktop || 220);
   const [bannerTransferPosition, setBannerTransferPosition] = useState<"top" | "bottom">(config.bannerTransferPosition || "top");
   const [bannerShowIndicators, setBannerShowIndicators] = useState(config.bannerShowIndicators !== false);
+  const [bannerMarginBottom, setBannerMarginBottom] = useState<number>(config.bannerMarginBottom ?? 24);
   const [isSavingDisplaySettings, setIsSavingDisplaySettings] = useState(false);
 
   // Per-slide edit modal state
@@ -105,6 +106,7 @@ export default function AdminBannersPage() {
     setBannerHeightDesktop(config.bannerHeightDesktop || 220);
     setBannerTransferPosition(config.bannerTransferPosition || "top");
     setBannerShowIndicators(config.bannerShowIndicators !== false);
+    setBannerMarginBottom(config.bannerMarginBottom ?? 24);
   }, [config]);
 
   const handleSaveDisplaySettings = async (e: React.FormEvent) => {
@@ -124,6 +126,7 @@ export default function AdminBannersPage() {
         bannerHeightDesktop: bannerHeightDesktop,
         bannerTransferPosition: bannerTransferPosition,
         bannerShowIndicators: bannerShowIndicators,
+        bannerMarginBottom: bannerMarginBottom,
       });
       toast.success("Banner display settings updated successfully!");
     } catch {
@@ -200,14 +203,6 @@ export default function AdminBannersPage() {
     setIsVerifyingPin(true);
 
     try {
-      const isMock = sessionStorage.getItem("mock") === "true";
-      if (isMock) {
-        setIsAdminUnlocked(true);
-        toast.success("Mock-Playtesting access granted to Banners!");
-        setIsVerifyingPin(false);
-        return;
-      }
-
       const res = await fetch("/api/admin/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -683,6 +678,31 @@ export default function AdminBannersPage() {
                 >
                   {bannerShowIndicators ? "Indicators Visible" : "Indicators Hidden"}
                 </button>
+              </div>
+
+              {/* Global Default Bottom Space / Margin Slider (0 - 100 px) */}
+              <div className="p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider">
+                    Global Bottom Space / Margin (0 - 100 px)
+                  </span>
+                  <span className="font-mono text-xs font-black text-indigo-600">
+                    {bannerMarginBottom} px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={bannerMarginBottom}
+                  onChange={(e) => setBannerMarginBottom(parseInt(e.target.value) || 0)}
+                  className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-gray-200 rounded-lg appearance-none"
+                />
+                <div className="flex justify-between text-[9px] font-bold text-gray-400">
+                  <span>0px (No Gap)</span>
+                  <span>24px (Default)</span>
+                  <span>100px (Large Gap)</span>
+                </div>
               </div>
 
               <button

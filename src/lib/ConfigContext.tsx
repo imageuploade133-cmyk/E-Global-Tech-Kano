@@ -35,6 +35,7 @@ export interface AppConfig {
   bannerHeightDesktop?: number;
   bannerTransferPosition?: "top" | "bottom";
   bannerShowIndicators?: boolean;
+  bannerMarginBottom?: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -68,6 +69,7 @@ const DEFAULT_CONFIG: AppConfig = {
   bannerHeightDesktop: 220,
   bannerTransferPosition: "top",
   bannerShowIndicators: true,
+  bannerMarginBottom: 24,
 };
 
 interface ConfigContextProps {

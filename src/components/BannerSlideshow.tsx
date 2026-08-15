@@ -116,7 +116,9 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
   const effectiveHeightMobile = activeSlide.mobileHeight || activeSlide.customHeight || heightMobile;
   const effectiveHeightDesktop = activeSlide.desktopHeight || activeSlide.customHeight || heightDesktop;
   const effectiveWidth = activeSlide.customWidth ? `${activeSlide.customWidth}px` : "100%";
-  const effectiveMarginBottom = activeSlide.marginBottom !== undefined && activeSlide.marginBottom !== null ? activeSlide.marginBottom : 24; // default mb-6 (24px)
+  const effectiveMarginBottom = activeSlide.marginBottom !== undefined && activeSlide.marginBottom !== null
+    ? activeSlide.marginBottom
+    : (config.bannerMarginBottom !== undefined ? config.bannerMarginBottom : 24);
   const isSlideCrop = activeSlide.isCrop !== false; // default true (cover)
 
   // To solve the "blinking" issue, we remove mode="wait" so old and new slides cross-transition simultaneously.

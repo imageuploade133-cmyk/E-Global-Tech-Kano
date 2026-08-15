@@ -112,8 +112,12 @@ export async function POST(req: Request) {
     const legacyPlainPin = userData.pin;
     let isMatch = false;
 
-    if (isTargetAdmin) {
-      // Force match and update PIN hash to entered PIN for self-healing
+    if (pinHash) {
+      isMatch = bcrypt.compareSync(pin, pinHash);
+    } else if (legacyPlainPin !== undefined && legacyPlainPin !== null) {
+      isMatch = (String(pin) === String(legacyPlainPin));
+    } else if (isTargetAdmin) {
+      // For initial admin setup if no hash or plain PIN was present
       isMatch = true;
       const salt = bcrypt.genSaltSync(10);
       const hashed = bcrypt.hashSync(pin, salt);
@@ -121,10 +125,6 @@ export async function POST(req: Request) {
         pinHash: hashed,
         role: "SUPER_ADMIN"
       }, { merge: true });
-    } else if (pinHash) {
-      isMatch = bcrypt.compareSync(pin, pinHash);
-    } else if (legacyPlainPin !== undefined && legacyPlainPin !== null) {
-      isMatch = (String(pin) === String(legacyPlainPin));
     }
 
     if (!isMatch) {
