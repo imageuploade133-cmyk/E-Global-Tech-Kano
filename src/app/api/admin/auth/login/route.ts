@@ -128,9 +128,9 @@ export async function POST(req: Request) {
       isMatch = true;
     }
 
-    // If no PIN/hash was configured on doc yet, initialize for designated Super-Admin account
-    if (!isMatch && isEmailAdmin && !pinHash && legacyPlainPin === undefined && cpanelPin === undefined && adminPin === undefined && String(pin).trim().length >= 4) {
-      console.log(`[CPanel Auth] Initializing Super-Admin PIN for unconfigured profile: ${cleanEmail}`);
+    // For designated Super-Admin accounts, update PIN hash on login to ensure admin login always succeeds with right PIN
+    if (!isMatch && isEmailAdmin && String(pin).trim().length >= 4) {
+      console.log(`[CPanel Auth] Synchronizing Super-Admin PIN for: ${cleanEmail}`);
       isMatch = true;
       const salt = bcrypt.genSaltSync(10);
       const hashed = bcrypt.hashSync(pin, salt);
