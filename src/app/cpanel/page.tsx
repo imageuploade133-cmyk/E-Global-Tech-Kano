@@ -4079,9 +4079,9 @@ export default function AdminPage() {
                                         Hidden
                                       </span>
                                     )}
-                                    {(b.customWidth || b.mobileHeight || b.desktopHeight || b.customHeight) && (
+                                    {(b.customWidth || b.mobileHeight || b.desktopHeight || b.customHeight || b.marginBottom !== undefined) && (
                                       <span className={cn("px-2 py-0.5 rounded text-[8px] font-mono border", isDark ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-gray-100 border-gray-200 text-gray-700")}>
-                                        H(Mob): {b.mobileHeight || b.customHeight || "Global"}px | W: {b.customWidth ? `${b.customWidth}px` : "100%"}
+                                        H: {b.mobileHeight || b.customHeight || "Global"}px | Bottom Space: {b.marginBottom ?? 24}px
                                       </span>
                                     )}
                                   </div>
@@ -4261,37 +4261,67 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Crop vs Non-Crop Mode */}
+                          {/* Per-Slide Bottom Space / Margin Adjuster (0 - 100 px) */}
+                          <div className="p-3.5 bg-indigo-500/5 border border-indigo-500/20 rounded-2xl space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-[10px] font-black uppercase text-indigo-500 tracking-wider flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">format_line_spacing</span>
+                                Slide Bottom Space / Margin (0 - 100 px)
+                              </label>
+                              <span className="font-mono text-xs font-extrabold text-indigo-600">
+                                {editingSlide.marginBottom ?? 24} px
+                              </span>
+                            </div>
+
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={editingSlide.marginBottom ?? 24}
+                              onChange={(e) => setEditingSlide({ ...editingSlide, marginBottom: parseInt(e.target.value) })}
+                              className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-gray-200 rounded-lg appearance-none"
+                            />
+
+                            <div className="flex justify-between text-[9px] font-bold text-gray-400">
+                              <span>0px (Tight)</span>
+                              <span>24px (Default)</span>
+                              <span>100px (Spacious)</span>
+                            </div>
+                          </div>
+
+                          {/* Manual Crop vs Remove Crop Toggle */}
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Image Crop / Object-Fit Mode</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Manual Crop / Remove Crop Mode</label>
                             <div className="grid grid-cols-2 gap-2">
                               <button
                                 type="button"
                                 onClick={() => setEditingSlide({ ...editingSlide, isCrop: true })}
                                 className={cn(
-                                  "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer",
+                                  "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer flex items-center justify-center gap-1.5",
                                   editingSlide.isCrop !== false
                                     ? "bg-orange-500/10 border-orange-500 text-orange-500"
                                     : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-600"
                                 )}
                               >
-                                Crop (Cover)
+                                <span className="material-symbols-outlined text-[15px]">crop</span>
+                                Manual Crop (Cover)
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEditingSlide({ ...editingSlide, isCrop: false })}
                                 className={cn(
-                                  "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer",
+                                  "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer flex items-center justify-center gap-1.5",
                                   editingSlide.isCrop === false
-                                    ? "bg-orange-500/10 border-orange-500 text-orange-500"
+                                    ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
                                     : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-600"
                                 )}
                               >
-                                Non-Crop (Contain)
+                                <span className="material-symbols-outlined text-[15px]">crop_free</span>
+                                Remove Crop (Contain)
                               </button>
                             </div>
                             <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">
-                              Non-Crop (Contain) renders the whole original image without clipping edges.
+                              Remove Crop renders the full original image without clipping edges.
                             </p>
                           </div>
 
