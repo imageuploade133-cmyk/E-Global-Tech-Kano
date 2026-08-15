@@ -16,6 +16,9 @@ export async function GET(req: Request) {
       banners = banners.filter((b: any) => b.targetPage === "all" || b.targetPage === page);
     }
 
+    // Filter out hidden slides for public consumption
+    banners = banners.filter((b: any) => b.isHidden !== true);
+
     return NextResponse.json({ success: true, banners });
   } catch (err: any) {
     console.error("[Public Banners GET Exception]:", err.message);
