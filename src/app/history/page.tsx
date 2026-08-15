@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 import { TransactionReceipt, Transaction } from "@/components/wallet/TransactionReceipt";
+import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 
@@ -28,7 +29,7 @@ export default function HistoryPage() {
   const { userData, user } = useAuth();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeCategory, setActiveCategory] = useState<"all" | "deposit" | "transfer" | "bills" | "card">("all");
+  const [activeCategory, setActiveCategory] = useState<"all" | "deposit" | "transfer" | "bills" | "swap" | "card">("all");
   const [selectedCurrencyFilter, setSelectedCurrencyFilter] = useState<"ALL" | "NGN" | "USD">("ALL");
   const hasPushedState = React.useRef(false);
 
@@ -176,10 +177,13 @@ export default function HistoryPage() {
 
   // Map category strings back to filters
   const getCategoryFromTx = (tx: Transaction) => {
-    if (tx.type === "DEPOSIT" || tx.type === "CASHOUT") return "deposit";
-    if (tx.type === "TRANSFER") return "transfer";
-    if (tx.type === "BILL_PAYMENT" || tx.type === "AIRTIME" || tx.type === "DATA" || tx.type === "BILLS") return "bills";
-    if (tx.type === "CARD_FUND") return "card";
+    const t = (tx.type || "").toUpperCase();
+    const d = (tx.description || "").toLowerCase();
+    if (t === "DEPOSIT" || t === "CASHOUT") return "deposit";
+    if (t === "TRANSFER" || t === "WITHDRAWAL") return "transfer";
+    if (t === "BILL_PAYMENT" || t === "AIRTIME" || t === "DATA" || t === "BILLS" || t === "CABLE" || t === "ELECTRICITY" || d.includes("airtime") || d.includes("data")) return "bills";
+    if (t === "SWAP" || t === "CURRENCY_SWAP" || d.includes("swap") || d.includes("exchange")) return "swap";
+    if (t === "CARD_FUND" || t === "CARD") return "card";
     return "all";
   };
 
@@ -250,6 +254,7 @@ export default function HistoryPage() {
               { id: "deposit" as const, label: "Deposits" },
               { id: "transfer" as const, label: "Transfers" },
               { id: "bills" as const, label: "Bills Pay" },
+              { id: "swap" as const, label: "Swaps" },
               { id: "card" as const, label: "Virtual Cards" }
             ].map((cat) => (
               <button
@@ -344,21 +349,13 @@ export default function HistoryPage() {
                       />
 
                       <div className="flex items-center gap-3 min-w-0">
-                        {/* Interactive type indicator badge icons */}
-                        <div
-                          className={cn(
-                            "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                            isCredit ? "bg-emerald-50 text-emerald-600" : "bg-error/5 text-error"
-                          )}
-                        >
-                          <span className="material-symbols-outlined text-[20px]">
-                            {tx.type === "DEPOSIT" && "south_west"}
-                            {(tx.type === "TRANSFER" || tx.type === "WITHDRAWAL") && "north_east"}
-                            {(tx.type === "BILL_PAYMENT" || tx.type === "AIRTIME" || tx.type === "DATA" || tx.type === "BILLS") && "receipt_long"}
-                            {tx.type === "CARD_FUND" && "credit_card"}
-                            {tx.type === "CASHOUT" && "atm"}
-                          </span>
-                        </div>
+                        <TransactionIcon
+                          type={tx.type}
+                          description={tx.description}
+                          recipientName={tx.recipientName}
+                          bankName={tx.bankName}
+                          className="w-10 h-10"
+                        />
 
                         <div className="min-w-0">
                           <p className="font-hanken font-extrabold text-xs text-black leading-tight truncate">
