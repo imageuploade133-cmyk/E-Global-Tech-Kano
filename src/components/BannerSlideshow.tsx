@@ -15,6 +15,8 @@ interface BannerSlide {
   link?: string;
   customWidth?: number | null;
   customHeight?: number | null;
+  mobileHeight?: number | null;
+  desktopHeight?: number | null;
   isCrop?: boolean;
   isHidden?: boolean;
 }
@@ -109,9 +111,9 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
     ? { border: `1px solid ${borderColor}` }
     : { border: "none" };
 
-  // Determine slide container height and mode overrides
-  const effectiveHeightMobile = activeSlide.customHeight || heightMobile;
-  const effectiveHeightDesktop = activeSlide.customHeight || heightDesktop;
+  // Determine slide container height and mode overrides (per-slide setting takes precedence over global fallback)
+  const effectiveHeightMobile = activeSlide.mobileHeight || activeSlide.customHeight || heightMobile;
+  const effectiveHeightDesktop = activeSlide.desktopHeight || activeSlide.customHeight || heightDesktop;
   const effectiveWidth = activeSlide.customWidth ? `${activeSlide.customWidth}px` : "100%";
   const isSlideCrop = activeSlide.isCrop !== false; // default true (cover)
 
