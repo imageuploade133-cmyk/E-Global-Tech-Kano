@@ -47,12 +47,34 @@ export default function RootLayout({
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           rel="preload"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block"
           as="style"
         />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                if ('fonts' in document) {
+                  var timeout = setTimeout(function() {
+                    document.documentElement.classList.add('material-symbols-loaded');
+                  }, 2000);
+                  document.fonts.load('1em "Material Symbols Outlined"').then(function() {
+                    clearTimeout(timeout);
+                    document.documentElement.classList.add('material-symbols-loaded');
+                  }).catch(function() {
+                    clearTimeout(timeout);
+                    document.documentElement.classList.add('material-symbols-loaded');
+                  });
+                } else {
+                  document.documentElement.classList.add('material-symbols-loaded');
+                }
+              })();
+            `,
+          }}
         />
       </head>
       <body

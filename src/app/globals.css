@@ -68,6 +68,38 @@
   --spacing-margin-mobile: clamp(10px, 4vw, 16px);
 }
 
+/* Material Symbols Icon System & FOUT Prevention */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'liga';
+}
+
+/* Prevent icon ligature string (e.g. "cancel", "close", "check_circle") from flashing as raw text before font finishes loading */
+html:not(.material-symbols-loaded) .material-symbols-outlined {
+  color: transparent !important;
+  text-shadow: none !important;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+html.material-symbols-loaded .material-symbols-outlined {
+  opacity: 1;
+}
+
 @layer base {
   /* Hide scrollbars globally across all browsers, Android WebViews, and Safari iOS */
   * {
