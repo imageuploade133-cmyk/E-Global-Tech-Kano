@@ -202,7 +202,12 @@ export default function AdminPage() {
   const [bannerHeightMobile, setBannerHeightMobile] = useState(config.bannerHeightMobile || 150);
   const [bannerHeightDesktop, setBannerHeightDesktop] = useState(config.bannerHeightDesktop || 220);
   const [bannerTransferPosition, setBannerTransferPosition] = useState<"top" | "bottom">(config.bannerTransferPosition || "top");
+  const [bannerShowIndicators, setBannerShowIndicators] = useState(config.bannerShowIndicators !== false);
   const [isSavingDisplaySettings, setIsSavingDisplaySettings] = useState(false);
+
+  // Per-slide edit modal state inside inline Cpanel tab
+  const [editingSlide, setEditingSlide] = useState<any | null>(null);
+  const [isUpdatingSlide, setIsUpdatingSlide] = useState(false);
 
   // Sync customize state with config when config updates
   useEffect(() => {
@@ -217,6 +222,7 @@ export default function AdminPage() {
     setBannerHeightMobile(config.bannerHeightMobile || 150);
     setBannerHeightDesktop(config.bannerHeightDesktop || 220);
     setBannerTransferPosition(config.bannerTransferPosition || "top");
+    setBannerShowIndicators(config.bannerShowIndicators !== false);
   }, [config]);
 
   const handleSaveDisplaySettings = async (e: React.FormEvent) => {
@@ -235,6 +241,7 @@ export default function AdminPage() {
         bannerHeightMobile: bannerHeightMobile,
         bannerHeightDesktop: bannerHeightDesktop,
         bannerTransferPosition: bannerTransferPosition,
+        bannerShowIndicators: bannerShowIndicators,
       });
       toast.success("Banner display settings updated successfully!");
     } catch {
@@ -780,6 +787,55 @@ export default function AdminPage() {
       toast.error("API connection error while saving banner.");
     } finally {
       setIsSavingBanner(false);
+    }
+  };
+
+  const handleUpdateSlideSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSlide) return;
+
+    setIsUpdatingSlide(true);
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          id: editingSlide.id,
+          imageUrl: editingSlide.imageUrl,
+          title: editingSlide.title,
+          description: editingSlide.description,
+          targetPage: editingSlide.targetPage,
+          link: editingSlide.link,
+          customWidth: editingSlide.customWidth,
+          customHeight: editingSlide.customHeight,
+          mobileHeight: editingSlide.mobileHeight,
+          desktopHeight: editingSlide.desktopHeight,
+          isCrop: editingSlide.isCrop,
+          isHidden: editingSlide.isHidden,
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Slide customizations saved successfully!");
+        setEditingSlide(null);
+        fetchBanners();
+      } else {
+        toast.error(data.error || "Failed to update slide customizations.");
+      }
+    } catch {
+      toast.error("API connection error while updating slide.");
+    } finally {
+      setIsUpdatingSlide(false);
     }
   };
 
@@ -3822,6 +3878,23 @@ export default function AdminPage() {
                           </select>
                         </div>
 
+                        {/* Hide Slide Indicators Toggle */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Slide Indicators / Dots</span>
+                          <button
+                            type="button"
+                            onClick={() => setBannerShowIndicators(!bannerShowIndicators)}
+                            className={cn(
+                              "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
+                              bannerShowIndicators
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                                : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-700"
+                            )}
+                          >
+                            {bannerShowIndicators ? "Indicators Visible" : "Indicators Hidden"}
+                          </button>
+                        </div>
+
                         <button
                           type="submit"
                           disabled={isSavingDisplaySettings}
@@ -3998,18 +4071,41 @@ export default function AdminPage() {
                                         Url: {b.link}
                                       </span>
                                     )}
+                                    <span className={cn("px-2 py-0.5 rounded text-[8px] font-bold uppercase border", b.isCrop !== false ? "bg-blue-500/10 border-blue-500/20 text-blue-500" : "bg-amber-500/10 border-amber-500/20 text-amber-500")}>
+                                      {b.isCrop !== false ? "Cropped (Cover)" : "Non-Crop (Contain)"}
+                                    </span>
+                                    {b.isHidden && (
+                                      <span className="px-2 py-0.5 rounded text-[8px] font-bold uppercase border bg-red-500/10 border-red-500/20 text-red-500">
+                                        Hidden
+                                      </span>
+                                    )}
+                                    {(b.customWidth || b.mobileHeight || b.desktopHeight || b.customHeight) && (
+                                      <span className={cn("px-2 py-0.5 rounded text-[8px] font-mono border", isDark ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-gray-100 border-gray-200 text-gray-700")}>
+                                        H(Mob): {b.mobileHeight || b.customHeight || "Global"}px | W: {b.customWidth ? `${b.customWidth}px` : "100%"}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Delete trigger */}
-                              <button
-                                onClick={() => handleDeleteBanner(b.id)}
-                                className={cn("px-3.5 h-10 rounded-xl font-bold text-xs uppercase border tracking-wider transition-all flex items-center gap-1.5 cursor-pointer", isDark ? "bg-gray-850 border-gray-700 text-red-400 hover:bg-red-500/10 hover:border-red-500/30" : "bg-white border-gray-200 text-red-600 hover:bg-red-50 hover:border-red-100")}
-                              >
-                                <span className="material-symbols-outlined text-[16px]">delete</span>
-                                <span>Remove</span>
-                              </button>
+                              {/* Actions */}
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <button
+                                  onClick={() => setEditingSlide(b)}
+                                  className={cn("px-3.5 h-10 rounded-xl font-bold text-xs uppercase border tracking-wider transition-all flex items-center gap-1.5 cursor-pointer", isDark ? "bg-gray-850 border-gray-700 text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/30" : "bg-white border-gray-200 text-orange-600 hover:bg-orange-50 hover:border-orange-100")}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                                  <span>Customize</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleDeleteBanner(b.id)}
+                                  className={cn("px-3.5 h-10 rounded-xl font-bold text-xs uppercase border tracking-wider transition-all flex items-center gap-1.5 cursor-pointer", isDark ? "bg-gray-850 border-gray-700 text-red-400 hover:bg-red-500/10 hover:border-red-500/30" : "bg-white border-gray-200 text-red-600 hover:bg-red-50 hover:border-red-100")}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                                  <span>Remove</span>
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -4017,6 +4113,220 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Per-Slide Customizer Modal Drawer */}
+                <AnimatePresence>
+                  {editingSlide && (
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setEditingSlide(null)}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+                      />
+
+                      <motion.div
+                        initial={{ y: "100%" }}
+                        animate={{ y: 0 }}
+                        exit={{ y: "100%" }}
+                        transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+                        className={cn("fixed bottom-0 left-0 right-0 max-w-lg mx-auto rounded-t-[32px] z-[99999] p-6 pb-8 shadow-2xl border-t overflow-y-auto max-h-[90vh] no-scrollbar", isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900")}
+                      >
+                        <div className="w-12 h-1.5 bg-gray-300 rounded-full mb-5 mx-auto" />
+
+                        <div className="flex items-center justify-between border-b pb-4 mb-5 border-gray-200/50">
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-orange-500">tune</span>
+                            <h3 className="font-extrabold text-base">Customize Slide Parameters</h3>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingSlide(null)}
+                            className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                          </button>
+                        </div>
+
+                        <form onSubmit={handleUpdateSlideSave} className="space-y-4 text-left">
+                          {/* Image Preview & URL */}
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Image URL</label>
+                            <input
+                              type="text"
+                              required
+                              value={editingSlide.imageUrl}
+                              onChange={(e) => setEditingSlide({ ...editingSlide, imageUrl: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+
+                          {/* Title & Target Page */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Title Caption</label>
+                              <input
+                                type="text"
+                                value={editingSlide.title || ""}
+                                onChange={(e) => setEditingSlide({ ...editingSlide, title: e.target.value })}
+                                className={inputClass}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Target Page</label>
+                              <select
+                                value={editingSlide.targetPage}
+                                onChange={(e) => setEditingSlide({ ...editingSlide, targetPage: e.target.value as any })}
+                                className={cn(inputClass, "cursor-pointer font-bold")}
+                              >
+                                <option value="all">All Pages</option>
+                                <option value="bills">Bills</option>
+                                <option value="investment">Investment</option>
+                                <option value="referral">Referral</option>
+                                <option value="transfer">Transfer</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Description</label>
+                            <input
+                              type="text"
+                              value={editingSlide.description || ""}
+                              onChange={(e) => setEditingSlide({ ...editingSlide, description: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
+                            <input
+                              type="text"
+                              value={editingSlide.link || ""}
+                              onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+
+                          {/* Dedicated Per-Slide Height Customization (Mobile & Desktop) */}
+                          <div className="p-3.5 bg-orange-500/5 border border-orange-500/20 rounded-2xl space-y-3">
+                            <p className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">stay_current_portrait</span>
+                              Per-Slide Mobile Height & Width (Overriding Global Defaults)
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Mobile Height (10 - 500 px)</label>
+                                <input
+                                  type="number"
+                                  min={10}
+                                  max={600}
+                                  placeholder={`Global (${config.bannerHeightMobile || 150}px)`}
+                                  value={editingSlide.mobileHeight ?? editingSlide.customHeight ?? ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value ? parseInt(e.target.value) : null;
+                                    setEditingSlide({ ...editingSlide, mobileHeight: val, customHeight: val });
+                                  }}
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Desktop Height (px)</label>
+                                <input
+                                  type="number"
+                                  min={50}
+                                  max={800}
+                                  placeholder={`Global (${config.bannerHeightDesktop || 220}px)`}
+                                  value={editingSlide.desktopHeight ?? ""}
+                                  onChange={(e) => setEditingSlide({ ...editingSlide, desktopHeight: e.target.value ? parseInt(e.target.value) : null })}
+                                  className={inputClass}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Container Width (px / blank = 100% full width)</label>
+                              <input
+                                type="number"
+                                min={10}
+                                max={1200}
+                                placeholder="Full Width (100%)"
+                                value={editingSlide.customWidth ?? ""}
+                                onChange={(e) => setEditingSlide({ ...editingSlide, customWidth: e.target.value ? parseInt(e.target.value) : null })}
+                                className={inputClass}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Crop vs Non-Crop Mode */}
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Image Crop / Object-Fit Mode</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingSlide({ ...editingSlide, isCrop: true })}
+                                className={cn(
+                                  "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer",
+                                  editingSlide.isCrop !== false
+                                    ? "bg-orange-500/10 border-orange-500 text-orange-500"
+                                    : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-600"
+                                )}
+                              >
+                                Crop (Cover)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSlide({ ...editingSlide, isCrop: false })}
+                                className={cn(
+                                  "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer",
+                                  editingSlide.isCrop === false
+                                    ? "bg-orange-500/10 border-orange-500 text-orange-500"
+                                    : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-600"
+                                )}
+                              >
+                                Non-Crop (Contain)
+                              </button>
+                            </div>
+                            <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">
+                              Non-Crop (Contain) renders the whole original image without clipping edges.
+                            </p>
+                          </div>
+
+                          {/* Hide Slide Toggle */}
+                          <div className="flex items-center justify-between p-3.5 bg-gray-50/50 border rounded-xl border-gray-200/50">
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-wider">Hide Slide</p>
+                              <p className="text-[10px] text-gray-400 font-semibold">Temporarily disable slide without deleting</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setEditingSlide({ ...editingSlide, isHidden: !editingSlide.isHidden })}
+                              className={cn(
+                                "px-3.5 py-1.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer",
+                                editingSlide.isHidden
+                                  ? "bg-rose-500/10 border-rose-500/30 text-rose-500"
+                                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                              )}
+                            >
+                              {editingSlide.isHidden ? "Hidden" : "Visible"}
+                            </button>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isUpdatingSlide}
+                            className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                          >
+                            {isUpdatingSlide ? <ButtonSpinner /> : "Save Customizations"}
+                          </button>
+                        </form>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
