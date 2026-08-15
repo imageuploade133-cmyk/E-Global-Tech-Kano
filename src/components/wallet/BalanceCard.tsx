@@ -1053,7 +1053,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         }
       }
 
-      const res = await fetch("/api/flutterwave/banks", {
+      const res = await fetch("/api/banks", {
         headers: {
           "Authorization": `Bearer ${idToken}`,
         },
