@@ -55,22 +55,57 @@ export async function POST(req: Request) {
 
     const now = new Date().toISOString();
 
-    if (action === "add_item") {
+    if (action === "add_item" || action === "edit_item") {
       if (!item || !item.title) {
         return NextResponse.json({ error: "Item title is required." }, { status: 400 });
       }
-      const newItem = {
-        id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        title: item.title.trim(),
-        description: (item.description || "").trim(),
-        price: Number(item.price) || 0,
-        category: (item.category || "General").trim(),
-        imageUrl: (item.imageUrl || "").trim(),
-        inStock: item.inStock !== false,
-        createdAt: now,
-        updatedAt: now,
-      };
-      items.unshift(newItem);
+
+      const imagesArray: string[] = Array.isArray(item.images)
+        ? item.images.map((img: string) => String(img).trim()).filter(Boolean)
+        : (item.imageUrl ? [String(item.imageUrl).trim()] : []);
+
+      const primaryImg = item.coverImageUrl
+        ? String(item.coverImageUrl).trim()
+        : (imagesArray[0] || (item.imageUrl ? String(item.imageUrl).trim() : ""));
+
+      if (action === "edit_item" && item.id) {
+        items = items.map((i: any) => {
+          if (i.id === item.id) {
+            return {
+              ...i,
+              title: item.title.trim(),
+              description: (item.description || "").trim(),
+              price: Number(item.price) || 0,
+              category: (item.category || "General").trim(),
+              imageUrl: primaryImg,
+              images: imagesArray,
+              coverImageUrl: primaryImg,
+              videoUrl: (item.videoUrl || "").trim(),
+              autoSlide: Boolean(item.autoSlide),
+              inStock: item.inStock !== false,
+              updatedAt: now,
+            };
+          }
+          return i;
+        });
+      } else {
+        const newItem = {
+          id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          title: item.title.trim(),
+          description: (item.description || "").trim(),
+          price: Number(item.price) || 0,
+          category: (item.category || "General").trim(),
+          imageUrl: primaryImg,
+          images: imagesArray,
+          coverImageUrl: primaryImg,
+          videoUrl: (item.videoUrl || "").trim(),
+          autoSlide: Boolean(item.autoSlide),
+          inStock: item.inStock !== false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        items.unshift(newItem);
+      }
     } else if (action === "delete_item") {
       if (!itemId) {
         return NextResponse.json({ error: "itemId is required for deletion." }, { status: 400 });

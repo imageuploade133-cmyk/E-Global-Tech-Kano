@@ -39,9 +39,104 @@ export default function StorePage() {
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
-  // Full screen product modal state
+  // Full screen product modal state & gallery slider index
   const [activeProduct, setActiveProduct] = useState<StoreItem | null>(null);
   const [productQuantity, setProductQuantity] = useState(1);
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
+
+  // Recently Viewed products state
+  const [recentlyViewed, setRecentlyViewed] = useState<StoreItem[]>([]);
+
+  // Load recently viewed products from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("e_tech_recently_viewed");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setRecentlyViewed(parsed);
+          }
+        }
+      } catch {
+        // Ignore JSON parse errors
+      }
+    }
+  }, []);
+
+  // Track product view in recently viewed list
+  const trackRecentlyViewed = (product: StoreItem) => {
+    const filtered = recentlyViewed.filter((p) => p.id !== product.id);
+    const updated = [product, ...filtered].slice(0, 10);
+    setRecentlyViewed(updated);
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("e_tech_recently_viewed", JSON.stringify(updated));
+      } catch {
+        // Ignore storage write errors
+      }
+    }
+  };
+
+  // Helper to extract gallery images for product
+  const getProductGallery = (item: StoreItem): string[] => {
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      return item.images;
+    }
+    if (item.imageUrl) {
+      return [item.imageUrl];
+    }
+    return [];
+  };
+
+  // Auto slide gallery images if autoSlide is ON
+  useEffect(() => {
+    if (!activeProduct) return;
+    const gallery = getProductGallery(activeProduct);
+    const totalMedia = gallery.length + (activeProduct.videoUrl ? 1 : 0);
+    if (totalMedia <= 1 || activeProduct.autoSlide === false) return;
+
+    const interval = setInterval(() => {
+      setSelectedGalleryIndex((prev) => (prev + 1) % totalMedia);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [activeProduct]);
+
+  // Helper to format YouTube or video embed URL
+  const renderVideoEmbed = (url: string) => {
+    if (!url) return null;
+    let embedUrl = url;
+
+    if (url.includes("youtube.com/watch?v=")) {
+      const videoId = url.split("v=")[1]?.split("&")[0];
+      if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0`;
+    } else if (url.includes("youtu.be/")) {
+      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
+      if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0`;
+    }
+
+    if (embedUrl.includes("youtube.com/embed/")) {
+      return (
+        <iframe
+          src={embedUrl}
+          title="Product Video"
+          className="w-full h-full rounded-2xl border border-gray-200"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      );
+    }
+
+    return (
+      <video
+        src={url}
+        controls
+        className="w-full h-full object-cover rounded-2xl border border-gray-200"
+      />
+    );
+  };
 
   // Full screen Cart modal state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -121,8 +216,10 @@ export default function StorePage() {
   // Open Full Screen Product Modal with zero re-reads if cached
   const handleOpenProductModal = (item: StoreItem) => {
     const cachedItem = getCachedProductDetail(item.id) || item;
+    setSelectedGalleryIndex(0);
     setActiveProduct(cachedItem);
     setProductQuantity(1);
+    trackRecentlyViewed(cachedItem);
   };
 
   // Cart operations
@@ -407,6 +504,56 @@ export default function StorePage() {
             })}
           </div>
 
+          {/* Recently Viewed Products Horizontal Scroll Section */}
+          {recentlyViewed.length > 0 && (
+            <div className="mb-5 space-y-2.5">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">history</span>
+                  <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider text-black">
+                    Recently Viewed
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecentlyViewed([]);
+                    if (typeof window !== "undefined") localStorage.removeItem("e_tech_recently_viewed");
+                  }}
+                  className="text-[9.5px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider"
+                >
+                  Clear History
+                </button>
+              </div>
+
+              <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 select-none">
+                {recentlyViewed.map((rv) => (
+                  <div
+                    key={rv.id}
+                    onClick={() => handleOpenProductModal(rv)}
+                    className="w-36 flex-shrink-0 bg-white border border-gray-200 hover:border-[#FC7A00] rounded-2xl p-2.5 space-y-2 cursor-pointer transition-all shadow-3xs"
+                  >
+                    <div className="w-full h-24 rounded-xl bg-gray-50 border border-gray-100 relative overflow-hidden flex items-center justify-center">
+                      {rv.imageUrl ? (
+                        <img src={rv.imageUrl} alt={rv.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="material-symbols-outlined text-[24px] text-gray-300">storefront</span>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-hanken font-bold text-[11px] text-black uppercase line-clamp-1 leading-tight">
+                        {rv.title}
+                      </h4>
+                      <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
+                        ₦{rv.price.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Storefront Products Showcase */}
           {isLoading ? (
             /* Skeleton Shimmer Loading Grid */
@@ -599,32 +746,79 @@ export default function StorePage() {
 
               {/* Full Screen Scrollable Showcase Body */}
               <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-6 custom-scrollbar pb-32">
-                {/* Hero Showcase Product Image Backdrop */}
-                <div className="w-full h-72 rounded-[28px] bg-gradient-to-b from-gray-50 to-gray-100/60 border border-gray-200 overflow-hidden relative flex items-center justify-center p-6 shadow-xs">
-                  {activeProduct.imageUrl ? (
-                    <Image
-                      src={activeProduct.imageUrl}
-                      alt={activeProduct.title}
-                      fill
-                      className="object-contain p-3"
-                      unoptimized
-                    />
-                  ) : (
-                    <span className="material-symbols-outlined text-[72px] text-gray-300">storefront</span>
-                  )}
+                {/* Hero Showcase Product Image/Video Backdrop */}
+                {(() => {
+                  const gallery = getProductGallery(activeProduct);
+                  const hasVideo = Boolean(activeProduct.videoUrl);
+                  const isShowingVideo = hasVideo && selectedGalleryIndex === gallery.length;
+                  const activeImgUrl = gallery[selectedGalleryIndex] || gallery[0] || activeProduct.imageUrl;
 
-                  <div className="absolute top-4 left-4 flex gap-2">
-                    <span className="px-3 py-1 rounded-full text-[9.5px] font-black uppercase bg-black/80 text-white backdrop-blur-xs">
-                      {activeProduct.category}
-                    </span>
-                  </div>
+                  return (
+                    <div className="space-y-3">
+                      <div className="w-full h-72 rounded-[28px] bg-gradient-to-b from-gray-50 to-gray-100/60 border border-gray-200 overflow-hidden relative flex items-center justify-center p-3 shadow-xs">
+                        {isShowingVideo ? (
+                          renderVideoEmbed(activeProduct.videoUrl!)
+                        ) : activeImgUrl ? (
+                          <Image
+                            src={activeImgUrl}
+                            alt={activeProduct.title}
+                            fill
+                            className="object-contain p-3"
+                            unoptimized
+                          />
+                        ) : (
+                          <span className="material-symbols-outlined text-[72px] text-gray-300">storefront</span>
+                        )}
 
-                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[9.5px] font-black uppercase ${
-                    activeProduct.inStock ? "bg-emerald-500 text-white shadow-xs" : "bg-red-500 text-white shadow-xs"
-                  }`}>
-                    {activeProduct.inStock ? "In Stock" : "Out of Stock"}
-                  </span>
-                </div>
+                        <div className="absolute top-4 left-4 flex gap-2 z-10">
+                          <span className="px-3 py-1 rounded-full text-[9.5px] font-black uppercase bg-black/80 text-white backdrop-blur-xs">
+                            {activeProduct.category}
+                          </span>
+                        </div>
+
+                        <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[9.5px] font-black uppercase z-10 ${
+                          activeProduct.inStock ? "bg-emerald-500 text-white shadow-xs" : "bg-red-500 text-white shadow-xs"
+                        }`}>
+                          {activeProduct.inStock ? "In Stock" : "Out of Stock"}
+                        </span>
+                      </div>
+
+                      {/* Horizontal Multi-Image & Video Thumbnail Carousel */}
+                      {(gallery.length > 1 || hasVideo) && (
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 select-none">
+                          {gallery.map((img, idx) => {
+                            const isSelected = !isShowingVideo && selectedGalleryIndex === idx;
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setSelectedGalleryIndex(idx)}
+                                className={`w-14 h-14 rounded-xl border-2 overflow-hidden flex-shrink-0 relative transition-all cursor-pointer ${
+                                  isSelected ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/30 scale-105" : "border-gray-200 opacity-70 hover:opacity-100"
+                                }`}
+                              >
+                                <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
+                              </button>
+                            );
+                          })}
+
+                          {hasVideo && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGalleryIndex(gallery.length)}
+                              className={`w-14 h-14 rounded-xl border-2 overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-black text-white flex flex-col items-center justify-center ${
+                                isShowingVideo ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/30 scale-105" : "border-gray-200 opacity-70 hover:opacity-100"
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">play_circle</span>
+                              <span className="text-[7.5px] font-black uppercase tracking-wider">Video</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Product Title & Price Badge */}
                 <div className="space-y-2 border-b border-gray-150 pb-4">
@@ -677,6 +871,53 @@ export default function StorePage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Products You May Like (Recommended Products Horizontal Scroll) */}
+                {(() => {
+                  const recommended = items.filter(
+                    (i) => i.id !== activeProduct.id && i.category.toLowerCase() === activeProduct.category.toLowerCase()
+                  );
+                  const displayRecs = recommended.length > 0 ? recommended : items.filter((i) => i.id !== activeProduct.id).slice(0, 6);
+
+                  if (displayRecs.length === 0) return null;
+
+                  return (
+                    <div className="space-y-3 border-t border-gray-150 pt-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider text-black">
+                          Products You May Like
+                        </h3>
+                        <span className="text-[10px] font-bold text-[#FC7A00] uppercase">Recommended</span>
+                      </div>
+
+                      <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 select-none">
+                        {displayRecs.map((rec) => (
+                          <div
+                            key={rec.id}
+                            onClick={() => handleOpenProductModal(rec)}
+                            className="w-36 flex-shrink-0 bg-white border border-gray-200 rounded-2xl p-2.5 space-y-2 cursor-pointer hover:border-[#FC7A00] transition-all shadow-3xs"
+                          >
+                            <div className="w-full h-24 rounded-xl bg-gray-50 border border-gray-100 relative overflow-hidden flex items-center justify-center">
+                              {rec.imageUrl ? (
+                                <img src={rec.imageUrl} alt={rec.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="material-symbols-outlined text-[24px] text-gray-300">storefront</span>
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-hanken font-bold text-[11px] text-black uppercase line-clamp-1 leading-tight">
+                                {rec.title}
+                              </h4>
+                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
+                                ₦{rec.price.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Fixed Bottom Action Bar */}

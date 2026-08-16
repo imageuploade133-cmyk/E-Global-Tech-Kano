@@ -861,6 +861,15 @@ export default function GenericBillPage() {
                 </p>
               </div>
             </div>
+
+            <a
+              href="/bills/history"
+              className="px-3 py-1.5 rounded-xl border border-[#FC7A00]/30 bg-[#FC7A00]/10 text-[#FC7A00] hover:bg-[#FC7A00] hover:text-white transition-all text-xs font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer flex-shrink-0"
+              title="View Bills History"
+            >
+              <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+              <span className="hidden min-[360px]:inline">History</span>
+            </a>
           </div>
 
           {/* Marketing Slide Banners - displayed below page title and back history */}
