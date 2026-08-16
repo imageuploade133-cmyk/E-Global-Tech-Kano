@@ -16,7 +16,7 @@ export async function GET() {
       items: data.items || [],
       slides: data.slides || [],
       categories,
-      settings: data.settings || { borderColor: "#FC7A00", hideBorders: false, borderOpacity: 100 },
+      settings: data.settings || { borderColor: "#FC7A00", hideBorders: false },
     });
   } catch (err: unknown) {
     const error = err as Error;
@@ -26,7 +26,7 @@ export async function GET() {
       items: [],
       slides: [],
       categories: DEFAULT_STORE_CATEGORIES,
-      settings: { borderColor: "#FC7A00", hideBorders: false, borderOpacity: 100 },
+      settings: { borderColor: "#FC7A00", hideBorders: false },
     });
   }
 }
