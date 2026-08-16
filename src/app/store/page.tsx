@@ -119,7 +119,7 @@ export default function StorePage() {
         <iframe
           src={embedUrl}
           title="Product Video"
-          className="w-full h-full rounded-2xl border border-gray-200"
+          className="w-full h-full rounded-2xl border-0 shadow-none"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
         />
@@ -130,7 +130,7 @@ export default function StorePage() {
       <video
         src={url}
         controls
-        className="w-full h-full object-cover rounded-2xl border border-gray-200"
+        className="w-full h-full object-cover rounded-2xl border-0 shadow-none"
       />
     );
   };
@@ -724,7 +724,7 @@ export default function StorePage() {
           </motion.button>
         )}
 
-        {/* Full Screen Product Detail Modal (Loaded on Demand from Cache) */}
+        {/* Full Screen Borderless App-Style Product Detail Modal */}
         <AnimatePresence>
           {activeProduct && (
             <motion.div
@@ -732,19 +732,19 @@ export default function StorePage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
-              className="fixed inset-0 bg-white z-[100001] flex flex-col text-black overflow-hidden"
+              className="fixed inset-0 bg-[#F8F9FB] z-[100001] flex flex-col text-black overflow-hidden select-none"
             >
-              {/* Ultra Polished App Header Bar */}
-              <div className="sticky top-0 bg-white border-b border-gray-150 px-5 py-4 flex items-center justify-between z-10 shadow-3xs">
+              {/* Sleek Borderless App Header Bar */}
+              <div className="sticky top-0 bg-white/80 backdrop-blur-xl px-5 py-3.5 flex items-center justify-between z-10 shadow-xs border-0">
                 <button
                   type="button"
                   onClick={() => setActiveProduct(null)}
-                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer"
+                  className="w-10 h-10 rounded-full bg-gray-100/80 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer border-0 shadow-none"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
                 <div className="text-center">
-                  <h2 className="font-hanken font-extrabold text-sm uppercase tracking-wide text-black truncate max-w-[200px]">
+                  <h2 className="font-hanken font-black text-sm uppercase tracking-wide text-black truncate max-w-[200px]">
                     {activeProduct.title}
                   </h2>
                   <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
@@ -754,20 +754,20 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(true)}
-                  className="relative w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-800 cursor-pointer"
+                  className="relative w-10 h-10 rounded-full bg-gray-100/80 flex items-center justify-center text-gray-800 active:scale-90 transition-all cursor-pointer border-0 shadow-none"
                 >
                   <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
                   {totalCartItems > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border border-white">
+                    <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white">
                       {totalCartItems}
                     </span>
                   )}
                 </button>
               </div>
 
-              {/* Full Screen Scrollable Showcase Body */}
-              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-6 custom-scrollbar pb-32">
-                {/* Hero Showcase Product Image/Video Backdrop */}
+              {/* Full Screen Borderless Showcase Body */}
+              <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-36">
+                {/* Hero Showcase Floating Card */}
                 {(() => {
                   const gallery = getProductGallery(activeProduct);
                   const hasVideo = Boolean(activeProduct.videoUrl);
@@ -776,7 +776,7 @@ export default function StorePage() {
 
                   return (
                     <div className="space-y-3">
-                      <div className="w-full h-72 rounded-[28px] bg-gradient-to-b from-gray-50 to-gray-100/60 border border-gray-200 overflow-hidden relative flex items-center justify-center p-3 shadow-xs">
+                      <div className="w-full h-80 rounded-[32px] bg-white shadow-sm border-0 overflow-hidden relative flex items-center justify-center p-4">
                         {isShowingVideo ? (
                           renderVideoEmbed(activeProduct.videoUrl!)
                         ) : activeImgUrl ? (
@@ -784,7 +784,7 @@ export default function StorePage() {
                             src={activeImgUrl}
                             alt={activeProduct.title}
                             fill
-                            className="object-contain p-3"
+                            className="object-contain p-4"
                             unoptimized
                           />
                         ) : (
@@ -792,12 +792,12 @@ export default function StorePage() {
                         )}
 
                         <div className="absolute top-4 left-4 flex gap-2 z-10">
-                          <span className="px-3 py-1 rounded-full text-[9.5px] font-black uppercase bg-black/80 text-white backdrop-blur-xs">
+                          <span className="px-3 py-1 rounded-full text-[9.5px] font-black uppercase bg-black/80 text-white backdrop-blur-md border-0">
                             {activeProduct.category}
                           </span>
                         </div>
 
-                        <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[9.5px] font-black uppercase z-10 ${
+                        <span className={`absolute top-4 right-4 px-3.5 py-1 rounded-full text-[9.5px] font-black uppercase z-10 border-0 ${
                           activeProduct.inStock ? "bg-emerald-500 text-white shadow-xs" : "bg-red-500 text-white shadow-xs"
                         }`}>
                           {activeProduct.inStock ? "In Stock" : "Out of Stock"}
@@ -806,7 +806,7 @@ export default function StorePage() {
 
                       {/* Horizontal Multi-Image & Video Thumbnail Carousel */}
                       {(gallery.length > 1 || hasVideo) && (
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 select-none">
+                        <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1 select-none">
                           {gallery.map((img, idx) => {
                             const isSelected = !isShowingVideo && selectedGalleryIndex === idx;
                             return (
@@ -814,8 +814,8 @@ export default function StorePage() {
                                 key={idx}
                                 type="button"
                                 onClick={() => setSelectedGalleryIndex(idx)}
-                                className={`w-14 h-14 rounded-xl border-2 overflow-hidden flex-shrink-0 relative transition-all cursor-pointer ${
-                                  isSelected ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/30 scale-105" : "border-gray-200 opacity-70 hover:opacity-100"
+                                className={`w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-white shadow-xs border-0 ${
+                                  isSelected ? "ring-2 ring-[#FC7A00] scale-105" : "opacity-60 hover:opacity-100"
                                 }`}
                               >
                                 <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
@@ -827,8 +827,8 @@ export default function StorePage() {
                             <button
                               type="button"
                               onClick={() => setSelectedGalleryIndex(gallery.length)}
-                              className={`w-14 h-14 rounded-xl border-2 overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-black text-white flex flex-col items-center justify-center ${
-                                isShowingVideo ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/30 scale-105" : "border-gray-200 opacity-70 hover:opacity-100"
+                              className={`w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-black text-white flex flex-col items-center justify-center shadow-xs border-0 ${
+                                isShowingVideo ? "ring-2 ring-[#FC7A00] scale-105" : "opacity-60 hover:opacity-100"
                               }`}
                             >
                               <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">play_circle</span>
@@ -841,26 +841,26 @@ export default function StorePage() {
                   );
                 })()}
 
-                {/* Product Title & Price Badge */}
-                <div className="space-y-2 border-b border-gray-150 pb-4">
-                  <h1 className="font-bodoni font-bold text-2xl text-black leading-tight uppercase">
+                {/* Borderless Title & Price Floating Card */}
+                <div className="bg-white rounded-3xl p-5 shadow-sm space-y-2 border-0">
+                  <h1 className="font-bodoni font-extrabold text-2xl text-black leading-tight uppercase">
                     {activeProduct.title}
                   </h1>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pt-1">
                     <span className="font-mono text-2xl font-black text-[#FC7A00]">
                       ₦{activeProduct.price.toLocaleString()}
                     </span>
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3.5 py-1 rounded-full border-0">
                       Verified Genuine
                     </span>
                   </div>
                 </div>
 
-                {/* Description Box */}
-                <div className="space-y-2.5 p-4 bg-gray-50 border border-gray-150 rounded-2xl">
-                  <div className="flex items-center gap-1.5 text-gray-500">
+                {/* Borderless Description Floating Card */}
+                <div className="bg-white rounded-3xl p-5 shadow-sm space-y-2 border-0">
+                  <div className="flex items-center gap-1.5 text-gray-400 mb-1">
                     <span className="material-symbols-outlined text-[18px]">info</span>
-                    <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider">
+                    <h3 className="font-hanken font-black text-xs uppercase tracking-wider text-gray-500">
                       Product Description
                     </h3>
                   </div>
@@ -869,24 +869,24 @@ export default function StorePage() {
                   </p>
                 </div>
 
-                {/* Quantity Controls */}
-                <div className="space-y-2">
-                  <span className="font-hanken text-xs font-bold uppercase tracking-wider text-gray-500 block">
+                {/* Borderless Quantity Controls Card */}
+                <div className="bg-white rounded-3xl p-5 shadow-sm space-y-3 border-0">
+                  <span className="font-hanken text-xs font-black uppercase tracking-wider text-gray-500 block">
                     Select Quantity
                   </span>
-                  <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 p-2 rounded-2xl w-fit">
+                  <div className="flex items-center gap-4 bg-gray-100/70 p-2 rounded-2xl w-fit border-0">
                     <button
                       type="button"
                       onClick={() => setProductQuantity((q) => Math.max(1, q - 1))}
-                      className="w-10 h-10 rounded-xl border border-gray-300 bg-white font-bold text-lg flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                      className="w-10 h-10 rounded-xl bg-white font-bold text-lg flex items-center justify-center active:scale-95 cursor-pointer shadow-xs border-0 text-black"
                     >
                       -
                     </button>
-                    <span className="font-mono font-black text-lg w-8 text-center">{productQuantity}</span>
+                    <span className="font-mono font-black text-lg w-8 text-center text-black">{productQuantity}</span>
                     <button
                       type="button"
                       onClick={() => setProductQuantity((q) => q + 1)}
-                      className="w-10 h-10 rounded-xl border border-gray-300 bg-white font-bold text-lg flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                      className="w-10 h-10 rounded-xl bg-white font-bold text-lg flex items-center justify-center active:scale-95 cursor-pointer shadow-xs border-0 text-black"
                     >
                       +
                     </button>
@@ -903,12 +903,12 @@ export default function StorePage() {
                   if (displayRecs.length === 0) return null;
 
                   return (
-                    <div className="space-y-3 border-t border-gray-150 pt-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider text-black">
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="font-hanken font-black text-xs uppercase tracking-wider text-black">
                           Products You May Like
                         </h3>
-                        <span className="text-[10px] font-bold text-[#FC7A00] uppercase">Recommended</span>
+                        <span className="text-[10px] font-black text-[#FC7A00] uppercase">Recommended</span>
                       </div>
 
                       <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 select-none">
@@ -916,9 +916,9 @@ export default function StorePage() {
                           <div
                             key={rec.id}
                             onClick={() => handleOpenProductModal(rec)}
-                            className="w-36 flex-shrink-0 bg-white border border-gray-200 rounded-2xl p-2.5 space-y-2 cursor-pointer hover:border-[#FC7A00] transition-all shadow-3xs"
+                            className="w-36 flex-shrink-0 bg-white shadow-sm rounded-3xl p-3 space-y-2 cursor-pointer hover:shadow-md transition-all border-0"
                           >
-                            <div className="w-full h-24 rounded-xl bg-gray-50 border border-gray-100 relative overflow-hidden flex items-center justify-center">
+                            <div className="w-full h-24 rounded-2xl bg-gray-50 overflow-hidden relative flex items-center justify-center border-0">
                               {rec.imageUrl ? (
                                 <img src={rec.imageUrl} alt={rec.title} className="w-full h-full object-cover" />
                               ) : (
@@ -926,7 +926,7 @@ export default function StorePage() {
                               )}
                             </div>
                             <div>
-                              <h4 className="font-hanken font-bold text-[11px] text-black uppercase line-clamp-1 leading-tight">
+                              <h4 className="font-hanken font-black text-[11px] text-black uppercase line-clamp-1 leading-tight">
                                 {rec.title}
                               </h4>
                               <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
@@ -941,15 +941,15 @@ export default function StorePage() {
                 })()}
               </div>
 
-              {/* Fixed Bottom Action Bar */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-150 flex gap-2.5 shadow-lg z-20">
+              {/* Fixed Borderless Glassy Bottom Action Bar */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-xl flex gap-3 shadow-2xl z-20 border-0 max-w-md mx-auto">
                 <button
                   type="button"
                   disabled={!activeProduct.inStock}
                   onClick={() => {
                     handleAddToCart(activeProduct, productQuantity);
                   }}
-                  className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 border-0 shadow-none"
                 >
                   <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
                   <span>Add to Cart</span>
@@ -963,7 +963,7 @@ export default function StorePage() {
                     setActiveProduct(null);
                     setIsCartOpen(true);
                   }}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                  className="flex-1 py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20 border-0"
                 >
                   <span className="material-symbols-outlined text-[18px]">bolt</span>
                   <span>Buy Now • ₦{(activeProduct.price * productQuantity).toLocaleString()}</span>
