@@ -366,9 +366,9 @@ export default function StorePage() {
   return (
     <RouteGuard>
       <div className="min-h-dvh bg-background text-on-background pb-32">
-        <main className="max-w-md mx-auto pt-3 min-[375px]:pt-4 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
-          {/* Top Bar matching Main Wallet Header layout with clean icons */}
-          <div className="flex items-center justify-between gap-3 mb-5 px-1">
+        {/* Sticky/Static App Top Bar - Pinned at top while products scroll underneath */}
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 py-3.5 px-margin-mobile">
+          <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div>
               <h1 className="font-hanken text-[18px] min-[375px]:text-[20px] font-black tracking-tight text-black leading-tight">
                 E-Tech Store
@@ -412,6 +412,9 @@ export default function StorePage() {
               </button>
             </div>
           </div>
+        </div>
+
+        <main className="max-w-md mx-auto pt-3 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
 
           {/* Dynamic Store Slideshow Banners */}
           {slides.length > 0 && (
