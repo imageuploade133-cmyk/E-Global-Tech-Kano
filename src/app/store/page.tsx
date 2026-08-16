@@ -369,13 +369,27 @@ export default function StorePage() {
         {/* Sticky/Static App Top Bar - Pinned at top while products scroll underneath */}
         <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 py-3.5 px-margin-mobile">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-            <div>
-              <h1 className="font-hanken text-[18px] min-[375px]:text-[20px] font-black tracking-tight text-black leading-tight">
-                E-Tech Store
-              </h1>
-              <p className="font-hanken text-[9.5px] text-gray-400 font-black uppercase tracking-widest mt-0.5">
-                Hardware & Premium Gear
-              </p>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {settings.storeLogoUrl && (
+                <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-150 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
+                  <img
+                    src={settings.storeLogoUrl}
+                    alt="Store Logo"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h1 className="font-hanken text-[18px] min-[375px]:text-[20px] font-black tracking-tight text-black leading-tight truncate">
+                  {settings.storeName || "E-Tech Store"}
+                </h1>
+                <p className="font-hanken text-[9.5px] text-gray-400 font-black uppercase tracking-widest mt-0.5 truncate">
+                  Hardware & Premium Gear
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">

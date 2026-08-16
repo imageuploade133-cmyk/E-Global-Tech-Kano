@@ -32,8 +32,11 @@ interface StoreSlide {
 }
 
 interface StoreSettings {
+  storeName?: string;
+  storeLogoUrl?: string;
   borderColor?: string;
   hideBorders?: boolean;
+  orderStatuses?: string[];
 }
 
 function ButtonSpinner() {
@@ -80,6 +83,9 @@ export default function CpanelStorePage() {
   const [isSavingSlide, setIsSavingSlide] = useState(false);
 
   // Store Settings Form
+  const [storeName, setStoreName] = useState("E-Tech Store");
+  const [storeLogoUrl, setStoreLogoUrl] = useState("");
+  const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [hideBorders, setHideBorders] = useState(false);
   const [orderStatuses, setOrderStatuses] = useState<string[]>([
@@ -171,6 +177,8 @@ export default function CpanelStorePage() {
         setSlides(data.slides || []);
         if (data.settings) {
           setSettings(data.settings);
+          setStoreName(data.settings.storeName || "E-Tech Store");
+          setStoreLogoUrl(data.settings.storeLogoUrl || "");
           setBorderColor(data.settings.borderColor || "#FC7A00");
           setHideBorders(Boolean(data.settings.hideBorders));
           if (Array.isArray(data.settings.orderStatuses)) {
@@ -229,6 +237,8 @@ export default function CpanelStorePage() {
         body: JSON.stringify({
           action: "update_settings",
           settings: {
+            storeName,
+            storeLogoUrl,
             borderColor,
             hideBorders,
             orderStatuses,
@@ -1056,14 +1066,69 @@ export default function CpanelStorePage() {
           <div className="max-w-xl mx-auto">
             <div className={cn("p-6 rounded-2xl border space-y-5", panelClass)}>
               <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
-                <span className="material-symbols-outlined text-orange-500 text-[22px]">palette</span>
+                <span className="material-symbols-outlined text-orange-500 text-[22px]">tune</span>
                 <div>
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Product Card Styling</h3>
-                  <p className="text-[10.5px] text-gray-400">Configure border color or completely hide card borders for public storefront users.</p>
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Name, Brand Logo & Styling</h3>
+                  <p className="text-[10.5px] text-gray-400">Customize the public storefront name, header logo, and product card styling.</p>
                 </div>
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-4">
+                {/* Store Name Input */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Store Name / Brand Title</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. E-Tech Store"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-extrabold outline-none border transition-all w-full", inputClass)}
+                  />
+                </div>
+
+                {/* Store Logo Upload & Preview */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Store Header Logo</label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl border border-gray-200/80 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0 relative">
+                      {storeLogoUrl ? (
+                        <img src={storeLogoUrl} alt="Store Logo" className="w-full h-full object-contain p-1" />
+                      ) : (
+                        <span className="material-symbols-outlined text-gray-400 text-[22px]">storefront</span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Paste logo URL (https://...)"
+                      value={storeLogoUrl}
+                      onChange={(e) => setStoreLogoUrl(e.target.value)}
+                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
+                    />
+                    <div className="relative flex-shrink-0">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            uploadImageToImgBB(file, setStoreLogoUrl, setIsUploadingStoreLogo);
+                          }
+                        }}
+                        disabled={isUploadingStoreLogo}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingStoreLogo}
+                        className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                      >
+                        {isUploadingStoreLogo ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Product Border Color */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-gray-400 block">Product Card Border Color</label>
