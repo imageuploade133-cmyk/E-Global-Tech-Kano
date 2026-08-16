@@ -11,6 +11,7 @@ import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import Link from "next/link";
+import { toast } from "sonner";
 
 const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
   const s = String(status || "").toUpperCase().trim();
@@ -78,36 +79,56 @@ export default function BillsHistoryPage() {
     const fetchInitialBillsHistory = async () => {
       try {
         setLoading(true);
+        // Fetch recent user transactions ordered by createdAt to avoid Firestore composite index missing errors
         const q = query(
           collection(db, "transactions"),
           where("userId", "==", user.uid),
-          where("type", "in", BILL_TYPES),
           orderBy("createdAt", "desc"),
-          limit(15)
+          limit(50)
         );
 
         const snap = await getDocs(q);
         const list: Transaction[] = [];
         snap.forEach((docSnap) => {
           const data = docSnap.data();
-          list.push({
-            id: docSnap.id,
-            reference: data.reference || docSnap.id,
-            type: data.type || "BILL_PAYMENT",
-            amount: Number(data.amount) || 0,
-            currency: data.currency || "NGN",
-            description: data.description || "",
-            recipientName: data.recipientName || "",
-            bankName: data.bankName || "",
-            status: data.status || "SUCCESS",
-            date: data.date || "",
-            time: data.time || "",
-            fee: Number(data.fee) || 0,
-          });
+          const typeUpper = (data.type || "").toUpperCase();
+          const descLower = (data.description || "").toLowerCase();
+          const isBill =
+            BILL_TYPES.includes(typeUpper) ||
+            descLower.includes("airtime") ||
+            descLower.includes("data") ||
+            descLower.includes("recharge") ||
+            descLower.includes("cable") ||
+            descLower.includes("electricity") ||
+            descLower.includes("waec") ||
+            descLower.includes("meter") ||
+            descLower.includes("betting") ||
+            descLower.includes("vtu");
+
+          if (isBill) {
+            list.push({
+              id: docSnap.id,
+              reference: data.reference || docSnap.id,
+              type: data.type || "BILL_PAYMENT",
+              amount: Number(data.amount) || 0,
+              currency: data.currency || "NGN",
+              description: data.description || "",
+              recipientName: data.recipientName || "",
+              bankName: data.bankName || "",
+              status: data.status || "SUCCESS",
+              date: data.date || "",
+              time: data.time || "",
+              fee: Number(data.fee) || 0,
+            });
+          }
         });
 
         setTransactions(list);
-        if (snap.docs.length < 15) {
+        if (list.length === 0) {
+          toast.info("No history");
+        }
+
+        if (snap.docs.length < 50) {
           setHasMore(false);
         } else {
           setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
@@ -115,53 +136,9 @@ export default function BillsHistoryPage() {
         }
       } catch (err) {
         console.error("[BillsHistoryPage Initial Load Exception]:", err);
-        // Fallback for missing composite index if type in query fails
-        try {
-          const fallbackQuery = query(
-            collection(db, "transactions"),
-            where("userId", "==", user.uid),
-            orderBy("createdAt", "desc"),
-            limit(40)
-          );
-          const fallbackSnap = await getDocs(fallbackQuery);
-          const list: Transaction[] = [];
-          fallbackSnap.forEach((docSnap) => {
-            const data = docSnap.data();
-            const typeUpper = (data.type || "").toUpperCase();
-            const descLower = (data.description || "").toLowerCase();
-            const isBill =
-              BILL_TYPES.includes(typeUpper) ||
-              descLower.includes("airtime") ||
-              descLower.includes("data") ||
-              descLower.includes("recharge") ||
-              descLower.includes("cable") ||
-              descLower.includes("electricity") ||
-              descLower.includes("waec");
-
-            if (isBill) {
-              list.push({
-                id: docSnap.id,
-                reference: data.reference || docSnap.id,
-                type: data.type || "BILL_PAYMENT",
-                amount: Number(data.amount) || 0,
-                currency: data.currency || "NGN",
-                description: data.description || "",
-                recipientName: data.recipientName || "",
-                bankName: data.bankName || "",
-                status: data.status || "SUCCESS",
-                date: data.date || "",
-                time: data.time || "",
-                fee: Number(data.fee) || 0,
-              });
-            }
-          });
-          setTransactions(list);
-          setHasMore(false);
-        } catch (fallbackErr) {
-          console.error("[BillsHistoryPage Fallback Exception]:", fallbackErr);
-          setTransactions([]);
-          setHasMore(false);
-        }
+        setTransactions([]);
+        setHasMore(false);
+        toast.info("No history");
       } finally {
         setLoading(false);
       }
@@ -179,34 +156,53 @@ export default function BillsHistoryPage() {
       const q = query(
         collection(db, "transactions"),
         where("userId", "==", user.uid),
-        where("type", "in", BILL_TYPES),
         orderBy("createdAt", "desc"),
         startAfter(lastVisibleDoc),
-        limit(15)
+        limit(50)
       );
 
       const snap = await getDocs(q);
       const list: Transaction[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
-        list.push({
-          id: docSnap.id,
-          reference: data.reference || docSnap.id,
-          type: data.type || "BILL_PAYMENT",
-          amount: Number(data.amount) || 0,
-          currency: data.currency || "NGN",
-          description: data.description || "",
-          recipientName: data.recipientName || "",
-          bankName: data.bankName || "",
-          status: data.status || "SUCCESS",
-          date: data.date || "",
-          time: data.time || "",
-          fee: Number(data.fee) || 0,
-        });
+        const typeUpper = (data.type || "").toUpperCase();
+        const descLower = (data.description || "").toLowerCase();
+        const isBill =
+          BILL_TYPES.includes(typeUpper) ||
+          descLower.includes("airtime") ||
+          descLower.includes("data") ||
+          descLower.includes("recharge") ||
+          descLower.includes("cable") ||
+          descLower.includes("electricity") ||
+          descLower.includes("waec") ||
+          descLower.includes("meter") ||
+          descLower.includes("betting") ||
+          descLower.includes("vtu");
+
+        if (isBill) {
+          list.push({
+            id: docSnap.id,
+            reference: data.reference || docSnap.id,
+            type: data.type || "BILL_PAYMENT",
+            amount: Number(data.amount) || 0,
+            currency: data.currency || "NGN",
+            description: data.description || "",
+            recipientName: data.recipientName || "",
+            bankName: data.bankName || "",
+            status: data.status || "SUCCESS",
+            date: data.date || "",
+            time: data.time || "",
+            fee: Number(data.fee) || 0,
+          });
+        }
       });
 
+      if (list.length === 0) {
+        toast.info("No history");
+      }
+
       setTransactions((prev) => [...prev, ...list]);
-      if (snap.docs.length < 15) {
+      if (snap.docs.length < 50) {
         setHasMore(false);
         setLastVisibleDoc(null);
       } else {
@@ -216,6 +212,7 @@ export default function BillsHistoryPage() {
     } catch (err) {
       console.error("[BillsHistoryPage Load More Exception]:", err);
       setHasMore(false);
+      toast.info("No history");
     } finally {
       setLoadingMore(false);
     }
