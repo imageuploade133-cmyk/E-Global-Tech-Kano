@@ -14,6 +14,10 @@ interface StoreItem {
   price: number;
   category: string;
   imageUrl: string;
+  images?: string[];
+  coverImageUrl?: string;
+  videoUrl?: string;
+  autoSlide?: boolean;
   inStock: boolean;
   createdAt: string;
 }
@@ -52,13 +56,18 @@ export default function CpanelStorePage() {
   const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false });
   const [isLoading, setIsLoading] = useState(true);
 
-  // New Item Form
+  // Item Form & Edit state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState("");
   const [itemDescription, setItemDescription] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [itemCategory, setItemCategory] = useState("Hardware");
-  const [itemImageUrl, setItemImageUrl] = useState("");
+  const [itemImages, setItemImages] = useState<string[]>([]);
+  const [itemCoverUrl, setItemCoverUrl] = useState("");
+  const [itemVideoUrl, setItemVideoUrl] = useState("");
+  const [itemAutoSlide, setItemAutoSlide] = useState(true);
   const [itemInStock, setItemInStock] = useState(true);
+  const [newImageInput, setNewImageInput] = useState("");
   const [isUploadingItemImage, setIsUploadingItemImage] = useState(false);
   const [isSavingItem, setIsSavingItem] = useState(false);
 
@@ -241,8 +250,60 @@ export default function CpanelStorePage() {
     }
   };
 
-  // Add Item Submit
-  const handleAddItem = async (e: React.FormEvent) => {
+  const resetItemForm = () => {
+    setEditingItemId(null);
+    setItemTitle("");
+    setItemDescription("");
+    setItemPrice("");
+    setItemCategory("Hardware");
+    setItemImages([]);
+    setItemCoverUrl("");
+    setItemVideoUrl("");
+    setItemAutoSlide(true);
+    setItemInStock(true);
+    setNewImageInput("");
+  };
+
+  const handleStartEditItem = (item: StoreItem) => {
+    setEditingItemId(item.id);
+    setItemTitle(item.title || "");
+    setItemDescription(item.description || "");
+    setItemPrice(item.price ? item.price.toString() : "");
+    setItemCategory(item.category || "Hardware");
+    const existingImgs = Array.isArray(item.images) && item.images.length > 0 ? item.images : (item.imageUrl ? [item.imageUrl] : []);
+    setItemImages(existingImgs);
+    setItemCoverUrl(item.coverImageUrl || item.imageUrl || existingImgs[0] || "");
+    setItemVideoUrl(item.videoUrl || "");
+    setItemAutoSlide(item.autoSlide !== false);
+    setItemInStock(item.inStock !== false);
+    setNewImageInput("");
+  };
+
+  const handleAddImageToProduct = (urlToAdd: string) => {
+    const trimmed = urlToAdd.trim();
+    if (!trimmed) return;
+    if (itemImages.includes(trimmed)) {
+      toast.info("Image URL already added.");
+      return;
+    }
+    const updated = [...itemImages, trimmed];
+    setItemImages(updated);
+    if (!itemCoverUrl) setItemCoverUrl(trimmed);
+    setNewImageInput("");
+    toast.success("Image added to product list!");
+  };
+
+  const handleRemoveImageFromProduct = (index: number) => {
+    const removedUrl = itemImages[index];
+    const updated = itemImages.filter((_, i) => i !== index);
+    setItemImages(updated);
+    if (itemCoverUrl === removedUrl) {
+      setItemCoverUrl(updated[0] || "");
+    }
+  };
+
+  // Add or Edit Item Submit
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemTitle.trim()) {
       toast.error("Item title is required.");
@@ -256,17 +317,25 @@ export default function CpanelStorePage() {
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };
 
+      const action = editingItemId ? "edit_item" : "add_item";
+      const primaryCover = itemCoverUrl || itemImages[0] || "";
+
       const res = await fetch("/api/admin/store", {
         method: "POST",
         headers,
         body: JSON.stringify({
-          action: "add_item",
+          action,
           item: {
+            id: editingItemId || undefined,
             title: itemTitle,
             description: itemDescription,
             price: parseFloat(itemPrice) || 0,
             category: itemCategory,
-            imageUrl: itemImageUrl,
+            imageUrl: primaryCover,
+            images: itemImages.length > 0 ? itemImages : (primaryCover ? [primaryCover] : []),
+            coverImageUrl: primaryCover,
+            videoUrl: itemVideoUrl,
+            autoSlide: itemAutoSlide,
             inStock: itemInStock,
           },
         }),
@@ -274,17 +343,14 @@ export default function CpanelStorePage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success("Store item added successfully!");
+        toast.success(editingItemId ? "Store item updated successfully!" : "Store item added successfully!");
         setItems(data.items || []);
-        setItemTitle("");
-        setItemDescription("");
-        setItemPrice("");
-        setItemImageUrl("");
+        resetItemForm();
       } else {
-        toast.error(data.error || "Failed to add store item.");
+        toast.error(data.error || "Failed to save store item.");
       }
     } catch (err: any) {
-      toast.error(err.message || "Network error adding store item.");
+      toast.error(err.message || "Network error saving store item.");
     } finally {
       setIsSavingItem(false);
     }
@@ -538,7 +604,27 @@ export default function CpanelStorePage() {
                 <h3 className="font-extrabold text-xs uppercase tracking-wider">Add Store Product</h3>
               </div>
 
-              <form onSubmit={handleAddItem} className="space-y-3.5">
+              <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500 text-[20px]">
+                    {editingItemId ? "edit_note" : "add_box"}
+                  </span>
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider">
+                    {editingItemId ? "Edit Product" : "Add Store Product"}
+                  </h3>
+                </div>
+                {editingItemId && (
+                  <button
+                    type="button"
+                    onClick={resetItemForm}
+                    className="text-[10px] font-bold text-gray-400 hover:text-white uppercase"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={handleSaveItem} className="space-y-3.5">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400 block">Product Title</label>
                   <input
@@ -547,7 +633,7 @@ export default function CpanelStorePage() {
                     placeholder="e.g. E-Tech POS Terminal V2"
                     value={itemTitle}
                     onChange={(e) => setItemTitle(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                   />
                 </div>
 
@@ -590,27 +676,42 @@ export default function CpanelStorePage() {
                     placeholder="e.g. 35000"
                     value={itemPrice}
                     onChange={(e) => setItemPrice(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Image URL or File</label>
+                {/* Multiple Images Upload Manager */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">
+                    Product Images ({itemImages.length})
+                  </label>
+
                   <div className="flex gap-2">
                     <input
                       type="text"
                       placeholder="Paste image URL (https://...)"
-                      value={itemImageUrl}
-                      onChange={(e) => setItemImageUrl(e.target.value)}
+                      value={newImageInput}
+                      onChange={(e) => setNewImageInput(e.target.value)}
                       className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
                     />
+                    <button
+                      type="button"
+                      onClick={() => handleAddImageToProduct(newImageInput)}
+                      className="px-3 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white rounded-xl text-xs font-bold uppercase transition-all"
+                    >
+                      + Add
+                    </button>
                     <div className="relative flex-shrink-0">
                       <input
                         type="file"
                         accept="image/*"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) uploadImageToImgBB(file, setItemImageUrl, setIsUploadingItemImage);
+                          if (file) {
+                            uploadImageToImgBB(file, (uploadedUrl) => {
+                              handleAddImageToProduct(uploadedUrl);
+                            }, setIsUploadingItemImage);
+                          }
                         }}
                         disabled={isUploadingItemImage}
                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
@@ -624,6 +725,80 @@ export default function CpanelStorePage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Thumbnail gallery list with Cover Image selector */}
+                  {itemImages.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      {itemImages.map((imgUrl, idx) => {
+                        const isCover = itemCoverUrl === imgUrl || (!itemCoverUrl && idx === 0);
+                        return (
+                          <div
+                            key={idx}
+                            className={cn(
+                              "relative h-16 rounded-xl border overflow-hidden group bg-white flex items-center justify-center",
+                              isCover ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/40" : "border-gray-200"
+                            )}
+                          >
+                            <img src={imgUrl} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
+                            {isCover && (
+                              <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase bg-[#FC7A00] text-white">
+                                COVER
+                              </span>
+                            )}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                              {!isCover && (
+                                <button
+                                  type="button"
+                                  onClick={() => setItemCoverUrl(imgUrl)}
+                                  className="p-1 bg-[#FC7A00] text-white rounded text-[8px] font-bold uppercase"
+                                  title="Set Cover Image"
+                                >
+                                  Cover
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveImageFromProduct(idx)}
+                                className="p-1 bg-red-600 text-white rounded text-[8px] font-bold"
+                                title="Remove Image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Product Video URL Field */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Video URL (YouTube or Direct MP4)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. https://www.youtube.com/watch?v=... or .mp4"
+                    value={itemVideoUrl}
+                    onChange={(e) => setItemVideoUrl(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                  />
+                </div>
+
+                {/* Auto Slide ON/OFF Toggle */}
+                <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200/50 bg-gray-50/50">
+                  <div>
+                    <span className="text-xs font-extrabold uppercase block">Auto Slide Gallery</span>
+                    <span className="text-[9.5px] text-gray-400">Auto advance product image slides for users</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={itemAutoSlide}
+                      onChange={(e) => setItemAutoSlide(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FC7A00]" />
+                  </label>
                 </div>
 
                 <div className="space-y-1">
@@ -651,8 +826,8 @@ export default function CpanelStorePage() {
                   disabled={isSavingItem || isUploadingItemImage}
                   className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  {isSavingItem ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">add</span>}
-                  <span>Add Product</span>
+                  {isSavingItem ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">{editingItemId ? "save" : "add"}</span>}
+                  <span>{editingItemId ? "Update Product" : "Add Product"}</span>
                 </button>
               </form>
             </div>
@@ -705,15 +880,26 @@ export default function CpanelStorePage() {
                             {item.inStock ? "IN STOCK" : "OUT OF STOCK"}
                           </span>
 
-                          <button
-                            type="button"
-                            disabled={isDeleting}
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-                          >
-                            {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">delete</span>}
-                            <span>Delete</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditItem(item)}
+                              className="text-[10px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">edit</span>
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isDeleting}
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                            >
+                              {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">delete</span>}
+                              <span>Delete</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

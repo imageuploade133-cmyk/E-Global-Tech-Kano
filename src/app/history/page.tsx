@@ -63,8 +63,8 @@ export default function HistoryPage() {
     }
   }, [selectedTx]);
 
-  // Initial secure paginated loading of transactions
-  useEffect(() => {
+  // Initial secure paginated loading of transactions with low-read session cache
+  const fetchInitialTransactions = async (forceRefresh = false) => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (isMock || !user) {
       setTransactions([]);
@@ -73,53 +73,91 @@ export default function HistoryPage() {
       return;
     }
 
-    const fetchInitialTransactions = async () => {
+    if (!forceRefresh && typeof window !== "undefined") {
       try {
-        setLoading(true);
-        const q = query(
-          collection(db, "transactions"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc"),
-          limit(15)
-        );
-
-        const snap = await getDocs(q);
-        const list: Transaction[] = [];
-        snap.forEach((docSnap) => {
-          const data = docSnap.data();
-          list.push({
-            id: docSnap.id,
-            reference: data.reference || docSnap.id,
-            type: data.type || "DEPOSIT",
-            amount: Number(data.amount) || 0,
-            currency: data.currency || "NGN",
-            description: data.description || "",
-            recipientName: data.recipientName || "",
-            bankName: data.bankName || "",
-            status: data.status || "SUCCESS",
-            date: data.date || "",
-            time: data.time || "",
-            fee: Number(data.fee) || 0,
-          });
-        });
-
-        setTransactions(list);
-        if (snap.docs.length < 15) {
-          setHasMore(false);
-        } else {
-          setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
-          setHasMore(true);
+        const raw = sessionStorage.getItem(`history_transactions_cache_${user.uid}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.data) && Date.now() - parsed.timestamp < 3 * 60 * 1000) {
+            setTransactions(parsed.data);
+            setHasMore(Boolean(parsed.hasMore));
+            setLoading(false);
+            return;
+          }
         }
-      } catch (err) {
-        console.error("[HistoryPage Initial Load Exception]:", err);
-        setTransactions([]);
-        setHasMore(false);
-      } finally {
-        setLoading(false);
+      } catch {
+        // Fall back to getDocs
       }
+    }
+
+    try {
+      setLoading(true);
+      const q = query(
+        collection(db, "transactions"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(15)
+      );
+
+      const snap = await getDocs(q);
+      const list: Transaction[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          reference: data.reference || docSnap.id,
+          type: data.type || "DEPOSIT",
+          amount: Number(data.amount) || 0,
+          currency: data.currency || "NGN",
+          description: data.description || "",
+          recipientName: data.recipientName || "",
+          bankName: data.bankName || "",
+          status: data.status || "SUCCESS",
+          date: data.date || "",
+          time: data.time || "",
+          fee: Number(data.fee) || 0,
+        });
+      });
+
+      setTransactions(list);
+      const moreAvailable = snap.docs.length >= 15;
+      if (!moreAvailable) {
+        setHasMore(false);
+      } else {
+        setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(true);
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            `history_transactions_cache_${user.uid}`,
+            JSON.stringify({ data: list, hasMore: moreAvailable, timestamp: Date.now() })
+          );
+        } catch {
+          // Ignore storage write errors
+        }
+      }
+    } catch (err) {
+      console.error("[HistoryPage Initial Load Exception]:", err);
+      setTransactions([]);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialTransactions();
+
+    const handleAppRefresh = () => {
+      fetchInitialTransactions(true);
     };
 
-    fetchInitialTransactions();
+    window.addEventListener("app-refresh", handleAppRefresh);
+    return () => {
+      window.removeEventListener("app-refresh", handleAppRefresh);
+    };
   }, [user]);
 
   // Load more function with query cursors to save read budget
