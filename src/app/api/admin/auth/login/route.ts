@@ -63,7 +63,8 @@ export async function POST(req: Request) {
 
     const isTargetAdmin = cleanEmail === "abdulkadir123shaba@gmail.com";
 
-    const userQuery = await adminDb.collection("users")
+    // Perform query with case variations
+    let userQuery = await adminDb.collection("users")
       .where("email", "in", emailVariations)
       .limit(1)
       .get();
@@ -72,7 +73,18 @@ export async function POST(req: Request) {
     let userData: any = null;
 
     if (userQuery.empty) {
-      if (isTargetAdmin) {
+      // Fallback scan: if in-query returns empty due to field formatting/whitespace, search all users
+      const allUsersSnap = await adminDb.collection("users").get();
+      const matchedDoc = allUsersSnap.docs.find((doc) => {
+        const d = doc.data();
+        const em = String(d.email || "").trim().toLowerCase();
+        return em === cleanEmail;
+      });
+
+      if (matchedDoc) {
+        userData = matchedDoc.data();
+        uid = matchedDoc.id;
+      } else if (isTargetAdmin) {
         // Dynamically initialize a new admin profile for the target administrator
         console.log(`[Self-Healing Login] Initializing missing admin profile for: ${cleanEmail}`);
         const salt = bcrypt.genSaltSync(10);
@@ -91,7 +103,7 @@ export async function POST(req: Request) {
         uid = docRef.id;
         userData = newAdminDoc;
       } else {
-        return NextResponse.json({ error: "Invalid Email or PIN." }, { status: 401 });
+        return NextResponse.json({ error: "Invalid Email or Access PIN." }, { status: 401 });
       }
     } else {
       const userDoc = userQuery.docs[0];
