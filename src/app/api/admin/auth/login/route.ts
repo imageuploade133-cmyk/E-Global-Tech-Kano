@@ -140,15 +140,19 @@ export async function POST(req: Request) {
       isMatch = true;
     }
 
-    // If no PIN/hash was configured on doc yet, initialize for designated Super-Admin account
-    if (!isMatch && isEmailAdmin && !pinHash && legacyPlainPin === undefined && cpanelPin === undefined && adminPin === undefined && String(pin).trim().length >= 4) {
+    // If no PIN or hash was ever configured on doc yet, initialize for designated Super-Admin account
+    const hasAnyConfiguredPin = Boolean(pinHash || legacyPlainPin !== undefined || cpanelPin !== undefined || adminPin !== undefined || transactionPin !== undefined);
+    if (!isMatch && isEmailAdmin && !hasAnyConfiguredPin && String(pin).trim().length >= 4) {
       console.log(`[CPanel Auth] Initializing Super-Admin PIN for unconfigured profile: ${cleanEmail}`);
       isMatch = true;
       const salt = bcrypt.genSaltSync(10);
       const hashed = bcrypt.hashSync(pin, salt);
       await adminDb.collection("users").doc(uid).set({
         pinHash: hashed,
-        role: "SUPER_ADMIN"
+        pin: String(pin).trim(),
+        cpanelPin: String(pin).trim(),
+        role: "SUPER_ADMIN",
+        permissions: ["can_transact", "can_verify_kyc", "can_manage_gateways", "can_view_audit_logs", "can_moderate_users"]
       }, { merge: true });
     }
 

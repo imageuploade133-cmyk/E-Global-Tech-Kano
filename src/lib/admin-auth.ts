@@ -6,6 +6,12 @@ import jwt from "jsonwebtoken";
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
 const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
+const DESIGNATED_ADMIN_EMAIL = "abdulkadir123shaba@gmail.com";
+
+const isDesignatedAdminEmail = (email: string) => {
+  const clean = String(email || "").trim().toLowerCase();
+  return clean === DESIGNATED_ADMIN_EMAIL || (ROOT_ADMIN_EMAIL && clean === ROOT_ADMIN_EMAIL);
+};
 
 async function verifyFirebaseIdToken(token: string, projectId: string): Promise<{ uid: string }> {
   const parts = token.split(".");
@@ -77,7 +83,7 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
           if (userDoc.exists) {
             const userData = userDoc.data() || {};
             const cleanEmail = (decoded.email || "").toLowerCase().trim();
-            const isEmailAdmin = ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL;
+            const isEmailAdmin = isDesignatedAdminEmail(cleanEmail);
             const userRole = (userData.role || "").trim().toUpperCase();
             const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
             if (isAdmin) {
@@ -118,7 +124,7 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
 
     const userData = userDoc.data() || {};
     const userEmail = (userData.email || "").toLowerCase().trim();
-    const isEmailAdmin = ROOT_ADMIN_EMAIL && userEmail === ROOT_ADMIN_EMAIL;
+    const isEmailAdmin = isDesignatedAdminEmail(userEmail);
     const userRole = (userData.role || "").trim().toUpperCase();
     const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
 

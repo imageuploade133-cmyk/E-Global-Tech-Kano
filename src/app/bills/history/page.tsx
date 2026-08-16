@@ -430,7 +430,7 @@ export default function BillsHistoryPage() {
                   </div>
                 )}
 
-                {hasMore && (
+                {hasMore && filteredTransactions.length > 0 && (
                   <div className="pt-4 flex justify-center">
                     <button
                       type="button"
