@@ -366,7 +366,7 @@ export default function StorePage() {
   return (
     <RouteGuard>
       <div className="min-h-dvh bg-background text-on-background pb-32">
-        <main className="max-w-md mx-auto pt-6 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
+        <main className="max-w-md mx-auto pt-3 min-[375px]:pt-4 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
           {/* Top Bar matching Main Wallet Header layout with clean icons */}
           <div className="flex items-center justify-between gap-3 mb-5 px-1">
             <div>
