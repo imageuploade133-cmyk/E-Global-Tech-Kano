@@ -85,6 +85,10 @@
   text-rendering: optimizeLegibility;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'liga';
+  max-width: 1.2em;
+  max-height: 1.2em;
+  overflow: hidden;
+  vertical-align: middle;
 }
 
 /* Prevent icon ligature string (e.g. "cancel", "close", "check_circle") from flashing as raw text before font finishes loading */
@@ -92,8 +96,8 @@ html:not(.material-symbols-loaded) .material-symbols-outlined {
   color: transparent !important;
   text-shadow: none !important;
   user-select: none !important;
-  opacity: 0.2 !important;
-  background-color: currentColor !important;
+  opacity: 0.6 !important;
+  background-color: #d1d5db !important;
   border-radius: 9999px !important;
   display: inline-block !important;
   overflow: hidden !important;
@@ -104,13 +108,16 @@ html:not(.material-symbols-loaded) .material-symbols-outlined {
   transition: opacity 0.15s ease-in-out;
 }
 
+.dark html:not(.material-symbols-loaded) .material-symbols-outlined {
+  background-color: #4b5563 !important;
+}
+
 html.material-symbols-loaded .material-symbols-outlined {
   opacity: 1 !important;
   background-color: transparent !important;
   border-radius: 0 !important;
   width: auto !important;
   height: auto !important;
-  overflow: visible !important;
 }
 
 @layer base {

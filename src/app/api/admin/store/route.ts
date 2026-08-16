@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 
+const DEFAULT_SETTINGS = {
+  borderColor: "#FC7A00",
+  hideBorders: false,
+  orderStatuses: ["Pending", "Processing", "Shipped", "Delivered", "Refunded", "Canceled"],
+};
+
 export async function GET(req: Request) {
   try {
     const { isAdmin } = await verifyAdminAuth(req);
@@ -17,7 +23,7 @@ export async function GET(req: Request) {
       items: data.items || [],
       slides: data.slides || [],
       categories: data.categories || [],
-      settings: data.settings || { borderColor: "#FC7A00", hideBorders: false },
+      settings: data.settings ? { ...DEFAULT_SETTINGS, ...data.settings } : DEFAULT_SETTINGS,
     });
   } catch (err: unknown) {
     const error = err as Error;
@@ -42,7 +48,9 @@ export async function POST(req: Request) {
 
     let items = Array.isArray(existingData.items) ? [...existingData.items] : [];
     let slides = Array.isArray(existingData.slides) ? [...existingData.slides] : [];
-    let currentSettings = existingData.settings || { borderColor: "#FC7A00", hideBorders: false };
+    let currentSettings = existingData.settings
+      ? { ...DEFAULT_SETTINGS, ...existingData.settings }
+      : { ...DEFAULT_SETTINGS };
 
     const now = new Date().toISOString();
 
@@ -90,9 +98,13 @@ export async function POST(req: Request) {
       if (!settings) {
         return NextResponse.json({ error: "settings payload is required." }, { status: 400 });
       }
+
       currentSettings = {
-        borderColor: (settings.borderColor || "#FC7A00").trim(),
-        hideBorders: Boolean(settings.hideBorders),
+        borderColor: (settings.borderColor || currentSettings.borderColor).trim(),
+        hideBorders: settings.hideBorders !== undefined ? Boolean(settings.hideBorders) : currentSettings.hideBorders,
+        orderStatuses: Array.isArray(settings.orderStatuses) && settings.orderStatuses.length > 0
+          ? settings.orderStatuses.map((s: string) => s.trim()).filter(Boolean)
+          : currentSettings.orderStatuses,
       };
     } else {
       return NextResponse.json({ error: "Invalid action specified." }, { status: 400 });
