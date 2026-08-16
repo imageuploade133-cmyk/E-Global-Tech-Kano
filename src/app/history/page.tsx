@@ -10,6 +10,7 @@ import { TransactionReceipt, Transaction } from "@/components/wallet/Transaction
 import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { toast } from "sonner";
 
 const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
   const s = String(status || "").toUpperCase().trim();
@@ -120,6 +121,10 @@ export default function HistoryPage() {
       });
 
       setTransactions(list);
+      if (list.length === 0) {
+        toast.info("No history");
+      }
+
       const moreAvailable = snap.docs.length >= 15;
       if (!moreAvailable) {
         setHasMore(false);
@@ -142,6 +147,7 @@ export default function HistoryPage() {
       console.error("[HistoryPage Initial Load Exception]:", err);
       setTransactions([]);
       setHasMore(false);
+      toast.info("No history");
     } finally {
       setLoading(false);
     }
