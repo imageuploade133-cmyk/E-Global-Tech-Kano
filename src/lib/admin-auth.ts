@@ -5,13 +5,6 @@ import jwt from "jsonwebtoken";
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
-const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
-const DESIGNATED_ADMIN_EMAIL = "abdulkadir123shaba@gmail.com";
-
-const isDesignatedAdminEmail = (email: string) => {
-  const clean = String(email || "").trim().toLowerCase();
-  return clean === DESIGNATED_ADMIN_EMAIL || (ROOT_ADMIN_EMAIL && clean === ROOT_ADMIN_EMAIL);
-};
 
 async function verifyFirebaseIdToken(token: string, projectId: string): Promise<{ uid: string }> {
   const parts = token.split(".");
@@ -70,7 +63,6 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
     const sessionToken = cookieStore.get("cpanel_session")?.value;
 
     let uid = "";
-    let tokenEmail = "";
 
     if (sessionToken) {
       try {
@@ -80,7 +72,6 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
             return { uid: decoded.uid, isAdmin: true, email: decoded.email, role: "super_admin", permissions: ["*"] };
           }
           uid = decoded.uid;
-          tokenEmail = decoded.email || "";
         }
       } catch (cookieErr: any) {
         console.warn("[verifyAdminAuth] Cookie session verification failed:", cookieErr.message);
@@ -105,57 +96,8 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
       throw new Error("Missing or invalid Authorization header/cookie session.");
     }
 
-    // Look up administrator document in dedicated admin_users collection
-    let adminDocSnap = await adminDb.collection("admin_users").doc(uid).get();
-
-    // Auto-provision initial Super Admin if admin_users doc doesn't exist yet but user is designated Super Admin
-    if (!adminDocSnap.exists) {
-      // Look up user in main users collection or verify by email
-      const mainUserSnap = await adminDb.collection("users").doc(uid).get();
-      const mainUserData = mainUserSnap.exists ? mainUserSnap.data() || {} : {};
-      const userEmail = (mainUserData.email || tokenEmail || "").toLowerCase().trim();
-
-      if (isDesignatedAdminEmail(userEmail)) {
-        console.log(`[verifyAdminAuth] Auto-provisioning admin_users record for initial Super Admin: ${userEmail}`);
-        const now = new Date().toISOString();
-        const initialAdminData = {
-          uid,
-          email: userEmail || DESIGNATED_ADMIN_EMAIL,
-          displayName: mainUserData.name || mainUserData.displayName || "SUPER ADMIN",
-          role: "super_admin",
-          permissions: ["*"],
-          status: "active",
-          createdBy: "system_init",
-          createdAt: now,
-          updatedAt: now,
-          lastLoginAt: now,
-          mfaEnabled: false
-        };
-        await adminDb.collection("admin_users").doc(uid).set(initialAdminData);
-        adminDocSnap = await adminDb.collection("admin_users").doc(uid).get();
-      } else {
-        // Fallback: Check if user doc has role == "admin" or "SUPER_ADMIN"
-        const userRole = (mainUserData.role || "").trim().toLowerCase();
-        if (userRole === "admin" || userRole === "super_admin") {
-          const now = new Date().toISOString();
-          const legacyAdminData = {
-            uid,
-            email: userEmail,
-            displayName: mainUserData.name || "Administrator",
-            role: userRole === "super_admin" ? "super_admin" : "admin",
-            permissions: mainUserData.permissions || ["users.view", "transactions.view", "kyc.view"],
-            status: "active",
-            createdBy: "legacy_migration",
-            createdAt: now,
-            updatedAt: now,
-            lastLoginAt: now,
-            mfaEnabled: false
-          };
-          await adminDb.collection("admin_users").doc(uid).set(legacyAdminData);
-          adminDocSnap = await adminDb.collection("admin_users").doc(uid).get();
-        }
-      }
-    }
+    // Look up administrator document in dedicated admin_users collection using Firebase UID as identity
+    const adminDocSnap = await adminDb.collection("admin_users").doc(uid).get();
 
     if (!adminDocSnap.exists) {
       throw new Error("Forbidden: Account is not configured in admin_users.");
@@ -186,17 +128,14 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
  * to securely authorize server-to-server calls to the payment-gateway VM on the fly.
  */
 export async function mintFirebaseIdToken(uid: string): Promise<string> {
-  // If mock admin user, return a mock token
   if (uid === "mock-admin-uid") {
     return "mock-admin-token";
   }
 
   const { getAuth } = await import("firebase-admin/auth");
-  // 1. Create a Firebase Custom Token for the user UID
   const customToken = await getAuth(adminApp).createCustomToken(uid);
 
-  // 2. Exchange the Custom Token for an ID Token using Google Identity Toolkit REST API
-  const apiKey = "AIzaSyCuolap_m6yXWEo2csYMyGhEshsHnd1aEQ"; // from src/lib/firebase.ts
+  const apiKey = "AIzaSyCuolap_m6yXWEo2csYMyGhEshsHnd1aEQ";
   const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`, {
     method: "POST",
     headers: {
