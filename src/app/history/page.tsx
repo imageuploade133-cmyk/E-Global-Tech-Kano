@@ -438,23 +438,51 @@ export default function HistoryPage() {
                   );
                 })}
 
+                {/* Skeleton placeholders when loading more activities so user continues seamlessly */}
+                {loadingMore && (
+                  <div className="space-y-2.5 pt-1">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={`loading-more-${i}`}
+                        className="w-full h-[72px] bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between animate-pulse"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-100" />
+                          <div className="space-y-2">
+                            <div className="h-3 bg-gray-200 rounded w-28" />
+                            <div className="h-2 bg-gray-100 rounded w-16" />
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-right">
+                          <div className="h-3.5 bg-gray-200 rounded w-16 ml-auto" />
+                          <div className="h-2.5 bg-gray-100 rounded w-10 ml-auto" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Highly intuitive production-ready pagination footer */}
                 {hasMore && (
                   <div className="pt-4 flex justify-center">
-                    {loadingMore ? (
-                      <div className="flex items-center gap-2 text-[#FC7A00] font-bold text-xs uppercase tracking-wider">
-                        <div className="w-4 h-4 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
-                        <span>Loading more...</span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleLoadMore}
-                        className="px-6 py-3 rounded-xl border border-[#FC7A00]/30 hover:border-[#FC7A00] bg-white text-[#FC7A00] text-xs font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer flex items-center gap-2"
-                      >
-                        Load More Activity
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      disabled={loadingMore}
+                      onClick={handleLoadMore}
+                      className="px-6 py-3.5 rounded-xl border border-[#FC7A00]/30 hover:border-[#FC7A00] bg-white text-[#FC7A00] text-xs font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer flex items-center gap-2.5 shadow-3xs hover:shadow-xs disabled:opacity-60"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
+                          <span>Fetching More History...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[18px]">expand_circle_down</span>
+                          <span>Load More History</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
               </>
