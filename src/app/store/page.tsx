@@ -45,6 +45,19 @@ export default function StorePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
+  // Checkout & Delivery Profile state
+  const [isCheckoutStep, setIsCheckoutStep] = useState(false);
+  const [customerDeliveryName, setCustomerDeliveryName] = useState<string>(String(userName || ""));
+  const [customerDeliveryPhone, setCustomerDeliveryPhone] = useState<string>(String(userData?.phoneNumber || ""));
+  const [customerDeliveryAddress, setCustomerDeliveryAddress] = useState<string>("");
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
+
+  // Customer Order History Modal state
+  const [isMyOrdersOpen, setIsMyOrdersOpen] = useState(false);
+  const [myOrders, setMyOrders] = useState<any[]>([]);
+  const [isLoadingMyOrders, setIsLoadingMyOrders] = useState(false);
+
   // Load Cart from localStorage on mount
   useEffect(() => {
     setCart(getSavedCart());
@@ -154,6 +167,90 @@ export default function StorePage() {
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
+  const fetchMyOrders = async () => {
+    setIsLoadingMyOrders(true);
+    try {
+      let idToken = "";
+      if (user && typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+      const headers: Record<string, string> = idToken ? { Authorization: `Bearer ${idToken}` } : {};
+
+      const res = await fetch("/api/store/orders", { headers });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.orders)) {
+        setMyOrders(data.orders);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch customer order history:", err);
+    } finally {
+      setIsLoadingMyOrders(false);
+    }
+  };
+
+  const handleConfirmCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerDeliveryName.trim() || !customerDeliveryPhone.trim() || !customerDeliveryAddress.trim()) {
+      toast.error("Please fill in all delivery information fields.");
+      return;
+    }
+
+    if (cart.length === 0) {
+      toast.error("Your shopping cart is empty.");
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    toast.loading("Processing order payment...", { id: "place-order" });
+
+    try {
+      let idToken = "";
+      if (user && typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      };
+
+      const payload = {
+        items: cart.map((c) => ({
+          id: c.product.id,
+          title: c.product.title,
+          price: c.product.price,
+          quantity: c.quantity,
+          imageUrl: c.product.imageUrl,
+          category: c.product.category,
+        })),
+        customerName: customerDeliveryName,
+        customerPhone: customerDeliveryPhone,
+        deliveryAddress: customerDeliveryAddress,
+        paymentMethod: "WALLET_NGN",
+      };
+
+      const res = await fetch("/api/store/orders", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Order placed successfully!", { id: "place-order" });
+        setConfirmedOrder(data.order);
+        updateCart([]);
+        setIsCheckoutStep(false);
+        setIsCartOpen(false);
+      } else {
+        toast.error(data.error || "Failed to place store order.", { id: "place-order" });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error placing store order.", { id: "place-order" });
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
   // Search & Category Filtered Products
   const filteredItems = items.filter((item) => {
     const matchesCategory = activeCategory === "ALL" || item.category.toLowerCase() === activeCategory.toLowerCase();
@@ -194,20 +291,34 @@ export default function StorePage() {
               </div>
             </div>
 
-            {/* Cart Header Button */}
-            <button
-              type="button"
-              onClick={() => setIsCartOpen(true)}
-              className="relative w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-800 hover:text-black hover:border-gray-300 active:scale-95 transition-all shadow-xs cursor-pointer"
-              title="Shopping Cart"
-            >
-              <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
-              {totalCartItems > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-bounce">
-                  {totalCartItems}
-                </span>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  fetchMyOrders();
+                  setIsMyOrdersOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-full border border-gray-200 bg-white flex items-center gap-1.5 text-xs font-extrabold text-gray-700 hover:text-black active:scale-95 transition-all shadow-xs cursor-pointer"
+                title="View My Orders"
+              >
+                <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">receipt_long</span>
+                <span className="text-[10px] font-black uppercase tracking-wider">Orders</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                className="relative w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-800 hover:text-black hover:border-gray-300 active:scale-95 transition-all shadow-xs cursor-pointer"
+                title="Shopping Cart"
+              >
+                <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
+                {totalCartItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-bounce">
+                    {totalCartItems}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Dynamic Store Slideshow Banners */}
@@ -732,7 +843,7 @@ export default function StorePage() {
               </div>
 
               {/* Fixed Bottom Checkout Action Bar */}
-              {cart.length > 0 && (
+              {cart.length > 0 && !isCheckoutStep && (
                 <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-150 space-y-3 shadow-lg z-20 max-w-md mx-auto">
                   <div className="flex justify-between items-center text-xs font-bold">
                     <span className="text-gray-500 uppercase tracking-wider">Subtotal ({totalCartItems} items)</span>
@@ -741,15 +852,11 @@ export default function StorePage() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      toast.success("Redirecting order to VIP Support desk...");
-                      setIsCartOpen(false);
-                      window.location.href = "/support";
-                    }}
+                    onClick={() => setIsCheckoutStep(true)}
                     className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[18px]">support_agent</span>
-                    <span>Checkout via VIP Desk</span>
+                    <span className="material-symbols-outlined text-[18px]">local_shipping</span>
+                    <span>Proceed to Delivery & Payment</span>
                   </button>
 
                   <button
@@ -761,9 +868,212 @@ export default function StorePage() {
                   </button>
                 </div>
               )}
+
+              {/* Delivery Profile & Payment Step */}
+              {isCheckoutStep && (
+                <div className="absolute inset-0 bg-white z-30 p-5 overflow-y-auto flex flex-col justify-between max-w-md mx-auto">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-150">
+                      <button
+                        type="button"
+                        onClick={() => setIsCheckoutStep(false)}
+                        className="flex items-center gap-1 text-xs font-bold text-gray-600 hover:text-black"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                        Back to Items
+                      </button>
+                      <span className="text-xs font-black uppercase text-[#FC7A00]">Delivery Profile</span>
+                    </div>
+
+                    <form id="checkout-form" onSubmit={handleConfirmCheckout} className="space-y-3.5">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                          Full Recipient Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={customerDeliveryName}
+                          onChange={(e) => setCustomerDeliveryName(e.target.value)}
+                          placeholder="e.g. Captain Jules"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                          Phone Number for Delivery Updates *
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={customerDeliveryPhone}
+                          onChange={(e) => setCustomerDeliveryPhone(e.target.value)}
+                          placeholder="e.g. 08012345678"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                          Full Delivery Address *
+                        </label>
+                        <textarea
+                          rows={3}
+                          required
+                          value={customerDeliveryAddress}
+                          onChange={(e) => setCustomerDeliveryAddress(e.target.value)}
+                          placeholder="e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00] resize-none"
+                        />
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-orange-50/60 border border-orange-200/80 space-y-1">
+                        <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                          <span>Payment Method:</span>
+                          <span className="text-emerald-600 font-black">Main NGN Wallet</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-black">
+                          <span className="text-gray-600">Total Order Charge:</span>
+                          <span className="text-[#FC7A00] text-sm">₦{cartSubtotal.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-150 space-y-2">
+                    <button
+                      type="submit"
+                      form="checkout-form"
+                      disabled={isPlacingOrder}
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                    >
+                      {isPlacingOrder ? (
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <span className="material-symbols-outlined text-[18px]">verified</span>
+                      )}
+                      <span>Confirm Order & Pay ₦{cartSubtotal.toLocaleString()}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Customer Order History Modal */}
+        <AnimatePresence>
+          {isMyOrdersOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="fixed inset-0 bg-white z-[100003] flex flex-col text-black overflow-hidden"
+            >
+              <div className="sticky top-0 bg-white border-b border-gray-150 px-5 py-4 flex items-center justify-between z-10 shadow-3xs">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">receipt_long</span>
+                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    My Order History
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMyOrdersOpen(false)}
+                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-24">
+                {isLoadingMyOrders ? (
+                  <div className="py-16 text-center text-xs font-bold uppercase tracking-wider text-gray-400">
+                    Loading Order History...
+                  </div>
+                ) : myOrders.length === 0 ? (
+                  <div className="py-16 text-center space-y-2">
+                    <span className="material-symbols-outlined text-[48px] text-gray-300">shopping_bag</span>
+                    <p className="font-bold text-xs text-gray-500">You have not placed any store orders yet.</p>
+                  </div>
+                ) : (
+                  myOrders.map((ord) => (
+                    <div key={ord.id} className="p-4 bg-gray-50 border border-gray-150 rounded-2xl space-y-2.5 shadow-3xs">
+                      <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
+                        <div>
+                          <span className="font-mono font-black text-xs text-[#FC7A00]">{ord.id}</span>
+                          <span className="text-[10px] text-gray-400 block">{new Date(ord.createdAt).toLocaleString()}</span>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase border bg-orange-100 text-orange-800 border-orange-300">
+                          {ord.status}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between font-bold text-gray-700">
+                          <span>Items ({ord.items?.length || 0}):</span>
+                          <span>₦{ord.totalAmount?.toLocaleString()}</span>
+                        </div>
+                        <p className="text-[10.5px] text-gray-500 line-clamp-2">
+                          {ord.items?.map((i: any) => `${i.title} (x${i.quantity})`).join(", ")}
+                        </p>
+                      </div>
+
+                      {ord.adminNotes && (
+                        <div className="p-2 rounded-xl bg-orange-50 border border-orange-200/60 text-[10px] text-orange-800 font-medium">
+                          <strong>Admin Note:</strong> {ord.adminNotes}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Confirmed Order Modal Dialog */}
+        {confirmedOrder && (
+          <div className="fixed inset-0 z-[100004] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-sm p-6 rounded-3xl bg-white text-black space-y-4 shadow-2xl text-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center mx-auto text-emerald-600">
+                <span className="material-symbols-outlined text-[36px]">check_circle</span>
+              </div>
+
+              <div>
+                <h3 className="font-black text-base uppercase tracking-tight text-black">Order Placed Successfully!</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Order ID: <strong className="font-mono text-[#FC7A00]">{confirmedOrder.id}</strong>
+                </p>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-gray-50 border border-gray-150 text-left text-xs space-y-1">
+                <div className="flex justify-between font-bold">
+                  <span className="text-gray-500">Amount Charged:</span>
+                  <span className="text-emerald-600 font-black">₦{confirmedOrder.totalAmount?.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Recipient:</span>
+                  <span className="font-bold">{confirmedOrder.customerName}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block text-[10px]">Address:</span>
+                  <span className="font-medium text-[11px] line-clamp-2">{confirmedOrder.deliveryAddress}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setConfirmedOrder(null)}
+                className="w-full py-3 bg-[#FC7A00] text-white rounded-xl font-black text-xs uppercase tracking-wider hover:opacity-90"
+              >
+                Close & View Store
+              </button>
+            </div>
+          </div>
+        )}
 
         <BottomNav />
       </div>

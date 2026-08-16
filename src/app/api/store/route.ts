@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { DEFAULT_STORE_CATEGORIES } from "@/app/api/admin/store/categories/route";
+import { DEFAULT_STORE_CATEGORIES } from "@/lib/store-defaults";
 
 export async function GET() {
   try {

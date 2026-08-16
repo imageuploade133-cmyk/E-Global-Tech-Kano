@@ -73,6 +73,15 @@ export default function CpanelStorePage() {
   // Store Settings Form
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [hideBorders, setHideBorders] = useState(false);
+  const [orderStatuses, setOrderStatuses] = useState<string[]>([
+    "Pending",
+    "Processing",
+    "Shipped",
+    "Delivered",
+    "Refunded",
+    "Canceled",
+  ]);
+  const [newStatusInput, setNewStatusInput] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Deleting item/slide ID
@@ -155,6 +164,9 @@ export default function CpanelStorePage() {
           setSettings(data.settings);
           setBorderColor(data.settings.borderColor || "#FC7A00");
           setHideBorders(Boolean(data.settings.hideBorders));
+          if (Array.isArray(data.settings.orderStatuses)) {
+            setOrderStatuses(data.settings.orderStatuses);
+          }
         }
       } else {
         toast.error(data.error || "Failed to load store data.");
@@ -210,6 +222,7 @@ export default function CpanelStorePage() {
           settings: {
             borderColor,
             hideBorders,
+            orderStatuses,
           },
         }),
       });
@@ -463,6 +476,16 @@ export default function CpanelStorePage() {
             <span className="material-symbols-outlined text-[18px]">inventory_2</span>
             <span>Store Products ({items.length})</span>
           </button>
+
+          <Link
+            href="/cpanel/store/orders"
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap bg-gradient-to-r from-orange-500 to-[#FC7A00] text-white shadow-sm hover:opacity-95"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
+            <span>Dispatch Orders</span>
+          </Link>
 
           <Link
             href="/cpanel/store/categories"
@@ -898,10 +921,58 @@ export default function CpanelStorePage() {
                     className="w-4 h-4 text-[#FC7A00] rounded"
                   />
                   <div>
-                    <span className="text-xs font-extrabold uppercase text-gray-800 block">Hide Card Borders Completely</span>
+                    <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Hide Card Borders Completely</span>
                     <span className="text-[10px] text-gray-400 font-medium">When checked, storefront product cards render without any border line.</span>
                   </div>
                 </label>
+
+                {/* Order Processing Statuses Manager */}
+                <div className="space-y-3 pt-4 border-t border-gray-200/40">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Custom Order Processing Statuses</label>
+                    <p className="text-[10.5px] text-gray-400">Add custom status tags for your order fulfillment workflow.</p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {orderStatuses.map((st) => (
+                      <span key={st} className="px-3 py-1 rounded-xl bg-orange-50 dark:bg-gray-800 text-[#FC7A00] dark:text-orange-400 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border border-orange-200/60 dark:border-gray-700">
+                        {st}
+                        {st !== "Pending" && st !== "Delivered" && (
+                          <button
+                            type="button"
+                            onClick={() => setOrderStatuses(orderStatuses.filter((s) => s !== st))}
+                            className="text-gray-400 hover:text-red-500 font-bold"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newStatusInput}
+                      onChange={(e) => setNewStatusInput(e.target.value)}
+                      placeholder="Add custom status (e.g. In Transit, Verification...)"
+                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border", inputClass)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = newStatusInput.trim();
+                        if (trimmed && !orderStatuses.includes(trimmed)) {
+                          setOrderStatuses([...orderStatuses, trimmed]);
+                          setNewStatusInput("");
+                        }
+                      }}
+                      className="px-4 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
 
                 <button
                   type="submit"
