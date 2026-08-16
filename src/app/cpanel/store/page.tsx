@@ -48,6 +48,7 @@ export default function CpanelStorePage() {
   // Data states
   const [items, setItems] = useState<StoreItem[]>([]);
   const [slides, setSlides] = useState<StoreSlide[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -463,6 +464,17 @@ export default function CpanelStorePage() {
             <span>Store Products ({items.length})</span>
           </button>
 
+          <Link
+            href="/cpanel/store/categories"
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
+              isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">category</span>
+            <span>Manage Categories ({categories.length})</span>
+          </Link>
+
           <button
             type="button"
             onClick={() => setActiveTab("slides")}
@@ -517,16 +529,33 @@ export default function CpanelStorePage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Category</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Category</label>
+                    <Link href="/cpanel/store/categories" className="text-[10px] font-bold text-[#FC7A00] hover:underline">
+                      + Add / Manage
+                    </Link>
+                  </div>
                   <select
                     value={itemCategory}
                     onChange={(e) => setItemCategory(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer", inputClass)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
                   >
-                    <option value="Hardware">Hardware & POS</option>
-                    <option value="Memberships">Memberships & VIP</option>
-                    <option value="E-Tech Gear">E-Tech Gear & Merchandise</option>
-                    <option value="Subscriptions">Software Subscriptions</option>
+                    {categories.length > 0 ? (
+                      categories.filter((c) => c.name !== "ALL").map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Fashion">Fashion</option>
+                        <option value="Airtime & Utilities">Airtime & Utilities</option>
+                        <option value="Gift Cards">Gift Cards</option>
+                        <option value="Gadgets & Phones">Gadgets & Phones</option>
+                        <option value="General">General</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

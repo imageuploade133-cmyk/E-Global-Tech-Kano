@@ -16,6 +16,7 @@ export async function GET(req: Request) {
       success: true,
       items: data.items || [],
       slides: data.slides || [],
+      categories: data.categories || [],
       settings: data.settings || { borderColor: "#FC7A00", hideBorders: false },
     });
   } catch (err: unknown) {

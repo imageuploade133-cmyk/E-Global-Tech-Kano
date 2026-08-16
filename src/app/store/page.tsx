@@ -11,6 +11,7 @@ import Image from "next/image";
 import {
   StoreItem,
   StoreSlide,
+  StoreCategory,
   StoreSettings,
   CartItem,
   getCachedStore,
@@ -27,6 +28,7 @@ export default function StorePage() {
 
   const [items, setItems] = useState<StoreItem[]>([]);
   const [slides, setSlides] = useState<StoreSlide[]>([]);
+  const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -62,6 +64,7 @@ export default function StorePage() {
       if (cached) {
         setItems(cached.items);
         setSlides(cached.slides);
+        setCategories(cached.categories || []);
         setSettings(cached.settings || {});
         setIsLoading(false);
         return;
@@ -74,11 +77,13 @@ export default function StorePage() {
         if (data.success) {
           const fetchedItems: StoreItem[] = data.items || [];
           const fetchedSlides: StoreSlide[] = data.slides || [];
+          const fetchedCategories: StoreCategory[] = data.categories || [];
           const fetchedSettings: StoreSettings = data.settings || {};
           setItems(fetchedItems);
           setSlides(fetchedSlides);
+          setCategories(fetchedCategories);
           setSettings(fetchedSettings);
-          setCachedStore(fetchedItems, fetchedSlides, fetchedSettings);
+          setCachedStore(fetchedItems, fetchedSlides, fetchedCategories, fetchedSettings);
         }
       } catch (err) {
         console.error("Failed to load store data:", err);
@@ -148,8 +153,6 @@ export default function StorePage() {
 
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-
-  const categories = ["ALL", "Hardware", "Memberships", "E-Tech Gear", "Subscriptions"];
 
   // Search & Category Filtered Products
   const filteredItems = items.filter((item) => {
@@ -279,22 +282,41 @@ export default function StorePage() {
             )}
           </div>
 
-          {/* Category Filter Pills */}
+          {/* Visual Category Filter Chips with Custom Logos */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-4 select-none">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setActiveCategory(cat)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-                  activeCategory === cat
-                    ? "bg-[#FC7A00] text-white shadow-xs"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+            {categories.filter((c) => !c.isHidden).map((cat) => {
+              const isActive = activeCategory.toLowerCase() === cat.name.toLowerCase();
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setActiveCategory(cat.name)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border ${
+                    isActive
+                      ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-xs"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[#FC7A00]/50"
+                  }`}
+                >
+                  {cat.imageUrl ? (
+                    <div className="w-5 h-5 rounded-md bg-gray-100 p-0.5 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.name}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <span className={`material-symbols-outlined text-[18px] ${isActive ? "text-white" : "text-[#FC7A00]"}`}>
+                      {cat.iconName || "category"}
+                    </span>
+                  )}
+                  <span>{cat.name}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Storefront Products Showcase */}
