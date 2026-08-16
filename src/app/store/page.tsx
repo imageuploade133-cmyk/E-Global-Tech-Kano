@@ -370,47 +370,45 @@ export default function StorePage() {
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
         <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
-          {/* Header Bar with Store Title & Cart Badge */}
-          <div className="flex items-center justify-between gap-3 mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#FC7A00]/10 border border-[#FC7A00]/20 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">
-                  storefront
-                </span>
-              </div>
-              <div>
-                <h1 className="font-bodoni text-[20px] font-bold tracking-tight text-black leading-tight">
-                  E-Tech Store
-                </h1>
-                <p className="font-hanken text-[11px] text-gray-500 font-medium">
-                  Premium boutique products & hardware
-                </p>
-              </div>
+          {/* Top Bar matching Main Wallet Header layout with clean icons */}
+          <div className="flex items-center justify-between gap-3 mb-5 px-1">
+            <div>
+              <h1 className="font-hanken text-[18px] min-[375px]:text-[20px] font-black tracking-tight text-black leading-tight">
+                E-Tech Store
+              </h1>
+              <p className="font-hanken text-[9.5px] text-gray-400 font-black uppercase tracking-widest mt-0.5">
+                Hardware & Premium Gear
+              </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* High Fidelity History Icon */}
               <button
                 type="button"
                 onClick={() => {
                   fetchMyOrders();
                   setIsMyOrdersOpen(true);
                 }}
-                className="px-3 py-1.5 rounded-full border border-gray-200 bg-white flex items-center gap-1.5 text-xs font-extrabold text-gray-700 hover:text-black active:scale-95 transition-all shadow-xs cursor-pointer"
-                title="View My Orders"
+                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-300 active:scale-90 transition-all cursor-pointer shadow-3xs"
+                title="Order History"
               >
-                <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">receipt_long</span>
-                <span className="text-[10px] font-black uppercase tracking-wider">Orders</span>
+                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]" style={{ fontVariationSettings: '"wght" 500' }}>
+                  receipt_long
+                </span>
               </button>
 
+              {/* Cart Icon with badge */}
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-800 hover:text-black hover:border-gray-300 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-300 active:scale-90 transition-all cursor-pointer shadow-3xs"
                 title="Shopping Cart"
               >
-                <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
+                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]">
+                  shopping_cart
+                </span>
                 {totalCartItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-bounce">
+                  <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
                     {totalCartItems}
                   </span>
                 )}
