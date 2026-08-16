@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
     const snapshot = await query.get();
 
-    let orders: any[] = [];
+    const orders: any[] = [];
     let totalRevenue = 0;
     let pendingCount = 0;
     let deliveredCount = 0;

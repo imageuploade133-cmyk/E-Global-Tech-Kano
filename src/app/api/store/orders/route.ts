@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { verifyAuth } from "@/lib/auth-util";
+import { authenticateUserRequest } from "@/lib/auth-util";
 
 export async function POST(req: Request) {
   try {
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.uid) {
+    let uid = "";
+    try {
+      const authUser = await authenticateUserRequest(req);
+      uid = authUser.uid;
+    } catch {
       return NextResponse.json({ error: "Unauthorized: Please sign in to place an order." }, { status: 401 });
     }
-
-    const uid = authResult.uid;
     const body = await req.json();
     const { items, customerName, customerEmail, customerPhone, deliveryAddress, paymentMethod = "WALLET_NGN" } = body;
 
@@ -131,12 +132,13 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    const authResult = await verifyAuth(req);
-    if (!authResult.authenticated || !authResult.uid) {
+    let uid = "";
+    try {
+      const authUser = await authenticateUserRequest(req);
+      uid = authUser.uid;
+    } catch {
       return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
     }
-
-    const uid = authResult.uid;
     const ordersSnap = await adminDb
       .collection("store_orders")
       .where("userId", "==", uid)

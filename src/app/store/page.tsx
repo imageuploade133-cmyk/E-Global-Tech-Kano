@@ -47,9 +47,9 @@ export default function StorePage() {
 
   // Checkout & Delivery Profile state
   const [isCheckoutStep, setIsCheckoutStep] = useState(false);
-  const [customerDeliveryName, setCustomerDeliveryName] = useState(userName);
-  const [customerDeliveryPhone, setCustomerDeliveryPhone] = useState(userData?.phoneNumber || "");
-  const [customerDeliveryAddress, setCustomerDeliveryAddress] = useState("");
+  const [customerDeliveryName, setCustomerDeliveryName] = useState<string>(String(userName || ""));
+  const [customerDeliveryPhone, setCustomerDeliveryPhone] = useState<string>(String(userData?.phoneNumber || ""));
+  const [customerDeliveryAddress, setCustomerDeliveryAddress] = useState<string>("");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
 
