@@ -33,6 +33,8 @@ export interface StoreCategory {
 export interface StoreSettings {
   borderColor?: string;
   hideBorders?: boolean;
+  borderOpacity?: number; // 0 to 100%
+  orderStatuses?: string[];
 }
 
 export interface CartItem {
