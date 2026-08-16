@@ -82,6 +82,7 @@ export default function CpanelStorePage() {
   // Store Settings Form
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [hideBorders, setHideBorders] = useState(false);
+  const [borderOpacity, setBorderOpacity] = useState(100);
   const [orderStatuses, setOrderStatuses] = useState<string[]>([
     "Pending",
     "Processing",
@@ -173,6 +174,7 @@ export default function CpanelStorePage() {
           setSettings(data.settings);
           setBorderColor(data.settings.borderColor || "#FC7A00");
           setHideBorders(Boolean(data.settings.hideBorders));
+          setBorderOpacity(data.settings.borderOpacity ?? 100);
           if (Array.isArray(data.settings.orderStatuses)) {
             setOrderStatuses(data.settings.orderStatuses);
           }
@@ -231,6 +233,7 @@ export default function CpanelStorePage() {
           settings: {
             borderColor,
             hideBorders,
+            borderOpacity,
             orderStatuses,
           },
         }),
@@ -1096,6 +1099,25 @@ export default function CpanelStorePage() {
                       />
                     ))}
                   </div>
+                </div>
+
+                {/* Border Opacity Slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Border Opacity</label>
+                    <span className="text-xs font-mono font-black text-[#FC7A00]">{borderOpacity}%</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={borderOpacity}
+                      onChange={(e) => setBorderOpacity(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#FC7A00]"
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-medium">Adjust transparency of product card borders from 0% (transparent) to 100% (solid).</p>
                 </div>
 
                 {/* Hide Product Borders Toggle */}

@@ -5,6 +5,7 @@ import { verifyAdminAuth } from "@/lib/admin-auth";
 const DEFAULT_SETTINGS = {
   borderColor: "#FC7A00",
   hideBorders: false,
+  borderOpacity: 100,
   orderStatuses: ["Pending", "Processing", "Shipped", "Delivered", "Refunded", "Canceled"],
 };
 
@@ -137,6 +138,7 @@ export async function POST(req: Request) {
       currentSettings = {
         borderColor: (settings.borderColor || currentSettings.borderColor).trim(),
         hideBorders: settings.hideBorders !== undefined ? Boolean(settings.hideBorders) : currentSettings.hideBorders,
+        borderOpacity: typeof settings.borderOpacity === "number" ? Math.min(100, Math.max(0, settings.borderOpacity)) : (currentSettings.borderOpacity ?? 100),
         orderStatuses: Array.isArray(settings.orderStatuses) && settings.orderStatuses.length > 0
           ? settings.orderStatuses.map((s: string) => s.trim()).filter(Boolean)
           : currentSettings.orderStatuses,
