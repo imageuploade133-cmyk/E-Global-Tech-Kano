@@ -46,9 +46,8 @@ export async function POST(req: Request) {
       }
     }
 
-    // Default fallback API key if not configured in env
     if (!apiKey) {
-      apiKey = "0d1a390cb385b632d952db08a3479005";
+      return NextResponse.json({ error: "ImgBB API Key is not configured in server environment or admin configuration" }, { status: 500 });
     }
 
     // Convert to base64 for ImgBB payload

@@ -18,6 +18,18 @@ export interface StoreSlide {
   link: string;
 }
 
+export interface StoreCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  imageUrl?: string;
+  backupUrl?: string;
+  iconName?: string;
+  isHidden?: boolean;
+  sortOrder?: number;
+}
+
 export interface StoreSettings {
   borderColor?: string;
   hideBorders?: boolean;
@@ -32,12 +44,12 @@ const CACHE_KEY = "e_tech_store_cache";
 const CART_KEY = "e_tech_store_cart";
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache TTL for low Firestore reads
 
-let memoryStoreCache: { items: StoreItem[]; slides: StoreSlide[]; settings: StoreSettings; timestamp: number } | null = null;
+let memoryStoreCache: { items: StoreItem[]; slides: StoreSlide[]; categories: StoreCategory[]; settings: StoreSettings; timestamp: number } | null = null;
 const memoryProductDetails = new Map<string, StoreItem>();
 
-export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[]; settings: StoreSettings } | null => {
+export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[]; categories: StoreCategory[]; settings: StoreSettings } | null => {
   if (memoryStoreCache && (Date.now() - memoryStoreCache.timestamp < CACHE_TTL_MS)) {
-    return { items: memoryStoreCache.items, slides: memoryStoreCache.slides, settings: memoryStoreCache.settings };
+    return { items: memoryStoreCache.items, slides: memoryStoreCache.slides, categories: memoryStoreCache.categories, settings: memoryStoreCache.settings };
   }
 
   if (typeof window !== "undefined") {
@@ -47,7 +59,7 @@ export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[]; se
         const parsed = JSON.parse(raw);
         if (parsed && (Date.now() - parsed.timestamp < CACHE_TTL_MS)) {
           memoryStoreCache = parsed;
-          return { items: parsed.items, slides: parsed.slides, settings: parsed.settings || {} };
+          return { items: parsed.items, slides: parsed.slides, categories: parsed.categories || [], settings: parsed.settings || {} };
         }
       }
     } catch {
@@ -58,8 +70,8 @@ export const getCachedStore = (): { items: StoreItem[]; slides: StoreSlide[]; se
   return null;
 };
 
-export const setCachedStore = (items: StoreItem[], slides: StoreSlide[], settings: StoreSettings = {}) => {
-  const cacheData = { items, slides, settings, timestamp: Date.now() };
+export const setCachedStore = (items: StoreItem[], slides: StoreSlide[], categories: StoreCategory[] = [], settings: StoreSettings = {}) => {
+  const cacheData = { items, slides, categories, settings, timestamp: Date.now() };
   memoryStoreCache = cacheData;
 
   items.forEach((item) => {
