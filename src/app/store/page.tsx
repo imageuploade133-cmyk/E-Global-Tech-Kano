@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { RouteGuard } from "@/components/RouteGuard";
-import { Header } from "@/components/layout/Header";
+import { StoreHeader } from "@/components/layout/StoreHeader";
+import { useAppConfig } from "@/lib/ConfigContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ import {
 
 export default function StorePage() {
   const { userData, user } = useAuth();
+  const { config } = useAppConfig();
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
@@ -264,62 +266,37 @@ export default function StorePage() {
     return matchesCategory && matchesQuery;
   });
 
-  const customBorderColor = settings.borderColor || "#FC7A00";
+  function hexToRgba(hex: string, opacityPercent: number = 100): string {
+    if (opacityPercent <= 0) return "transparent";
+    let c = (hex || "#FC7A00").replace("#", "");
+    if (c.length === 3) {
+      c = c.split("").map((x) => x + x).join("");
+    }
+    const num = parseInt(c, 16);
+    if (isNaN(num)) return `rgba(252, 122, 0, ${opacityPercent / 100})`;
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${opacityPercent / 100})`;
+  }
+
+  const customBorderColor = hexToRgba(settings.borderColor || "#FC7A00", settings.borderOpacity ?? 100);
   const hideBorders = Boolean(settings.hideBorders);
 
   return (
     <RouteGuard>
       <div className="min-h-dvh bg-background text-on-background pb-32">
-        <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
+        <StoreHeader
+          logoUrl={config.logoUrl}
+          totalCartItems={totalCartItems}
+          onOpenCart={() => setIsCartOpen(true)}
+          onOpenOrders={() => {
+            fetchMyOrders();
+            setIsMyOrdersOpen(true);
+          }}
+        />
 
-        <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
-          {/* Header Bar with Store Title & Cart Badge */}
-          <div className="flex items-center justify-between gap-3 mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#FC7A00]/10 border border-[#FC7A00]/20 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">
-                  storefront
-                </span>
-              </div>
-              <div>
-                <h1 className="font-bodoni text-[20px] font-bold tracking-tight text-black leading-tight">
-                  E-Tech Store
-                </h1>
-                <p className="font-hanken text-[11px] text-gray-500 font-medium">
-                  Premium boutique products & hardware
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  fetchMyOrders();
-                  setIsMyOrdersOpen(true);
-                }}
-                className="px-3 py-1.5 rounded-full border border-gray-200 bg-white flex items-center gap-1.5 text-xs font-extrabold text-gray-700 hover:text-black active:scale-95 transition-all shadow-xs cursor-pointer"
-                title="View My Orders"
-              >
-                <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">receipt_long</span>
-                <span className="text-[10px] font-black uppercase tracking-wider">Orders</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsCartOpen(true)}
-                className="relative w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-800 hover:text-black hover:border-gray-300 active:scale-95 transition-all shadow-xs cursor-pointer"
-                title="Shopping Cart"
-              >
-                <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
-                {totalCartItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-bounce">
-                    {totalCartItems}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
+        <main className="max-w-md mx-auto mt-16 min-[375px]:mt-20 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
 
           {/* Dynamic Store Slideshow Banners */}
           {slides.length > 0 && (
@@ -478,12 +455,12 @@ export default function StorePage() {
                 <motion.div
                   key={item.id}
                   whileTap={{ scale: 0.98 }}
-                  style={{
-                    borderColor: hideBorders ? "transparent" : customBorderColor,
-                  }}
-                  className={`bg-white rounded-2xl p-3.5 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative border ${
-                    hideBorders ? "border-transparent" : ""
-                  }`}
+                  style={
+                    hideBorders
+                      ? { border: "none" }
+                      : { borderColor: customBorderColor, borderWidth: "1px", borderStyle: "solid" }
+                  }
+                  className="bg-white rounded-2xl p-3.5 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative"
                   onClick={() => handleOpenProductModal(item)}
                 >
                   <div className="space-y-2.5">
