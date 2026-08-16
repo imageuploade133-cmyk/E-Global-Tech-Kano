@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb, adminApp } from "@/lib/firebase-admin";
 
-export const GRANULAR_PERMISSIONS_CATALOG = [
+const GRANULAR_PERMISSIONS_CATALOG = [
   { key: "users.view", label: "View Users", category: "Users" },
   { key: "users.edit", label: "Edit Users", category: "Users" },
   { key: "users.suspend", label: "Suspend Users", category: "Users" },
@@ -28,7 +28,7 @@ export const GRANULAR_PERMISSIONS_CATALOG = [
   { key: "settings.manage", label: "Manage Settings", category: "Settings" },
 ];
 
-export async function logAdminAction(payload: {
+async function logAdminAction(payload: {
   adminUid: string;
   adminEmail: string;
   action: string;

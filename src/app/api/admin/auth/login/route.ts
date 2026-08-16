@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     const isDesignatedSuperAdmin = cleanEmail === "abdulkadir123shaba@gmail.com" || (ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL);
 
     // Fetch or provision admin user in dedicated admin_users collection
-    let adminDocRef = adminDb.collection("admin_users").doc(uid);
+    const adminDocRef = adminDb.collection("admin_users").doc(uid);
     let adminSnap = await adminDocRef.get();
 
     const now = new Date().toISOString();
