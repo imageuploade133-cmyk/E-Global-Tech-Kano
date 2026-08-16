@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
 const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
+const DESIGNATED_ADMIN_EMAIL = "abdulkadir123shaba@gmail.com";
 
 export async function GET() {
   try {
@@ -48,7 +49,7 @@ export async function GET() {
 
     const userData = userDoc.data() || {};
     const cleanEmail = (decoded.email || "").toLowerCase().trim();
-    const isEmailAdmin = ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL;
+    const isEmailAdmin = cleanEmail === DESIGNATED_ADMIN_EMAIL || (ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL);
     const userRole = (userData.role || "").trim().toUpperCase();
     const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
 
