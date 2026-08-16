@@ -3,6 +3,8 @@ import { adminDb } from "@/lib/firebase-admin";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 
 const DEFAULT_SETTINGS = {
+  storeName: "E-Tech Store",
+  storeLogoUrl: "",
   borderColor: "#FC7A00",
   hideBorders: false,
   orderStatuses: ["Pending", "Processing", "Shipped", "Delivered", "Refunded", "Canceled"],
@@ -135,6 +137,8 @@ export async function POST(req: Request) {
       }
 
       currentSettings = {
+        storeName: settings.storeName !== undefined ? String(settings.storeName).trim() : currentSettings.storeName,
+        storeLogoUrl: settings.storeLogoUrl !== undefined ? String(settings.storeLogoUrl).trim() : currentSettings.storeLogoUrl,
         borderColor: (settings.borderColor || currentSettings.borderColor).trim(),
         hideBorders: settings.hideBorders !== undefined ? Boolean(settings.hideBorders) : currentSettings.hideBorders,
         orderStatuses: Array.isArray(settings.orderStatuses) && settings.orderStatuses.length > 0

@@ -35,8 +35,11 @@ export interface StoreCategory {
 }
 
 export interface StoreSettings {
+  storeName?: string;
+  storeLogoUrl?: string;
   borderColor?: string;
   hideBorders?: boolean;
+  orderStatuses?: string[];
 }
 
 export interface CartItem {
