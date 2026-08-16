@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     const isTargetAdmin = cleanEmail === "abdulkadir123shaba@gmail.com";
 
     // Perform query with case variations
-    let userQuery = await adminDb.collection("users")
+    const userQuery = await adminDb.collection("users")
       .where("email", "in", emailVariations)
       .limit(1)
       .get();
