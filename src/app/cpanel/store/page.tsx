@@ -12,6 +12,8 @@ interface StoreItem {
   title: string;
   description: string;
   price: number;
+  costPrice?: number | null;
+  discountPrice?: number | null;
   category: string;
   imageUrl: string;
   images?: string[];
@@ -66,7 +68,9 @@ export default function CpanelStorePage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState("");
   const [itemDescription, setItemDescription] = useState("");
+  const [itemCostPrice, setItemCostPrice] = useState("");
   const [itemPrice, setItemPrice] = useState("");
+  const [itemDiscountPrice, setItemDiscountPrice] = useState("");
   const [itemCategory, setItemCategory] = useState("Hardware");
   const [itemImages, setItemImages] = useState<string[]>([]);
   const [itemCoverUrl, setItemCoverUrl] = useState("");
@@ -168,14 +172,20 @@ export default function CpanelStorePage() {
     fetchConfig();
   }, []);
 
-  // Fetch Store Data
+  // Fetch Store Data & Dynamic Categories
   const fetchStoreData = async () => {
     setIsLoading(true);
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
-      const res = await fetch("/api/admin/store", { headers });
-      const data = await res.json();
+
+      const [storeRes, catRes] = await Promise.all([
+        fetch("/api/admin/store", { headers }),
+        fetch("/api/admin/store/categories", { headers })
+      ]);
+
+      const data = await storeRes.json();
+      const catData = await catRes.json();
 
       if (data.success) {
         setItems(data.items || []);
@@ -192,6 +202,10 @@ export default function CpanelStorePage() {
         }
       } else {
         toast.error(data.error || "Failed to load store data.");
+      }
+
+      if (catData.success && Array.isArray(catData.categories)) {
+        setCategories(catData.categories);
       }
     } catch (err: any) {
       toast.error(err.message || "Network error fetching store data.");
@@ -269,7 +283,9 @@ export default function CpanelStorePage() {
     setEditingItemId(null);
     setItemTitle("");
     setItemDescription("");
+    setItemCostPrice("");
     setItemPrice("");
+    setItemDiscountPrice("");
     setItemCategory("Hardware");
     setItemImages([]);
     setItemCoverUrl("");
@@ -285,7 +301,9 @@ export default function CpanelStorePage() {
     setEditingItemId(item.id);
     setItemTitle(item.title || "");
     setItemDescription(item.description || "");
+    setItemCostPrice(item.costPrice !== null && item.costPrice !== undefined ? item.costPrice.toString() : "");
     setItemPrice(item.price ? item.price.toString() : "");
+    setItemDiscountPrice(item.discountPrice !== null && item.discountPrice !== undefined ? item.discountPrice.toString() : "");
     setItemCategory(item.category || "Hardware");
     const existingImgs = Array.isArray(item.images) && item.images.length > 0 ? item.images : (item.imageUrl ? [item.imageUrl] : []);
     setItemImages(existingImgs);
@@ -354,7 +372,9 @@ export default function CpanelStorePage() {
             id: editingItemId || undefined,
             title: itemTitle,
             description: itemDescription,
+            costPrice: itemCostPrice !== "" ? parseFloat(itemCostPrice) : null,
             price: parseFloat(itemPrice) || 0,
+            discountPrice: itemDiscountPrice !== "" ? parseFloat(itemDiscountPrice) : null,
             category: itemCategory,
             imageUrl: primaryCover,
             images: itemImages.length > 0 ? itemImages : (primaryCover ? [primaryCover] : []),
@@ -673,7 +693,16 @@ export default function CpanelStorePage() {
                           <div>
                             <div className="flex items-center justify-between gap-2">
                               <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{item.title}</h4>
-                              <span className="font-mono font-black text-sm text-[#FC7A00]">₦{item.price.toLocaleString()}</span>
+                              <div className="text-right">
+                                {item.discountPrice ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-[10px] text-gray-400 line-through">₦{item.price.toLocaleString()}</span>
+                                    <span className="font-mono font-black text-sm text-emerald-600">₦{item.discountPrice.toLocaleString()}</span>
+                                  </div>
+                                ) : (
+                                  <span className="font-mono font-black text-sm text-[#FC7A00]">₦{item.price.toLocaleString()}</span>
+                                )}
+                              </div>
                             </div>
                             <p className="text-[10.5px] text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{item.description || "No description provided."}</p>
                           </div>
@@ -1039,8 +1068,8 @@ export default function CpanelStorePage() {
 
       {/* Standalone Product Add/Edit Modal */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-          <div className={cn("w-full max-w-xl p-6 rounded-3xl border shadow-2xl space-y-4 my-8", panelClass)}>
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+          <div className={cn("w-[94vw] sm:w-full max-w-xl p-4 sm:p-6 rounded-3xl border shadow-2xl space-y-4 my-auto max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col justify-between", panelClass)}>
             <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">
@@ -1075,12 +1104,13 @@ export default function CpanelStorePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Category & Pricing Fields */}
+              <div className="space-y-3">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-black uppercase text-gray-400 block">Category</label>
                     <Link href="/cpanel/store/categories" className="text-[9.5px] font-bold text-[#FC7A00] hover:underline">
-                      + Manage
+                      + Manage Categories
                     </Link>
                   </div>
                   <select
@@ -1107,16 +1137,40 @@ export default function CpanelStorePage() {
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Price (₦) *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 35000"
-                    value={itemPrice}
-                    onChange={(e) => setItemPrice(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Cost Price (₦)</label>
+                    <input
+                      type="number"
+                      placeholder="Wholesale cost"
+                      value={itemCostPrice}
+                      onChange={(e) => setItemCostPrice(e.target.value)}
+                      className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-[#FC7A00] block">Selling Price (₦) *</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="Standard price"
+                      value={itemPrice}
+                      onChange={(e) => setItemPrice(e.target.value)}
+                      className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-emerald-500 block">Discount Price (₦)</label>
+                    <input
+                      type="number"
+                      placeholder="Sale price"
+                      value={itemDiscountPrice}
+                      onChange={(e) => setItemDiscountPrice(e.target.value)}
+                      className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                    />
+                  </div>
                 </div>
               </div>
 
