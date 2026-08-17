@@ -54,7 +54,7 @@ export default function CpanelFreezePage() {
   // Auth & Session Check
   useEffect(() => {
     async function checkSession() {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       if (isMock) {
         setIsLoadingSession(false);
         return;
@@ -88,7 +88,7 @@ export default function CpanelFreezePage() {
     setHasSearched(true);
 
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch(`/api/admin/freeze?search=${encodeURIComponent(searchQuery.trim())}`, { headers });
       const data = await res.json();
@@ -112,7 +112,7 @@ export default function CpanelFreezePage() {
   const handleToggleFreeze = async (userItem: FrozenUser, nextIsFrozen: boolean) => {
     setSavingUid(userItem.uid);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };

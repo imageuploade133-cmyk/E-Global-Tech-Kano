@@ -5,6 +5,10 @@ export interface StoreItem {
   price: number;
   category: string;
   imageUrl: string;
+  images?: string[];
+  coverImageUrl?: string;
+  videoUrl?: string;
+  autoSlide?: boolean;
   inStock: boolean;
   specs?: string[];
   features?: string[];
@@ -31,8 +35,11 @@ export interface StoreCategory {
 }
 
 export interface StoreSettings {
+  storeName?: string;
+  storeLogoUrl?: string;
   borderColor?: string;
   hideBorders?: boolean;
+  orderStatuses?: string[];
 }
 
 export interface CartItem {

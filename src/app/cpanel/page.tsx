@@ -95,11 +95,25 @@ export default function AdminPage() {
   const labelClass = isDark ? "text-gray-300" : "text-gray-900";
   const metaClass = isDark ? "text-gray-400" : "text-gray-500";
 
-  // Admin lock validation
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  // Admin lock validation & Firebase Auth for CPanel
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("admin_session_unlocked") === "true";
+    }
+    return false;
+  });
   const [showLockConfirm, setShowLockConfirm] = useState(false);
-  const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
+  const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetOtp, setResetOtp] = useState("");
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isDispatchingResetEmail, setIsDispatchingResetEmail] = useState(false);
+  const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "banners" | "investments" | "history">("dashboard");
 
@@ -126,6 +140,11 @@ export default function AdminPage() {
           setAdminEmail(data.user.email);
           if (typeof window !== "undefined") {
             sessionStorage.setItem("admin_session_unlocked", "true");
+          }
+        } else {
+          setIsAdminUnlocked(false);
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("admin_session_unlocked");
           }
         }
       } catch (err) {
@@ -351,13 +370,7 @@ export default function AdminPage() {
     permissions: [] as string[]
   });
 
-  const handleUserSearchSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchUserTerm.trim()) {
-      toast.warning("Please enter a search term (email address or phone number) to save read costs.");
-      return;
-    }
-
+  const fetchUsersDirectory = async (searchTermVal?: string) => {
     setIsLoadingUsers(true);
     try {
       let idToken = "mock-admin-token";
@@ -366,8 +379,8 @@ export default function AdminPage() {
         idToken = await user.getIdToken();
       }
 
-      // LOW COST INDEXED EQUALITY LOOKUP
-      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(searchUserTerm.trim())}`, {
+      const q = searchTermVal !== undefined ? searchTermVal : searchUserTerm;
+      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(q.trim())}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`
         }
@@ -375,11 +388,6 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setUsersList(data.users || []);
-        if (data.users?.length === 0) {
-          toast.info("No matching records found. Double check email or complete phone number prefix.");
-        } else {
-          toast.success(`Found ${data.users.length} matching result(s)!`);
-        }
       } else {
         toast.error(data.error || "Failed to load system users securely.");
       }
@@ -389,6 +397,17 @@ export default function AdminPage() {
       setIsLoadingUsers(false);
     }
   };
+
+  const handleUserSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetchUsersDirectory(searchUserTerm);
+  };
+
+  useEffect(() => {
+    if (isAdminUnlocked && activeTab === "users" && usersList.length === 0) {
+      fetchUsersDirectory("");
+    }
+  }, [isAdminUnlocked, activeTab]);
 
   const fetchPendingKyc = async (isLoadMore: boolean = false, customTab?: "pending" | "verified_today" | "unverified") => {
     setIsLoadingKyc(true);
@@ -1162,27 +1181,39 @@ export default function AdminPage() {
     e.preventDefault();
     setIsVerifyingPin(true);
 
-    if (!adminEmail.trim()) {
-      toast.error("Please enter your admin email address.");
+    const cleanEmail = adminEmail.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      toast.error("Please enter your administrator email address.");
       setIsVerifyingPin(false);
       return;
     }
 
-    if (!adminPin || adminPin.length < 4) {
-      toast.error("Please enter your 4-digit Access PIN.");
+    if (!adminPassword) {
+      toast.error("Please enter your administrator password.");
       setIsVerifyingPin(false);
       return;
     }
 
     try {
+      // 1. Authenticate with Firebase Auth on the client
+      const { signInWithEmailAndPassword } = await import("firebase/auth");
+      const { auth } = await import("@/lib/firebase");
+
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, adminPassword);
+      const firebaseUser = userCredential.user;
+      const idToken = await firebaseUser.getIdToken(true);
+
+      // 2. Exchange Firebase ID Token for CPanel Session
       const res = await fetch("/api/admin/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
         },
         body: JSON.stringify({
-          email: adminEmail,
-          pin: adminPin,
+          email: cleanEmail,
+          idToken
         }),
       });
 
@@ -1192,14 +1223,140 @@ export default function AdminPage() {
         if (typeof window !== "undefined") {
           sessionStorage.setItem("admin_session_unlocked", "true");
         }
-        toast.success(data.message || "Identity PIN Verified. Access Granted!");
+        toast.success(data.message || "Firebase Admin Authentication Granted!");
       } else {
-        toast.error(data.error || "Invalid Email or Access PIN!");
+        toast.error(data.error || "Access Denied: Account is not an authorized administrator.");
       }
     } catch (err: any) {
-      toast.error("API connection error during verification.");
+      console.error("[CPanel Firebase Auth Error]:", err);
+      let errMsg = "Firebase Authentication Failed.";
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+        errMsg = "Invalid administrator Email or Password.";
+      } else if (err.code === "auth/too-many-requests") {
+        errMsg = "Too many failed attempts. Please try again later.";
+      } else if (err.message) {
+        errMsg = err.message;
+      }
+      toast.error(errMsg);
     } finally {
       setIsVerifyingPin(false);
+    }
+  };
+
+  // 3-Step Phone OTP Admin Password Reset Flow
+  const handleRequestResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    const cleanPhone = resetPhone.trim();
+
+    if (!cleanEmail) {
+      toast.error("Please enter your administrator email address.");
+      return;
+    }
+
+    if (!cleanPhone) {
+      toast.error("Please enter your registered phone number.");
+      return;
+    }
+
+    setIsRequestingOtp(true);
+    try {
+      const res = await fetch("/api/admin/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "request_otp",
+          email: cleanEmail,
+          phoneNumber: cleanPhone
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Phone OTP sent successfully!");
+        if (data.devOtp) {
+          setOtpDevCode(data.devOtp);
+        }
+        setResetStep(2);
+      } else {
+        toast.error(data.error || "Failed to request password reset OTP.");
+      }
+    } catch {
+      toast.error("Network communication failure requesting OTP.");
+    } finally {
+      setIsRequestingOtp(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    const cleanOtp = resetOtp.trim();
+
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      toast.error("Please enter the 6-digit OTP code.");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch("/api/admin/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "verify_otp",
+          email: cleanEmail,
+          otp: cleanOtp
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Phone OTP verified!");
+        setResetStep(3);
+      } else {
+        toast.error(data.error || "Invalid or expired OTP code.");
+      }
+    } catch {
+      toast.error("Network communication failure verifying OTP.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleDispatchResetEmail = async () => {
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    setIsDispatchingResetEmail(true);
+
+    try {
+      // First, notify server of completed reset email dispatch
+      const res = await fetch("/api/admin/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_reset_email",
+          email: cleanEmail
+        })
+      });
+
+      const data = await res.json();
+
+      // Dispatch Firebase Auth Password Reset Email
+      const { sendPasswordResetEmail } = await import("firebase/auth");
+      const { auth } = await import("@/lib/firebase");
+
+      await sendPasswordResetEmail(auth, cleanEmail);
+
+      toast.success(data.message || "Official password recovery email sent! Check your inbox.");
+      setIsResetPasswordMode(false);
+      setResetStep(1);
+      setResetPhone("");
+      setResetOtp("");
+      setOtpDevCode(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send password recovery email.");
+    } finally {
+      setIsDispatchingResetEmail(false);
     }
   };
 
@@ -1398,10 +1555,12 @@ export default function AdminPage() {
 
   const sidebarNavItems = [
     { id: "dashboard", label: "Metrics", icon: "cell_tower" },
+    { id: "admins", label: "Admin Management", icon: "admin_panel_settings", href: "/cpanel/admins" },
     { id: "users", label: "Users & Permissions", icon: "group" },
     { id: "kyc", label: "KYC Approvals", icon: "verified_user" },
     { id: "settings", label: "Branding", icon: "diamond" },
     { id: "store", label: "Store Manager", icon: "storefront", href: "/cpanel/store" },
+    { id: "stock", label: "Stock Income", icon: "trending_up", href: "/cpanel/store/stock" },
     { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze" },
     { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits" },
     { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos" },
@@ -1419,52 +1578,225 @@ export default function AdminPage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6"
+          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6 shadow-xl"
         >
-          <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
-            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_maybe</span>
+          <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
+            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>admin_panel_settings</span>
           </div>
 
           <div>
-            <h2 className="font-hanken font-extrabold text-2xl tracking-tight text-gray-900 leading-tight">Admin Gatekeeper</h2>
+            <h2 className="font-hanken font-black text-2xl tracking-tight text-gray-900 leading-tight">
+              {isResetPasswordMode ? "Reset Admin Password" : "CPanel Administrator Login"}
+            </h2>
             <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
-              Welcome to the E-Tech Enterprise Control Panel. Enter your administrative passcode or your secure transaction PIN to grant access.
+              {isResetPasswordMode
+                ? "Enter your administrator email address to receive a secure Firebase password recovery link."
+                : "Welcome to the E-Tech Enterprise Control Panel. Authenticate using your Firebase Administrator credentials."}
             </p>
           </div>
 
-          <form onSubmit={handleAdminVerify} className="w-full space-y-4">
-            <div className="space-y-1.5 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Email Address</label>
-              <input
-                type="email"
-                required
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@example.com"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-              />
-            </div>
+          {isResetPasswordMode ? (
+            <div className="w-full space-y-4 text-left">
+              {/* Step indicator pills */}
+              <div className="flex items-center justify-between gap-2 px-2 py-1 bg-gray-100 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                <span className={cn("px-2 py-1 rounded-lg transition-all", resetStep === 1 ? "bg-[#FC7A00] text-white" : "text-gray-400")}>1. Phone Verification</span>
+                <span className={cn("px-2 py-1 rounded-lg transition-all", resetStep === 2 ? "bg-[#FC7A00] text-white" : "text-gray-400")}>2. OTP Check</span>
+                <span className={cn("px-2 py-1 rounded-lg transition-all", resetStep === 3 ? "bg-emerald-600 text-white" : "text-gray-400")}>3. Reset Link</span>
+              </div>
 
-            <div className="space-y-1.5 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Access PIN</label>
-              <input
-                type="password"
-                maxLength={6}
-                value={adminPin}
-                onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter 4-digit Access PIN"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-              />
-            </div>
+              {/* Step 1 Form */}
+              {resetStep === 1 && (
+                <form onSubmit={handleRequestResetOtp} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      placeholder="e.g. abdulkadir123shaba@gmail.com"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    />
+                  </div>
 
-            <button
-              type="submit"
-              disabled={isVerifyingPin}
-              className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isVerifyingPin ? <><ButtonSpinner /> Verifying Authority...</> : "Verify Authority"}
-            </button>
-          </form>
+                  <div className="space-y-1.5">
+                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Registered Phone Number</label>
+                    <input
+                      type="tel"
+                      required
+                      value={resetPhone}
+                      onChange={(e) => setResetPhone(e.target.value)}
+                      placeholder="e.g. +2348033123456 or 08033123456"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isRequestingOtp}
+                    className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                  >
+                    {isRequestingOtp ? <><ButtonSpinner /> Requesting Phone OTP...</> : "Verify Phone & Request OTP"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetPasswordMode(false);
+                      setResetStep(1);
+                    }}
+                    className="w-full text-center text-xs font-bold text-gray-500 hover:text-black uppercase tracking-wider cursor-pointer"
+                  >
+                    ← Back to Login
+                  </button>
+                </form>
+              )}
+
+              {/* Step 2 Form */}
+              {resetStep === 2 && (
+                <form onSubmit={handleVerifyResetOtp} className="space-y-4">
+                  <div className="p-3 bg-orange-50 border border-orange-100 rounded-2xl text-center space-y-1">
+                    <p className="text-[11px] font-bold text-gray-700">OTP code dispatched via SMS/WhatsApp</p>
+                    <p className="text-[10px] text-gray-500">Sent to: <span className="font-mono font-black">{resetPhone}</span></p>
+                    {otpDevCode && (
+                      <p className="text-[10px] font-mono font-bold text-[#FC7A00] bg-white p-1 rounded border border-orange-200 mt-1 select-all">
+                        DEV OTP: {otpDevCode}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Enter 6-Digit OTP Code</label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      required
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="e.g. 123456"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-center font-mono text-lg tracking-widest text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isVerifyingOtp}
+                    className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                  >
+                    {isVerifyingOtp ? <><ButtonSpinner /> Verifying OTP Code...</> : "Confirm OTP Code"}
+                  </button>
+
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
+                    <button
+                      type="button"
+                      onClick={() => setResetStep(1)}
+                      className="hover:text-black uppercase tracking-wider cursor-pointer"
+                    >
+                      ← Re-enter Phone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRequestResetOtp({ preventDefault: () => {} } as any)}
+                      className="text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer"
+                    >
+                      Resend OTP
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Step 3 Confirmation */}
+              {resetStep === 3 && (
+                <div className="space-y-4 text-center">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                    <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>mark_email_read</span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-black text-sm text-gray-900 uppercase">Phone Identity Verified</h3>
+                    <p className="text-[11px] text-gray-500 mt-1 font-semibold leading-relaxed">
+                      Click below to dispatch the official password reset recovery link to <span className="font-bold text-black">{adminEmail}</span>.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isDispatchingResetEmail}
+                    onClick={handleDispatchResetEmail}
+                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                  >
+                    {isDispatchingResetEmail ? <><ButtonSpinner /> Sending Password Reset Email...</> : "Dispatch Reset Link to Email"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetPasswordMode(false);
+                      setResetStep(1);
+                    }}
+                    className="text-xs font-bold text-gray-500 hover:text-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleAdminVerify} className="w-full space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Email</label>
+                <input
+                  type="email"
+                  required
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="e.g. abdulkadir123shaba@gmail.com"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <div className="flex justify-between items-center">
+                  <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsResetPasswordMode(true)}
+                    className="text-[10px] font-bold text-gray-400 hover:text-[#FC7A00] uppercase"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <div className="relative w-full">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Enter Password"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-4 pr-11 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] transition-colors p-1 flex items-center justify-center cursor-pointer"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      {showPassword ? "visibility_off" : "visibility"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isVerifyingPin}
+                className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+              >
+                {isVerifyingPin ? <><ButtonSpinner /> Authenticating Firebase Token...</> : "Authenticate Administrator"}
+              </button>
+            </form>
+          )}
         </motion.div>
       </main>
     );
@@ -2131,10 +2463,9 @@ export default function AdminPage() {
                           </span>
                           <input
                             type="text"
-                            required
                             value={searchUserTerm}
                             onChange={(e) => setSearchUserTerm(e.target.value)}
-                            placeholder="Enter exact email, phone number, or 11-digit BVN..."
+                            placeholder="Search by name, email, phone number, or BVN..."
                             className={cn(
                               "w-full rounded-xl pl-9 pr-3 py-3 text-xs outline-none transition-all",
                               isDark ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500" : "bg-gray-50 border border-gray-200 text-black focus:border-[#FC7A00]"

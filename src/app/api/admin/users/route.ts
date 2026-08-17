@@ -10,7 +10,6 @@ const ALLOWED_PERMISSIONS = [
   "can_moderate_users"
 ];
 
-const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
 
 export async function GET(req: Request) {
   try {
@@ -69,13 +68,13 @@ export async function GET(req: Request) {
 
     const users: any[] = [];
 
-    // LOW READ COST: Direct indexed equality search queries inside Firestore.
+    // Low-cost multi-field indexed query
     if (searchTerm) {
       if (searchTerm.includes("@")) {
         // Query exactly by email
         const snap = await adminDb.collection("users")
           .where("email", "==", searchTerm)
-          .limit(5)
+          .limit(20)
           .get();
 
         snap.forEach(doc => {
@@ -83,10 +82,11 @@ export async function GET(req: Request) {
           users.push({ uid: doc.id, ...data });
         });
       } else {
-        // Query exactly by phoneNumber or BVN in parallel
+        // Query by phoneNumber or BVN or Name
         const queries = [
-          adminDb.collection("users").where("phoneNumber", "==", searchTerm).limit(5).get(),
-          adminDb.collection("users").where("bvn", "==", searchTerm).limit(5).get()
+          adminDb.collection("users").where("phoneNumber", "==", searchTerm).limit(20).get(),
+          adminDb.collection("users").where("bvn", "==", searchTerm).limit(20).get(),
+          adminDb.collection("users").where("name", "==", searchTerm.toUpperCase()).limit(20).get()
         ];
 
         const snaps = await Promise.all(queries);
@@ -99,31 +99,35 @@ export async function GET(req: Request) {
           });
         });
 
-        // Fallback: If phone prefix omitted or formatted differently, query by custom formats
+        // Fallback: Try variations for phone prefix
         if (users.length === 0) {
-          const variations = [
-            searchTerm,
-            `+234${searchTerm.startsWith("0") ? searchTerm.slice(1) : searchTerm}`,
-            `+227${searchTerm.startsWith("0") ? searchTerm.slice(1) : searchTerm}`,
-          ];
-          const querySnap = await adminDb.collection("users")
-            .where("phoneNumber", "in", variations)
-            .limit(5)
-            .get();
+          const rawDigits = searchTerm.replace(/\D/g, "");
+          if (rawDigits.length >= 7) {
+            const variations = [
+              searchTerm,
+              `+234${rawDigits.startsWith("0") ? rawDigits.slice(1) : rawDigits}`,
+              `+227${rawDigits.startsWith("0") ? rawDigits.slice(1) : rawDigits}`,
+              rawDigits
+            ];
+            const querySnap = await adminDb.collection("users")
+              .where("phoneNumber", "in", variations)
+              .limit(20)
+              .get();
 
-          querySnap.forEach(doc => {
-            const data = doc.data();
-            if (!users.some(u => u.uid === doc.id)) {
-              users.push({ uid: doc.id, ...data });
-            }
-          });
+            querySnap.forEach(doc => {
+              const data = doc.data();
+              if (!users.some(u => u.uid === doc.id)) {
+                users.push({ uid: doc.id, ...data });
+              }
+            });
+          }
         }
       }
     } else {
-      // Default: Return only 5 users to keep database reads extremely low if no search term entered
+      // Default: Return latest 20 users
       const usersSnap = await adminDb.collection("users")
         .orderBy("createdAt", "desc")
-        .limit(5)
+        .limit(20)
         .get();
 
       usersSnap.forEach(doc => {
@@ -204,12 +208,11 @@ export async function POST(req: Request) {
       } = body;
 
       // Enforce administrative creation privileges: Only SUPER_ADMIN or root can create administrative accounts
-      const callerDoc = await adminDb.collection("users").doc(uid).get();
-      const callerData = callerDoc.exists ? callerDoc.data() || {} : {};
-      const callerRole = callerData.role || "user";
-      const callerEmail = (callerData.email || "").toLowerCase().trim();
+      const adminDoc = await adminDb.collection("admin_users").doc(uid).get();
+      const adminData = adminDoc.exists ? adminDoc.data() || {} : {};
+      const callerRole = (adminData.role || "").toLowerCase();
 
-      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || (ROOT_ADMIN_EMAIL && callerEmail === ROOT_ADMIN_EMAIL) || uid === "mock-admin-uid");
+      const isCallerSuperAdmin = (callerRole === "super_admin" || uid === "mock-admin-uid");
 
       if (role === "admin" || role === "SUPER_ADMIN") {
         if (!isCallerSuperAdmin) {
@@ -307,12 +310,11 @@ export async function POST(req: Request) {
       }
 
       // Enforce role modification privileges: Only SUPER_ADMIN can manage administrative roles/privileges
-      const callerDoc = await adminDb.collection("users").doc(uid).get();
-      const callerData = callerDoc.exists ? callerDoc.data() || {} : {};
-      const callerRole = callerData.role || "user";
-      const callerEmail = (callerData.email || "").toLowerCase().trim();
+      const adminDoc = await adminDb.collection("admin_users").doc(uid).get();
+      const adminData = adminDoc.exists ? adminDoc.data() || {} : {};
+      const callerRole = (adminData.role || "").toLowerCase();
 
-      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || (ROOT_ADMIN_EMAIL && callerEmail === ROOT_ADMIN_EMAIL) || uid === "mock-admin-uid");
+      const isCallerSuperAdmin = (callerRole === "super_admin" || uid === "mock-admin-uid");
 
       const targetDoc = await adminDb.collection("users").doc(targetUid).get();
       const targetData = targetDoc.exists ? targetDoc.data() || {} : {};

@@ -8,7 +8,7 @@ import { TransactionReceipt, Transaction } from "./TransactionReceipt";
 import { TransactionIcon } from "./TransactionIcon";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
-import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 
 interface RecentTransactionsProps {
   isLoading?: boolean;
@@ -28,6 +28,9 @@ const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "R
   return "FAILED";
 };
 
+const RECENT_TX_CACHE_KEY = "recent_transactions_cache";
+const RECENT_TX_TTL_MS = 3 * 60 * 1000; // 3-minute cache to drastically save Firestore read budget
+
 export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoading: propIsLoading }) => {
   const { user } = useAuth();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -35,8 +38,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
   const [loading, setLoading] = useState(true);
   const hasPushedState = React.useRef(false);
 
-  // Fetch live user transactions (top 5 recent activities)
-  useEffect(() => {
+  const fetchRecentTransactions = async (forceRefresh = false) => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (isMock || !user) {
       setTransactions([]);
@@ -44,47 +46,83 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
       return;
     }
 
-    setLoading(true);
-    const q = query(
-      collection(db, "transactions"),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(5)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list: Transaction[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          list.push({
-            id: docSnap.id,
-            reference: data.reference || docSnap.id,
-            type: data.type || "DEPOSIT",
-            amount: Number(data.amount) || 0,
-            currency: data.currency || "NGN",
-            description: data.description || "",
-            recipientName: data.recipientName || "",
-            bankName: data.bankName || "",
-            status: data.status || "SUCCESS",
-            date: data.date || "",
-            time: data.time || "",
-            fee: Number(data.fee) || 0,
-          });
-        });
-
-        setTransactions(list.slice(0, 3));
-        setLoading(false);
-      },
-      (error) => {
-        console.error("[RecentTransactions Listener Error]:", error);
-        setTransactions([]);
-        setLoading(false);
+    // Check low-read session cache first unless explicit refresh is requested
+    if (!forceRefresh && typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(`${RECENT_TX_CACHE_KEY}_${user.uid}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.data) && Date.now() - parsed.timestamp < RECENT_TX_TTL_MS) {
+            setTransactions(parsed.data);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // Fall back to getDocs query on cache read error
       }
-    );
+    }
 
-    return () => unsubscribe();
+    try {
+      setLoading(true);
+      const q = query(
+        collection(db, "transactions"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(3)
+      );
+
+      const snapshot = await getDocs(q);
+      const list: Transaction[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          reference: data.reference || docSnap.id,
+          type: data.type || "DEPOSIT",
+          amount: Number(data.amount) || 0,
+          currency: data.currency || "NGN",
+          description: data.description || "",
+          recipientName: data.recipientName || "",
+          bankName: data.bankName || "",
+          status: data.status || "SUCCESS",
+          date: data.date || "",
+          time: data.time || "",
+          fee: Number(data.fee) || 0,
+        });
+      });
+
+      setTransactions(list);
+
+      // Save in low-read session cache
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            `${RECENT_TX_CACHE_KEY}_${user.uid}`,
+            JSON.stringify({ data: list, timestamp: Date.now() })
+          );
+        } catch {
+          // Ignore storage write errors
+        }
+      }
+    } catch (error) {
+      console.error("[RecentTransactions Query Error]:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecentTransactions();
+
+    const handleAppRefresh = () => {
+      fetchRecentTransactions(true);
+    };
+
+    window.addEventListener("app-refresh", handleAppRefresh);
+    return () => {
+      window.removeEventListener("app-refresh", handleAppRefresh);
+    };
   }, [user]);
 
   // Sync state with browser back history for swipe-to-dismiss behavior

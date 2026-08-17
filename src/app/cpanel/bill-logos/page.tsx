@@ -94,7 +94,7 @@ export default function CpanelBillLogosPage() {
   // Auth & Session Check
   useEffect(() => {
     async function checkSession() {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       if (isMock) {
         setIsLoadingSession(false);
         return;
@@ -136,7 +136,7 @@ export default function CpanelBillLogosPage() {
   const fetchBillLogos = async () => {
     setIsLoading(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bill-logos", { headers });
       const data = await res.json();
@@ -208,7 +208,7 @@ export default function CpanelBillLogosPage() {
     setSavingCode(cleanCode);
 
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bill-logos", {
         method: "POST",

@@ -10,6 +10,7 @@ import { TransactionReceipt, Transaction } from "@/components/wallet/Transaction
 import { TransactionIcon } from "@/components/wallet/TransactionIcon";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
+import { toast } from "sonner";
 
 const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
   const s = String(status || "").toUpperCase().trim();
@@ -63,8 +64,8 @@ export default function HistoryPage() {
     }
   }, [selectedTx]);
 
-  // Initial secure paginated loading of transactions
-  useEffect(() => {
+  // Initial secure paginated loading of transactions with low-read session cache
+  const fetchInitialTransactions = async (forceRefresh = false) => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (isMock || !user) {
       setTransactions([]);
@@ -73,53 +74,96 @@ export default function HistoryPage() {
       return;
     }
 
-    const fetchInitialTransactions = async () => {
+    if (!forceRefresh && typeof window !== "undefined") {
       try {
-        setLoading(true);
-        const q = query(
-          collection(db, "transactions"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc"),
-          limit(15)
-        );
-
-        const snap = await getDocs(q);
-        const list: Transaction[] = [];
-        snap.forEach((docSnap) => {
-          const data = docSnap.data();
-          list.push({
-            id: docSnap.id,
-            reference: data.reference || docSnap.id,
-            type: data.type || "DEPOSIT",
-            amount: Number(data.amount) || 0,
-            currency: data.currency || "NGN",
-            description: data.description || "",
-            recipientName: data.recipientName || "",
-            bankName: data.bankName || "",
-            status: data.status || "SUCCESS",
-            date: data.date || "",
-            time: data.time || "",
-            fee: Number(data.fee) || 0,
-          });
-        });
-
-        setTransactions(list);
-        if (snap.docs.length < 15) {
-          setHasMore(false);
-        } else {
-          setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
-          setHasMore(true);
+        const raw = sessionStorage.getItem(`history_transactions_cache_${user.uid}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.data) && Date.now() - parsed.timestamp < 3 * 60 * 1000) {
+            setTransactions(parsed.data);
+            setHasMore(Boolean(parsed.hasMore));
+            setLoading(false);
+            return;
+          }
         }
-      } catch (err) {
-        console.error("[HistoryPage Initial Load Exception]:", err);
-        setTransactions([]);
-        setHasMore(false);
-      } finally {
-        setLoading(false);
+      } catch {
+        // Fall back to getDocs
       }
+    }
+
+    try {
+      setLoading(true);
+      const q = query(
+        collection(db, "transactions"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(15)
+      );
+
+      const snap = await getDocs(q);
+      const list: Transaction[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          reference: data.reference || docSnap.id,
+          type: data.type || "DEPOSIT",
+          amount: Number(data.amount) || 0,
+          currency: data.currency || "NGN",
+          description: data.description || "",
+          recipientName: data.recipientName || "",
+          bankName: data.bankName || "",
+          status: data.status || "SUCCESS",
+          date: data.date || "",
+          time: data.time || "",
+          fee: Number(data.fee) || 0,
+        });
+      });
+
+      setTransactions(list);
+      if (list.length === 0) {
+        toast.info("No history");
+      }
+
+      const moreAvailable = snap.docs.length >= 15;
+      if (!moreAvailable) {
+        setHasMore(false);
+      } else {
+        setLastVisibleDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(true);
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            `history_transactions_cache_${user.uid}`,
+            JSON.stringify({ data: list, hasMore: moreAvailable, timestamp: Date.now() })
+          );
+        } catch {
+          // Ignore storage write errors
+        }
+      }
+    } catch (err) {
+      console.error("[HistoryPage Initial Load Exception]:", err);
+      setTransactions([]);
+      setHasMore(false);
+      toast.info("No history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialTransactions();
+
+    const handleAppRefresh = () => {
+      fetchInitialTransactions(true);
     };
 
-    fetchInitialTransactions();
+    window.addEventListener("app-refresh", handleAppRefresh);
+    return () => {
+      window.removeEventListener("app-refresh", handleAppRefresh);
+    };
   }, [user]);
 
   // Load more function with query cursors to save read budget
@@ -400,23 +444,51 @@ export default function HistoryPage() {
                   );
                 })}
 
+                {/* Skeleton placeholders when loading more activities so user continues seamlessly */}
+                {loadingMore && (
+                  <div className="space-y-2.5 pt-1">
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={`loading-more-${i}`}
+                        className="w-full h-[72px] bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between animate-pulse"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-100" />
+                          <div className="space-y-2">
+                            <div className="h-3 bg-gray-200 rounded w-28" />
+                            <div className="h-2 bg-gray-100 rounded w-16" />
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-right">
+                          <div className="h-3.5 bg-gray-200 rounded w-16 ml-auto" />
+                          <div className="h-2.5 bg-gray-100 rounded w-10 ml-auto" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Highly intuitive production-ready pagination footer */}
                 {hasMore && (
                   <div className="pt-4 flex justify-center">
-                    {loadingMore ? (
-                      <div className="flex items-center gap-2 text-[#FC7A00] font-bold text-xs uppercase tracking-wider">
-                        <div className="w-4 h-4 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
-                        <span>Loading more...</span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleLoadMore}
-                        className="px-6 py-3 rounded-xl border border-[#FC7A00]/30 hover:border-[#FC7A00] bg-white text-[#FC7A00] text-xs font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer flex items-center gap-2"
-                      >
-                        Load More Activity
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      disabled={loadingMore}
+                      onClick={handleLoadMore}
+                      className="px-6 py-3.5 rounded-xl border border-[#FC7A00]/30 hover:border-[#FC7A00] bg-white text-[#FC7A00] text-xs font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer flex items-center gap-2.5 shadow-3xs hover:shadow-xs disabled:opacity-60"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
+                          <span>Fetching More History...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[18px]">expand_circle_down</span>
+                          <span>Load More History</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
               </>

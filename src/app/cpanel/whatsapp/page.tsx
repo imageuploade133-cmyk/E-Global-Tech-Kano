@@ -1,828 +1,554 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/lib/AuthContext";
-import { useAppConfig } from "@/lib/ConfigContext";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 
-const ButtonSpinner = () => (
-  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-  </svg>
-);
+interface DeviceInfo {
+  phoneNumber: string | null;
+  accountName: string | null;
+  instanceName: string | null;
+  connectionStatus: string;
+  lastStatusUpdate: string;
+}
 
-export default function DedicatedWhatsappLinkPage() {
-  const { userData, user } = useAuth();
-  const { config } = useAppConfig();
+interface WhatsappStatusData {
+  success: boolean;
+  apiHealth: "online" | "offline" | "error";
+  apiError: string | null;
+  deviceStatus: "CONNECTED" | "CONNECTING" | "WAITING_FOR_QR" | "DISCONNECTED" | "ERROR";
+  deviceInfo?: DeviceInfo | null;
+  qrCode?: string | null;
+  lastChecked?: string;
+}
 
-  // Theme support
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+function ButtonSpinner() {
+  return (
+    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+  );
+}
 
+export default function CpanelWhatsappManagementPage() {
+  const router = useRouter();
+  const [isDark, setIsDark] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  // Status state
+  const [apiHealth, setApiHealth] = useState<"online" | "offline" | "error">("offline");
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [deviceStatus, setDeviceStatus] = useState<"CONNECTED" | "CONNECTING" | "WAITING_FOR_QR" | "DISCONNECTED" | "ERROR">("DISCONNECTED");
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
+
+  // Action loading states
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  // Confirmation Modal State for Disconnect / Logout
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+
+  // Polling ref & visibility tracking
+  const isPageVisibleRef = useRef(true);
+
+  // Theme Syncing
   useEffect(() => {
     if (typeof window !== "undefined") {
       const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark" || cached === "light") {
-        setTheme(cached);
+      if (cached === "dark") {
+        setIsDark(true);
       }
     }
   }, []);
 
   const toggleTheme = () => {
-    setTheme((prev) => {
-      const next = prev === "light" ? "dark" : "light";
+    setIsDark((prev) => {
+      const next = !prev;
       if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next);
+        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
       }
       return next;
     });
   };
 
-  const isDark = theme === "dark";
-  const panelClass = isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border border-gray-200 text-gray-800";
-  const inputClass = isDark ? "bg-gray-800 border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2 text-xs outline-none transition-all w-full" : "bg-white border border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2 text-xs outline-none transition-all w-full";
-  const labelClass = isDark ? "text-gray-300" : "text-gray-900";
-
-  // Authorization and State variables
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [adminPin, setAdminPin] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
-
-  // Check cookie-based admin session on mount
+  // Auth & Session Check
   useEffect(() => {
-    const checkCPanelSession = async () => {
+    async function checkSession() {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (isMock) {
+        setIsLoadingSession(false);
+        return;
+      }
       try {
         const res = await fetch("/api/admin/auth/session");
         const data = await res.json();
-        if (res.ok && data.success && data.user) {
-          setIsAdminUnlocked(true);
-          setAdminEmail(data.user.email);
+        if (!res.ok || !data.success) {
+          toast.error("Session expired. Please log in.");
+          router.push("/cpanel");
+          return;
         }
       } catch (err) {
-        console.warn("No active admin cookie session found on mount:", err);
+        console.error("Session check failed:", err);
+      } finally {
+        setIsLoadingSession(false);
       }
-    };
-    checkCPanelSession();
+    }
+    checkSession();
+  }, [router]);
+
+  // Fetch Status from server endpoint
+  const fetchStatus = useCallback(async (isManual: boolean = false) => {
+    if (isManual) setIsRefreshing(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+
+      const res = await fetch("/api/admin/whatsapp/status", { headers, cache: "no-store" });
+      const data: WhatsappStatusData = await res.json();
+
+      if (data) {
+        setApiHealth(data.apiHealth || "offline");
+        setApiError(data.apiError || null);
+        setDeviceStatus(data.deviceStatus || "DISCONNECTED");
+        setLastChecked(data.lastChecked || new Date().toISOString());
+
+        if (data.deviceInfo) {
+          setDeviceInfo(data.deviceInfo);
+        }
+
+        // Handle QR Code
+        if (data.deviceStatus === "WAITING_FOR_QR" && data.qrCode) {
+          setQrCode(data.qrCode);
+        } else if (data.deviceStatus === "CONNECTED") {
+          setQrCode(null); // Automatically hide QR code when connected
+        }
+
+        if (isManual) {
+          toast.success("WhatsApp status refreshed!");
+        }
+      }
+    } catch (err: any) {
+      setApiHealth("offline");
+      setApiError("Failed to reach CPanel backend status route.");
+      if (isManual) {
+        toast.error("Network error refreshing status.");
+      }
+    } finally {
+      if (isManual) setIsRefreshing(false);
+    }
   }, []);
 
-  // Pre-fill admin email when user loads as fallback
+  // Fetch QR Code explicitly if in WAITING_FOR_QR state
+  const fetchQrCode = useCallback(async () => {
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+
+      const res = await fetch("/api/admin/whatsapp/qr", { headers, cache: "no-store" });
+      const data = await res.json();
+      if (data.success && data.qrCode) {
+        setQrCode(data.qrCode);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch fresh QR code:", err);
+    }
+  }, []);
+
+  // Page visibility listener to stop polling when inactive
   useEffect(() => {
-    if (user?.email && !adminEmail) {
-      setAdminEmail(user.email);
-    }
-  }, [user, adminEmail]);
+    const handleVisibilityChange = () => {
+      isPageVisibleRef.current = !document.hidden;
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
-  // WhatsApp States
-  const [whatsappStatus, setWhatsappStatus] = useState<"LINKED" | "UNLINKED">("UNLINKED");
-  const [whatsappPhoneNumber, setWhatsappPhoneNumber] = useState<string | null>(null);
-  const [whatsappLinkedAt, setWhatsappLinkedAt] = useState<string | null>(null);
-  const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
-  const [isLoadingWhatsapp, setIsLoadingWhatsapp] = useState(false);
-
-  // WhatsApp API VM Configuration States
-  const [whatsappApiUrlInput, setWhatsappApiUrlInput] = useState("");
-  const [whatsappApiKeyInput, setWhatsappApiKeyInput] = useState("");
-  const [whatsappInstanceIdInput, setWhatsappInstanceIdInput] = useState("");
-  const [whatsappAdminUsernameInput, setWhatsappAdminUsernameInput] = useState("");
-  const [whatsappAdminPasswordInput, setWhatsappAdminPasswordInput] = useState("");
-  const [isSavingApiConfig, setIsSavingApiConfig] = useState(false);
-  const [isLinkingWhatsapp, setIsLinkingWhatsapp] = useState(false);
-  const [whatsappPairMode, setWhatsappPairMode] = useState<"qr" | "code">("qr");
-  const [whatsappPhoneInput, setWhatsappPhoneInput] = useState("");
-  const [whatsappPhonePrefix, setWhatsappPhonePrefix] = useState("+234");
-  const [whatsappPairingCode, setWhatsappPairingCode] = useState<string | null>(null);
-  const [whatsappCodeCountdown, setWhatsappCodeCountdown] = useState(120);
-  const [whatsappLogs, setWhatsappLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] WhatsApp Gateway engine ready.`,
-    `[${new Date().toLocaleTimeString()}] Idle: Waiting for administrator action...`
-  ]);
-
-  const addWhatsappLog = (msg: string) => {
-    const time = new Date().toLocaleTimeString();
-    setWhatsappLogs(prev => [`[${time}] ${msg}`, ...prev.slice(0, 49)]);
-  };
-
-  const fetchWhatsappStatus = async () => {
-    setIsLoadingWhatsapp(true);
-    try {
-      let idToken = "mock-admin-token";
-      const isMock = sessionStorage.getItem("mock") === "true";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
-      }
-
-      const res = await fetch("/api/admin/whatsapp", {
-        headers: {
-          "Authorization": `Bearer ${idToken}`
-        }
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setWhatsappStatus(data.status || "UNLINKED");
-        setWhatsappPhoneNumber(data.phoneNumber || null);
-        setWhatsappLinkedAt(data.linkedAt || null);
-        setWhatsappQrCode(data.qrCode || null);
-        if (data.apiConfig) {
-          setWhatsappApiUrlInput(data.apiConfig.whatsappApiUrl || "");
-          setWhatsappApiKeyInput(data.apiConfig.whatsappApiKey || "");
-          setWhatsappInstanceIdInput(data.apiConfig.whatsappInstanceId || "");
-          setWhatsappAdminUsernameInput(data.apiConfig.whatsappAdminUsername || "");
-          setWhatsappAdminPasswordInput(data.apiConfig.whatsappAdminPassword || "");
-        }
-        if (data.status === "LINKED") {
-          addWhatsappLog(`Active secure session found: ${data.phoneNumber} (Linked at: ${new Date(data.linkedAt).toLocaleString()})`);
-          addWhatsappLog(`WhatsApp Gateway active and monitoring OTP dispatch rails.`);
-        } else {
-          addWhatsappLog(`WhatsApp Gateway disconnected. Please scan the QR code to pair.`);
-        }
-      }
-    } catch (err: any) {
-      console.error("Failed to load WhatsApp link status:", err);
-      addWhatsappLog(`[ERROR] Failed to query status: ${err.message}`);
-    } finally {
-      setIsLoadingWhatsapp(false);
-    }
-  };
-
+  // Polling Effect (Interval 8 seconds when active)
   useEffect(() => {
-    if (isAdminUnlocked) {
-      fetchWhatsappStatus();
-    }
-  }, [isAdminUnlocked]);
+    if (!isLoadingSession) {
+      fetchStatus();
 
+      const interval = setInterval(() => {
+        if (isPageVisibleRef.current) {
+          fetchStatus();
+        }
+      }, 8000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isLoadingSession, fetchStatus]);
+
+  // QR Code auto-refresh effect if in WAITING_FOR_QR
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (whatsappPairingCode && whatsappCodeCountdown > 0) {
-      timer = setInterval(() => {
-        setWhatsappCodeCountdown(prev => prev - 1);
-      }, 1000);
-    } else if (whatsappCodeCountdown === 0) {
-      setWhatsappPairingCode(null);
-      addWhatsappLog("Pairing code session expired. Please generate a new code.");
+    if (deviceStatus === "WAITING_FOR_QR" && !qrCode) {
+      fetchQrCode();
     }
-    return () => clearInterval(timer);
-  }, [whatsappPairingCode, whatsappCodeCountdown]);
+  }, [deviceStatus, qrCode, fetchQrCode]);
 
-  const handleGeneratePairingCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!whatsappPhoneInput.trim()) {
-      toast.error("Please enter a valid WhatsApp phone number.");
-      return;
-    }
-
-    setIsLinkingWhatsapp(true);
-    addWhatsappLog(`Requesting Pairing Code for phone prefix: ${whatsappPhonePrefix} number: ${whatsappPhoneInput}...`);
-
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let part1 = "";
-    let part2 = "";
-    for (let i = 0; i < 4; i++) {
-      part1 += chars.charAt(Math.floor(Math.random() * chars.length));
-      part2 += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    const code = `${part1}-${part2}`;
-    setWhatsappPairingCode(code);
-    setWhatsappCodeCountdown(120);
-    setIsLinkingWhatsapp(false);
-
-    addWhatsappLog(`Pairing code generated successfully: ${code}`);
-    addWhatsappLog(`Waiting for device connection. Open WhatsApp > Linked Devices > Link with Phone Number.`);
-    toast.success("Pairing Code generated! Enter this code on your WhatsApp app.");
-
-    // Simulate successful link after 12 seconds
-    setTimeout(async () => {
-      if (whatsappPairingCode !== "") {
-        addWhatsappLog("Device handshake initiated. Verifying pairing key...");
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await handleApplyWhatsappLink(`${whatsappPhonePrefix}${whatsappPhoneInput}`);
-      }
-    }, 12000);
-  };
-
-  const handleApplyWhatsappLink = async (numToLink: string) => {
-    setIsLinkingWhatsapp(true);
+  // Actions
+  const handleConnect = async () => {
+    setIsConnecting(true);
+    toast.loading("Initializing WhatsApp connection sequence...", { id: "wa-action" });
     try {
-      let idToken = "mock-admin-token";
-      const isMock = sessionStorage.getItem("mock") === "true";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
-      }
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
 
-      const res = await fetch("/api/admin/whatsapp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          action: "link",
-          phoneNumber: numToLink
-        })
-      });
-
+      const res = await fetch("/api/admin/whatsapp/connect", { method: "POST", headers });
       const data = await res.json();
+
       if (res.ok && data.success) {
-        setWhatsappStatus("LINKED");
-        setWhatsappPhoneNumber(data.phoneNumber);
-        setWhatsappLinkedAt(data.linkedAt);
-        setWhatsappPairingCode(null);
-        addWhatsappLog(`Success! WhatsApp Session fully linked. Active node: ${data.phoneNumber}`);
-        toast.success("WhatsApp Gateway linked successfully!");
+        toast.success(data.message || "Connection sequence started!", { id: "wa-action" });
+        if (data.qrCode) setQrCode(data.qrCode);
+        fetchStatus();
       } else {
-        toast.error(data.error || "Failed to establish link state.");
-        addWhatsappLog(`[ERROR] Link failed: ${data.error}`);
+        toast.error(data.error || "Failed to initialize connection.", { id: "wa-action" });
       }
     } catch (err: any) {
-      toast.error("Network communication failure linking session.");
-      addWhatsappLog(`[ERROR] Link API failure: ${err.message}`);
+      toast.error(err.message || "Network error connecting WhatsApp.", { id: "wa-action" });
     } finally {
-      setIsLinkingWhatsapp(false);
+      setIsConnecting(false);
     }
   };
 
-  const handleUnlinkWhatsapp = async () => {
-    if (!window.confirm("Are you absolutely sure you want to unlink and log out the WhatsApp sender instance? This will suspend all WhatsApp OTP dispatch systems immediately!")) {
-      return;
-    }
-
-    setIsLinkingWhatsapp(true);
-    addWhatsappLog("Dispatching unlink payload to session manager...");
-
+  const handleReconnect = async () => {
+    setIsReconnecting(true);
+    toast.loading("Restarting WhatsApp connection...", { id: "wa-action" });
     try {
-      let idToken = "mock-admin-token";
-      const isMock = sessionStorage.getItem("mock") === "true";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
-      }
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
 
-      const res = await fetch("/api/admin/whatsapp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          action: "unlink"
-        })
-      });
-
+      const res = await fetch("/api/admin/whatsapp/reconnect", { method: "POST", headers });
       const data = await res.json();
+
       if (res.ok && data.success) {
-        setWhatsappStatus("UNLINKED");
-        setWhatsappPhoneNumber(null);
-        setWhatsappLinkedAt(null);
-        setWhatsappPairingCode(null);
-        addWhatsappLog("WhatsApp Session logged out and destroyed successfully.");
-        toast.success("WhatsApp Gateway instance unlinked successfully.");
+        toast.success(data.message || "Reconnection triggered successfully!", { id: "wa-action" });
+        fetchStatus();
       } else {
-        toast.error(data.error || "Unlink request failed.");
-        addWhatsappLog(`[ERROR] Unlink failed: ${data.error}`);
+        toast.error(data.error || "Failed to restart connection.", { id: "wa-action" });
       }
     } catch (err: any) {
-      toast.error("Network error unlinking WhatsApp instance.");
-      addWhatsappLog(`[ERROR] Unlink API error: ${err.message}`);
+      toast.error(err.message || "Network error reconnecting WhatsApp.", { id: "wa-action" });
     } finally {
-      setIsLinkingWhatsapp(false);
+      setIsReconnecting(false);
     }
   };
 
-  const handleSaveWhatsappApiConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingApiConfig(true);
-    addWhatsappLog("Applying and storing new WhatsApp API VM gateway configs...");
-
+  const handleDisconnect = async () => {
+    setShowDisconnectConfirm(false);
+    setIsDisconnecting(true);
+    toast.loading("Logging out WhatsApp device and clearing session...", { id: "wa-action" });
     try {
-      let idToken = "mock-admin-token";
-      const isMock = sessionStorage.getItem("mock") === "true";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
-      }
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
 
-      const res = await fetch("/api/admin/whatsapp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          action: "save_api_config",
-          whatsappApiUrl: whatsappApiUrlInput.trim(),
-          whatsappApiKey: whatsappApiKeyInput.trim(),
-          whatsappInstanceId: whatsappInstanceIdInput.trim(),
-          whatsappAdminUsername: whatsappAdminUsernameInput.trim(),
-          whatsappAdminPassword: whatsappAdminPasswordInput.trim()
-        })
-      });
-
+      const res = await fetch("/api/admin/whatsapp/disconnect", { method: "POST", headers });
       const data = await res.json();
+
       if (res.ok && data.success) {
-        toast.success("WhatsApp API Credentials secured successfully!");
-        addWhatsappLog("Success: WhatsApp API connection keys applied.");
-        // Fetch status again with new keys
-        fetchWhatsappStatus();
+        toast.success("WhatsApp device logged out and session cleared.", { id: "wa-action" });
+        setDeviceStatus("DISCONNECTED");
+        setDeviceInfo(null);
+        setQrCode(null);
+        fetchStatus();
       } else {
-        toast.error(data.error || "Failed to save configuration.");
+        toast.error(data.error || "Failed to logout WhatsApp device.", { id: "wa-action" });
       }
     } catch (err: any) {
-      toast.error("Network communication failure applying settings.");
-      addWhatsappLog(`[ERROR] Save config failed: ${err.message}`);
+      toast.error(err.message || "Network error during logout.", { id: "wa-action" });
     } finally {
-      setIsSavingApiConfig(false);
+      setIsDisconnecting(false);
     }
   };
 
-  const handleAdminVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsVerifyingPin(true);
+  const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
+  const panelClass = isDark ? "bg-[#131927] border-gray-800" : "bg-white border-gray-200 shadow-sm";
 
-    if (!adminEmail.trim()) {
-      toast.error("Please enter your admin email address.");
-      setIsVerifyingPin(false);
-      return;
-    }
-
-    if (!adminPin || adminPin.length < 4) {
-      toast.error("Please enter your 4-digit Access PIN.");
-      setIsVerifyingPin(false);
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/admin/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: adminEmail,
-          pin: adminPin,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setIsAdminUnlocked(true);
-        toast.success(data.message || "Identity PIN Verified. Access Granted!");
-      } else {
-        toast.error(data.error || "Invalid Email or Access PIN!");
-      }
-    } catch (err: any) {
-      toast.error("API connection error during verification.");
-    } finally {
-      setIsVerifyingPin(false);
-    }
-  };
-
-  if (!isAdminUnlocked) {
+  if (isLoadingSession) {
     return (
-      <main className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4 text-gray-800" style={{ marginTop: 0 }}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6"
-        >
-          <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
-            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_maybe</span>
-          </div>
-
-          <div>
-            <h2 className="font-hanken font-extrabold text-2xl tracking-tight text-gray-900 leading-tight">Admin Gatekeeper</h2>
-            <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
-              Enter your administrative passcode or your secure transaction PIN to grant access to the dedicated WhatsApp Link page.
-            </p>
-          </div>
-
-          <form onSubmit={handleAdminVerify} className="w-full space-y-4">
-            <div className="space-y-1.5 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Email Address</label>
-              <input
-                type="email"
-                required
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@example.com"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-              />
-            </div>
-
-            <div className="space-y-1.5 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Access PIN</label>
-              <input
-                type="password"
-                maxLength={6}
-                value={adminPin}
-                onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter 4-digit Access PIN"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isVerifyingPin}
-              className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isVerifyingPin ? <><ButtonSpinner /> Verifying Authority...</> : "Verify Authority"}
-            </button>
-          </form>
-        </motion.div>
-      </main>
+      <div className={cn("min-h-screen flex items-center justify-center p-6", bgClass)}>
+        <div className="flex flex-col items-center gap-3">
+          <ButtonSpinner />
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Verifying Admin Access...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <main
-      className={cn(
-        "min-h-screen flex flex-col font-hanken !mt-0 relative transition-colors duration-300",
-        isDark ? "bg-gray-950 text-gray-100" : "bg-gray-50 text-gray-800"
-      )}
-      style={{ marginTop: 0 }}
-    >
-      {/* Top Header Row with Back Button */}
-      <div role="banner" className={cn(
-        "flex justify-between items-center px-8 py-5 border-b transition-colors duration-300",
-        isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
-      )}>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/cpanel"
-            className={cn(
-              "w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer hover:brightness-110",
-              isDark ? "border-gray-700 bg-gray-800 text-white" : "border-gray-200 bg-white text-gray-800"
-            )}
-          >
-            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          </Link>
-          <div>
-            <h1 className={cn("font-hanken font-extrabold text-lg", isDark ? "text-white" : "text-gray-800")}>
-              Dedicated WhatsApp API Link
-            </h1>
-            <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider font-hanken">Secure Gateway Link Page</p>
-          </div>
-        </div>
+    <div className={cn("min-h-screen p-4 md:p-8 font-hanken transition-colors duration-300", bgClass)}>
+      <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* Theme Toggle Button */}
-        <button
-          onClick={toggleTheme}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 duration-300",
-            isDark
-              ? "bg-gray-800 border-gray-700 text-yellow-400 hover:bg-gray-700"
-              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-black"
-          )}
-        >
-          <span className="material-symbols-outlined text-[16px]">
-            {isDark ? "light_mode" : "dark_mode"}
-          </span>
-          <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
-        </button>
-      </div>
-
-      <div className="p-4 md:p-8 overflow-y-auto flex-1 max-w-5xl w-full mx-auto space-y-6 pb-24 md:pb-8">
-        {/* Connection Status Overview Banner */}
-        <div className={cn(
-          "p-6 rounded-2xl border transition-all duration-300 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4",
-          whatsappStatus === "LINKED"
-            ? "bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-500/25 text-emerald-900 dark:text-emerald-300"
-            : "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/25 text-amber-900 dark:text-amber-300"
-        )}>
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className={cn(
-              "w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-white relative",
-              whatsappStatus === "LINKED"
-                ? "bg-gradient-to-tr from-emerald-500 to-teal-600 shadow-[0_4px_12px_rgba(16,185,129,0.2)] animate-pulse"
-                : "bg-gradient-to-tr from-amber-500 to-orange-600 shadow-[0_4px_12px_rgba(245,158,11,0.2)]"
-            )}>
-              <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                {whatsappStatus === "LINKED" ? "cloud_done" : "cloud_off"}
-              </span>
-            </div>
+        {/* Top Header */}
+        <div className={cn("p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/cpanel"
+              className={cn("w-10 h-10 rounded-xl border flex items-center justify-center transition-all", isDark ? "bg-gray-900 border-gray-800 text-white hover:bg-gray-800" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100")}
+              title="Return to Control Panel"
+            >
+              <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            </Link>
             <div>
-              <h3 className={cn("font-hanken font-extrabold text-base tracking-tight uppercase", isDark ? "text-white" : "text-gray-900")}>
-                Gateway Status: {whatsappStatus === "LINKED" ? "ACTIVE & LINKED" : "DISCONNECTED / OFFLINE"}
-              </h3>
-              {whatsappStatus === "LINKED" ? (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
-                  Node: <span className="font-mono select-all font-bold">{whatsappPhoneNumber}</span> • Connected: <span className="font-mono font-bold">{whatsappLinkedAt ? new Date(whatsappLinkedAt).toLocaleString() : "Just now"}</span>
-                </p>
-              ) : (
-                <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                  WhatsApp OTP dispatch rails are currently disabled. Connect a sender device below to resume.
-                </p>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-500 text-[22px]">hub</span>
+                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">WhatsApp Device Management</h1>
+              </div>
+              <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
+                Monitor API health, pair devices via QR code scan, and control active OTP dispatch sessions securely.
+              </p>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              disabled={isLoadingWhatsapp}
-              onClick={fetchWhatsappStatus}
-              className="px-4 py-2.5 bg-black hover:bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
+              onClick={toggleTheme}
+              className={cn("px-3 h-10 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-yellow-400" : "bg-gray-100 border-gray-200 text-gray-700")}
             >
-              {isLoadingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
+              <span className="material-symbols-outlined text-[18px]">{isDark ? "light_mode" : "dark_mode"}</span>
+              <span className="hidden sm:inline">{isDark ? "Light Mode" : "Dark Mode"}</span>
+            </button>
+            <button
+              type="button"
+              disabled={isRefreshing}
+              onClick={() => fetchStatus(true)}
+              className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isRefreshing ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">refresh</span>}
               <span>Refresh Status</span>
             </button>
-
-            {whatsappStatus === "LINKED" && (
-              <button
-                type="button"
-                disabled={isLinkingWhatsapp}
-                onClick={handleUnlinkWhatsapp}
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(220,38,38,0.2)] disabled:opacity-50"
-              >
-                {isLinkingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">logout</span>}
-                <span>Unlink WhatsApp Sender</span>
-              </button>
-            )}
           </div>
         </div>
 
-        {whatsappStatus === "UNLINKED" && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-            {/* Left side: Instructions and Pairing Panel */}
-            <div className={cn("rounded-2xl p-6 md:col-span-3 border transition-colors duration-300 space-y-6", panelClass)}>
-              <div className="border-b pb-4 flex justify-between items-center">
-                <div>
-                  <h4 className={cn("font-hanken font-extrabold text-sm uppercase", labelClass)}>
-                    Link WhatsApp Sender Device
-                  </h4>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Setup professional OTP & notification delivery systems</p>
+        {/* API Health & Status Overview Banner */}
+        <div className={cn("p-6 rounded-2xl border space-y-4", panelClass)}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200/40 pb-4">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-3 h-3 rounded-full animate-ping",
+                apiHealth === "online" ? "bg-emerald-500" : "bg-red-500"
+              )} />
+              <div>
+                <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">API Backend Health</span>
+                <span className={cn(
+                  "text-xs font-black uppercase tracking-wide",
+                  apiHealth === "online" ? "text-emerald-500" : "text-red-500"
+                )}>
+                  {apiHealth === "online" ? "WhatsApp API Server Online" : "WhatsApp API Unavailable"}
+                </span>
+              </div>
+            </div>
+
+            {lastChecked && (
+              <span className="text-[10px] font-mono font-bold text-gray-400">
+                Last checked: {new Date(lastChecked).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+
+          {apiError && (
+            <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">warning</span>
+              <span>{apiError}</span>
+            </div>
+          )}
+
+          {/* Device Status Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+
+            {/* Status Visual Indicator */}
+            <div className="space-y-4">
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Device Connection Status</span>
+
+              <div className={cn(
+                "p-5 rounded-2xl border flex items-center gap-4 transition-all",
+                deviceStatus === "CONNECTED" && "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
+                deviceStatus === "CONNECTING" && "border-blue-500/30 bg-blue-500/10 text-blue-500",
+                deviceStatus === "WAITING_FOR_QR" && "border-amber-500/30 bg-amber-500/10 text-amber-500",
+                (deviceStatus === "DISCONNECTED" || deviceStatus === "ERROR") && "border-gray-300 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-gray-500"
+              )}>
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0",
+                  deviceStatus === "CONNECTED" && "bg-emerald-500",
+                  deviceStatus === "CONNECTING" && "bg-blue-500",
+                  deviceStatus === "WAITING_FOR_QR" && "bg-amber-500",
+                  (deviceStatus === "DISCONNECTED" || deviceStatus === "ERROR") && "bg-gray-400"
+                )}>
+                  <span className="material-symbols-outlined text-[24px]">
+                    {deviceStatus === "CONNECTED" && "cell_tower"}
+                    {deviceStatus === "CONNECTING" && "sync"}
+                    {deviceStatus === "WAITING_FOR_QR" && "qr_code_scanner"}
+                    {(deviceStatus === "DISCONNECTED" || deviceStatus === "ERROR") && "phonelink_off"}
+                  </span>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={isLoadingWhatsapp}
-                  onClick={fetchWhatsappStatus}
-                  className="px-3 py-1.5 bg-[#FC7A00] text-white hover:brightness-105 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1"
-                >
-                  {isLoadingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">refresh</span>}
-                  <span>Reconnect / Fetch QR</span>
-                </button>
-              </div>
-
-              {/* Mode Toggles */}
-              <div className="grid grid-cols-2 gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWhatsappPairMode("qr");
-                    setWhatsappPairingCode(null);
-                  }}
-                  className={cn(
-                    "py-2 rounded-lg text-xs font-extrabold uppercase transition-all cursor-pointer",
-                    whatsappPairMode === "qr"
-                      ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm"
-                      : "text-gray-400 hover:text-white"
-                  )}
-                >
-                  Scan QR Code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWhatsappPairMode("code")}
-                  className={cn(
-                    "py-2 rounded-lg text-xs font-extrabold uppercase transition-all cursor-pointer",
-                    whatsappPairMode === "code"
-                      ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm"
-                      : "text-gray-400 hover:text-white"
-                  )}
-                >
-                  Use Pairing Code
-                </button>
-              </div>
-
-              {/* Conditional view based on link mode */}
-              {whatsappPairMode === "qr" ? (
-                <div className="flex flex-col items-center py-6 text-center space-y-5">
-                  <p className="text-xs text-gray-400 max-w-sm leading-relaxed font-semibold">
-                    Open WhatsApp on your phone, navigate to <span className="text-[#FC7A00] font-bold">Linked Devices</span>, choose <span className="text-[#FC7A00] font-bold">Link a Device</span>, and point your camera to scan this QR code:
+                <div>
+                  <h3 className="font-black text-sm uppercase tracking-wider">
+                    {deviceStatus === "CONNECTED" && "Connected & Active"}
+                    {deviceStatus === "CONNECTING" && "Connecting..."}
+                    {deviceStatus === "WAITING_FOR_QR" && "Waiting for QR Scan"}
+                    {deviceStatus === "DISCONNECTED" && "Disconnected"}
+                    {deviceStatus === "ERROR" && "Connection Error"}
+                  </h3>
+                  <p className="text-[11px] font-medium opacity-80 mt-0.5">
+                    {deviceStatus === "CONNECTED" && "WhatsApp sender node is ready for OTP dispatch."}
+                    {deviceStatus === "CONNECTING" && "Establishing handshake with WhatsApp API server."}
+                    {deviceStatus === "WAITING_FOR_QR" && "Scan the QR code with WhatsApp to pair device."}
+                    {deviceStatus === "DISCONNECTED" && "Device is not currently paired or connected."}
+                    {deviceStatus === "ERROR" && "Unable to retrieve status from WhatsApp gateway."}
                   </p>
+                </div>
+              </div>
 
-                  <div className={cn("p-4 rounded-2xl bg-white border inline-block relative overflow-hidden group shadow-xs transition-colors", isDark ? "border-gray-800" : "border-gray-150")}>
-                    <img
-                      src={whatsappQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-session-${Date.now()}&color=000000`}
-                      alt="WhatsApp Pairing QR Code"
-                      className="w-48 h-48 object-contain transition-transform group-hover:scale-102"
-                    />
-                    {isLinkingWhatsapp && (
-                      <div className="absolute inset-0 bg-white/90 dark:bg-black/90 flex flex-col items-center justify-center p-4">
-                        <ButtonSpinner />
-                        <p className="text-[10px] font-black uppercase text-gray-500 mt-2">Pairing device...</p>
-                      </div>
-                    )}
+              {/* Connected Device Info */}
+              {deviceStatus === "CONNECTED" && deviceInfo && (
+                <div className="p-4 rounded-xl border border-gray-200/50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 space-y-2 text-xs">
+                  <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Active Device Details</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-gray-400 text-[10px] block">Phone Number:</span>
+                      <strong className="font-mono text-emerald-600 dark:text-emerald-400 font-extrabold">{deviceInfo.phoneNumber || "N/A"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 text-[10px] block">Account Name:</span>
+                      <strong className="font-semibold text-gray-800 dark:text-gray-200">{deviceInfo.accountName || "E-Tech Gateway"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 text-[10px] block">Instance ID:</span>
+                      <strong className="font-mono text-gray-800 dark:text-gray-200">{deviceInfo.instanceName || "Default"}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 text-[10px] block">Status:</span>
+                      <strong className="text-emerald-500 uppercase font-black">{deviceInfo.connectionStatus}</strong>
+                    </div>
                   </div>
+                </div>
+              )}
+            </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setIsLinkingWhatsapp(true);
-                        addWhatsappLog("Simulating QR camera viewport scan...");
-                        await new Promise(r => setTimeout(r, 2500));
-                        await handleApplyWhatsappLink("+2348033123456");
-                      }}
-                      className="px-5 py-2.5 bg-black hover:bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
-                    >
-                      Simulate Scanner Scan (Mock Link)
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isLoadingWhatsapp}
-                      onClick={fetchWhatsappStatus}
-                      className={cn(
-                        "px-4 py-2 border hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all text-xs font-bold uppercase rounded-xl cursor-pointer",
-                        isDark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-600"
-                      )}
-                    >
-                      {isLoadingWhatsapp ? "Syncing..." : "Refresh Code"}
-                    </button>
+            {/* QR Code Scan View or Device Control Buttons */}
+            <div className="flex flex-col items-center justify-center border-t md:border-t-0 md:border-l border-gray-200/40 pt-4 md:pt-0 md:pl-6 space-y-4">
+              {deviceStatus === "WAITING_FOR_QR" && qrCode ? (
+                <div className="text-center space-y-3">
+                  <div className="p-3 bg-white rounded-2xl border border-gray-200 shadow-md inline-block">
+                    <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48 object-contain" />
                   </div>
+                  <div>
+                    <p className="text-xs font-black uppercase text-amber-500 tracking-wider">Scan with WhatsApp</p>
+                    <p className="text-[10.5px] text-gray-400 font-semibold mt-0.5">Open WhatsApp → Linked Devices → Link a Device</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchQrCode}
+                    className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+                  >
+                    Refresh QR Code
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <p className="text-xs text-gray-400 leading-relaxed font-semibold">
-                    Enter your active WhatsApp phone number below to generate an 8-character code, then enter it directly in WhatsApp on your phone:
-                  </p>
+                <div className="w-full space-y-3 my-auto">
+                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block text-center">Available Actions</span>
 
-                  {!whatsappPairingCode ? (
-                    <form onSubmit={handleGeneratePairingCode} className="space-y-4">
-                      <div className="grid grid-cols-4 gap-2">
-                        <div className="col-span-1">
-                          <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Prefix</label>
-                          <select
-                            value={whatsappPhonePrefix}
-                            onChange={(e) => setWhatsappPhonePrefix(e.target.value)}
-                            className={cn(
-                              "w-full rounded-xl px-2 py-2.5 text-xs outline-none transition-all",
-                              isDark ? "bg-gray-800 border border-gray-700 text-white" : "bg-white border border-gray-200 text-black"
-                            )}
-                          >
-                            <option value="+234">+234 (NG)</option>
-                            <option value="+227">+227 (NE)</option>
-                            <option value="+1">+1 (US)</option>
-                          </select>
-                        </div>
-                        <div className="col-span-3">
-                          <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">WhatsApp Number</label>
-                          <input
-                            type="tel"
-                            required
-                            value={whatsappPhoneInput}
-                            onChange={(e) => setWhatsappPhoneInput(e.target.value)}
-                            placeholder="e.g. 8123456789"
-                            className={inputClass}
-                          />
-                        </div>
-                      </div>
+                  {deviceStatus === "DISCONNECTED" && (
+                    <button
+                      type="button"
+                      disabled={isConnecting}
+                      onClick={handleConnect}
+                      className="w-full py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      {isConnecting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">add_link</span>}
+                      <span>Connect Device</span>
+                    </button>
+                  )}
 
+                  {deviceStatus === "CONNECTED" && (
+                    <>
                       <button
-                        type="submit"
-                        disabled={isLinkingWhatsapp}
-                        className="w-full py-3.5 bg-black hover:bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 disabled:opacity-50"
+                        type="button"
+                        disabled={isReconnecting}
+                        onClick={handleReconnect}
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                       >
-                        {isLinkingWhatsapp ? <><ButtonSpinner /> Requesting Pairing Key...</> : "Generate Pairing Code"}
+                        {isReconnecting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">sync</span>}
+                        <span>Reconnect Instance</span>
                       </button>
-                    </form>
-                  ) : (
-                    <div className="flex flex-col items-center py-4 text-center space-y-4">
-                      <p className="text-[10px] font-black uppercase text-gray-400">Enter this code on your device:</p>
-                      <div className="font-mono text-4xl font-black tracking-widest text-[#FC7A00] bg-gray-100 dark:bg-gray-800 px-6 py-4 rounded-2xl border border-gray-150 dark:border-gray-700 animate-pulse">
-                        {whatsappPairingCode}
-                      </div>
-                      <p className="text-xs text-gray-500 font-semibold">
-                        Code expires in <span className="font-mono text-[#FC7A00] font-black">{Math.floor(whatsappCodeCountdown / 60)}:{(whatsappCodeCountdown % 60).toString().padStart(2, "0")}</span>
-                      </p>
 
                       <button
                         type="button"
-                        onClick={() => setWhatsappPairingCode(null)}
-                        className="text-[11px] text-[#FC7A00] hover:underline font-black uppercase tracking-wider cursor-pointer"
+                        disabled={isDisconnecting}
+                        onClick={() => setShowDisconnectConfirm(true)}
+                        className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
                       >
-                        Cancel & Enter different number
+                        {isDisconnecting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">logout</span>}
+                        <span>Disconnect / Logout Device</span>
                       </button>
-                    </div>
+                    </>
+                  )}
+
+                  {(deviceStatus === "CONNECTING" || deviceStatus === "WAITING_FOR_QR") && (
+                    <button
+                      type="button"
+                      disabled={isDisconnecting}
+                      onClick={() => setShowDisconnectConfirm(true)}
+                      className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isDisconnecting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">cancel</span>}
+                      <span>Cancel / Logout Session</span>
+                    </button>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Right side: Dynamic WhatsApp API Configuration Form */}
-            <div className={cn("rounded-2xl p-6 md:col-span-2 border transition-colors duration-300 space-y-4", panelClass)}>
-              <div className="border-b pb-3.5">
-                <h4 className="text-xs font-black uppercase tracking-wider text-[#FC7A00]">API Configuration Keys</h4>
-                <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Manage live connection to backend WhatsApp API VM</p>
-              </div>
-
-              <form onSubmit={handleSaveWhatsappApiConfig} className="space-y-3.5 text-left">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-404">WHATSAPP_API_URL</label>
-                  <input
-                    type="url"
-                    value={whatsappApiUrlInput}
-                    onChange={(e) => setWhatsappApiUrlInput(e.target.value)}
-                    placeholder="e.g. http://192.168.1.100:3055"
-                    className={inputClass}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-404">WHATSAPP_API_KEY</label>
-                  <input
-                    type="password"
-                    value={whatsappApiKeyInput}
-                    onChange={(e) => setWhatsappApiKeyInput(e.target.value)}
-                    placeholder="Enter API apikey"
-                    className={inputClass}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-404">WHATSAPP_INSTANCE_ID</label>
-                  <input
-                    type="text"
-                    value={whatsappInstanceIdInput}
-                    onChange={(e) => setWhatsappInstanceIdInput(e.target.value)}
-                    placeholder="e.g. my-session-instance"
-                    className={inputClass}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-404">Admin User</label>
-                    <input
-                      type="text"
-                      value={whatsappAdminUsernameInput}
-                      onChange={(e) => setWhatsappAdminUsernameInput(e.target.value)}
-                      placeholder="Username"
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-gray-404">Admin Pass</label>
-                    <input
-                      type="password"
-                      value={whatsappAdminPasswordInput}
-                      onChange={(e) => setWhatsappAdminPasswordInput(e.target.value)}
-                      placeholder="Password"
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSavingApiConfig}
-                  className="w-full py-3.5 bg-black hover:bg-[#FC7A00] text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 disabled:opacity-50"
-                >
-                  {isSavingApiConfig ? <><ButtonSpinner /> Saving Configs...</> : "Save API Configuration"}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Live Connection log terminal */}
-        <div className={cn("rounded-2xl p-6 border transition-colors duration-300 space-y-4", panelClass)}>
-          <div className="flex justify-between items-center border-b pb-3">
-            <div>
-              <h4 className={cn("font-hanken font-extrabold text-xs uppercase", labelClass)}>
-                WhatsApp Gateway System Console Logs
-              </h4>
-              <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Real-time status updates and delivery heartbeats</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setWhatsappLogs([
-                `[${new Date().toLocaleTimeString()}] System console buffer cleared.`,
-                `[${new Date().toLocaleTimeString()}] Gateway Status: ${whatsappStatus}`
-              ])}
-              className={cn(
-                "px-3 py-1 border hover:border-red-500 hover:text-red-500 transition-all text-[9px] font-black uppercase rounded-lg cursor-pointer",
-                isDark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-500"
-              )}
-            >
-              Clear Logs
-            </button>
-          </div>
-
-          <div className="bg-black text-emerald-400 font-mono text-[11px] rounded-xl p-4 h-48 overflow-y-auto border border-gray-800 custom-scrollbar shadow-inner flex flex-col-reverse gap-1.5 selection:bg-emerald-900 selection:text-white">
-            {whatsappLogs.map((log, idx) => (
-              <div key={idx} className="leading-relaxed whitespace-pre-wrap select-text truncate">
-                {log}
-              </div>
-            ))}
           </div>
         </div>
+
       </div>
-    </main>
+
+      {/* Confirmation Modal for Disconnect / Logout Device */}
+      {showDisconnectConfirm && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className={cn("w-full max-w-sm p-6 rounded-3xl border text-center shadow-2xl space-y-4", panelClass)}>
+            <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-500 flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-[24px]">gpp_maybe</span>
+            </div>
+
+            <div>
+              <h4 className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">Disconnect / Logout Device?</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium leading-relaxed">
+                This will log out the WhatsApp device and clear its saved authentication session. You will need to scan a new QR code to connect it again.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDisconnectConfirm(false)}
+                className="py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black uppercase cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                className="py-2.5 bg-red-600 text-white rounded-xl text-xs font-black uppercase cursor-pointer hover:bg-red-700"
+              >
+                Disconnect & Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
