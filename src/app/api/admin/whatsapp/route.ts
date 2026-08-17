@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
+import { formatQrCodePayload } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
         linkedAt,
         sessionName: "E-Tech VIP Whatsapp Gateway (Simulation Mode)",
         isMock: true,
-        qrCode: currentStatus === "UNLINKED" ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-simulation-session-${Date.now()}` : null,
+        qrCode: null,
         apiConfig: {
           whatsappApiUrl,
           whatsappApiKey,
@@ -112,7 +113,7 @@ export async function GET(req: Request) {
 
     // 3. FETCH LIVE QR CODE AUTOMATICALLY FROM THE INSTANCE
     console.log(`[WhatsApp API GET] Disconnected. Fetching QR from connect endpoint: ${whatsappApiUrl}/instance/connect/${whatsappInstanceId}`);
-    let qrCodeUrl = "";
+    let qrCodeUrl: string | null = null;
     try {
       const qrResponse = await fetch(`${whatsappApiUrl}/instance/connect/${whatsappInstanceId}`, {
         method: "GET",
@@ -127,15 +128,11 @@ export async function GET(req: Request) {
         const qrData = await qrResponse.json();
         const base64Code = qrData?.base64 || qrData?.code || qrData?.qr || qrData?.qrcode;
         if (base64Code) {
-          qrCodeUrl = base64Code.startsWith("data:") ? base64Code : `data:image/png;base64,${base64Code}`;
+          qrCodeUrl = formatQrCodePayload(base64Code);
         }
       }
     } catch (qrErr: any) {
       console.error("[WhatsApp GET] Error fetching QR code from VM gateway:", qrErr.message);
-    }
-
-    if (!qrCodeUrl) {
-      qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-vm-session-${Date.now()}`;
     }
 
     return NextResponse.json({

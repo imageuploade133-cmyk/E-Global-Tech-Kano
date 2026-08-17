@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { getWhatsappServerConfig, callWhatsappBackend } from "@/lib/whatsapp-service";
+import { getWhatsappServerConfig, callWhatsappBackend, formatQrCodePayload } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
     let qrCode: string | null = null;
     const rawQr = instanceObj.qr || instanceObj.qrcode || instanceObj.base64 || rawData.qr || rawData.base64;
     if (rawQr && deviceStatus === "WAITING_FOR_QR") {
-      qrCode = String(rawQr).startsWith("data:") ? String(rawQr) : `data:image/png;base64,${rawQr}`;
+      qrCode = formatQrCodePayload(rawQr);
     }
 
     return NextResponse.json({

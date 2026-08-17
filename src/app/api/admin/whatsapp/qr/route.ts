@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { getWhatsappServerConfig, callWhatsappBackend } from "@/lib/whatsapp-service";
+import { getWhatsappServerConfig, callWhatsappBackend, formatQrCodePayload } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const qrCodeFormatted = String(qrData).startsWith("data:") ? String(qrData) : `data:image/png;base64,${qrData}`;
+    const qrCodeFormatted = formatQrCodePayload(qrData);
 
     return NextResponse.json({
       success: true,

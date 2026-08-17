@@ -140,3 +140,28 @@ export function acquireWhatsappActionLock(): boolean {
 export function releaseWhatsappActionLock() {
   isActionInFlight = false;
 }
+
+/**
+ * Formats a raw QR data payload into a valid image URL for <img src="...">.
+ * Handles base64 data URIs, raw base64 images, and raw WhatsApp pairing strings (e.g. "1@...", "2@...").
+ */
+export function formatQrCodePayload(qrData: string | null | undefined): string | null {
+  if (!qrData) return null;
+  const str = String(qrData).trim();
+  if (!str) return null;
+
+  // 1. If already a data URI (e.g. data:image/png;base64,...)
+  if (str.startsWith("data:image/")) {
+    return str;
+  }
+
+  // 2. If raw base64 image string (starts with common image base64 headers)
+  // iVBORw0KGgo = PNG, /9j/ = JPG, R0lGOD = GIF, PHN2Zw = SVG
+  if (/^(iVBORw0KGgo|\/9j\/|R0lGOD|PHN2Zw)/.test(str)) {
+    return `data:image/png;base64,${str}`;
+  }
+
+  // 3. Otherwise, qrData is a raw WhatsApp connection string (e.g. "1@...", "2@...")
+  // Generate a QR code image encoding the exact raw string using api.qrserver.com
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(str)}`;
+}
