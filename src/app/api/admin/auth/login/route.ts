@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
@@ -18,27 +19,15 @@ export async function POST(req: Request) {
 
     const cleanEmail = String(email).trim().toLowerCase();
 
-    // Verify Firebase ID token with Firebase Admin SDK / verification helper
+    // Verify Firebase ID token natively using Node crypto + Google certs (no jwks-rsa/jose ESM conflict)
     let uid = "";
     const isMock = cleanEmail === "jules@example.com" || cleanEmail === "admin@example.com" || token === "mock-admin-token";
 
     if (isMock) {
       uid = "mock-admin-uid";
     } else {
-      const { getAuth } = await import("firebase-admin/auth");
-      const { adminApp } = await import("@/lib/firebase-admin");
-      try {
-        const decodedToken = await getAuth(adminApp).verifyIdToken(token);
-        uid = decodedToken.uid;
-      } catch (tokenErr: any) {
-        console.warn("[CPanel Login] verifyIdToken failed, falling back to public cert verification:", tokenErr.message);
-        const { verifyAdminAuth } = await import("@/lib/admin-auth");
-        const mockReq = new Request("http://localhost", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const verified = await verifyAdminAuth(mockReq);
-        uid = verified.uid;
-      }
+      const decodedToken = await verifyFirebaseIdToken(token);
+      uid = decodedToken.uid;
     }
 
     if (!uid) {
@@ -66,18 +55,6 @@ export async function POST(req: Request) {
       lastLoginAt: now,
       updatedAt: now
     });
-
-    // Set Firebase Custom Claims where supported
-    try {
-      const { getAuth } = await import("firebase-admin/auth");
-      const { adminApp } = await import("@/lib/firebase-admin");
-      await getAuth(adminApp).setCustomUserClaims(uid, {
-        admin: true,
-        role: adminData.role || "admin"
-      });
-    } catch (claimErr: any) {
-      console.warn("[CPanel Login] Could not set custom user claims:", claimErr.message);
-    }
 
     const finalRole = adminData.role || "admin";
 
