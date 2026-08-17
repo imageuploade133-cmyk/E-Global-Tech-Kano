@@ -76,25 +76,36 @@ export default function CpanelStoreOrdersPage() {
     setIsDark(isDarkTheme);
   }, []);
 
-  // Check Admin Unlock Session
+  // Check Admin Unlock Session via /api/admin/auth/session
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isUnlocked = sessionStorage.getItem("cpanel_unlocked") === "true";
-      const isMock = window.location.search.includes("mock=true");
-      if (!isUnlocked && !isMock) {
-        toast.error("Security Session Expired. Please authenticate in CPanel.");
-        router.push("/cpanel");
+    async function checkSession() {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (isMock) {
+        setIsLoadingSession(false);
         return;
       }
-      setIsLoadingSession(false);
+      try {
+        const res = await fetch("/api/admin/auth/session");
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          toast.error("Security Session Expired. Please authenticate in CPanel.");
+          router.push("/cpanel");
+          return;
+        }
+      } catch (err) {
+        console.error("Session check failed:", err);
+      } finally {
+        setIsLoadingSession(false);
+      }
     }
+    checkSession();
   }, [router]);
 
   // Fetch Store Config for custom status list
   useEffect(() => {
     async function fetchConfigSettings() {
       try {
-        const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+        const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
         const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
         const res = await fetch("/api/admin/store", { headers: authHeader });
         const data = await res.json();
@@ -114,7 +125,7 @@ export default function CpanelStoreOrdersPage() {
   const fetchOrders = async () => {
     setIsLoadingCategories(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
       const params = new URLSearchParams();
@@ -164,7 +175,7 @@ export default function CpanelStoreOrdersPage() {
     toast.loading(`Updating order ${activeOrder.id} to "${targetStatus}"...`, { id: "update-order" });
 
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
       const res = await fetch("/api/admin/store/orders", {

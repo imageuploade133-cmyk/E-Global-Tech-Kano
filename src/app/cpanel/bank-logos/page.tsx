@@ -70,7 +70,7 @@ export default function CpanelBankLogosPage() {
   // Auth & Session Check
   useEffect(() => {
     async function checkSession() {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       if (isMock) {
         setIsLoadingSession(false);
         return;
@@ -115,7 +115,7 @@ export default function CpanelBankLogosPage() {
     setIsLoadingBanks(true);
     setHasSearched(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch(`/api/admin/bank-logos?search=${encodeURIComponent(query)}`, { headers });
       const data = await res.json();
@@ -180,7 +180,7 @@ export default function CpanelBankLogosPage() {
     setTogglingBankId(bankId);
 
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bank-logos", {
         method: "POST",
@@ -217,7 +217,7 @@ export default function CpanelBankLogosPage() {
     setSavingBankId(bankId);
 
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bank-logos", {
         method: "POST",
@@ -246,7 +246,7 @@ export default function CpanelBankLogosPage() {
     toast.loading("Running logo health check and repair scan...", { id: "repair-logos" });
 
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/bank-logos/repair", {
         method: "POST",
