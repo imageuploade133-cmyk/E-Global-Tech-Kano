@@ -82,7 +82,8 @@ export async function POST(req: Request) {
 
       categories.push(newCategory);
     } else if (action === "edit_category") {
-      if (!categoryId) {
+      const targetId = categoryId || (category && category.id);
+      if (!targetId) {
         return NextResponse.json({ error: "categoryId is required for update." }, { status: 400 });
       }
 

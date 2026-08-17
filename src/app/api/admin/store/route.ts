@@ -84,6 +84,8 @@ export async function POST(req: Request) {
               videoUrl: (item.videoUrl || "").trim(),
               autoSlide: Boolean(item.autoSlide),
               inStock: item.inStock !== false,
+              stockQuantity: typeof item.stockQuantity === "number" ? item.stockQuantity : (item.stockQuantity ? Number(item.stockQuantity) : null),
+              unlimitedStock: Boolean(item.unlimitedStock),
               updatedAt: now,
             };
           }
@@ -102,6 +104,8 @@ export async function POST(req: Request) {
           videoUrl: (item.videoUrl || "").trim(),
           autoSlide: Boolean(item.autoSlide),
           inStock: item.inStock !== false,
+          stockQuantity: typeof item.stockQuantity === "number" ? item.stockQuantity : (item.stockQuantity ? Number(item.stockQuantity) : null),
+          unlimitedStock: Boolean(item.unlimitedStock),
           createdAt: now,
           updatedAt: now,
         };
