@@ -100,8 +100,15 @@ export default function AdminPage() {
   const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
-  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
+  const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetOtp, setResetOtp] = useState("");
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isDispatchingResetEmail, setIsDispatchingResetEmail] = useState(false);
+  const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "banners" | "investments" | "history">("dashboard");
 
@@ -1226,26 +1233,120 @@ export default function AdminPage() {
     }
   };
 
-  const handlePasswordReset = async (e: React.FormEvent) => {
+  // 3-Step Phone OTP Admin Password Reset Flow
+  const handleRequestResetOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = adminEmail.trim().toLowerCase();
+    const cleanPhone = resetPhone.trim();
+
     if (!cleanEmail) {
       toast.error("Please enter your administrator email address.");
       return;
     }
 
-    setIsSendingResetEmail(true);
+    if (!cleanPhone) {
+      toast.error("Please enter your registered phone number.");
+      return;
+    }
+
+    setIsRequestingOtp(true);
     try {
+      const res = await fetch("/api/admin/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "request_otp",
+          email: cleanEmail,
+          phoneNumber: cleanPhone
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Phone OTP sent successfully!");
+        if (data.devOtp) {
+          setOtpDevCode(data.devOtp);
+        }
+        setResetStep(2);
+      } else {
+        toast.error(data.error || "Failed to request password reset OTP.");
+      }
+    } catch {
+      toast.error("Network communication failure requesting OTP.");
+    } finally {
+      setIsRequestingOtp(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    const cleanOtp = resetOtp.trim();
+
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      toast.error("Please enter the 6-digit OTP code.");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch("/api/admin/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "verify_otp",
+          email: cleanEmail,
+          otp: cleanOtp
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Phone OTP verified!");
+        setResetStep(3);
+      } else {
+        toast.error(data.error || "Invalid or expired OTP code.");
+      }
+    } catch {
+      toast.error("Network communication failure verifying OTP.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleDispatchResetEmail = async () => {
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    setIsDispatchingResetEmail(true);
+
+    try {
+      // First, notify server of completed reset email dispatch
+      const res = await fetch("/api/admin/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_reset_email",
+          email: cleanEmail
+        })
+      });
+
+      const data = await res.json();
+
+      // Dispatch Firebase Auth Password Reset Email
       const { sendPasswordResetEmail } = await import("firebase/auth");
       const { auth } = await import("@/lib/firebase");
 
       await sendPasswordResetEmail(auth, cleanEmail);
-      toast.success("Password recovery email sent! Check your inbox.");
+
+      toast.success(data.message || "Official password recovery email sent! Check your inbox.");
       setIsResetPasswordMode(false);
+      setResetStep(1);
+      setResetPhone("");
+      setResetOtp("");
+      setOtpDevCode(null);
     } catch (err: any) {
       toast.error(err.message || "Failed to send password recovery email.");
     } finally {
-      setIsSendingResetEmail(false);
+      setIsDispatchingResetEmail(false);
     }
   };
 
@@ -1484,35 +1585,151 @@ export default function AdminPage() {
           </div>
 
           {isResetPasswordMode ? (
-            <form onSubmit={handlePasswordReset} className="w-full space-y-4">
-              <div className="space-y-1.5 text-left">
-                <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Email</label>
-                <input
-                  type="email"
-                  required
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="e.g. abdulkadir123shaba@gmail.com"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-                />
+            <div className="w-full space-y-4 text-left">
+              {/* Step indicator pills */}
+              <div className="flex items-center justify-between gap-2 px-2 py-1 bg-gray-100 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                <span className={cn("px-2 py-1 rounded-lg transition-all", resetStep === 1 ? "bg-[#FC7A00] text-white" : "text-gray-400")}>1. Phone Verification</span>
+                <span className={cn("px-2 py-1 rounded-lg transition-all", resetStep === 2 ? "bg-[#FC7A00] text-white" : "text-gray-400")}>2. OTP Check</span>
+                <span className={cn("px-2 py-1 rounded-lg transition-all", resetStep === 3 ? "bg-emerald-600 text-white" : "text-gray-400")}>3. Reset Link</span>
               </div>
 
-              <button
-                type="submit"
-                disabled={isSendingResetEmail}
-                className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSendingResetEmail ? <><ButtonSpinner /> Sending Reset Link...</> : "Send Recovery Email"}
-              </button>
+              {/* Step 1 Form */}
+              {resetStep === 1 && (
+                <form onSubmit={handleRequestResetOtp} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      placeholder="e.g. abdulkadir123shaba@gmail.com"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    />
+                  </div>
 
-              <button
-                type="button"
-                onClick={() => setIsResetPasswordMode(false)}
-                className="text-xs font-bold text-gray-500 hover:text-black uppercase tracking-wider"
-              >
-                ← Back to Login
-              </button>
-            </form>
+                  <div className="space-y-1.5">
+                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Registered Phone Number</label>
+                    <input
+                      type="tel"
+                      required
+                      value={resetPhone}
+                      onChange={(e) => setResetPhone(e.target.value)}
+                      placeholder="e.g. +2348033123456 or 08033123456"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isRequestingOtp}
+                    className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                  >
+                    {isRequestingOtp ? <><ButtonSpinner /> Requesting Phone OTP...</> : "Verify Phone & Request OTP"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetPasswordMode(false);
+                      setResetStep(1);
+                    }}
+                    className="w-full text-center text-xs font-bold text-gray-500 hover:text-black uppercase tracking-wider cursor-pointer"
+                  >
+                    ← Back to Login
+                  </button>
+                </form>
+              )}
+
+              {/* Step 2 Form */}
+              {resetStep === 2 && (
+                <form onSubmit={handleVerifyResetOtp} className="space-y-4">
+                  <div className="p-3 bg-orange-50 border border-orange-100 rounded-2xl text-center space-y-1">
+                    <p className="text-[11px] font-bold text-gray-700">OTP code dispatched via SMS/WhatsApp</p>
+                    <p className="text-[10px] text-gray-500">Sent to: <span className="font-mono font-black">{resetPhone}</span></p>
+                    {otpDevCode && (
+                      <p className="text-[10px] font-mono font-bold text-[#FC7A00] bg-white p-1 rounded border border-orange-200 mt-1 select-all">
+                        DEV OTP: {otpDevCode}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Enter 6-Digit OTP Code</label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      required
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="e.g. 123456"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-center font-mono text-lg tracking-widest text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isVerifyingOtp}
+                    className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                  >
+                    {isVerifyingOtp ? <><ButtonSpinner /> Verifying OTP Code...</> : "Confirm OTP Code"}
+                  </button>
+
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-500">
+                    <button
+                      type="button"
+                      onClick={() => setResetStep(1)}
+                      className="hover:text-black uppercase tracking-wider cursor-pointer"
+                    >
+                      ← Re-enter Phone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRequestResetOtp({ preventDefault: () => {} } as any)}
+                      className="text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer"
+                    >
+                      Resend OTP
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Step 3 Confirmation */}
+              {resetStep === 3 && (
+                <div className="space-y-4 text-center">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                    <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>mark_email_read</span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-black text-sm text-gray-900 uppercase">Phone Identity Verified</h3>
+                    <p className="text-[11px] text-gray-500 mt-1 font-semibold leading-relaxed">
+                      Click below to dispatch the official password reset recovery link to <span className="font-bold text-black">{adminEmail}</span>.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isDispatchingResetEmail}
+                    onClick={handleDispatchResetEmail}
+                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+                  >
+                    {isDispatchingResetEmail ? <><ButtonSpinner /> Sending Password Reset Email...</> : "Dispatch Reset Link to Email"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetPasswordMode(false);
+                      setResetStep(1);
+                    }}
+                    className="text-xs font-bold text-gray-500 hover:text-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <form onSubmit={handleAdminVerify} className="w-full space-y-4">
               <div className="space-y-1.5 text-left">
@@ -1538,14 +1755,26 @@ export default function AdminPage() {
                     Forgot Password?
                   </button>
                 </div>
-                <input
-                  type="password"
-                  required
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="Enter Password"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-                />
+                <div className="relative w-full">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Enter Password"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-4 pr-11 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] transition-colors p-1 flex items-center justify-center cursor-pointer"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      {showPassword ? "visibility_off" : "visibility"}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               <button
