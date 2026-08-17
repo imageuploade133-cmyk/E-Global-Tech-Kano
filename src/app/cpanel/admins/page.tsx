@@ -507,8 +507,8 @@ export default function CpanelAdminsPage() {
 
         {/* Edit Admin Modal */}
         {editingAdmin && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-4">
-            <div className={cn("w-full max-w-md p-6 rounded-3xl border space-y-4 shadow-2xl", panelClass)}>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className={cn("w-[94vw] sm:w-full max-w-md p-5 sm:p-6 rounded-3xl border space-y-4 shadow-2xl my-auto max-h-[85vh] overflow-y-auto no-scrollbar", panelClass)}>
               <div className="flex justify-between items-center border-b border-gray-200/40 pb-3">
                 <h3 className="font-extrabold text-sm uppercase">Edit Administrator Privileges</h3>
                 <button
