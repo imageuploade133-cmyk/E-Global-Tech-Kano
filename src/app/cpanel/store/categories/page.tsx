@@ -27,6 +27,33 @@ export default function CpanelStoreCategoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<StoreCategoryDoc | null>(null);
 
+  // Custom Confirm Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    actionLabel: string;
+    actionStyle: "danger" | "warning" | "success" | "info";
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    actionLabel: "",
+    actionStyle: "danger",
+    onConfirm: () => {},
+  });
+
+  const triggerConfirm = (
+    title: string,
+    message: string,
+    actionLabel: string,
+    actionStyle: "danger" | "warning" | "success" | "info",
+    onConfirm: () => void
+  ) => {
+    setConfirmModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
+  };
+
   // Form State
   const [catName, setCatName] = useState("");
   const [catDescription, setCatDescription] = useState("");
@@ -161,6 +188,7 @@ export default function CpanelStoreCategoriesPage() {
         action,
         categoryId: editingCategory?.id,
         category: {
+          id: editingCategory?.id,
           name: catName.trim(),
           description: catDescription.trim(),
           imageUrl: catImageUrl.trim(),
@@ -223,31 +251,37 @@ export default function CpanelStoreCategoriesPage() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete category "${cat.name}"?`)) return;
+    triggerConfirm(
+      "Delete Store Category?",
+      `Are you sure you want to delete category "${cat.name.toUpperCase()}"? Products mapped to this category may need re-assignment.`,
+      "Delete Category",
+      "danger",
+      async () => {
+        setActionCategoryId(cat.id);
+        try {
+          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+          const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
-    setActionCategoryId(cat.id);
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+          const res = await fetch("/api/admin/store/categories", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader },
+            body: JSON.stringify({ action: "delete_category", categoryId: cat.id }),
+          });
 
-      const res = await fetch("/api/admin/store/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ action: "delete_category", categoryId: cat.id }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Category deleted successfully!");
-        fetchCategories();
-      } else {
-        toast.error(data.error || "Failed to delete category.");
+          const data = await res.json();
+          if (res.ok && data.success) {
+            toast.success("Category deleted successfully!");
+            fetchCategories();
+          } else {
+            toast.error(data.error || "Failed to delete category.");
+          }
+        } catch (err: any) {
+          toast.error(err.message || "Network error deleting category.");
+        } finally {
+          setActionCategoryId(null);
+        }
       }
-    } catch (err: any) {
-      toast.error(err.message || "Network error deleting category.");
-    } finally {
-      setActionCategoryId(null);
-    }
+    );
   };
 
   // Filter categories
@@ -467,6 +501,45 @@ export default function CpanelStoreCategoriesPage() {
         )}
 
       </div>
+
+      {/* Action Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className={cn("w-full max-w-sm p-6 rounded-3xl border text-center shadow-2xl space-y-4", panelClass)}>
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center mx-auto border",
+              confirmModal.actionStyle === "danger" && "bg-red-50 text-red-500 border-red-200 dark:bg-red-950/40 dark:border-red-900/50"
+            )}>
+              <span className="material-symbols-outlined text-[24px]">gpp_maybe</span>
+            </div>
+
+            <div>
+              <h4 className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">{confirmModal.title}</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium leading-relaxed">{confirmModal.message}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                className="py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black uppercase cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                  confirmModal.onConfirm();
+                }}
+                className="py-2.5 bg-red-600 text-white rounded-xl text-xs font-black uppercase cursor-pointer hover:bg-red-700"
+              >
+                {confirmModal.actionLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Dialog for Add / Edit Category */}
       {isModalOpen && (

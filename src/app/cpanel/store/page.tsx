@@ -19,6 +19,8 @@ interface StoreItem {
   videoUrl?: string;
   autoSlide?: boolean;
   inStock: boolean;
+  stockQuantity?: number | null;
+  unlimitedStock?: boolean;
   createdAt: string;
 }
 
@@ -59,7 +61,8 @@ export default function CpanelStorePage() {
   const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Item Form & Edit state
+  // Item Form & Edit Modal state
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState("");
   const [itemDescription, setItemDescription] = useState("");
@@ -70,6 +73,8 @@ export default function CpanelStorePage() {
   const [itemVideoUrl, setItemVideoUrl] = useState("");
   const [itemAutoSlide, setItemAutoSlide] = useState(true);
   const [itemInStock, setItemInStock] = useState(true);
+  const [itemStockQuantity, setItemStockQuantity] = useState<string>("");
+  const [itemUnlimitedStock, setItemUnlimitedStock] = useState(true);
   const [newImageInput, setNewImageInput] = useState("");
   const [isUploadingItemImage, setIsUploadingItemImage] = useState(false);
   const [isSavingItem, setIsSavingItem] = useState(false);
@@ -271,6 +276,8 @@ export default function CpanelStorePage() {
     setItemVideoUrl("");
     setItemAutoSlide(true);
     setItemInStock(true);
+    setItemStockQuantity("");
+    setItemUnlimitedStock(true);
     setNewImageInput("");
   };
 
@@ -286,7 +293,15 @@ export default function CpanelStorePage() {
     setItemVideoUrl(item.videoUrl || "");
     setItemAutoSlide(item.autoSlide !== false);
     setItemInStock(item.inStock !== false);
+    setItemStockQuantity(item.stockQuantity !== null && item.stockQuantity !== undefined ? item.stockQuantity.toString() : "");
+    setItemUnlimitedStock(item.unlimitedStock !== false && (item.stockQuantity === null || item.stockQuantity === undefined));
     setNewImageInput("");
+    setIsProductModalOpen(true);
+  };
+
+  const handleOpenAddModal = () => {
+    resetItemForm();
+    setIsProductModalOpen(true);
   };
 
   const handleAddImageToProduct = (urlToAdd: string) => {
@@ -347,6 +362,8 @@ export default function CpanelStorePage() {
             videoUrl: itemVideoUrl,
             autoSlide: itemAutoSlide,
             inStock: itemInStock,
+            stockQuantity: itemUnlimitedStock ? null : (itemStockQuantity !== "" ? parseInt(itemStockQuantity) : null),
+            unlimitedStock: itemUnlimitedStock,
           },
         }),
       });
@@ -603,247 +620,27 @@ export default function CpanelStorePage() {
           </button>
         </div>
 
-        {/* TAB 1: Store Items Form & Grid */}
+        {/* TAB 1: Store Items Grid with Action Bar */}
         {activeTab === "items" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {/* Add Item Form */}
-            <div className={cn("p-5 rounded-2xl border space-y-4 lg:col-span-1 h-fit", panelClass)}>
-              <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
-                <span className="material-symbols-outlined text-orange-500 text-[20px]">add_box</span>
-                <h3 className="font-extrabold text-xs uppercase tracking-wider">Add Store Product</h3>
+          <div className="space-y-4">
+            <div className={cn("p-4 rounded-2xl border flex items-center justify-between gap-4", panelClass)}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">inventory_2</span>
+                <h3 className="font-extrabold text-sm uppercase">Products Directory ({items.length})</h3>
               </div>
 
-              <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-orange-500 text-[20px]">
-                    {editingItemId ? "edit_note" : "add_box"}
-                  </span>
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider">
-                    {editingItemId ? "Edit Product" : "Add Store Product"}
-                  </h3>
-                </div>
-                {editingItemId && (
-                  <button
-                    type="button"
-                    onClick={resetItemForm}
-                    className="text-[10px] font-bold text-gray-400 hover:text-white uppercase"
-                  >
-                    Cancel Edit
-                  </button>
-                )}
-              </div>
-
-              <form onSubmit={handleSaveItem} className="space-y-3.5">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Title</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. E-Tech POS Terminal V2"
-                    value={itemTitle}
-                    onChange={(e) => setItemTitle(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Category</label>
-                    <Link href="/cpanel/store/categories" className="text-[10px] font-bold text-[#FC7A00] hover:underline">
-                      + Add / Manage
-                    </Link>
-                  </div>
-                  <select
-                    value={itemCategory}
-                    onChange={(e) => setItemCategory(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
-                  >
-                    {categories.length > 0 ? (
-                      categories.filter((c) => c.name !== "ALL").map((cat) => (
-                        <option key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="Electronics">Electronics</option>
-                        <option value="Fashion">Fashion</option>
-                        <option value="Airtime & Utilities">Airtime & Utilities</option>
-                        <option value="Gift Cards">Gift Cards</option>
-                        <option value="Gadgets & Phones">Gadgets & Phones</option>
-                        <option value="General">General</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Price (₦)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 35000"
-                    value={itemPrice}
-                    onChange={(e) => setItemPrice(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                  />
-                </div>
-
-                {/* Multiple Images Upload Manager */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">
-                    Product Images ({itemImages.length})
-                  </label>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Paste image URL (https://...)"
-                      value={newImageInput}
-                      onChange={(e) => setNewImageInput(e.target.value)}
-                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddImageToProduct(newImageInput)}
-                      className="px-3 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white rounded-xl text-xs font-bold uppercase transition-all"
-                    >
-                      + Add
-                    </button>
-                    <div className="relative flex-shrink-0">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            uploadImageToImgBB(file, (uploadedUrl) => {
-                              handleAddImageToProduct(uploadedUrl);
-                            }, setIsUploadingItemImage);
-                          }
-                        }}
-                        disabled={isUploadingItemImage}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                      />
-                      <button
-                        type="button"
-                        disabled={isUploadingItemImage}
-                        className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
-                      >
-                        {isUploadingItemImage ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Thumbnail gallery list with Cover Image selector */}
-                  {itemImages.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 pt-1">
-                      {itemImages.map((imgUrl, idx) => {
-                        const isCover = itemCoverUrl === imgUrl || (!itemCoverUrl && idx === 0);
-                        return (
-                          <div
-                            key={idx}
-                            className={cn(
-                              "relative h-16 rounded-xl border overflow-hidden group bg-white flex items-center justify-center",
-                              isCover ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/40" : "border-gray-200"
-                            )}
-                          >
-                            <img src={imgUrl} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
-                            {isCover && (
-                              <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase bg-[#FC7A00] text-white">
-                                COVER
-                              </span>
-                            )}
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                              {!isCover && (
-                                <button
-                                  type="button"
-                                  onClick={() => setItemCoverUrl(imgUrl)}
-                                  className="p-1 bg-[#FC7A00] text-white rounded text-[8px] font-bold uppercase"
-                                  title="Set Cover Image"
-                                >
-                                  Cover
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveImageFromProduct(idx)}
-                                className="p-1 bg-red-600 text-white rounded text-[8px] font-bold"
-                                title="Remove Image"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Product Video URL Field */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Video URL (YouTube or Direct MP4)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. https://www.youtube.com/watch?v=... or .mp4"
-                    value={itemVideoUrl}
-                    onChange={(e) => setItemVideoUrl(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                  />
-                </div>
-
-                {/* Auto Slide ON/OFF Toggle */}
-                <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200/50 bg-gray-50/50">
-                  <div>
-                    <span className="text-xs font-extrabold uppercase block">Auto Slide Gallery</span>
-                    <span className="text-[9.5px] text-gray-400">Auto advance product image slides for users</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={itemAutoSlide}
-                      onChange={(e) => setItemAutoSlide(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FC7A00]" />
-                  </label>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Description</label>
-                  <textarea
-                    placeholder="Enter short details about this item..."
-                    value={itemDescription}
-                    onChange={(e) => setItemDescription(e.target.value)}
-                    className={cn("w-full h-20 p-3 rounded-xl text-xs font-semibold outline-none border transition-all resize-none", inputClass)}
-                  />
-                </div>
-
-                <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
-                  <input
-                    type="checkbox"
-                    checked={itemInStock}
-                    onChange={(e) => setItemInStock(e.target.checked)}
-                    className="w-4 h-4 text-[#FC7A00] rounded"
-                  />
-                  <span className="text-xs font-bold uppercase text-gray-400">In Stock for Ordering</span>
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={isSavingItem || isUploadingItemImage}
-                  className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {isSavingItem ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">{editingItemId ? "save" : "add"}</span>}
-                  <span>{editingItemId ? "Update Product" : "Add Product"}</span>
-                </button>
-              </form>
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+                className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span>Add Product</span>
+              </button>
             </div>
 
             {/* Items Grid */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="w-full">
               {isLoading ? (
                 <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
                   <ButtonSpinner />
@@ -1239,6 +1036,289 @@ export default function CpanelStorePage() {
         )}
 
       </div>
+
+      {/* Standalone Product Add/Edit Modal */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+          <div className={cn("w-full max-w-xl p-6 rounded-3xl border shadow-2xl space-y-4 my-8", panelClass)}>
+            <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">
+                  {editingItemId ? "edit_note" : "add_box"}
+                </span>
+                <h3 className="font-extrabold text-sm uppercase tracking-wider">
+                  {editingItemId ? "Edit Product" : "Add Store Product"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProductModalOpen(false);
+                  resetItemForm();
+                }}
+                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveItem} className="space-y-4 text-left">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Product Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. E-Tech POS Terminal V2"
+                  value={itemTitle}
+                  onChange={(e) => setItemTitle(e.target.value)}
+                  className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Category</label>
+                    <Link href="/cpanel/store/categories" className="text-[9.5px] font-bold text-[#FC7A00] hover:underline">
+                      + Manage
+                    </Link>
+                  </div>
+                  <select
+                    value={itemCategory}
+                    onChange={(e) => setItemCategory(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
+                  >
+                    {categories.length > 0 ? (
+                      categories.filter((c) => c.name !== "ALL").map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Fashion">Fashion</option>
+                        <option value="Airtime & Utilities">Airtime & Utilities</option>
+                        <option value="Gift Cards">Gift Cards</option>
+                        <option value="Gadgets & Phones">Gadgets & Phones</option>
+                        <option value="General">General</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Price (₦) *</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="e.g. 35000"
+                    value={itemPrice}
+                    onChange={(e) => setItemPrice(e.target.value)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                  />
+                </div>
+              </div>
+
+              {/* Stock Quantity & Unlimited Stock Controls */}
+              <div className="p-3.5 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase text-[#FC7A00]">Inventory & Stock Control</span>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={itemUnlimitedStock}
+                      onChange={(e) => {
+                        setItemUnlimitedStock(e.target.checked);
+                        if (e.target.checked) setItemStockQuantity("");
+                      }}
+                      className="w-4 h-4 text-[#FC7A00] rounded"
+                    />
+                    <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300">Unlimited Stock (No Quantity Cap)</span>
+                  </label>
+                </div>
+
+                {!itemUnlimitedStock && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Available Units / Stock Count</label>
+                    <input
+                      type="number"
+                      min={0}
+                      required={!itemUnlimitedStock}
+                      placeholder="e.g. 50"
+                      value={itemStockQuantity}
+                      onChange={(e) => setItemStockQuantity(e.target.value)}
+                      className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Multiple Images Upload Manager */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">
+                  Product Images ({itemImages.length})
+                </label>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Paste image URL (https://...)"
+                    value={newImageInput}
+                    onChange={(e) => setNewImageInput(e.target.value)}
+                    className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddImageToProduct(newImageInput)}
+                    className="px-3 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white rounded-xl text-xs font-bold uppercase transition-all cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                  <div className="relative flex-shrink-0">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          uploadImageToImgBB(file, (uploadedUrl) => {
+                            handleAddImageToProduct(uploadedUrl);
+                          }, setIsUploadingItemImage);
+                        }
+                      }}
+                      disabled={isUploadingItemImage}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingItemImage}
+                      className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                    >
+                      {isUploadingItemImage ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Thumbnail gallery list with Cover Image selector */}
+                {itemImages.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 pt-1">
+                    {itemImages.map((imgUrl, idx) => {
+                      const isCover = itemCoverUrl === imgUrl || (!itemCoverUrl && idx === 0);
+                      return (
+                        <div
+                          key={idx}
+                          className={cn(
+                            "relative h-16 rounded-xl border overflow-hidden group bg-white flex items-center justify-center",
+                            isCover ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/40" : "border-gray-200"
+                          )}
+                        >
+                          <img src={imgUrl} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
+                          {isCover && (
+                            <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase bg-[#FC7A00] text-white">
+                              COVER
+                            </span>
+                          )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                            {!isCover && (
+                              <button
+                                type="button"
+                                onClick={() => setItemCoverUrl(imgUrl)}
+                                className="p-1 bg-[#FC7A00] text-white rounded text-[8px] font-bold uppercase cursor-pointer"
+                                title="Set Cover Image"
+                              >
+                                Cover
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImageFromProduct(idx)}
+                              className="p-1 bg-red-600 text-white rounded text-[8px] font-bold cursor-pointer"
+                              title="Remove Image"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Product Video URL Field */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Product Video URL (YouTube or Direct MP4)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. https://www.youtube.com/watch?v=... or .mp4"
+                  value={itemVideoUrl}
+                  onChange={(e) => setItemVideoUrl(e.target.value)}
+                  className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                />
+              </div>
+
+              {/* Auto Slide ON/OFF Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200/50 bg-gray-50/50">
+                <div>
+                  <span className="text-xs font-extrabold uppercase block">Auto Slide Gallery</span>
+                  <span className="text-[9.5px] text-gray-400">Auto advance product image slides for users</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={itemAutoSlide}
+                    onChange={(e) => setItemAutoSlide(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FC7A00]" />
+                </label>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Description</label>
+                <textarea
+                  placeholder="Enter short details about this item..."
+                  value={itemDescription}
+                  onChange={(e) => setItemDescription(e.target.value)}
+                  className={cn("w-full h-20 p-3 rounded-xl text-xs font-semibold outline-none border transition-all resize-none", inputClass)}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={itemInStock}
+                  onChange={(e) => setItemInStock(e.target.checked)}
+                  className="w-4 h-4 text-[#FC7A00] rounded"
+                />
+                <span className="text-xs font-bold uppercase text-gray-400">In Stock for Ordering</span>
+              </label>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-gray-200/40">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProductModalOpen(false);
+                    resetItemForm();
+                  }}
+                  className="px-4 h-10 bg-gray-200 dark:bg-gray-800 text-xs font-bold uppercase rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingItem || isUploadingItemImage}
+                  className="px-6 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-bold uppercase rounded-xl flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingItem ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">{editingItemId ? "save" : "add"}</span>}
+                  <span>{editingItemId ? "Save Product Changes" : "Add Product"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -96,7 +96,12 @@ export default function AdminPage() {
   const metaClass = isDark ? "text-gray-400" : "text-gray-500";
 
   // Admin lock validation & Firebase Auth for CPanel
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("admin_session_unlocked") === "true";
+    }
+    return false;
+  });
   const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -135,6 +140,11 @@ export default function AdminPage() {
           setAdminEmail(data.user.email);
           if (typeof window !== "undefined") {
             sessionStorage.setItem("admin_session_unlocked", "true");
+          }
+        } else {
+          setIsAdminUnlocked(false);
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("admin_session_unlocked");
           }
         }
       } catch (err) {
