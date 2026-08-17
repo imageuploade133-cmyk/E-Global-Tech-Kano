@@ -6,31 +6,56 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatFirebaseError(error: unknown): string {
-  if (!error || typeof error !== "object") {
+  if (!error) {
     return "An error occurred during secure authentication. Please check your network and try again.";
   }
 
-  const err = error as { code?: string; message?: string };
-  const code = err.code || "";
+  let code = "";
+  let message = "";
 
-  switch (code) {
-    case "auth/email-already-in-use":
-      return "This email address is already associated with an active E-Tech account.";
-    case "auth/invalid-email":
-      return "Please enter a valid email address.";
-    case "auth/weak-password":
-      return "Your password must contain at least 6 characters for security.";
-    case "auth/wrong-password":
-    case "auth/user-not-found":
-    case "auth/invalid-credential":
-      return "The email address or password entered is incorrect. Please verify your credentials.";
-    case "auth/too-many-requests":
-      return "Access temporarily restricted due to multiple failed attempts. Please try again shortly.";
-    case "auth/network-request-failed":
-      return "Secure connection failed. Please check your internet connection.";
-    default:
-      return err.message || "An error occurred during secure authentication. Please check your network and try again.";
+  if (typeof error === "string") {
+    message = error;
+  } else if (typeof error === "object" && error !== null) {
+    const err = error as { code?: string; message?: string };
+    code = err.code || "";
+    message = err.message || "";
   }
+
+  const combined = (code + " " + message).toLowerCase();
+
+  if (code === "auth/email-already-in-use" || combined.includes("email-already-in-use")) {
+    return "This email address is already associated with an active E-Tech account.";
+  }
+  if (code === "auth/invalid-email" || combined.includes("invalid-email")) {
+    return "Please enter a valid email address.";
+  }
+  if (code === "auth/weak-password" || combined.includes("weak-password")) {
+    return "Your password must contain at least 6 characters for security.";
+  }
+  if (
+    code === "auth/wrong-password" ||
+    code === "auth/user-not-found" ||
+    code === "auth/invalid-credential" ||
+    combined.includes("wrong-password") ||
+    combined.includes("user-not-found") ||
+    combined.includes("invalid-credential")
+  ) {
+    return "The email address or password entered is incorrect. Please verify your credentials.";
+  }
+  if (code === "auth/too-many-requests" || combined.includes("too-many-requests")) {
+    return "Access temporarily restricted due to multiple failed attempts. Please try again shortly.";
+  }
+  if (code === "auth/network-request-failed" || combined.includes("network-request-failed")) {
+    return "Network connection error. Please check your internet connection and try again.";
+  }
+  if (code === "auth/popup-closed-by-user" || combined.includes("popup-closed-by-user")) {
+    return "Authentication popup was closed before completing.";
+  }
+  if (combined.includes("firebase:") || combined.includes("auth/")) {
+    return "Secure authentication failed. Please check your internet connection and try again.";
+  }
+
+  return message || "An error occurred during secure authentication. Please check your network and try again.";
 }
 
 /**
