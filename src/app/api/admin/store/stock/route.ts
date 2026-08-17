@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const data = docSnap.exists ? docSnap.data() || {} : {};
     const items: any[] = Array.isArray(data.items) ? data.items : [];
 
-    let totalProducts = items.length;
+    const totalProducts = items.length;
     let availableStockUnits = 0;
     let unlimitedCount = 0;
     let totalCostValue = 0;
