@@ -1,3 +1,25 @@
+import fs from "fs";
+import path from "path";
+
+// Zero-dependency .env loader for seed script
+try {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, "utf8");
+    content.split("\n").forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+        const [key, ...val] = trimmed.split("=");
+        if (key && !process.env[key.trim()]) {
+          process.env[key.trim()] = val.join("=").trim().replace(/^["']|["']$/g, "");
+        }
+      }
+    });
+  }
+} catch {
+  // Ignore env read errors
+}
+
 import { adminDb, adminApp } from "../src/lib/firebase-admin";
 
 const SUPER_ADMIN_EMAIL = "abdulkadir123shaba@gmail.com";
