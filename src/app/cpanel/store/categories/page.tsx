@@ -543,8 +543,8 @@ export default function CpanelStoreCategoriesPage() {
 
       {/* Modal Dialog for Add / Edit Category */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className={cn("w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-5", panelClass)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className={cn("w-[94vw] sm:w-full max-w-lg p-5 sm:p-6 rounded-3xl border shadow-2xl space-y-4 my-auto max-h-[85vh] overflow-y-auto no-scrollbar", panelClass)}>
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4">
               <div className="flex items-center gap-2.5">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">category</span>

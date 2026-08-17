@@ -111,6 +111,33 @@ export default function CpanelStorePage() {
   // Deleting item/slide ID
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Custom Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    actionLabel: string;
+    actionStyle: "danger" | "warning" | "success" | "info";
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    actionLabel: "",
+    actionStyle: "danger",
+    onConfirm: () => {},
+  });
+
+  const triggerConfirm = (
+    title: string,
+    message: string,
+    actionLabel: string,
+    actionStyle: "danger" | "warning" | "success" | "info",
+    onConfirm: () => void
+  ) => {
+    setConfirmModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
+  };
+
   // Theme Syncing
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -403,36 +430,47 @@ export default function CpanelStorePage() {
     }
   };
 
-  // Delete Item
+  // Delete Item with Confirmation Modal
   const handleDeleteItem = async (itemId: string) => {
-    setDeletingId(itemId);
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const headers: Record<string, string> = isMock
-        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-        : { "Content-Type": "application/json" };
+    const targetItem = items.find((i) => i.id === itemId);
+    const itemTitle = targetItem ? targetItem.title.toUpperCase() : "THIS PRODUCT";
 
-      const res = await fetch("/api/admin/store", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          action: "delete_item",
-          itemId,
-        }),
-      });
+    triggerConfirm(
+      "Delete Store Product?",
+      `Are you sure you want to permanently delete product "${itemTitle}" from your store?`,
+      "Delete Product",
+      "danger",
+      async () => {
+        setDeletingId(itemId);
+        try {
+          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+          const headers: Record<string, string> = isMock
+            ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+            : { "Content-Type": "application/json" };
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Store item deleted.");
-        setItems(data.items || []);
-      } else {
-        toast.error(data.error || "Failed to delete item.");
+          const res = await fetch("/api/admin/store", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              action: "delete_item",
+              itemId,
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.success) {
+            toast.success("Store item deleted.");
+            setItems(data.items || []);
+          } else {
+            toast.error(data.error || "Failed to delete item.");
+          }
+        } catch (err: any) {
+          toast.error(err.message || "Network error deleting item.");
+        } finally {
+          setDeletingId(null);
+        }
       }
-    } catch (err: any) {
-      toast.error(err.message || "Network error deleting item.");
-    } finally {
-      setDeletingId(null);
-    }
+    );
   };
 
   // Add Slide Submit
@@ -482,36 +520,44 @@ export default function CpanelStorePage() {
     }
   };
 
-  // Delete Slide
+  // Delete Slide with Confirmation Modal
   const handleDeleteSlide = async (slideId: string) => {
-    setDeletingId(slideId);
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const headers: Record<string, string> = isMock
-        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-        : { "Content-Type": "application/json" };
+    triggerConfirm(
+      "Delete Store Slide?",
+      "Are you sure you want to permanently delete this storefront slideshow banner?",
+      "Delete Slide",
+      "danger",
+      async () => {
+        setDeletingId(slideId);
+        try {
+          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+          const headers: Record<string, string> = isMock
+            ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+            : { "Content-Type": "application/json" };
 
-      const res = await fetch("/api/admin/store", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          action: "delete_slide",
-          slideId,
-        }),
-      });
+          const res = await fetch("/api/admin/store", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              action: "delete_slide",
+              slideId,
+            }),
+          });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Store slide image deleted.");
-        setSlides(data.slides || []);
-      } else {
-        toast.error(data.error || "Failed to delete slide image.");
+          const data = await res.json();
+          if (res.ok && data.success) {
+            toast.success("Store slide image deleted.");
+            setSlides(data.slides || []);
+          } else {
+            toast.error(data.error || "Failed to delete slide image.");
+          }
+        } catch (err: any) {
+          toast.error(err.message || "Network error deleting slide image.");
+        } finally {
+          setDeletingId(null);
+        }
       }
-    } catch (err: any) {
-      toast.error(err.message || "Network error deleting slide image.");
-    } finally {
-      setDeletingId(null);
-    }
+    );
   };
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
@@ -598,6 +644,16 @@ export default function CpanelStorePage() {
           >
             <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
             <span>Dispatch Orders</span>
+          </Link>
+
+          <Link
+            href="/cpanel/store/stock"
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap border border-orange-500/30 text-orange-600 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">trending_up</span>
+            <span>Stock Income</span>
           </Link>
 
           <Link
@@ -1065,6 +1121,45 @@ export default function CpanelStorePage() {
         )}
 
       </div>
+
+      {/* Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-[100001] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className={cn("w-[92vw] sm:w-full max-w-sm p-6 rounded-3xl border text-center shadow-2xl space-y-4", panelClass)}>
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center mx-auto border",
+              confirmModal.actionStyle === "danger" && "bg-red-50 text-red-500 border-red-200 dark:bg-red-950/40 dark:border-red-900/50"
+            )}>
+              <span className="material-symbols-outlined text-[24px]">gpp_maybe</span>
+            </div>
+
+            <div>
+              <h4 className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">{confirmModal.title}</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium leading-relaxed">{confirmModal.message}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                className="py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black uppercase cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                  confirmModal.onConfirm();
+                }}
+                className="py-2.5 bg-red-600 text-white rounded-xl text-xs font-black uppercase cursor-pointer hover:bg-red-700"
+              >
+                {confirmModal.actionLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Standalone Product Add/Edit Modal */}
       {isProductModalOpen && (
