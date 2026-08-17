@@ -95,11 +95,13 @@ export default function AdminPage() {
   const labelClass = isDark ? "text-gray-300" : "text-gray-900";
   const metaClass = isDark ? "text-gray-400" : "text-gray-500";
 
-  // Admin lock validation
+  // Admin lock validation & Firebase Auth for CPanel
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [showLockConfirm, setShowLockConfirm] = useState(false);
-  const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
+  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
   const [isEmailAdmin, setIsEmailAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "users" | "kyc" | "settings" | "whatsapp" | "profit" | "banners" | "investments" | "history">("dashboard");
 
@@ -1162,27 +1164,39 @@ export default function AdminPage() {
     e.preventDefault();
     setIsVerifyingPin(true);
 
-    if (!adminEmail.trim()) {
-      toast.error("Please enter your admin email address.");
+    const cleanEmail = adminEmail.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      toast.error("Please enter your administrator email address.");
       setIsVerifyingPin(false);
       return;
     }
 
-    if (!adminPin || adminPin.length < 4) {
-      toast.error("Please enter your 4-digit Access PIN.");
+    if (!adminPassword) {
+      toast.error("Please enter your administrator password.");
       setIsVerifyingPin(false);
       return;
     }
 
     try {
+      // 1. Authenticate with Firebase Auth on the client
+      const { signInWithEmailAndPassword } = await import("firebase/auth");
+      const { auth } = await import("@/lib/firebase");
+
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, adminPassword);
+      const firebaseUser = userCredential.user;
+      const idToken = await firebaseUser.getIdToken(true);
+
+      // 2. Exchange Firebase ID Token for CPanel Session
       const res = await fetch("/api/admin/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
         },
         body: JSON.stringify({
-          email: adminEmail,
-          pin: adminPin,
+          email: cleanEmail,
+          idToken
         }),
       });
 
@@ -1192,14 +1206,46 @@ export default function AdminPage() {
         if (typeof window !== "undefined") {
           sessionStorage.setItem("admin_session_unlocked", "true");
         }
-        toast.success(data.message || "Identity PIN Verified. Access Granted!");
+        toast.success(data.message || "Firebase Admin Authentication Granted!");
       } else {
-        toast.error(data.error || "Invalid Email or Access PIN!");
+        toast.error(data.error || "Access Denied: Account is not an authorized administrator.");
       }
     } catch (err: any) {
-      toast.error("API connection error during verification.");
+      console.error("[CPanel Firebase Auth Error]:", err);
+      let errMsg = "Firebase Authentication Failed.";
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+        errMsg = "Invalid administrator Email or Password.";
+      } else if (err.code === "auth/too-many-requests") {
+        errMsg = "Too many failed attempts. Please try again later.";
+      } else if (err.message) {
+        errMsg = err.message;
+      }
+      toast.error(errMsg);
     } finally {
       setIsVerifyingPin(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = adminEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      toast.error("Please enter your administrator email address.");
+      return;
+    }
+
+    setIsSendingResetEmail(true);
+    try {
+      const { sendPasswordResetEmail } = await import("firebase/auth");
+      const { auth } = await import("@/lib/firebase");
+
+      await sendPasswordResetEmail(auth, cleanEmail);
+      toast.success("Password recovery email sent! Check your inbox.");
+      setIsResetPasswordMode(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send password recovery email.");
+    } finally {
+      setIsSendingResetEmail(false);
     }
   };
 
@@ -1398,6 +1444,7 @@ export default function AdminPage() {
 
   const sidebarNavItems = [
     { id: "dashboard", label: "Metrics", icon: "cell_tower" },
+    { id: "admins", label: "Admin Management", icon: "admin_panel_settings", href: "/cpanel/admins" },
     { id: "users", label: "Users & Permissions", icon: "group" },
     { id: "kyc", label: "KYC Approvals", icon: "verified_user" },
     { id: "settings", label: "Branding", icon: "diamond" },
@@ -1419,52 +1466,97 @@ export default function AdminPage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6"
+          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6 shadow-xl"
         >
-          <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
-            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_maybe</span>
+          <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
+            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>admin_panel_settings</span>
           </div>
 
           <div>
-            <h2 className="font-hanken font-extrabold text-2xl tracking-tight text-gray-900 leading-tight">Admin Gatekeeper</h2>
+            <h2 className="font-hanken font-black text-2xl tracking-tight text-gray-900 leading-tight">
+              {isResetPasswordMode ? "Reset Admin Password" : "CPanel Administrator Login"}
+            </h2>
             <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
-              Welcome to the E-Tech Enterprise Control Panel. Enter your administrative passcode or your secure transaction PIN to grant access.
+              {isResetPasswordMode
+                ? "Enter your administrator email address to receive a secure Firebase password recovery link."
+                : "Welcome to the E-Tech Enterprise Control Panel. Authenticate using your Firebase Administrator credentials."}
             </p>
           </div>
 
-          <form onSubmit={handleAdminVerify} className="w-full space-y-4">
-            <div className="space-y-1.5 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Email Address</label>
-              <input
-                type="email"
-                required
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@example.com"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-              />
-            </div>
+          {isResetPasswordMode ? (
+            <form onSubmit={handlePasswordReset} className="w-full space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Email</label>
+                <input
+                  type="email"
+                  required
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="e.g. abdulkadir123shaba@gmail.com"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                />
+              </div>
 
-            <div className="space-y-1.5 text-left">
-              <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Admin Access PIN</label>
-              <input
-                type="password"
-                maxLength={6}
-                value={adminPin}
-                onChange={(e) => setAdminPin(e.target.value)}
-                placeholder="Enter 4-digit Access PIN"
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-center font-mono font-bold text-xl text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-              />
-            </div>
+              <button
+                type="submit"
+                disabled={isSendingResetEmail}
+                className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSendingResetEmail ? <><ButtonSpinner /> Sending Reset Link...</> : "Send Recovery Email"}
+              </button>
 
-            <button
-              type="submit"
-              disabled={isVerifyingPin}
-              className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isVerifyingPin ? <><ButtonSpinner /> Verifying Authority...</> : "Verify Authority"}
-            </button>
-          </form>
+              <button
+                type="button"
+                onClick={() => setIsResetPasswordMode(false)}
+                className="text-xs font-bold text-gray-500 hover:text-black uppercase tracking-wider"
+              >
+                ← Back to Login
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleAdminVerify} className="w-full space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Email</label>
+                <input
+                  type="email"
+                  required
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="e.g. abdulkadir123shaba@gmail.com"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <div className="flex justify-between items-center">
+                  <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Administrator Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsResetPasswordMode(true)}
+                    className="text-[10px] font-bold text-gray-400 hover:text-[#FC7A00] uppercase"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="Enter Password"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isVerifyingPin}
+                className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
+              >
+                {isVerifyingPin ? <><ButtonSpinner /> Authenticating Firebase Token...</> : "Authenticate Administrator"}
+              </button>
+            </form>
+          )}
         </motion.div>
       </main>
     );

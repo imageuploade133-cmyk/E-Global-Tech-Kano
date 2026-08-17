@@ -10,8 +10,6 @@ const ALLOWED_PERMISSIONS = [
   "can_moderate_users"
 ];
 
-const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
-const DESIGNATED_ADMIN_EMAIL = "abdulkadir123shaba@gmail.com";
 
 export async function GET(req: Request) {
   try {
@@ -205,12 +203,11 @@ export async function POST(req: Request) {
       } = body;
 
       // Enforce administrative creation privileges: Only SUPER_ADMIN or root can create administrative accounts
-      const callerDoc = await adminDb.collection("users").doc(uid).get();
-      const callerData = callerDoc.exists ? callerDoc.data() || {} : {};
-      const callerRole = callerData.role || "user";
-      const callerEmail = (callerData.email || "").toLowerCase().trim();
+      const adminDoc = await adminDb.collection("admin_users").doc(uid).get();
+      const adminData = adminDoc.exists ? adminDoc.data() || {} : {};
+      const callerRole = (adminData.role || "").toLowerCase();
 
-      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || callerEmail === DESIGNATED_ADMIN_EMAIL || (ROOT_ADMIN_EMAIL && callerEmail === ROOT_ADMIN_EMAIL) || uid === "mock-admin-uid");
+      const isCallerSuperAdmin = (callerRole === "super_admin" || uid === "mock-admin-uid");
 
       if (role === "admin" || role === "SUPER_ADMIN") {
         if (!isCallerSuperAdmin) {
@@ -308,12 +305,11 @@ export async function POST(req: Request) {
       }
 
       // Enforce role modification privileges: Only SUPER_ADMIN can manage administrative roles/privileges
-      const callerDoc = await adminDb.collection("users").doc(uid).get();
-      const callerData = callerDoc.exists ? callerDoc.data() || {} : {};
-      const callerRole = callerData.role || "user";
-      const callerEmail = (callerData.email || "").toLowerCase().trim();
+      const adminDoc = await adminDb.collection("admin_users").doc(uid).get();
+      const adminData = adminDoc.exists ? adminDoc.data() || {} : {};
+      const callerRole = (adminData.role || "").toLowerCase();
 
-      const isCallerSuperAdmin = (callerRole === "SUPER_ADMIN" || (ROOT_ADMIN_EMAIL && callerEmail === ROOT_ADMIN_EMAIL) || uid === "mock-admin-uid");
+      const isCallerSuperAdmin = (callerRole === "super_admin" || uid === "mock-admin-uid");
 
       const targetDoc = await adminDb.collection("users").doc(targetUid).get();
       const targetData = targetDoc.exists ? targetDoc.data() || {} : {};

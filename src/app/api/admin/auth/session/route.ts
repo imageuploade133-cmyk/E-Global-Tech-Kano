@@ -4,8 +4,6 @@ import { adminDb } from "@/lib/firebase-admin";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
-const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
-const DESIGNATED_ADMIN_EMAIL = "abdulkadir123shaba@gmail.com";
 
 export async function GET() {
   try {
@@ -35,38 +33,32 @@ export async function GET() {
           uid: "mock-admin-uid",
           name: "MOCK SUPER ADMIN",
           email: decoded.email,
-          role: "SUPER_ADMIN",
-          permissions: ["can_transact", "can_verify_kyc", "can_manage_gateways", "can_view_audit_logs", "can_moderate_users"]
+          role: "super_admin",
+          permissions: ["*"]
         }
       });
     }
 
-    // Query user doc from Firestore to verify their role/status
-    const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ success: false, error: "Admin profile not found in Firestore." }, { status: 401 });
+    // Query admin doc from admin_users collection using UID
+    const adminDocSnap = await adminDb.collection("admin_users").doc(decoded.uid).get();
+    if (!adminDocSnap.exists) {
+      return NextResponse.json({ success: false, error: "Admin profile not configured in admin_users." }, { status: 401 });
     }
 
-    const userData = userDoc.data() || {};
-    const cleanEmail = (decoded.email || "").toLowerCase().trim();
-    const isEmailAdmin = cleanEmail === DESIGNATED_ADMIN_EMAIL || (ROOT_ADMIN_EMAIL && cleanEmail === ROOT_ADMIN_EMAIL);
-    const userRole = (userData.role || "").trim().toUpperCase();
-    const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
+    const adminData = adminDocSnap.data() || {};
 
-    if (!isAdmin) {
-      return NextResponse.json({ success: false, error: "Forbidden: Not an administrator." }, { status: 403 });
+    if (adminData.status !== "active") {
+      return NextResponse.json({ success: false, error: "Administrator account is disabled or suspended." }, { status: 403 });
     }
-
-    const finalRole = isEmailAdmin ? "SUPER_ADMIN" : (userData.role || "admin");
 
     return NextResponse.json({
       success: true,
       user: {
         uid: decoded.uid,
-        name: userData.name || userData.displayName || `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "Admin",
-        email: decoded.email,
-        role: finalRole,
-        permissions: userData.permissions || []
+        name: adminData.displayName || "Administrator",
+        email: adminData.email || decoded.email,
+        role: adminData.role || "admin",
+        permissions: adminData.permissions || []
       }
     });
 

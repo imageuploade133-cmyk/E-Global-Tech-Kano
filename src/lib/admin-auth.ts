@@ -5,13 +5,6 @@ import jwt from "jsonwebtoken";
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
-const ROOT_ADMIN_EMAIL = (process.env.ROOT_ADMIN_EMAIL || "").trim().toLowerCase();
-const DESIGNATED_ADMIN_EMAIL = "abdulkadir123shaba@gmail.com";
-
-const isDesignatedAdminEmail = (email: string) => {
-  const clean = String(email || "").trim().toLowerCase();
-  return clean === DESIGNATED_ADMIN_EMAIL || (ROOT_ADMIN_EMAIL && clean === ROOT_ADMIN_EMAIL);
-};
 
 async function verifyFirebaseIdToken(token: string, projectId: string): Promise<{ uid: string }> {
   const parts = token.split(".");
@@ -63,76 +56,66 @@ async function verifyFirebaseIdToken(token: string, projectId: string): Promise<
   return { uid: payloadJson.sub };
 }
 
-export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAdmin: boolean }> {
+export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAdmin: boolean; email?: string; role?: string; permissions?: string[] }> {
   try {
-    // 1. Try cookie-based CPanel authentication first
+    // 1. Check CPanel session cookie
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get("cpanel_session")?.value;
+
+    let uid = "";
 
     if (sessionToken) {
       try {
         const decoded = jwt.verify(sessionToken, JWT_SECRET) as { uid: string; email: string; role: string };
         if (decoded && decoded.uid) {
-          // Playtesting mock bypass
           if (decoded.uid === "mock-admin-uid") {
-            return { uid: decoded.uid, isAdmin: true };
+            return { uid: decoded.uid, isAdmin: true, email: decoded.email, role: "super_admin", permissions: ["*"] };
           }
-
-          // Lookup user in Firestore to make sure they are still an admin and exist
-          const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
-          if (userDoc.exists) {
-            const userData = userDoc.data() || {};
-            const cleanEmail = (decoded.email || "").toLowerCase().trim();
-            const isEmailAdmin = isDesignatedAdminEmail(cleanEmail);
-            const userRole = (userData.role || "").trim().toUpperCase();
-            const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
-            if (isAdmin) {
-              return { uid: decoded.uid, isAdmin: true };
-            }
-          }
+          uid = decoded.uid;
         }
       } catch (cookieErr: any) {
         console.warn("[verifyAdminAuth] Cookie session verification failed:", cookieErr.message);
       }
     }
 
-    // 2. Fall back to standard Authorization Bearer header check (e.g. for external APIs, VMs, or mock testing)
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    // 2. Fall back to Authorization Bearer header (Firebase ID Token or mock)
+    if (!uid) {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.split("Bearer ")[1];
+        if (token === "mock-admin-token") {
+          return { uid: "mock-admin-uid", isAdmin: true, email: "admin@example.com", role: "super_admin", permissions: ["*"] };
+        } else {
+          const decoded = await verifyFirebaseIdToken(token, FIREBASE_PROJECT_ID);
+          uid = decoded.uid;
+        }
+      }
+    }
+
+    if (!uid) {
       throw new Error("Missing or invalid Authorization header/cookie session.");
     }
 
-    const token = authHeader.split("Bearer ")[1];
+    // Look up administrator document in dedicated admin_users collection using Firebase UID as identity
+    const adminDocSnap = await adminDb.collection("admin_users").doc(uid).get();
 
-    let uid = "";
-    if (token === "mock-admin-token") {
-      uid = "mock-admin-uid";
-    } else {
-      const decoded = await verifyFirebaseIdToken(token, FIREBASE_PROJECT_ID);
-      uid = decoded.uid;
+    if (!adminDocSnap.exists) {
+      throw new Error("Forbidden: Account is not configured in admin_users.");
     }
 
-    if (uid === "mock-admin-uid") {
-      return { uid, isAdmin: true };
+    const adminData = adminDocSnap.data() || {};
+
+    if (adminData.status !== "active") {
+      throw new Error("Forbidden: Administrator account is disabled or suspended.");
     }
 
-    // Look up user document to ensure role == "admin" or "SUPER_ADMIN" or has admin email
-    const userDoc = await adminDb.collection("users").doc(uid).get();
-    if (!userDoc.exists) {
-      throw new Error("User profile not found in Firestore.");
-    }
-
-    const userData = userDoc.data() || {};
-    const userEmail = (userData.email || "").toLowerCase().trim();
-    const isEmailAdmin = isDesignatedAdminEmail(userEmail);
-    const userRole = (userData.role || "").trim().toUpperCase();
-    const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || isEmailAdmin;
-
-    if (!isAdmin) {
-      throw new Error("Forbidden: User is not an administrator.");
-    }
-
-    return { uid, isAdmin: true };
+    return {
+      uid,
+      isAdmin: true,
+      email: adminData.email || "",
+      role: adminData.role || "admin",
+      permissions: Array.isArray(adminData.permissions) ? adminData.permissions : []
+    };
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[verifyAdminAuth Error] Access denied:", error.message);
@@ -145,17 +128,14 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
  * to securely authorize server-to-server calls to the payment-gateway VM on the fly.
  */
 export async function mintFirebaseIdToken(uid: string): Promise<string> {
-  // If mock admin user, return a mock token
   if (uid === "mock-admin-uid") {
     return "mock-admin-token";
   }
 
   const { getAuth } = await import("firebase-admin/auth");
-  // 1. Create a Firebase Custom Token for the user UID
   const customToken = await getAuth(adminApp).createCustomToken(uid);
 
-  // 2. Exchange the Custom Token for an ID Token using Google Identity Toolkit REST API
-  const apiKey = "AIzaSyCuolap_m6yXWEo2csYMyGhEshsHnd1aEQ"; // from src/lib/firebase.ts
+  const apiKey = "AIzaSyCuolap_m6yXWEo2csYMyGhEshsHnd1aEQ";
   const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`, {
     method: "POST",
     headers: {
