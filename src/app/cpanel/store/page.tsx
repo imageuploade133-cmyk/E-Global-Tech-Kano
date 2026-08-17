@@ -125,7 +125,7 @@ export default function CpanelStorePage() {
   // Auth & Session Check
   useEffect(() => {
     async function checkSession() {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       if (isMock) {
         setIsLoadingSession(false);
         return;
@@ -167,7 +167,7 @@ export default function CpanelStorePage() {
   const fetchStoreData = async () => {
     setIsLoading(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
       const res = await fetch("/api/admin/store", { headers });
       const data = await res.json();
@@ -226,7 +226,7 @@ export default function CpanelStorePage() {
     e.preventDefault();
     setIsSavingSettings(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };
@@ -322,7 +322,7 @@ export default function CpanelStorePage() {
 
     setIsSavingItem(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };
@@ -370,7 +370,7 @@ export default function CpanelStorePage() {
   const handleDeleteItem = async (itemId: string) => {
     setDeletingId(itemId);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };
@@ -408,7 +408,7 @@ export default function CpanelStorePage() {
 
     setIsSavingSlide(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };
@@ -449,7 +449,7 @@ export default function CpanelStorePage() {
   const handleDeleteSlide = async (slideId: string) => {
     setDeletingId(slideId);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };

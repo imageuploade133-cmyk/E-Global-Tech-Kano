@@ -360,13 +360,7 @@ export default function AdminPage() {
     permissions: [] as string[]
   });
 
-  const handleUserSearchSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchUserTerm.trim()) {
-      toast.warning("Please enter a search term (email address or phone number) to save read costs.");
-      return;
-    }
-
+  const fetchUsersDirectory = async (searchTermVal?: string) => {
     setIsLoadingUsers(true);
     try {
       let idToken = "mock-admin-token";
@@ -375,8 +369,8 @@ export default function AdminPage() {
         idToken = await user.getIdToken();
       }
 
-      // LOW COST INDEXED EQUALITY LOOKUP
-      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(searchUserTerm.trim())}`, {
+      const q = searchTermVal !== undefined ? searchTermVal : searchUserTerm;
+      const res = await fetch(`/api/admin/users?search=${encodeURIComponent(q.trim())}`, {
         headers: {
           "Authorization": `Bearer ${idToken}`
         }
@@ -384,11 +378,6 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setUsersList(data.users || []);
-        if (data.users?.length === 0) {
-          toast.info("No matching records found. Double check email or complete phone number prefix.");
-        } else {
-          toast.success(`Found ${data.users.length} matching result(s)!`);
-        }
       } else {
         toast.error(data.error || "Failed to load system users securely.");
       }
@@ -398,6 +387,17 @@ export default function AdminPage() {
       setIsLoadingUsers(false);
     }
   };
+
+  const handleUserSearchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetchUsersDirectory(searchUserTerm);
+  };
+
+  useEffect(() => {
+    if (isAdminUnlocked && activeTab === "users" && usersList.length === 0) {
+      fetchUsersDirectory("");
+    }
+  }, [isAdminUnlocked, activeTab]);
 
   const fetchPendingKyc = async (isLoadMore: boolean = false, customTab?: "pending" | "verified_today" | "unverified") => {
     setIsLoadingKyc(true);
@@ -2452,10 +2452,9 @@ export default function AdminPage() {
                           </span>
                           <input
                             type="text"
-                            required
                             value={searchUserTerm}
                             onChange={(e) => setSearchUserTerm(e.target.value)}
-                            placeholder="Enter exact email, phone number, or 11-digit BVN..."
+                            placeholder="Search by name, email, phone number, or BVN..."
                             className={cn(
                               "w-full rounded-xl pl-9 pr-3 py-3 text-xs outline-none transition-all",
                               isDark ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500" : "bg-gray-50 border border-gray-200 text-black focus:border-[#FC7A00]"

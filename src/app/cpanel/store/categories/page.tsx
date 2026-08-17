@@ -45,25 +45,36 @@ export default function CpanelStoreCategoriesPage() {
     setIsDark(isDarkTheme);
   }, []);
 
-  // Check Admin Unlock Session
+  // Check Admin Unlock Session via /api/admin/auth/session
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isUnlocked = sessionStorage.getItem("cpanel_unlocked") === "true";
-      const isMock = window.location.search.includes("mock=true");
-      if (!isUnlocked && !isMock) {
-        toast.error("Security Session Expired. Please authenticate in CPanel.");
-        router.push("/cpanel");
+    async function checkSession() {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (isMock) {
+        setIsLoadingSession(false);
         return;
       }
-      setIsLoadingSession(false);
+      try {
+        const res = await fetch("/api/admin/auth/session");
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          toast.error("Security Session Expired. Please authenticate in CPanel.");
+          router.push("/cpanel");
+          return;
+        }
+      } catch (err) {
+        console.error("Session check failed:", err);
+      } finally {
+        setIsLoadingSession(false);
+      }
     }
+    checkSession();
   }, [router]);
 
   // Fetch Categories
   const fetchCategories = async () => {
     setIsLoadingCategories(true);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
       const res = await fetch("/api/admin/store/categories", { headers: authHeader });
@@ -142,7 +153,7 @@ export default function CpanelStoreCategoriesPage() {
     toast.loading("Saving category...", { id: "save-cat" });
 
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
       const action = editingCategory ? "edit_category" : "add_category";
@@ -183,7 +194,7 @@ export default function CpanelStoreCategoriesPage() {
   const handleToggleVisibility = async (cat: StoreCategoryDoc) => {
     setActionCategoryId(cat.id);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
       const res = await fetch("/api/admin/store/categories", {
@@ -216,7 +227,7 @@ export default function CpanelStoreCategoriesPage() {
 
     setActionCategoryId(cat.id);
     try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("cpanel_unlocked") === "true");
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
       const res = await fetch("/api/admin/store/categories", {

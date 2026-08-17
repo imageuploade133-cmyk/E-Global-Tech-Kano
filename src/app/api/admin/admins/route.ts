@@ -97,12 +97,18 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
 
     if (action === "create_admin") {
-      const { email, password, displayName, role, permissions } = adminData || {};
+      const { email, password, displayName, phoneNumber, role, permissions } = adminData || {};
       if (!email || !email.includes("@")) {
         return NextResponse.json({ error: "Valid administrator email address is required." }, { status: 400 });
       }
 
       const cleanEmail = String(email).trim().toLowerCase();
+      let cleanPhone = String(phoneNumber || "").trim().replace(/[^\d+]/g, "");
+      if (cleanPhone && cleanPhone.startsWith("0")) {
+        cleanPhone = "+234" + cleanPhone.slice(1);
+      } else if (cleanPhone && !cleanPhone.startsWith("+") && (cleanPhone.length === 10 || cleanPhone.length === 11)) {
+        cleanPhone = "+234" + cleanPhone;
+      }
 
       // Check if admin already exists
       const existingSnap = await adminDb.collection("admin_users").where("email", "==", cleanEmail).limit(1).get();
@@ -134,6 +140,7 @@ export async function POST(req: Request) {
         uid: firebaseUid,
         email: cleanEmail,
         displayName: displayName || cleanEmail.split("@")[0],
+        phoneNumber: cleanPhone,
         role: role || "admin",
         permissions: Array.isArray(permissions) ? permissions : ["users.view", "transactions.view", "kyc.view"],
         status: "active",
@@ -173,7 +180,7 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "update_admin") {
-      const { targetUid, role, permissions, status, displayName } = adminData || {};
+      const { targetUid, role, permissions, status, displayName, phoneNumber } = adminData || {};
       if (!targetUid) {
         return NextResponse.json({ error: "Target administrator UID is required." }, { status: 400 });
       }
@@ -206,6 +213,15 @@ export async function POST(req: Request) {
       if (permissions !== undefined) updatePayload.permissions = permissions;
       if (status !== undefined) updatePayload.status = status;
       if (displayName !== undefined) updatePayload.displayName = displayName;
+      if (phoneNumber !== undefined) {
+        let cleanPhone = String(phoneNumber || "").trim().replace(/[^\d+]/g, "");
+        if (cleanPhone && cleanPhone.startsWith("0")) {
+          cleanPhone = "+234" + cleanPhone.slice(1);
+        } else if (cleanPhone && !cleanPhone.startsWith("+") && (cleanPhone.length === 10 || cleanPhone.length === 11)) {
+          cleanPhone = "+234" + cleanPhone;
+        }
+        updatePayload.phoneNumber = cleanPhone;
+      }
 
       await targetRef.update(updatePayload);
 
