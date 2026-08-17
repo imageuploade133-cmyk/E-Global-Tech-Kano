@@ -10,6 +10,7 @@ interface AdminUserRecord {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber?: string;
   role: "super_admin" | "admin" | "support" | "finance" | "kyc_admin" | "read_only";
   permissions: string[];
   status: "active" | "disabled" | "suspended";
@@ -44,6 +45,7 @@ export default function CpanelAdminsPage() {
   // Form states for creating admin
   const [newEmail, setNewEmail] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
+  const [newPhoneNumber, setNewPhoneNumber] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<AdminUserRecord["role"]>("admin");
   const [newPermissions, setNewPermissions] = useState<string[]>(["users.view", "transactions.view", "kyc.view"]);
@@ -151,6 +153,7 @@ export default function CpanelAdminsPage() {
             email: newEmail,
             password: newPassword,
             displayName: newDisplayName,
+            phoneNumber: newPhoneNumber,
             role: newRole,
             permissions: newPermissions,
           },
@@ -162,6 +165,7 @@ export default function CpanelAdminsPage() {
         toast.success(data.message || "Administrator account created!");
         setNewEmail("");
         setNewDisplayName("");
+        setNewPhoneNumber("");
         setNewPassword("");
         setNewPermissions(["users.view", "transactions.view", "kyc.view"]);
         fetchAdmins();
@@ -194,6 +198,7 @@ export default function CpanelAdminsPage() {
           adminData: {
             targetUid: editingAdmin.uid,
             displayName: editingAdmin.displayName,
+            phoneNumber: editingAdmin.phoneNumber,
             role: editingAdmin.role,
             permissions: editingAdmin.permissions,
             status: editingAdmin.status,
@@ -343,6 +348,17 @@ export default function CpanelAdminsPage() {
               </div>
 
               <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">WhatsApp Phone Number (OTP Rail)</label>
+                <input
+                  type="tel"
+                  placeholder="e.g. +2348033123456 or 08033123456"
+                  value={newPhoneNumber}
+                  onChange={(e) => setNewPhoneNumber(e.target.value)}
+                  className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                />
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 block">Initial Password *</label>
                 <input
                   type="password"
@@ -445,6 +461,12 @@ export default function CpanelAdminsPage() {
                             </span>
                           </div>
                           <p className="text-xs font-mono text-gray-400 mt-1">{adm.email}</p>
+                          {adm.phoneNumber && (
+                            <p className="text-[10px] font-mono font-bold text-[#FC7A00] mt-0.5 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[13px]">phone</span>
+                              <span>{adm.phoneNumber}</span>
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -505,6 +527,17 @@ export default function CpanelAdminsPage() {
                     type="text"
                     value={editingAdmin.displayName}
                     onChange={(e) => setEditingAdmin({ ...editingAdmin, displayName: e.target.value })}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">WhatsApp Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. +2348033123456"
+                    value={editingAdmin.phoneNumber || ""}
+                    onChange={(e) => setEditingAdmin({ ...editingAdmin, phoneNumber: e.target.value })}
                     className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                   />
                 </div>
