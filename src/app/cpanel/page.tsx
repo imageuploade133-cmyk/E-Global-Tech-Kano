@@ -597,6 +597,55 @@ export default function AdminPage() {
     }
   };
 
+  const handleFetchRealQrCode = async () => {
+    setIsLoadingWhatsapp(true);
+    addWhatsappLog("Dispatching connect command to generate live QR code from WhatsApp VM...");
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/whatsapp/connect", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success && data.qrCode) {
+        setWhatsappQrCode(data.qrCode);
+        toast.success("Live WhatsApp QR code generated successfully!");
+        addWhatsappLog("Received live QR code payload from WhatsApp VM.");
+      } else {
+        const qrRes = await fetch("/api/admin/whatsapp/qr", {
+          headers: {
+            "Authorization": `Bearer ${idToken}`,
+          },
+        });
+        const qrData = await qrRes.json();
+        if (qrRes.ok && qrData.qrCode) {
+          setWhatsappQrCode(qrData.qrCode);
+          toast.success("Live WhatsApp QR code retrieved!");
+          addWhatsappLog("Retrieved QR code payload from WhatsApp gateway.");
+        } else {
+          const errMsg = data.error || qrData.error || "QR code is not currently available from WhatsApp VM.";
+          toast.error(errMsg);
+          addWhatsappLog(`[WARNING] Failed to generate QR code: ${errMsg}`);
+        }
+      }
+    } catch (err: any) {
+      console.error("Error generating WhatsApp QR code:", err);
+      toast.error("Network error requesting QR code from gateway.");
+      addWhatsappLog(`[ERROR] QR code request exception: ${err.message}`);
+    } finally {
+      setIsLoadingWhatsapp(false);
+    }
+  };
+
   const addWhatsappLog = (msg: string) => {
     const time = new Date().toLocaleTimeString();
     setWhatsappLogs(prev => [`[${time}] ${msg}`, ...prev.slice(0, 49)]);
@@ -3248,166 +3297,54 @@ export default function AdminPage() {
                         <button
                           type="button"
                           disabled={isLoadingWhatsapp}
-                          onClick={fetchWhatsappStatus}
+                          onClick={handleFetchRealQrCode}
                           className="px-3 py-1.5 bg-[#FC7A00] text-white hover:brightness-105 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1"
                         >
                           {isLoadingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">refresh</span>}
-                          <span>Reconnect / Fetch QR</span>
+                          <span>Generate Real QR</span>
                         </button>
                       </div>
 
-                      {/* Mode Toggles */}
-                      <div className="grid grid-cols-2 gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWhatsappPairMode("qr");
-                            setWhatsappPairingCode(null);
-                          }}
-                          className={cn(
-                            "py-2 rounded-lg text-xs font-extrabold uppercase transition-all cursor-pointer",
-                            whatsappPairMode === "qr"
-                              ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm"
-                              : "text-gray-400 hover:text-white"
-                          )}
-                        >
-                          Scan QR Code
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setWhatsappPairMode("code")}
-                          className={cn(
-                            "py-2 rounded-lg text-xs font-extrabold uppercase transition-all cursor-pointer",
-                            whatsappPairMode === "code"
-                              ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm"
-                              : "text-gray-400 hover:text-white"
-                          )}
-                        >
-                          Use Pairing Code
-                        </button>
-                      </div>
+                      {/* QR Code pairing view */}
+                      <div className="flex flex-col items-center py-6 text-center space-y-5">
+                        <p className="text-xs text-gray-400 max-w-sm leading-relaxed font-semibold">
+                          Open WhatsApp on your phone, navigate to <span className="text-[#FC7A00] font-bold">Linked Devices</span>, choose <span className="text-[#FC7A00] font-bold">Link a Device</span>, and point your camera to scan this QR code:
+                        </p>
 
-                      {/* Conditional view based on link mode */}
-                      {whatsappPairMode === "qr" ? (
-                        <div className="flex flex-col items-center py-6 text-center space-y-5">
-                          <p className="text-xs text-gray-400 max-w-sm leading-relaxed font-semibold">
-                            Open WhatsApp on your phone, navigate to <span className="text-[#FC7A00] font-bold">Linked Devices</span>, choose <span className="text-[#FC7A00] font-bold">Link a Device</span>, and point your camera to scan this QR code:
-                          </p>
-
-                          <div className={cn("p-4 rounded-2xl bg-white border inline-block relative overflow-hidden group shadow-xs transition-colors", isDark ? "border-gray-800" : "border-gray-150")}>
-                            {/* Embedded high fidelity QR Server API or Live VM Base64 QR code */}
-                            {whatsappQrCode ? (
-                              <img
-                                src={whatsappQrCode}
-                                alt="WhatsApp Pairing QR Code"
-                                className="w-48 h-48 object-contain transition-transform group-hover:scale-102"
-                              />
-                            ) : (
-                              <div className="w-48 h-48 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex flex-col items-center justify-center p-4 text-center">
-                                <ButtonSpinner />
-                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mt-2">Generating QR Code...</span>
-                              </div>
-                            )}
-                            {isLinkingWhatsapp && (
-                              <div className="absolute inset-0 bg-white/90 dark:bg-black/90 flex flex-col items-center justify-center p-4">
-                                <ButtonSpinner />
-                                <p className="text-[10px] font-black uppercase text-gray-500 mt-2">Pairing device...</p>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                setIsLinkingWhatsapp(true);
-                                addWhatsappLog("Simulating QR camera viewport scan...");
-                                await new Promise(r => setTimeout(r, 2500));
-                                await handleApplyWhatsappLink("+2348033123456");
-                              }}
-                              className="px-5 py-2.5 bg-black hover:bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
-                            >
-                              Simulate Scanner Scan (Mock Link)
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isLoadingWhatsapp}
-                              onClick={fetchWhatsappStatus}
-                              className={cn(
-                                "px-4 py-2 border hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all text-xs font-bold uppercase rounded-xl cursor-pointer",
-                                isDark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-600"
-                              )}
-                            >
-                              {isLoadingWhatsapp ? "Syncing..." : "Refresh Code"}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-6">
-                          <p className="text-xs text-gray-400 leading-relaxed font-semibold">
-                            Enter your active WhatsApp phone number below to generate an 8-character code, then enter it directly in WhatsApp on your phone:
-                          </p>
-
-                          {!whatsappPairingCode ? (
-                            <form onSubmit={handleGeneratePairingCode} className="space-y-4">
-                              <div className="grid grid-cols-4 gap-2">
-                                <div className="col-span-1">
-                                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">Prefix</label>
-                                  <select
-                                    value={whatsappPhonePrefix}
-                                    onChange={(e) => setWhatsappPhonePrefix(e.target.value)}
-                                    className={cn(
-                                      "w-full rounded-xl px-2 py-2.5 text-xs outline-none transition-all",
-                                      isDark ? "bg-gray-800 border border-gray-700 text-white" : "bg-white border border-gray-200 text-black"
-                                    )}
-                                  >
-                                    <option value="+234">+234 (NG)</option>
-                                    <option value="+227">+227 (NE)</option>
-                                    <option value="+1">+1 (US)</option>
-                                  </select>
-                                </div>
-                                <div className="col-span-3">
-                                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">WhatsApp Number</label>
-                                  <input
-                                    type="tel"
-                                    required
-                                    value={whatsappPhoneInput}
-                                    onChange={(e) => setWhatsappPhoneInput(e.target.value)}
-                                    placeholder="e.g. 8123456789"
-                                    className={inputClass}
-                                  />
-                                </div>
-                              </div>
-
-                              <button
-                                type="submit"
-                                disabled={isLinkingWhatsapp}
-                                className="w-full py-3.5 bg-black hover:bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 disabled:opacity-50"
-                              >
-                                {isLinkingWhatsapp ? <><ButtonSpinner /> Requesting Pairing Key...</> : "Generate Pairing Code"}
-                              </button>
-                            </form>
+                        <div className={cn("p-4 rounded-2xl bg-white border inline-block relative overflow-hidden group shadow-xs transition-colors", isDark ? "border-gray-800" : "border-gray-150")}>
+                          {whatsappQrCode ? (
+                            <img
+                              src={whatsappQrCode}
+                              alt="WhatsApp Pairing QR Code"
+                              className="w-48 h-48 object-contain transition-transform group-hover:scale-102"
+                            />
                           ) : (
-                            <div className="flex flex-col items-center py-4 text-center space-y-4">
-                              <p className="text-[10px] font-black uppercase text-gray-400">Enter this code on your device:</p>
-                              <div className="font-mono text-4xl font-black tracking-widest text-[#FC7A00] bg-gray-100 dark:bg-gray-800 px-6 py-4 rounded-2xl border border-gray-150 dark:border-gray-700 animate-pulse">
-                                {whatsappPairingCode}
-                              </div>
-                              <p className="text-xs text-gray-500 font-semibold">
-                                Code expires in <span className="font-mono text-[#FC7A00] font-black">{Math.floor(whatsappCodeCountdown / 60)}:{(whatsappCodeCountdown % 60).toString().padStart(2, "0")}</span>
-                              </p>
-
-                              <button
-                                type="button"
-                                onClick={() => setWhatsappPairingCode(null)}
-                                className="text-[11px] text-[#FC7A00] hover:underline font-black uppercase tracking-wider cursor-pointer"
-                              >
-                                Cancel & Enter different number
-                              </button>
+                            <div className="w-48 h-48 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex flex-col items-center justify-center p-4 text-center">
+                              {isLoadingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-gray-400 text-3xl mb-1">qr_code_2</span>}
+                              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mt-2">
+                                {isLoadingWhatsapp ? "Generating QR Code..." : "Click Below to Generate QR Code"}
+                              </span>
+                            </div>
+                          )}
+                          {isLinkingWhatsapp && (
+                            <div className="absolute inset-0 bg-white/90 dark:bg-black/90 flex flex-col items-center justify-center p-4">
+                              <ButtonSpinner />
+                              <p className="text-[10px] font-black uppercase text-gray-500 mt-2">Pairing device...</p>
                             </div>
                           )}
                         </div>
-                      )}
+
+                        <div className="w-full max-w-sm pt-2">
+                          <button
+                            type="button"
+                            disabled={isLoadingWhatsapp}
+                            onClick={handleFetchRealQrCode}
+                            className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                          >
+                            {isLoadingWhatsapp ? <><ButtonSpinner /> Generating Live QR Code...</> : <><span className="material-symbols-outlined text-[18px]">qr_code_2</span> Generate / Refresh Real QR Code</>}
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Right side: Dynamic WhatsApp API Configuration Form */}
