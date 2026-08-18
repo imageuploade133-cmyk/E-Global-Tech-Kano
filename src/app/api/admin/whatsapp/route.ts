@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
-import { formatQrCodePayload } from "@/lib/whatsapp-service";
+import { formatQrCodePayload, callWhatsappBackend } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
@@ -72,67 +72,98 @@ export async function GET(req: Request) {
     }
 
     // 2. LIVE INTERROGATION OF WHATSAPP VM API GATEWAY
-    console.log(`[WhatsApp API GET] Querying live VM gateway: ${whatsappApiUrl}/instance/connectionStatus/${whatsappInstanceId}`);
+    console.log(`[WhatsApp API GET] Querying live VM gateway for instance: ${whatsappInstanceId}`);
+    let isConnected = false;
+    let phoneNumber: string | null = null;
+    let liveQrCode: string | null = null;
+
     try {
-      const statusResponse = await fetch(`${whatsappApiUrl}/instance/connectionStatus/${whatsappInstanceId}`, {
-        method: "GET",
-        headers: {
-          "apikey": whatsappApiKey,
-          "Content-Type": "application/json"
-        },
-        signal: AbortSignal.timeout(6000)
-      });
+      let backendRes = await callWhatsappBackend(`/instances/${whatsappInstanceId}`, "GET");
 
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
-        const state = statusData?.instance?.state || statusData?.status || statusData?.state;
-        const isConnected = state === "open" || state === "CONNECTED" || state === "connected";
+      if (!backendRes.ok) {
+        backendRes = await callWhatsappBackend("/instances", "GET");
+      }
 
-        if (isConnected) {
-          const phoneNumber = statusData?.instance?.owner || statusData?.owner || statusData?.phoneNumber || "Connected Sender";
-          return NextResponse.json({
-            success: true,
-            status: "LINKED",
-            phoneNumber,
-            linkedAt: new Date().toISOString(),
-            sessionName: `VM Instance: ${whatsappInstanceId}`,
-            isMock: false,
-            apiConfig: {
-              whatsappApiUrl,
-              whatsappApiKey,
-              whatsappInstanceId,
-              whatsappAdminUsername,
-              whatsappAdminPassword
-            }
-          });
+      if (backendRes.ok && backendRes.data) {
+        const rawData = backendRes.data;
+        let targetInstance: any = null;
+
+        if (Array.isArray(rawData)) {
+          targetInstance = rawData.find((inst: any) => inst.id === whatsappInstanceId || inst.name === whatsappInstanceId) || rawData[0];
+        } else if (rawData.instance) {
+          targetInstance = rawData.instance;
+        } else {
+          targetInstance = rawData;
         }
+
+        if (targetInstance) {
+          const rawState = (
+            targetInstance.state ||
+            targetInstance.status ||
+            targetInstance.connectionStatus ||
+            ""
+          ).toString().toLowerCase();
+
+          isConnected = rawState === "open" || rawState === "connected" || rawState === "authenticated" || rawState === "ready" || !!targetInstance.owner;
+
+          const rawOwner = targetInstance.owner || targetInstance.phoneNumber || targetInstance.jid || null;
+          if (rawOwner) {
+            const cleanNum = String(rawOwner).split("@")[0].replace(/\D/g, "");
+            if (cleanNum) phoneNumber = `+${cleanNum}`;
+          }
+
+          if (targetInstance.qr || targetInstance.base64) {
+            liveQrCode = formatQrCodePayload(targetInstance.qr || targetInstance.base64);
+          }
+        }
+      }
+
+      if (isConnected) {
+        try {
+          await adminDb.collection("config").doc("whatsapp").set({
+            status: "LINKED",
+            phoneNumber: phoneNumber || "+2348000000000",
+            linkedAt: new Date().toISOString(),
+            sessionName: `VM Instance: ${whatsappInstanceId}`
+          }, { merge: true });
+        } catch (dbErr) {
+          console.warn("[WhatsApp GET] Firestore status sync warning:", dbErr);
+        }
+
+        return NextResponse.json({
+          success: true,
+          status: "LINKED",
+          phoneNumber: phoneNumber || "Connected Sender",
+          linkedAt: new Date().toISOString(),
+          sessionName: `VM Instance: ${whatsappInstanceId}`,
+          isMock: false,
+          apiConfig: {
+            whatsappApiUrl,
+            whatsappApiKey,
+            whatsappInstanceId,
+            whatsappAdminUsername,
+            whatsappAdminPassword
+          }
+        });
       }
     } catch (apiErr: any) {
-      console.error("[WhatsApp GET] Error querying live connectionStatus, trying QR connector:", apiErr.message);
+      console.error("[WhatsApp GET] Error querying live connectionStatus:", apiErr.message);
     }
 
-    // 3. FETCH LIVE QR CODE AUTOMATICALLY FROM THE INSTANCE
-    console.log(`[WhatsApp API GET] Disconnected. Fetching QR from connect endpoint: ${whatsappApiUrl}/instance/connect/${whatsappInstanceId}`);
-    let qrCodeUrl: string | null = null;
-    try {
-      const qrResponse = await fetch(`${whatsappApiUrl}/instance/connect/${whatsappInstanceId}`, {
-        method: "GET",
-        headers: {
-          "apikey": whatsappApiKey,
-          "Content-Type": "application/json"
-        },
-        signal: AbortSignal.timeout(8000)
-      });
-
-      if (qrResponse.ok) {
-        const qrData = await qrResponse.json();
-        const base64Code = qrData?.base64 || qrData?.code || qrData?.qr || qrData?.qrcode;
-        if (base64Code) {
-          qrCodeUrl = formatQrCodePayload(base64Code);
+    // 3. FETCH LIVE QR CODE AUTOMATICALLY IF DISCONNECTED
+    if (!liveQrCode) {
+      try {
+        const qrRes = await callWhatsappBackend(`/instances/${whatsappInstanceId}/qr`, "GET");
+        if (qrRes.ok && qrRes.data) {
+          const qrData = qrRes.data;
+          const base64Code = qrData?.qr || qrData?.base64 || qrData?.code || qrData?.qrcode;
+          if (base64Code) {
+            liveQrCode = formatQrCodePayload(base64Code);
+          }
         }
+      } catch (qrErr: any) {
+        console.error("[WhatsApp GET] Error fetching QR code from VM gateway:", qrErr.message);
       }
-    } catch (qrErr: any) {
-      console.error("[WhatsApp GET] Error fetching QR code from VM gateway:", qrErr.message);
     }
 
     return NextResponse.json({
@@ -142,7 +173,7 @@ export async function GET(req: Request) {
       linkedAt: null,
       sessionName: `VM Instance: ${whatsappInstanceId}`,
       isMock: false,
-      qrCode: qrCodeUrl,
+      qrCode: liveQrCode,
       apiConfig: {
         whatsappApiUrl,
         whatsappApiKey,
