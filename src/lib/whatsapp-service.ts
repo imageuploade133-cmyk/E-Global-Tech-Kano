@@ -1,14 +1,49 @@
 import { adminDb } from "@/lib/firebase-admin";
 
-interface WhatsappConfig {
+export interface WhatsappConfig {
   apiUrl: string;
   apiKey: string;
   instanceId: string;
+  adminUsername?: string;
+  adminPassword?: string;
 }
 
 // In-memory lock to prevent duplicate concurrent actions
 let isActionInFlight = false;
 let lastActionTime = 0;
+let vmSessionCookie = "";
+
+/**
+ * Ensures an active session cookie with the WhatsApp API VM.
+ */
+async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
+  if (vmSessionCookie) return vmSessionCookie;
+  if (!config.adminUsername || !config.adminPassword) return "";
+
+  try {
+    const loginUrl = `${config.apiUrl}/api/login`;
+    const res = await fetch(loginUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: config.adminUsername,
+        password: config.adminPassword,
+      }),
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      const setCookie = res.headers.get("set-cookie");
+      if (setCookie) {
+        vmSessionCookie = setCookie.split(";")[0];
+        return vmSessionCookie;
+      }
+    }
+  } catch (err: any) {
+    console.warn("[ensureVmSessionCookie] VM Login failed:", err.message);
+  }
+  return "";
+}
 
 /**
  * Resolves server-side WhatsApp environment configuration.
@@ -18,6 +53,8 @@ export async function getWhatsappServerConfig(): Promise<WhatsappConfig> {
   let apiUrl = (process.env.WHATSAPP_API_URL || "https://whatsapp-5fda.onrender.com").replace(/\/+$/, "");
   let apiKey = process.env.WHATSAPP_API_KEY || "";
   let instanceId = process.env.WHATSAPP_INSTANCE_ID || "default";
+  let adminUsername = process.env.WHATSAPP_ADMIN_USERNAME || "admin";
+  let adminPassword = process.env.WHATSAPP_ADMIN_PASSWORD || "";
 
   try {
     const docSnap = await adminDb.collection("config").doc("whatsapp_api").get();
@@ -26,12 +63,14 @@ export async function getWhatsappServerConfig(): Promise<WhatsappConfig> {
       if (data.whatsappApiUrl) apiUrl = data.whatsappApiUrl.replace(/\/+$/, "");
       if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
       if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
+      if (data.whatsappAdminUsername) adminUsername = data.whatsappAdminUsername;
+      if (data.whatsappAdminPassword) adminPassword = data.whatsappAdminPassword;
     }
   } catch (err: any) {
     console.warn("[getWhatsappServerConfig] Firestore config lookup warning:", err.message);
   }
 
-  return { apiUrl, apiKey, instanceId };
+  return { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
 }
 
 /**
@@ -60,7 +99,7 @@ export async function callWhatsappBackend(
   endpointPath: string,
   method: "GET" | "POST" | "DELETE" = "GET",
   body?: any,
-  timeoutMs: number = 8000
+  timeoutMs: number = 10000
 ): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
   const config = await getWhatsappServerConfig();
 
@@ -68,7 +107,11 @@ export async function callWhatsappBackend(
     return { ok: false, status: 500, error: "WHATSAPP_API_URL is not configured on server." };
   }
 
-  const cleanPath = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
+  let cleanPath = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
+  if (!cleanPath.startsWith("/api/")) {
+    cleanPath = `/api${cleanPath}`;
+  }
+
   const targetUrl = `${config.apiUrl}${cleanPath}`;
 
   const headers: Record<string, string> = {
@@ -77,7 +120,13 @@ export async function callWhatsappBackend(
 
   if (config.apiKey) {
     headers["apikey"] = config.apiKey;
+    headers["x-api-key"] = config.apiKey;
     headers["Authorization"] = `Bearer ${config.apiKey}`;
+  }
+
+  const sessionCookie = await ensureVmSessionCookie(config);
+  if (sessionCookie) {
+    headers["Cookie"] = sessionCookie;
   }
 
   try {
@@ -101,6 +150,43 @@ export async function callWhatsappBackend(
         resData = JSON.parse(text);
       } catch {
         resData = { textResponse: text };
+      }
+    }
+
+    // If 404 "Instance not found", auto-create instance on VM and retry
+    if (response.status === 404 && resData?.error?.includes("not found")) {
+      console.log(`[callWhatsappBackend] Instance '${config.instanceId}' not found on VM. Auto-creating instance...`);
+      try {
+        const createRes = await fetch(`${config.apiUrl}/api/instances`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            name: config.instanceId,
+            id: config.instanceId,
+            apiKey: config.apiKey,
+          }),
+          cache: "no-store",
+        });
+
+        if (createRes.ok || createRes.status === 200 || createRes.status === 201) {
+          console.log(`[callWhatsappBackend] Instance '${config.instanceId}' auto-created. Retrying action...`);
+          const retryRes = await fetch(targetUrl, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined,
+            cache: "no-store",
+          });
+          const retryText = await retryRes.text();
+          let retryData: any = null;
+          if (retryText) {
+            try { retryData = JSON.parse(retryText); } catch { retryData = { textResponse: retryText }; }
+          }
+          if (retryRes.ok) {
+            return { ok: true, status: retryRes.status, data: retryData };
+          }
+        }
+      } catch (createErr: any) {
+        console.warn("[callWhatsappBackend] Auto-create instance attempt failed:", createErr.message);
       }
     }
 
