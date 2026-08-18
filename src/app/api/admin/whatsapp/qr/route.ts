@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { getWhatsappServerConfig, callWhatsappBackend } from "@/lib/whatsapp-service";
+import { getWhatsappServerConfig, callWhatsappBackend, formatQrCodePayload } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     }
 
     // Call WhatsApp API to retrieve QR code or connect payload
-    let backendRes = await callWhatsappBackend(`/instances/${config.instanceId}`, "GET", undefined, 6000);
+    const backendRes = await callWhatsappBackend(`/instances/${config.instanceId}`, "GET", undefined, 6000);
 
     // Check if status endpoint returned a QR code
     let qrData = backendRes.data?.instance?.qr || backendRes.data?.instance?.base64 || backendRes.data?.qr || backendRes.data?.base64;
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const qrCodeFormatted = String(qrData).startsWith("data:") ? String(qrData) : `data:image/png;base64,${qrData}`;
+    const qrCodeFormatted = formatQrCodePayload(qrData);
 
     return NextResponse.json({
       success: true,

@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { uploadImageSecurely } from "@/lib/image-upload";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatFirebaseError } from "@/lib/utils";
 
 interface AdminUser {
   uid: string;
@@ -3296,11 +3296,18 @@ export default function AdminPage() {
 
                           <div className={cn("p-4 rounded-2xl bg-white border inline-block relative overflow-hidden group shadow-xs transition-colors", isDark ? "border-gray-800" : "border-gray-150")}>
                             {/* Embedded high fidelity QR Server API or Live VM Base64 QR code */}
-                            <img
-                              src={whatsappQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=etech-auth-gateway-session-${Date.now()}&color=000000`}
-                              alt="WhatsApp Pairing QR Code"
-                              className="w-48 h-48 object-contain transition-transform group-hover:scale-102"
-                            />
+                            {whatsappQrCode ? (
+                              <img
+                                src={whatsappQrCode}
+                                alt="WhatsApp Pairing QR Code"
+                                className="w-48 h-48 object-contain transition-transform group-hover:scale-102"
+                              />
+                            ) : (
+                              <div className="w-48 h-48 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex flex-col items-center justify-center p-4 text-center">
+                                <ButtonSpinner />
+                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mt-2">Generating QR Code...</span>
+                              </div>
+                            )}
                             {isLinkingWhatsapp && (
                               <div className="absolute inset-0 bg-white/90 dark:bg-black/90 flex flex-col items-center justify-center p-4">
                                 <ButtonSpinner />

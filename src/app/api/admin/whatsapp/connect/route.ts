@@ -6,6 +6,7 @@ import {
   acquireWhatsappActionLock,
   releaseWhatsappActionLock,
   logWhatsappAdminAudit,
+  formatQrCodePayload,
 } from "@/lib/whatsapp-service";
 
 export async function POST(req: Request) {
@@ -49,11 +50,7 @@ export async function POST(req: Request) {
       }
 
       const qrData = backendRes.data?.qr || backendRes.data?.base64 || backendRes.data?.code;
-      const qrCodeFormatted = qrData
-        ? String(qrData).startsWith("data:")
-          ? String(qrData)
-          : `data:image/png;base64,${qrData}`
-        : null;
+      const qrCodeFormatted = formatQrCodePayload(qrData);
 
       return NextResponse.json({
         success: true,
