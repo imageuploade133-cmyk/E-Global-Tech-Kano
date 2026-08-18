@@ -377,7 +377,7 @@ export default function StorePage() {
 
   return (
     <RouteGuard>
-      <div className="min-h-dvh bg-background text-on-background pb-32">
+      <div id="store-page-root" className="min-h-dvh bg-background text-on-background pb-32">
         {/* Sticky/Static App Top Bar - Pinned at top while products scroll underneath */}
         <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-1.5 px-margin-mobile">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
@@ -443,53 +443,68 @@ export default function StorePage() {
         <main className="max-w-md mx-auto pt-0 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
 
           {/* Dynamic Store Slideshow Banners */}
-          {slides.length > 0 && (
-            <div className="relative w-full h-44 rounded-2xl overflow-hidden mb-5 shadow-xs bg-black border-0">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={slides[activeSlideIndex]?.id || activeSlideIndex}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="absolute inset-0 w-full h-full"
-                >
-                  <img
-                    src={slides[activeSlideIndex].imageUrl}
-                    alt={slides[activeSlideIndex].title || "Store Slide"}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-4 flex flex-col justify-end text-left text-white">
-                    {slides[activeSlideIndex].title && (
-                      <h3 className="font-hanken font-extrabold text-sm uppercase tracking-tight text-[#FC7A00]">
-                        {slides[activeSlideIndex].title}
-                      </h3>
-                    )}
-                    {slides[activeSlideIndex].subtitle && (
-                      <p className="font-hanken text-[11px] font-medium text-gray-200 mt-0.5 line-clamp-1">
-                        {slides[activeSlideIndex].subtitle}
-                      </p>
-                    )}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
+          {slides.length > 0 && (() => {
+            const currentSlide = slides[activeSlideIndex] || slides[0];
+            const isCrop = currentSlide.isCrop !== false;
+            const mb = currentSlide.marginBottom !== undefined ? currentSlide.marginBottom : 20;
+            const mobileH = currentSlide.mobileHeight || 176;
 
-              {/* Indicator dots */}
-              {slides.length > 1 && (
-                <div className="absolute bottom-2 right-3 flex gap-1 z-10">
-                  {slides.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveSlideIndex(idx)}
-                      className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                        activeSlideIndex === idx ? "bg-[#FC7A00] w-4" : "bg-white/50"
-                      }`}
+            return (
+              <div
+                className="relative w-full rounded-2xl overflow-hidden shadow-xs bg-black border-0 transition-all duration-300"
+                style={{
+                  height: `${mobileH}px`,
+                  marginBottom: `${mb}px`,
+                }}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentSlide?.id || activeSlideIndex}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="absolute inset-0 w-full h-full flex items-center justify-center"
+                  >
+                    <img
+                      src={currentSlide.imageUrl}
+                      alt={currentSlide.title || "Store Slide"}
+                      className={`w-full h-full ${isCrop ? "object-cover" : "object-contain bg-black"}`}
                     />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    {(currentSlide.title || currentSlide.subtitle) && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 flex flex-col justify-end text-left text-white">
+                        {currentSlide.title && (
+                          <h3 className="font-hanken font-extrabold text-sm uppercase tracking-tight text-[#FC7A00]">
+                            {currentSlide.title}
+                          </h3>
+                        )}
+                        {currentSlide.subtitle && (
+                          <p className="font-hanken text-[11px] font-medium text-gray-200 mt-0.5 line-clamp-1">
+                            {currentSlide.subtitle}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Indicator dots */}
+                {slides.length > 1 && (
+                  <div className="absolute bottom-2 right-3 flex gap-1 z-10">
+                    {slides.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveSlideIndex(idx)}
+                        className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                          activeSlideIndex === idx ? "bg-[#FC7A00] w-4" : "bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Robust Search Input */}
           <div className="relative w-full mb-4">

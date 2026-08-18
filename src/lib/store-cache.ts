@@ -20,6 +20,10 @@ export interface StoreSlide {
   title: string;
   subtitle: string;
   link: string;
+  isCrop?: boolean;
+  marginBottom?: number;
+  mobileHeight?: number;
+  desktopHeight?: number;
 }
 
 export interface StoreCategory {

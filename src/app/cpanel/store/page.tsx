@@ -32,6 +32,10 @@ interface StoreSlide {
   title: string;
   subtitle: string;
   link: string;
+  isCrop?: boolean;
+  marginBottom?: number;
+  mobileHeight?: number;
+  desktopHeight?: number;
   createdAt: string;
 }
 
@@ -83,11 +87,16 @@ export default function CpanelStorePage() {
   const [isUploadingItemImage, setIsUploadingItemImage] = useState(false);
   const [isSavingItem, setIsSavingItem] = useState(false);
 
-  // New Slide Form
+  // New Slide Form & Edit state
+  const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
   const [slideImageUrl, setSlideImageUrl] = useState("");
   const [slideTitle, setSlideTitle] = useState("");
   const [slideSubtitle, setSlideSubtitle] = useState("");
   const [slideLink, setSlideLink] = useState("");
+  const [slideIsCrop, setSlideIsCrop] = useState(true);
+  const [slideMarginBottom, setSlideMarginBottom] = useState(20);
+  const [slideMobileHeight, setSlideMobileHeight] = useState(176);
+  const [slideDesktopHeight, setSlideDesktopHeight] = useState(220);
   const [isUploadingSlideImage, setIsUploadingSlideImage] = useState(false);
   const [isSavingSlide, setIsSavingSlide] = useState(false);
 
@@ -473,7 +482,31 @@ export default function CpanelStorePage() {
     );
   };
 
-  // Add Slide Submit
+  const resetSlideForm = () => {
+    setEditingSlideId(null);
+    setSlideImageUrl("");
+    setSlideTitle("");
+    setSlideSubtitle("");
+    setSlideLink("");
+    setSlideIsCrop(true);
+    setSlideMarginBottom(20);
+    setSlideMobileHeight(176);
+    setSlideDesktopHeight(220);
+  };
+
+  const handleStartEditSlide = (s: StoreSlide) => {
+    setEditingSlideId(s.id);
+    setSlideImageUrl(s.imageUrl || "");
+    setSlideTitle(s.title || "");
+    setSlideSubtitle(s.subtitle || "");
+    setSlideLink(s.link || "");
+    setSlideIsCrop(s.isCrop !== false);
+    setSlideMarginBottom(s.marginBottom !== undefined ? s.marginBottom : 20);
+    setSlideMobileHeight(s.mobileHeight !== undefined ? s.mobileHeight : 176);
+    setSlideDesktopHeight(s.desktopHeight !== undefined ? s.desktopHeight : 220);
+  };
+
+  // Add/Edit Slide Submit
   const handleAddSlide = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!slideImageUrl.trim()) {
@@ -488,33 +521,37 @@ export default function CpanelStorePage() {
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };
 
+      const action = editingSlideId ? "edit_slide" : "add_slide";
+
       const res = await fetch("/api/admin/store", {
         method: "POST",
         headers,
         body: JSON.stringify({
-          action: "add_slide",
+          action,
           slide: {
+            id: editingSlideId || undefined,
             imageUrl: slideImageUrl,
             title: slideTitle,
             subtitle: slideSubtitle,
             link: slideLink,
+            isCrop: slideIsCrop,
+            marginBottom: Number(slideMarginBottom) || 0,
+            mobileHeight: Number(slideMobileHeight) || 176,
+            desktopHeight: Number(slideDesktopHeight) || 220,
           },
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success("Store slide image added successfully!");
+        toast.success(editingSlideId ? "Store slide updated!" : "Store slide added!");
         setSlides(data.slides || []);
-        setSlideImageUrl("");
-        setSlideTitle("");
-        setSlideSubtitle("");
-        setSlideLink("");
+        resetSlideForm();
       } else {
-        toast.error(data.error || "Failed to add slide image.");
+        toast.error(data.error || "Failed to save slide image.");
       }
     } catch (err: any) {
-      toast.error(err.message || "Network error adding slide image.");
+      toast.error(err.message || "Network error saving slide image.");
     } finally {
       setIsSavingSlide(false);
     }
@@ -807,11 +844,24 @@ export default function CpanelStorePage() {
         {activeTab === "slides" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            {/* Add Slide Form */}
+            {/* Add / Edit Slide Form */}
             <div className={cn("p-5 rounded-2xl border space-y-4 lg:col-span-1 h-fit", panelClass)}>
-              <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
-                <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
-                <h3 className="font-extrabold text-xs uppercase tracking-wider">Add Store Banner Slide</h3>
+              <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider">
+                    {editingSlideId ? "Edit Store Banner Slide" : "Add Store Banner Slide"}
+                  </h3>
+                </div>
+                {editingSlideId && (
+                  <button
+                    type="button"
+                    onClick={resetSlideForm}
+                    className="text-[10px] font-bold text-gray-400 hover:text-black dark:hover:text-white uppercase cursor-pointer"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
               </div>
 
               <form onSubmit={handleAddSlide} className="space-y-3.5">
@@ -848,6 +898,96 @@ export default function CpanelStorePage() {
                   </div>
                 </div>
 
+                {/* Crop vs Contain Fitting Control */}
+                <div className="space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
+                  <label className="text-[10px] font-black uppercase text-orange-500 block">
+                    Image Fit & Size (Don&apos;t Cut Off)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSlideIsCrop(true)}
+                      className={cn(
+                        "py-2 px-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider border transition-all cursor-pointer",
+                        slideIsCrop
+                          ? "bg-[#FC7A00] text-white border-[#FC7A00]"
+                          : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:text-black dark:hover:text-white"
+                      )}
+                    >
+                      Cropped (Cover)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSlideIsCrop(false)}
+                      className={cn(
+                        "py-2 px-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider border transition-all cursor-pointer",
+                        !slideIsCrop
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:text-black dark:hover:text-white"
+                      )}
+                    >
+                      Keep Size (Contain)
+                    </button>
+                  </div>
+                  <p className="text-[9.5px] text-gray-400 font-medium leading-tight pt-0.5">
+                    {slideIsCrop
+                      ? "Cover mode crops outer edges to fill container without blank gaps."
+                      : "Keep Size retains entire image without cutting off any details."}
+                  </p>
+                </div>
+
+                {/* Bottom Space / Margin Selector */}
+                <div className="space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">
+                      Bottom Space / Margin
+                    </label>
+                    <span className="text-[11px] font-mono font-bold text-[#FC7A00]">
+                      {slideMarginBottom}px
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="2"
+                    value={slideMarginBottom}
+                    onChange={(e) => setSlideMarginBottom(Number(e.target.value))}
+                    className="w-full accent-[#FC7A00] cursor-pointer"
+                  />
+                  <div className="flex items-center justify-between text-[9px] text-gray-400 font-bold uppercase">
+                    <span>0px (No Gap)</span>
+                    <span>50px</span>
+                    <span>100px</span>
+                  </div>
+                </div>
+
+                {/* Heights Customization */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Mobile Height (px)</label>
+                    <input
+                      type="number"
+                      min={100}
+                      max={500}
+                      value={slideMobileHeight}
+                      onChange={(e) => setSlideMobileHeight(Number(e.target.value))}
+                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Desktop Height (px)</label>
+                    <input
+                      type="number"
+                      min={100}
+                      max={800}
+                      value={slideDesktopHeight}
+                      onChange={(e) => setSlideDesktopHeight(Number(e.target.value))}
+                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Title</label>
                   <input
@@ -855,7 +995,7 @@ export default function CpanelStorePage() {
                     placeholder="e.g. Exclusive E-Tech Gear!"
                     value={slideTitle}
                     onChange={(e) => setSlideTitle(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                   />
                 </div>
 
@@ -866,7 +1006,7 @@ export default function CpanelStorePage() {
                     placeholder="e.g. Get 20% discount on all POS hardware."
                     value={slideSubtitle}
                     onChange={(e) => setSlideSubtitle(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                   />
                 </div>
 
@@ -877,7 +1017,7 @@ export default function CpanelStorePage() {
                     placeholder="e.g. /store, /support, or https://..."
                     value={slideLink}
                     onChange={(e) => setSlideLink(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                   />
                 </div>
 
@@ -886,8 +1026,8 @@ export default function CpanelStorePage() {
                   disabled={isSavingSlide || isUploadingSlideImage}
                   className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  {isSavingSlide ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>}
-                  <span>Add Slide Banner</span>
+                  {isSavingSlide ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">{editingSlideId ? "save" : "add_photo_alternate"}</span>}
+                  <span>{editingSlideId ? "Save Slide Changes" : "Add Slide Banner"}</span>
                 </button>
               </form>
             </div>
@@ -913,26 +1053,51 @@ export default function CpanelStorePage() {
                       <div key={slide.id} className={cn("p-4 rounded-2xl border flex flex-col md:flex-row gap-4 items-center justify-between transition-all", panelClass)}>
                         <div className="flex items-center gap-4 flex-1 min-w-0">
                           <div className="w-28 h-16 rounded-xl border border-gray-200/50 bg-white overflow-hidden flex-shrink-0 relative">
-                            <img src={slide.imageUrl} alt={slide.title || "Slide"} className="w-full h-full object-cover" />
+                            <img
+                              src={slide.imageUrl}
+                              alt={slide.title || "Slide"}
+                              className={cn("w-full h-full", slide.isCrop !== false ? "object-cover" : "object-contain bg-gray-900")}
+                            />
+                            <span className={cn(
+                              "absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase text-white backdrop-blur-xs",
+                              slide.isCrop !== false ? "bg-black/70" : "bg-emerald-600/90"
+                            )}>
+                              {slide.isCrop !== false ? "Cropped" : "Keep Size"}
+                            </span>
                           </div>
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 space-y-1">
                             <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{slide.title || "Untitled Slide"}</h4>
-                            <p className="text-[11px] text-gray-400 font-medium truncate mt-0.5">{slide.subtitle || "No subtitle provided."}</p>
-                            {slide.link && (
-                              <p className="text-[10px] font-mono text-orange-500 truncate mt-1">Link: {slide.link}</p>
-                            )}
+                            <p className="text-[11px] text-gray-400 font-medium truncate">{slide.subtitle || "No subtitle provided."}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold text-gray-500">
+                              <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200/50 dark:border-gray-700">
+                                Gap: {slide.marginBottom !== undefined ? slide.marginBottom : 20}px
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200/50 dark:border-gray-700">
+                                Height: {slide.mobileHeight || 176}px / {slide.desktopHeight || 220}px
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          disabled={isDeleting}
-                          onClick={() => handleDeleteSlide(slide.id)}
-                          className="px-4 h-9 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0"
-                        >
-                          {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">delete</span>}
-                          <span>Delete</span>
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditSlide(slide)}
+                            className="px-3 h-9 border border-orange-500/30 text-[#FC7A00] bg-orange-500/10 hover:bg-orange-500/20 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">edit</span>
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isDeleting}
+                            onClick={() => handleDeleteSlide(slide.id)}
+                            className="px-3 h-9 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">delete</span>}
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </div>
                     );
                   })}

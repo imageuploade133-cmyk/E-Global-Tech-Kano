@@ -120,20 +120,45 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "itemId is required for deletion." }, { status: 400 });
       }
       items = items.filter((i: any) => i.id !== itemId);
-    } else if (action === "add_slide") {
+    } else if (action === "add_slide" || action === "edit_slide") {
       if (!slide || !slide.imageUrl) {
         return NextResponse.json({ error: "Slide image URL is required." }, { status: 400 });
       }
-      const newSlide = {
-        id: `slide_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        imageUrl: slide.imageUrl.trim(),
-        title: (slide.title || "").trim(),
-        subtitle: (slide.subtitle || "").trim(),
-        link: (slide.link || "").trim(),
-        createdAt: now,
-        updatedAt: now,
-      };
-      slides.unshift(newSlide);
+
+      if (action === "edit_slide" && slide.id) {
+        slides = slides.map((s: any) => {
+          if (s.id === slide.id) {
+            return {
+              ...s,
+              imageUrl: slide.imageUrl.trim(),
+              title: (slide.title || "").trim(),
+              subtitle: (slide.subtitle || "").trim(),
+              link: (slide.link || "").trim(),
+              isCrop: slide.isCrop !== undefined ? Boolean(slide.isCrop) : true,
+              marginBottom: typeof slide.marginBottom === "number" ? slide.marginBottom : (slide.marginBottom ? Number(slide.marginBottom) : 20),
+              mobileHeight: typeof slide.mobileHeight === "number" ? slide.mobileHeight : (slide.mobileHeight ? Number(slide.mobileHeight) : 176),
+              desktopHeight: typeof slide.desktopHeight === "number" ? slide.desktopHeight : (slide.desktopHeight ? Number(slide.desktopHeight) : 220),
+              updatedAt: now,
+            };
+          }
+          return s;
+        });
+      } else {
+        const newSlide = {
+          id: `slide_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          imageUrl: slide.imageUrl.trim(),
+          title: (slide.title || "").trim(),
+          subtitle: (slide.subtitle || "").trim(),
+          link: (slide.link || "").trim(),
+          isCrop: slide.isCrop !== undefined ? Boolean(slide.isCrop) : true,
+          marginBottom: typeof slide.marginBottom === "number" ? slide.marginBottom : (slide.marginBottom ? Number(slide.marginBottom) : 20),
+          mobileHeight: typeof slide.mobileHeight === "number" ? slide.mobileHeight : (slide.mobileHeight ? Number(slide.mobileHeight) : 176),
+          desktopHeight: typeof slide.desktopHeight === "number" ? slide.desktopHeight : (slide.desktopHeight ? Number(slide.desktopHeight) : 220),
+          createdAt: now,
+          updatedAt: now,
+        };
+        slides.unshift(newSlide);
+      }
     } else if (action === "delete_slide") {
       if (!slideId) {
         return NextResponse.json({ error: "slideId is required for deletion." }, { status: 400 });
