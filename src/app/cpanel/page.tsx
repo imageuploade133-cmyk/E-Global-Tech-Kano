@@ -1110,58 +1110,6 @@ export default function AdminPage() {
     }
   }, [isAdminUnlocked, activeTab]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (whatsappPairingCode && whatsappCodeCountdown > 0) {
-      timer = setInterval(() => {
-        setWhatsappCodeCountdown(prev => prev - 1);
-      }, 1000);
-    } else if (whatsappCodeCountdown === 0) {
-      setWhatsappPairingCode(null);
-      addWhatsappLog("Pairing code session expired. Please generate a new code.");
-    }
-    return () => clearInterval(timer);
-  }, [whatsappPairingCode, whatsappCodeCountdown]);
-
-  const handleGeneratePairingCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!whatsappPhoneInput.trim()) {
-      toast.error("Please enter a valid WhatsApp phone number.");
-      return;
-    }
-
-    setIsLinkingWhatsapp(true);
-    addWhatsappLog(`Requesting Pairing Code for phone prefix: ${whatsappPhonePrefix} number: ${whatsappPhoneInput}...`);
-
-    // Simulate API request delay
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    // Generate random 8 character pairing code: e.g. A2B4-9F5Z
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let part1 = "";
-    let part2 = "";
-    for (let i = 0; i < 4; i++) {
-      part1 += chars.charAt(Math.floor(Math.random() * chars.length));
-      part2 += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    const code = `${part1}-${part2}`;
-    setWhatsappPairingCode(code);
-    setWhatsappCodeCountdown(120);
-    setIsLinkingWhatsapp(false);
-
-    addWhatsappLog(`Pairing code generated successfully: ${code}`);
-    addWhatsappLog(`Waiting for device connection. Open WhatsApp > Linked Devices > Link with Phone Number.`);
-    toast.success("Pairing Code generated! Enter this code on your WhatsApp app.");
-
-    // Simulate successful link after 12 seconds
-    setTimeout(async () => {
-      if (activeTab === "whatsapp" && whatsappPairingCode !== "") {
-        addWhatsappLog("Device handshake initiated. Verifying pairing key...");
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await handleApplyWhatsappLink(`${whatsappPhonePrefix}${whatsappPhoneInput}`);
-      }
-    }, 12000);
-  };
 
   const handleApplyWhatsappLink = async (numToLink: string) => {
     setIsLinkingWhatsapp(true);
