@@ -20,10 +20,14 @@ export interface StoreSlide {
   title: string;
   subtitle: string;
   link: string;
+  customWidth?: number | null;
+  customHeight?: number | null;
+  mobileHeight?: number | null;
+  desktopHeight?: number | null;
+  marginBottom?: number | null;
   isCrop?: boolean;
-  marginBottom?: number;
-  mobileHeight?: number;
-  desktopHeight?: number;
+  isHidden?: boolean;
+  createdAt?: string;
 }
 
 export interface StoreCategory {
@@ -44,6 +48,19 @@ export interface StoreSettings {
   borderColor?: string;
   hideBorders?: boolean;
   orderStatuses?: string[];
+  searchBarMarginTop?: number;
+  bannerOverlayFadeEnabled?: boolean;
+  bannerSlideIntervalSeconds?: number;
+  bannerBorderEnabled?: boolean;
+  bannerBorderColor?: string;
+  bannerBackgroundColor?: string;
+  bannerImageMode?: "cover" | "contain";
+  bannerSlideEffect?: "fade" | "slide";
+  bannerImagePosition?: string;
+  bannerShowIndicators?: boolean;
+  bannerMarginBottom?: number;
+  bannerHeightMobile?: number;
+  bannerHeightDesktop?: number;
 }
 
 export interface CartItem {

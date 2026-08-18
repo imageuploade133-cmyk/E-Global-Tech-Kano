@@ -215,12 +215,14 @@ export default function StorePage() {
 
   // Slide autoplay interval
   useEffect(() => {
-    if (slides.length <= 1) return;
+    const activeSlides = slides.filter((s) => !s.isHidden);
+    if (activeSlides.length <= 1) return;
+    const intervalSeconds = settings.bannerSlideIntervalSeconds || 5;
     const timer = setInterval(() => {
-      setActiveSlideIndex((prev) => (prev + 1) % slides.length);
-    }, 5000);
+      setActiveSlideIndex((prev) => (prev + 1) % activeSlides.length);
+    }, intervalSeconds * 1000);
     return () => clearInterval(timer);
-  }, [slides.length]);
+  }, [slides, settings.bannerSlideIntervalSeconds]);
 
   // Open Full Screen Product Modal with zero re-reads if cached
   const handleOpenProductModal = (item: StoreItem) => {
@@ -443,36 +445,60 @@ export default function StorePage() {
         <main className="max-w-md mx-auto pt-0 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
 
           {/* Dynamic Store Slideshow Banners */}
-          {slides.length > 0 && (() => {
-            const currentSlide = slides[activeSlideIndex] || slides[0];
+          {(() => {
+            const activeSlides = slides.filter((s) => !s.isHidden);
+            if (activeSlides.length === 0) return null;
+
+            const currentSlide = activeSlides[activeSlideIndex] || activeSlides[0];
             const isCrop = currentSlide.isCrop !== false;
-            const mb = currentSlide.marginBottom !== undefined ? currentSlide.marginBottom : 20;
-            const mobileH = currentSlide.mobileHeight || 176;
+            const mb = currentSlide.marginBottom !== undefined && currentSlide.marginBottom !== null
+              ? currentSlide.marginBottom
+              : (settings.bannerMarginBottom ?? 20);
+            const mobileH = currentSlide.mobileHeight || settings.bannerHeightMobile || 176;
+            const slideEffect = settings.bannerSlideEffect || "fade";
+            const overlayFade = settings.bannerOverlayFadeEnabled !== false;
+            const showDots = settings.bannerShowIndicators !== false;
+            const customBg = settings.bannerBackgroundColor || "#111827";
+
+            const animationVariants = slideEffect === "slide" ? {
+              initial: { x: "100%", opacity: 0 },
+              animate: { x: 0, opacity: 1 },
+              exit: { x: "-100%", opacity: 0 },
+            } : {
+              initial: { opacity: 0 },
+              animate: { opacity: 1 },
+              exit: { opacity: 0 },
+            };
 
             return (
               <div
-                className="relative w-full rounded-2xl overflow-hidden shadow-xs bg-black border-0 transition-all duration-300"
+                className="relative w-full rounded-2xl overflow-hidden shadow-xs border-0 transition-all duration-300"
                 style={{
                   height: `${mobileH}px`,
                   marginBottom: `${mb}px`,
+                  backgroundColor: customBg,
                 }}
               >
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentSlide?.id || activeSlideIndex}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5 }}
+                    variants={animationVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
                     className="absolute inset-0 w-full h-full flex items-center justify-center"
                   >
                     <img
                       src={currentSlide.imageUrl}
                       alt={currentSlide.title || "Store Slide"}
-                      className={`w-full h-full ${isCrop ? "object-cover" : "object-contain bg-black"}`}
+                      className={`w-full h-full ${isCrop ? "object-cover" : "object-contain"}`}
+                      style={{ objectPosition: settings.bannerImagePosition || "center" }}
                     />
                     {(currentSlide.title || currentSlide.subtitle) && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-4 flex flex-col justify-end text-left text-white">
+                      <div className={`absolute inset-0 p-4 flex flex-col justify-end text-left text-white ${
+                        overlayFade ? "bg-gradient-to-t from-black/80 via-black/20 to-transparent" : ""
+                      }`}>
                         {currentSlide.title && (
                           <h3 className="font-hanken font-extrabold text-sm uppercase tracking-tight text-[#FC7A00]">
                             {currentSlide.title}
@@ -489,9 +515,9 @@ export default function StorePage() {
                 </AnimatePresence>
 
                 {/* Indicator dots */}
-                {slides.length > 1 && (
+                {showDots && activeSlides.length > 1 && (
                   <div className="absolute bottom-2 right-3 flex gap-1 z-10">
-                    {slides.map((_, idx) => (
+                    {activeSlides.map((_, idx) => (
                       <button
                         key={idx}
                         onClick={() => setActiveSlideIndex(idx)}
@@ -506,8 +532,13 @@ export default function StorePage() {
             );
           })()}
 
-          {/* Robust Search Input */}
-          <div className="relative w-full mb-4">
+          {/* Robust Search Input with Custom Top Space */}
+          <div
+            className="relative w-full mb-4 transition-all duration-300"
+            style={{
+              marginTop: `${settings.searchBarMarginTop || 0}px`,
+            }}
+          >
             <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
               search
             </span>

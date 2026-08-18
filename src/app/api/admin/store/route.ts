@@ -8,6 +8,19 @@ const DEFAULT_SETTINGS = {
   borderColor: "#FC7A00",
   hideBorders: false,
   orderStatuses: ["Pending", "Processing", "Shipped", "Delivered", "Refunded", "Canceled"],
+  searchBarMarginTop: 0,
+  bannerOverlayFadeEnabled: true,
+  bannerSlideIntervalSeconds: 5,
+  bannerBorderEnabled: false,
+  bannerBorderColor: "#FC7A00",
+  bannerBackgroundColor: "#111827",
+  bannerImageMode: "cover" as const,
+  bannerSlideEffect: "fade" as const,
+  bannerImagePosition: "center",
+  bannerShowIndicators: true,
+  bannerMarginBottom: 20,
+  bannerHeightMobile: 176,
+  bannerHeightDesktop: 220,
 };
 
 export async function GET(req: Request) {
@@ -133,11 +146,15 @@ export async function POST(req: Request) {
               imageUrl: slide.imageUrl.trim(),
               title: (slide.title || "").trim(),
               subtitle: (slide.subtitle || "").trim(),
+              description: (slide.description || slide.subtitle || "").trim(),
               link: (slide.link || "").trim(),
-              isCrop: slide.isCrop !== undefined ? Boolean(slide.isCrop) : true,
-              marginBottom: typeof slide.marginBottom === "number" ? slide.marginBottom : (slide.marginBottom ? Number(slide.marginBottom) : 20),
+              customWidth: typeof slide.customWidth === "number" ? slide.customWidth : (slide.customWidth ? Number(slide.customWidth) : null),
+              customHeight: typeof slide.customHeight === "number" ? slide.customHeight : (slide.customHeight ? Number(slide.customHeight) : null),
               mobileHeight: typeof slide.mobileHeight === "number" ? slide.mobileHeight : (slide.mobileHeight ? Number(slide.mobileHeight) : 176),
               desktopHeight: typeof slide.desktopHeight === "number" ? slide.desktopHeight : (slide.desktopHeight ? Number(slide.desktopHeight) : 220),
+              marginBottom: typeof slide.marginBottom === "number" ? slide.marginBottom : (slide.marginBottom ? Number(slide.marginBottom) : 20),
+              isCrop: slide.isCrop !== undefined ? Boolean(slide.isCrop) : true,
+              isHidden: Boolean(slide.isHidden),
               updatedAt: now,
             };
           }
@@ -149,11 +166,15 @@ export async function POST(req: Request) {
           imageUrl: slide.imageUrl.trim(),
           title: (slide.title || "").trim(),
           subtitle: (slide.subtitle || "").trim(),
+          description: (slide.description || slide.subtitle || "").trim(),
           link: (slide.link || "").trim(),
-          isCrop: slide.isCrop !== undefined ? Boolean(slide.isCrop) : true,
-          marginBottom: typeof slide.marginBottom === "number" ? slide.marginBottom : (slide.marginBottom ? Number(slide.marginBottom) : 20),
+          customWidth: typeof slide.customWidth === "number" ? slide.customWidth : (slide.customWidth ? Number(slide.customWidth) : null),
+          customHeight: typeof slide.customHeight === "number" ? slide.customHeight : (slide.customHeight ? Number(slide.customHeight) : null),
           mobileHeight: typeof slide.mobileHeight === "number" ? slide.mobileHeight : (slide.mobileHeight ? Number(slide.mobileHeight) : 176),
           desktopHeight: typeof slide.desktopHeight === "number" ? slide.desktopHeight : (slide.desktopHeight ? Number(slide.desktopHeight) : 220),
+          marginBottom: typeof slide.marginBottom === "number" ? slide.marginBottom : (slide.marginBottom ? Number(slide.marginBottom) : 20),
+          isCrop: slide.isCrop !== undefined ? Boolean(slide.isCrop) : true,
+          isHidden: Boolean(slide.isHidden),
           createdAt: now,
           updatedAt: now,
         };
@@ -177,6 +198,19 @@ export async function POST(req: Request) {
         orderStatuses: Array.isArray(settings.orderStatuses) && settings.orderStatuses.length > 0
           ? settings.orderStatuses.map((s: string) => s.trim()).filter(Boolean)
           : currentSettings.orderStatuses,
+        searchBarMarginTop: typeof settings.searchBarMarginTop === "number" ? settings.searchBarMarginTop : currentSettings.searchBarMarginTop,
+        bannerOverlayFadeEnabled: settings.bannerOverlayFadeEnabled !== undefined ? Boolean(settings.bannerOverlayFadeEnabled) : currentSettings.bannerOverlayFadeEnabled,
+        bannerSlideIntervalSeconds: typeof settings.bannerSlideIntervalSeconds === "number" ? settings.bannerSlideIntervalSeconds : currentSettings.bannerSlideIntervalSeconds,
+        bannerBorderEnabled: settings.bannerBorderEnabled !== undefined ? Boolean(settings.bannerBorderEnabled) : currentSettings.bannerBorderEnabled,
+        bannerBorderColor: settings.bannerBorderColor ? String(settings.bannerBorderColor).trim() : currentSettings.bannerBorderColor,
+        bannerBackgroundColor: settings.bannerBackgroundColor ? String(settings.bannerBackgroundColor).trim() : currentSettings.bannerBackgroundColor,
+        bannerImageMode: settings.bannerImageMode === "contain" ? "contain" : "cover",
+        bannerSlideEffect: settings.bannerSlideEffect === "slide" ? "slide" : "fade",
+        bannerImagePosition: settings.bannerImagePosition ? String(settings.bannerImagePosition).trim() : currentSettings.bannerImagePosition,
+        bannerShowIndicators: settings.bannerShowIndicators !== undefined ? Boolean(settings.bannerShowIndicators) : currentSettings.bannerShowIndicators,
+        bannerMarginBottom: typeof settings.bannerMarginBottom === "number" ? settings.bannerMarginBottom : currentSettings.bannerMarginBottom,
+        bannerHeightMobile: typeof settings.bannerHeightMobile === "number" ? settings.bannerHeightMobile : currentSettings.bannerHeightMobile,
+        bannerHeightDesktop: typeof settings.bannerHeightDesktop === "number" ? settings.bannerHeightDesktop : currentSettings.bannerHeightDesktop,
       };
     } else {
       return NextResponse.json({ error: "Invalid action specified." }, { status: 400 });
