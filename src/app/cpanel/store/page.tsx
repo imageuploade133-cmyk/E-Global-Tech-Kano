@@ -31,12 +31,16 @@ interface StoreSlide {
   imageUrl: string;
   title: string;
   subtitle: string;
+  description?: string;
   link: string;
+  customWidth?: number | null;
+  customHeight?: number | null;
+  mobileHeight?: number | null;
+  desktopHeight?: number | null;
+  marginBottom?: number | null;
   isCrop?: boolean;
-  marginBottom?: number;
-  mobileHeight?: number;
-  desktopHeight?: number;
-  createdAt: string;
+  isHidden?: boolean;
+  createdAt?: string;
 }
 
 interface StoreSettings {
@@ -45,6 +49,19 @@ interface StoreSettings {
   borderColor?: string;
   hideBorders?: boolean;
   orderStatuses?: string[];
+  searchBarMarginTop?: number;
+  bannerOverlayFadeEnabled?: boolean;
+  bannerSlideIntervalSeconds?: number;
+  bannerBorderEnabled?: boolean;
+  bannerBorderColor?: string;
+  bannerBackgroundColor?: string;
+  bannerImageMode?: "cover" | "contain";
+  bannerSlideEffect?: "fade" | "slide";
+  bannerImagePosition?: string;
+  bannerShowIndicators?: boolean;
+  bannerMarginBottom?: number;
+  bannerHeightMobile?: number;
+  bannerHeightDesktop?: number;
 }
 
 function ButtonSpinner() {
@@ -93,12 +110,29 @@ export default function CpanelStorePage() {
   const [slideTitle, setSlideTitle] = useState("");
   const [slideSubtitle, setSlideSubtitle] = useState("");
   const [slideLink, setSlideLink] = useState("");
+  const [slideCustomWidth, setSlideCustomWidth] = useState<string>("");
   const [slideIsCrop, setSlideIsCrop] = useState(true);
+  const [slideIsHidden, setSlideIsHidden] = useState(false);
   const [slideMarginBottom, setSlideMarginBottom] = useState(20);
   const [slideMobileHeight, setSlideMobileHeight] = useState(176);
   const [slideDesktopHeight, setSlideDesktopHeight] = useState(220);
   const [isUploadingSlideImage, setIsUploadingSlideImage] = useState(false);
   const [isSavingSlide, setIsSavingSlide] = useState(false);
+
+  // Slide Display Settings Form
+  const [searchBarMarginTop, setSearchBarMarginTop] = useState(0);
+  const [bannerOverlayFadeEnabled, setBannerOverlayFadeEnabled] = useState(true);
+  const [bannerSlideIntervalSeconds, setBannerSlideIntervalSeconds] = useState(5);
+  const [bannerBorderEnabled, setBannerBorderEnabled] = useState(false);
+  const [bannerBorderColor, setBannerBorderColor] = useState("#FC7A00");
+  const [bannerBackgroundColor, setBannerBackgroundColor] = useState("#111827");
+  const [bannerImageMode, setBannerImageMode] = useState<"cover" | "contain">("cover");
+  const [bannerSlideEffect, setBannerSlideEffect] = useState<"fade" | "slide">("fade");
+  const [bannerImagePosition, setBannerImagePosition] = useState("center");
+  const [bannerShowIndicators, setBannerShowIndicators] = useState(true);
+  const [bannerMarginBottom, setBannerMarginBottom] = useState(20);
+  const [bannerHeightMobile, setBannerHeightMobile] = useState(176);
+  const [bannerHeightDesktop, setBannerHeightDesktop] = useState(220);
 
   // Store Settings Form
   const [storeName, setStoreName] = useState("E-Tech Store");
@@ -235,6 +269,19 @@ export default function CpanelStorePage() {
           if (Array.isArray(data.settings.orderStatuses)) {
             setOrderStatuses(data.settings.orderStatuses);
           }
+          setSearchBarMarginTop(data.settings.searchBarMarginTop ?? 0);
+          setBannerOverlayFadeEnabled(data.settings.bannerOverlayFadeEnabled !== false);
+          setBannerSlideIntervalSeconds(data.settings.bannerSlideIntervalSeconds || 5);
+          setBannerBorderEnabled(Boolean(data.settings.bannerBorderEnabled));
+          setBannerBorderColor(data.settings.bannerBorderColor || "#FC7A00");
+          setBannerBackgroundColor(data.settings.bannerBackgroundColor || "#111827");
+          setBannerImageMode(data.settings.bannerImageMode || "cover");
+          setBannerSlideEffect(data.settings.bannerSlideEffect || "fade");
+          setBannerImagePosition(data.settings.bannerImagePosition || "center");
+          setBannerShowIndicators(data.settings.bannerShowIndicators !== false);
+          setBannerMarginBottom(data.settings.bannerMarginBottom ?? 20);
+          setBannerHeightMobile(data.settings.bannerHeightMobile || 176);
+          setBannerHeightDesktop(data.settings.bannerHeightDesktop || 220);
         }
       } else {
         toast.error(data.error || "Failed to load store data.");
@@ -297,6 +344,19 @@ export default function CpanelStorePage() {
             borderColor,
             hideBorders,
             orderStatuses,
+            searchBarMarginTop,
+            bannerOverlayFadeEnabled,
+            bannerSlideIntervalSeconds,
+            bannerBorderEnabled,
+            bannerBorderColor,
+            bannerBackgroundColor,
+            bannerImageMode,
+            bannerSlideEffect,
+            bannerImagePosition,
+            bannerShowIndicators,
+            bannerMarginBottom,
+            bannerHeightMobile,
+            bannerHeightDesktop,
           },
         }),
       });
@@ -488,7 +548,9 @@ export default function CpanelStorePage() {
     setSlideTitle("");
     setSlideSubtitle("");
     setSlideLink("");
+    setSlideCustomWidth("");
     setSlideIsCrop(true);
+    setSlideIsHidden(false);
     setSlideMarginBottom(20);
     setSlideMobileHeight(176);
     setSlideDesktopHeight(220);
@@ -498,12 +560,14 @@ export default function CpanelStorePage() {
     setEditingSlideId(s.id);
     setSlideImageUrl(s.imageUrl || "");
     setSlideTitle(s.title || "");
-    setSlideSubtitle(s.subtitle || "");
+    setSlideSubtitle(s.subtitle || s.description || "");
     setSlideLink(s.link || "");
+    setSlideCustomWidth(s.customWidth !== null && s.customWidth !== undefined ? String(s.customWidth) : "");
     setSlideIsCrop(s.isCrop !== false);
-    setSlideMarginBottom(s.marginBottom !== undefined ? s.marginBottom : 20);
-    setSlideMobileHeight(s.mobileHeight !== undefined ? s.mobileHeight : 176);
-    setSlideDesktopHeight(s.desktopHeight !== undefined ? s.desktopHeight : 220);
+    setSlideIsHidden(Boolean(s.isHidden));
+    setSlideMarginBottom(s.marginBottom !== undefined && s.marginBottom !== null ? s.marginBottom : 20);
+    setSlideMobileHeight(s.mobileHeight !== undefined && s.mobileHeight !== null ? s.mobileHeight : 176);
+    setSlideDesktopHeight(s.desktopHeight !== undefined && s.desktopHeight !== null ? s.desktopHeight : 220);
   };
 
   // Add/Edit Slide Submit
@@ -533,8 +597,11 @@ export default function CpanelStorePage() {
             imageUrl: slideImageUrl,
             title: slideTitle,
             subtitle: slideSubtitle,
+            description: slideSubtitle,
             link: slideLink,
+            customWidth: slideCustomWidth !== "" ? Number(slideCustomWidth) : null,
             isCrop: slideIsCrop,
+            isHidden: slideIsHidden,
             marginBottom: Number(slideMarginBottom) || 0,
             mobileHeight: Number(slideMobileHeight) || 176,
             desktopHeight: Number(slideDesktopHeight) || 220,
@@ -1115,12 +1182,137 @@ export default function CpanelStorePage() {
               <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
                 <span className="material-symbols-outlined text-orange-500 text-[22px]">tune</span>
                 <div>
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Name, Brand Logo & Styling</h3>
-                  <p className="text-[10.5px] text-gray-400">Customize the public storefront name, header logo, and product card styling.</p>
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Name, Brand Logo & Display Configurations</h3>
+                  <p className="text-[10.5px] text-gray-400">Customize search bar top space, slide display settings, storefront name, header logo, and product styling.</p>
                 </div>
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-4">
+
+                {/* Search Bar Top Space Adjustment Slider */}
+                <div className="p-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-extrabold uppercase text-[#FC7A00] flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">search</span>
+                      Search Bar Top Space / Margin ({searchBarMarginTop}px)
+                    </label>
+                    <span className="font-mono text-xs font-black text-[#FC7A00]">{searchBarMarginTop}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="2"
+                    value={searchBarMarginTop}
+                    onChange={(e) => setSearchBarMarginTop(Number(e.target.value))}
+                    className="w-full accent-[#FC7A00] cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] font-bold text-gray-400 uppercase">
+                    <span>0px (Flush)</span>
+                    <span>50px</span>
+                    <span>100px (Extra Space)</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-medium leading-tight pt-1">
+                    Adjust space above the search input on the Store page.
+                  </p>
+                </div>
+
+                {/* Slide Display Configurations */}
+                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-3.5">
+                  <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block border-b border-gray-200/40 pb-2">
+                    Store Slideshow Display Settings
+                  </span>
+
+                  {/* Remove Overlay Fade */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">Overlay Fade Gradient</span>
+                    <button
+                      type="button"
+                      onClick={() => setBannerOverlayFadeEnabled(!bannerOverlayFadeEnabled)}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
+                        bannerOverlayFadeEnabled
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                          : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
+                      )}
+                    >
+                      {bannerOverlayFadeEnabled ? "Fade Active" : "Fade Removed"}
+                    </button>
+                  </div>
+
+                  {/* Slideshow Interval */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Slideshow Autoplay Interval (Seconds)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={bannerSlideIntervalSeconds}
+                      onChange={(e) => setBannerSlideIntervalSeconds(Number(e.target.value))}
+                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                    />
+                  </div>
+
+                  {/* Transition Effect */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Transition Effect</label>
+                    <select
+                      value={bannerSlideEffect}
+                      onChange={(e) => setBannerSlideEffect(e.target.value as "fade" | "slide")}
+                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
+                    >
+                      <option value="fade">Seamless Cross-Fade</option>
+                      <option value="slide">Smooth Slide-In (Right-to-Left)</option>
+                    </select>
+                  </div>
+
+                  {/* Image Size Mode (Cover vs Contain) */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Global Image Size Mode</label>
+                    <select
+                      value={bannerImageMode}
+                      onChange={(e) => setBannerImageMode(e.target.value as "cover" | "contain")}
+                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
+                    >
+                      <option value="cover">Crop to Fit Container (Cover)</option>
+                      <option value="contain">Keep Full Image Aspect Ratio (Contain - Don&apos;t Cut Off)</option>
+                    </select>
+                  </div>
+
+                  {/* Crop Position Alignment */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Crop Alignment Position</label>
+                    <select
+                      value={bannerImagePosition}
+                      onChange={(e) => setBannerImagePosition(e.target.value)}
+                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
+                    >
+                      <option value="center">Center</option>
+                      <option value="top">Top</option>
+                      <option value="bottom">Bottom</option>
+                      <option value="left">Left</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+
+                  {/* Slide Indicator Dots Toggle */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">Slide Indicator Dots</span>
+                    <button
+                      type="button"
+                      onClick={() => setBannerShowIndicators(!bannerShowIndicators)}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
+                        bannerShowIndicators
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                          : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
+                      )}
+                    >
+                      {bannerShowIndicators ? "Dots Visible" : "Dots Hidden"}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Store Name Input */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400 block">Store Name / Brand Title</label>
