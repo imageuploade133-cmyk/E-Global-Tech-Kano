@@ -428,7 +428,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   // Route protection rules for standard login status
   useEffect(() => {
-    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+    const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
     if (loading && !isMock) return;
 
     const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");

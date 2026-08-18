@@ -243,12 +243,12 @@ header {
   background-image: none !important;
 }
 
-main {
+body:not(:has(#store-page-root)) main {
   margin-top: 80px !important;
 }
 
 @media (min-width: 375px) {
-  main {
+  body:not(:has(#store-page-root)) main {
     margin-top: 96px !important;
   }
 }
