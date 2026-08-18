@@ -746,7 +746,39 @@ export default function AdminPage() {
     }));
   };
 
-  // Auto-poll WhatsApp connection status every 5 seconds when in WhatsApp tab
+  const handleReconnectWhatsapp = async () => {
+    setIsLinkingWhatsapp(true);
+    addWhatsappLog("Dispatching reconnect payload to WhatsApp VM...");
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/whatsapp/reconnect", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Reconnection triggered successfully!");
+        addWhatsappLog("WhatsApp instance reconnected successfully.");
+        fetchWhatsappStatus();
+      } else {
+        toast.error(data.error || "Failed to reconnect instance.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error reconnecting WhatsApp.");
+    } finally {
+      setIsLinkingWhatsapp(false);
+    }
+  };
+
+  // Auto-poll WhatsApp connection status in real-time every 3 seconds when in WhatsApp tab
   useEffect(() => {
     if (!isAdminUnlocked || activeTab !== "whatsapp") return;
 
@@ -754,7 +786,7 @@ export default function AdminPage() {
 
     const interval = setInterval(() => {
       fetchWhatsappStatus(true);
-    }, 5000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [isAdminUnlocked, activeTab, whatsappStatus]);
@@ -775,7 +807,7 @@ export default function AdminPage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [whatsappQrCode, whatsappStatus, whatsappQrCountdown]);
+  }, [whatsappQrCode, whatsappStatus]);
 
   useEffect(() => {
     if (isAdminUnlocked && activeTab === "profit") {
@@ -3310,15 +3342,27 @@ export default function AdminPage() {
                     </button>
 
                     {whatsappStatus === "LINKED" && (
-                      <button
-                        type="button"
-                        disabled={isLinkingWhatsapp}
-                        onClick={handleUnlinkWhatsapp}
-                        className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(220,38,38,0.2)] disabled:opacity-50"
-                      >
-                        {isLinkingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">logout</span>}
-                        <span>Unlink WhatsApp Sender</span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          disabled={isLinkingWhatsapp}
+                          onClick={handleReconnectWhatsapp}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isLinkingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">sync</span>}
+                          <span>Reconnect</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isLinkingWhatsapp}
+                          onClick={handleUnlinkWhatsapp}
+                          className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(220,38,38,0.2)] disabled:opacity-50"
+                        >
+                          {isLinkingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">logout</span>}
+                          <span>Disconnect Device</span>
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
