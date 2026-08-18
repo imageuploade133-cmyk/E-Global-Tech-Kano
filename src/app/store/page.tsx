@@ -379,7 +379,7 @@ export default function StorePage() {
     <RouteGuard>
       <div className="min-h-dvh bg-background text-on-background pb-32">
         {/* Sticky/Static App Top Bar - Pinned at top while products scroll underneath */}
-        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2.5 px-margin-mobile">
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-1.5 px-margin-mobile">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               {settings.storeLogoUrl && (
@@ -440,7 +440,7 @@ export default function StorePage() {
           </div>
         </div>
 
-        <main className="max-w-md mx-auto pt-1.5 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
+        <main className="max-w-md mx-auto pt-0 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
 
           {/* Dynamic Store Slideshow Banners */}
           {slides.length > 0 && (
@@ -788,9 +788,6 @@ export default function StorePage() {
 
               {/* Full Screen Borderless Showcase Body */}
               <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-36 overscroll-contain">
-                {/* Visual Grab Handle for Drawer Feel */}
-                <div className="w-12 h-1.5 bg-gray-200/80 rounded-full mx-auto mb-1" />
-
                 {/* Hero Showcase Floating Card */}
                 {(() => {
                   const gallery = getProductGallery(activeProduct);
@@ -1035,9 +1032,6 @@ export default function StorePage() {
 
               {/* Scrollable Cart Items List */}
               <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-36 overscroll-contain">
-                {/* Visual Grab Handle for Drawer Feel */}
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-2" />
-
                 {cart.length === 0 ? (
                   <div className="py-20 flex flex-col items-center text-center space-y-3">
                     <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center border-0">
@@ -1255,9 +1249,6 @@ export default function StorePage() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-24 overscroll-contain">
-                {/* Visual Grab Handle for Drawer Feel */}
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-2" />
-
                 {isLoadingMyOrders ? (
                   <div className="py-16 text-center text-xs font-bold uppercase tracking-wider text-gray-400">
                     Loading Order History...
