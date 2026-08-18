@@ -3323,6 +3323,56 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                {/* Full Connected Device Information Card */}
+                {whatsappStatus === "LINKED" && (
+                  <div className={cn("p-6 rounded-2xl border transition-all duration-300 space-y-5", panelClass)}>
+                    <div className="flex items-center justify-between border-b pb-4 flex-wrap gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="material-symbols-outlined text-emerald-500 text-[26px]">verified</span>
+                        <div>
+                          <h4 className="font-extrabold text-sm uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                            Active WhatsApp Sender Device Details
+                          </h4>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">
+                            Device is connected and ready for automated OTP & notification dispatch
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        Status: Connected
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Device Name */}
+                      <div className="p-4 rounded-xl border border-gray-200/60 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 space-y-1">
+                        <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Device Name</span>
+                        <strong className="font-extrabold text-sm text-gray-900 dark:text-white block font-mono">
+                          {whatsappInstanceIdInput || "inst_17506348"}
+                        </strong>
+                      </div>
+
+                      {/* Phone Number */}
+                      <div className="p-4 rounded-xl border border-gray-200/60 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 space-y-1">
+                        <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Phone Number</span>
+                        <strong className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400 block font-mono">
+                          {whatsappPhoneNumber || "Connected Sender"}
+                        </strong>
+                      </div>
+
+                      {/* Status */}
+                      <div className="p-4 rounded-xl border border-gray-200/60 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 space-y-1">
+                        <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Status</span>
+                        <strong className="font-extrabold text-sm text-emerald-500 block uppercase">
+                          Connected
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {whatsappStatus === "UNLINKED" && (
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                     {/* Left side: Instructions and Pairing Panel */}
