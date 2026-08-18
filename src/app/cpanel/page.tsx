@@ -179,6 +179,7 @@ export default function AdminPage() {
   const [whatsappPhoneNumber, setWhatsappPhoneNumber] = useState<string | null>(null);
   const [whatsappLinkedAt, setWhatsappLinkedAt] = useState<string | null>(null);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
+  const [whatsappQrCountdown, setWhatsappQrCountdown] = useState(45);
   const [isLoadingWhatsapp, setIsLoadingWhatsapp] = useState(false);
 
   // WhatsApp API VM Configuration States
@@ -555,8 +556,8 @@ export default function AdminPage() {
   }, [config]);
 
   // WhatsApp Gateway Sync & Operation Handlers
-  const fetchWhatsappStatus = async () => {
-    setIsLoadingWhatsapp(true);
+  const fetchWhatsappStatus = async (isBackground: boolean = false) => {
+    if (!isBackground) setIsLoadingWhatsapp(true);
     try {
       let idToken = "mock-admin-token";
       const isMock = sessionStorage.getItem("mock") === "true";
@@ -571,10 +572,16 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setWhatsappStatus(data.status || "UNLINKED");
+        const prevStatus = whatsappStatus;
+        const newStatus = data.status || "UNLINKED";
+        setWhatsappStatus(newStatus);
         setWhatsappPhoneNumber(data.phoneNumber || null);
         setWhatsappLinkedAt(data.linkedAt || null);
-        setWhatsappQrCode(data.qrCode || null);
+
+        if (data.qrCode) {
+          setWhatsappQrCode(data.qrCode);
+        }
+
         if (data.apiConfig) {
           setWhatsappApiUrlInput(data.apiConfig.whatsappApiUrl || "");
           setWhatsappApiKeyInput(data.apiConfig.whatsappApiKey || "");
@@ -582,18 +589,25 @@ export default function AdminPage() {
           setWhatsappAdminUsernameInput(data.apiConfig.whatsappAdminUsername || "");
           setWhatsappAdminPasswordInput(data.apiConfig.whatsappAdminPassword || "");
         }
-        if (data.status === "LINKED") {
-          addWhatsappLog(`Active secure session found: ${data.phoneNumber} (Linked at: ${new Date(data.linkedAt).toLocaleString()})`);
-          addWhatsappLog(`WhatsApp Gateway active and monitoring OTP dispatch rails.`);
-        } else {
+
+        if (newStatus === "LINKED") {
+          setWhatsappQrCode(null);
+          setWhatsappQrCountdown(0);
+          if (prevStatus === "UNLINKED") {
+            toast.success("WhatsApp device linked successfully!");
+            addWhatsappLog(`[SUCCESS] Device linked: ${data.phoneNumber}`);
+          }
+        } else if (!isBackground) {
           addWhatsappLog(`WhatsApp Gateway disconnected. Please scan the QR code to pair.`);
         }
       }
     } catch (err: any) {
-      console.error("Failed to load WhatsApp link status:", err);
-      addWhatsappLog(`[ERROR] Failed to query status: ${err.message}`);
+      if (!isBackground) {
+        console.error("Failed to load WhatsApp link status:", err);
+        addWhatsappLog(`[ERROR] Failed to query status: ${err.message}`);
+      }
     } finally {
-      setIsLoadingWhatsapp(false);
+      if (!isBackground) setIsLoadingWhatsapp(false);
     }
   };
 
@@ -618,6 +632,7 @@ export default function AdminPage() {
 
       if (res.ok && data.success && data.qrCode) {
         setWhatsappQrCode(data.qrCode);
+        setWhatsappQrCountdown(45);
         toast.success("Live WhatsApp QR code generated successfully!");
         addWhatsappLog("Received live QR code payload from WhatsApp VM.");
       } else {
@@ -629,6 +644,7 @@ export default function AdminPage() {
         const qrData = await qrRes.json();
         if (qrRes.ok && qrData.qrCode) {
           setWhatsappQrCode(qrData.qrCode);
+          setWhatsappQrCountdown(45);
           toast.success("Live WhatsApp QR code retrieved!");
           addWhatsappLog("Retrieved QR code payload from WhatsApp gateway.");
         } else {
@@ -730,11 +746,36 @@ export default function AdminPage() {
     }));
   };
 
+  // Auto-poll WhatsApp connection status every 5 seconds when in WhatsApp tab
   useEffect(() => {
-    if (isAdminUnlocked && activeTab === "whatsapp") {
-      fetchWhatsappStatus();
-    }
-  }, [isAdminUnlocked, activeTab]);
+    if (!isAdminUnlocked || activeTab !== "whatsapp") return;
+
+    fetchWhatsappStatus();
+
+    const interval = setInterval(() => {
+      fetchWhatsappStatus(true);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isAdminUnlocked, activeTab, whatsappStatus]);
+
+  // QR Code countdown timer
+  useEffect(() => {
+    if (!whatsappQrCode || whatsappStatus === "LINKED" || whatsappQrCountdown <= 0) return;
+
+    const timer = setInterval(() => {
+      setWhatsappQrCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleFetchRealQrCode();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [whatsappQrCode, whatsappStatus, whatsappQrCountdown]);
 
   useEffect(() => {
     if (isAdminUnlocked && activeTab === "profit") {
@@ -3261,7 +3302,7 @@ export default function AdminPage() {
                     <button
                       type="button"
                       disabled={isLoadingWhatsapp}
-                      onClick={fetchWhatsappStatus}
+                      onClick={() => fetchWhatsappStatus()}
                       className="px-4 py-2.5 bg-black hover:bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
                     >
                       {isLoadingWhatsapp ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
@@ -3333,6 +3374,30 @@ export default function AdminPage() {
                             </div>
                           )}
                         </div>
+
+                        {whatsappQrCode && (
+                          <div className="flex flex-col items-center gap-2 pt-1">
+                            <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#FC7A00] bg-[#FC7A00]/10 px-3.5 py-1.5 rounded-full border border-[#FC7A00]/20">
+                              <span className="material-symbols-outlined text-[15px] animate-spin">timer</span>
+                              <span>
+                                {whatsappQrCountdown > 0
+                                  ? `QR code expires in ${whatsappQrCountdown}s`
+                                  : "Refreshing QR code..."}
+                              </span>
+                            </div>
+
+                            <div className="w-48 bg-gray-200 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className="bg-[#FC7A00] h-full transition-all duration-1000 ease-linear rounded-full"
+                                style={{ width: `${Math.max(0, (whatsappQrCountdown / 45) * 100)}%` }}
+                              />
+                            </div>
+
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                              Auto-detecting device link status every 5s...
+                            </p>
+                          </div>
+                        )}
 
                         <div className="w-full max-w-sm pt-2">
                           <button
