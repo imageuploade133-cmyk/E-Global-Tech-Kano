@@ -439,11 +439,11 @@ export default function StorePage() {
     <RouteGuard>
       <div id="store-page-root" className="min-h-dvh bg-background text-on-background pb-32">
         {/* Sticky/Static App Top Bar - Pinned at top while products scroll underneath */}
-        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-1.5 px-margin-mobile">
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2 px-margin-mobile">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               {settings.storeLogoUrl && (
-                <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-150 flex items-center justify-center p-0.5 overflow-hidden flex-shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-transparent border-0 flex items-center justify-center p-0 overflow-hidden flex-shrink-0">
                   <img
                     src={settings.storeLogoUrl}
                     alt="Store Logo"
@@ -469,7 +469,7 @@ export default function StorePage() {
               <button
                 type="button"
                 onClick={handleClearStoreCache}
-                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
+                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-2xl border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 hover:text-black active:scale-95 transition-all cursor-pointer shadow-none"
                 title="Clear Cache & Refresh Store Data"
               >
                 <span className="material-symbols-outlined text-[19px] min-[375px]:text-[21px]">
@@ -477,33 +477,33 @@ export default function StorePage() {
                 </span>
               </button>
 
-              {/* High Fidelity Borderless History Icon */}
+              {/* Redesigned Premium History Icon Button */}
               <button
                 type="button"
                 onClick={() => {
                   fetchMyOrders();
                   setIsMyOrdersOpen(true);
                 }}
-                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
+                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-2xl border-0 bg-orange-50 hover:bg-orange-100 text-[#FC7A00] flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-none"
                 title="Order History"
               >
-                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]" style={{ fontVariationSettings: '"wght" 500' }}>
+                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]" style={{ fontVariationSettings: '"wght" 600' }}>
                   receipt_long
                 </span>
               </button>
 
-              {/* High Fidelity Borderless Cart Icon */}
+              {/* Redesigned Premium Dark Cart Icon Button */}
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
+                className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-2xl border-0 bg-gray-900 hover:bg-black text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-sm"
                 title="Shopping Cart"
               >
-                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]">
-                  shopping_cart
+                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px] text-orange-400">
+                  shopping_bag
                 </span>
                 {totalCartItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-bounce">
                     {totalCartItems}
                   </span>
                 )}
