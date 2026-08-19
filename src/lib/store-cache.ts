@@ -46,10 +46,14 @@ export interface StoreSettings {
   storeName?: string;
   storeLogoUrl?: string;
   borderColor?: string;
+  borderOpacity?: number;
   hideBorders?: boolean;
   enableGradientBorder?: boolean;
   gradientColorStart?: string;
   gradientColorEnd?: string;
+  recentlyViewedBorderEnabled?: boolean;
+  recentlyViewedBorderColor?: string;
+  recentlyViewedBorderOpacity?: number;
   orderStatuses?: string[];
   searchBarMarginTop?: number;
   bannerOverlayFadeEnabled?: boolean;
