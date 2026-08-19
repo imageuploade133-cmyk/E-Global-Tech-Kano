@@ -122,6 +122,18 @@ export const setCachedStore = (items: StoreItem[], slides: StoreSlide[], categor
   }
 };
 
+export const clearStoreCache = () => {
+  memoryStoreCache = null;
+  memoryProductDetails.clear();
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.removeItem(CACHE_KEY);
+    } catch {
+      // Ignore storage removal errors
+    }
+  }
+};
+
 export const getCachedProductDetail = (id: string): StoreItem | null => {
   if (memoryProductDetails.has(id)) {
     return memoryProductDetails.get(id) || null;

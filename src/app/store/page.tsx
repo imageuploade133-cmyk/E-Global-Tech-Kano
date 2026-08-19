@@ -15,10 +15,25 @@ import {
   CartItem,
   getCachedStore,
   setCachedStore,
+  clearStoreCache,
   getCachedProductDetail,
   getSavedCart,
   saveCart,
 } from "@/lib/store-cache";
+
+// Convert hex color + opacity fraction (0 to 1) to rgba string strictly for product borders
+const hexToRgba = (hex: string = "#FC7A00", opacity: number = 1): string => {
+  let c = hex.trim().replace("#", "");
+  if (c.length === 3) {
+    c = c.split("").map((x) => x + x).join("");
+  }
+  if (c.length !== 6) return `rgba(252, 122, 0, ${opacity})`;
+  const num = parseInt(c, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
 
 export default function StorePage() {
   const { userData, user } = useAuth();
@@ -204,9 +219,8 @@ export default function StorePage() {
   };
 
   // Fetch Storefront Data with Low Read Cache Strategy
-  useEffect(() => {
-    async function fetchStore() {
-      // Check cache first to avoid unnecessary Firestore reads
+  const fetchStoreData = async (forceRefresh: boolean = false) => {
+    if (!forceRefresh) {
       const cached = getCachedStore();
       if (cached) {
         setItems(cached.items);
@@ -216,30 +230,48 @@ export default function StorePage() {
         setIsLoading(false);
         return;
       }
+    }
 
-      setIsLoading(true);
+    setIsLoading(true);
+    try {
+      const res = await fetch(forceRefresh ? "/api/store?fresh=true" : "/api/store");
+      const data = await res.json();
+      if (data.success) {
+        const fetchedItems: StoreItem[] = data.items || [];
+        const fetchedSlides: StoreSlide[] = data.slides || [];
+        const fetchedCategories: StoreCategory[] = data.categories || [];
+        const fetchedSettings: StoreSettings = data.settings || {};
+        setItems(fetchedItems);
+        setSlides(fetchedSlides);
+        setCategories(fetchedCategories);
+        setSettings(fetchedSettings);
+        setCachedStore(fetchedItems, fetchedSlides, fetchedCategories, fetchedSettings);
+      }
+    } catch (err) {
+      console.error("Failed to load store data:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStoreData(false);
+  }, []);
+
+  // Clean local storage / cache handler
+  const handleClearStoreCache = () => {
+    clearStoreCache();
+    if (typeof window !== "undefined") {
       try {
-        const res = await fetch("/api/store");
-        const data = await res.json();
-        if (data.success) {
-          const fetchedItems: StoreItem[] = data.items || [];
-          const fetchedSlides: StoreSlide[] = data.slides || [];
-          const fetchedCategories: StoreCategory[] = data.categories || [];
-          const fetchedSettings: StoreSettings = data.settings || {};
-          setItems(fetchedItems);
-          setSlides(fetchedSlides);
-          setCategories(fetchedCategories);
-          setSettings(fetchedSettings);
-          setCachedStore(fetchedItems, fetchedSlides, fetchedCategories, fetchedSettings);
-        }
-      } catch (err) {
-        console.error("Failed to load store data:", err);
-      } finally {
-        setIsLoading(false);
+        localStorage.removeItem("e_tech_recently_viewed");
+      } catch {
+        // Ignore storage removal error
       }
     }
-    fetchStore();
-  }, []);
+    setRecentlyViewed([]);
+    toast.success("Clearing store cache and reloading fresh data...");
+    fetchStoreData(true);
+  };
 
   // Slide autoplay interval
   useEffect(() => {
@@ -433,6 +465,18 @@ export default function StorePage() {
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Clean Cache / Refresh Button */}
+              <button
+                type="button"
+                onClick={handleClearStoreCache}
+                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
+                title="Clear Cache & Refresh Store Data"
+              >
+                <span className="material-symbols-outlined text-[19px] min-[375px]:text-[21px]">
+                  cached
+                </span>
+              </button>
+
               {/* High Fidelity Borderless History Icon */}
               <button
                 type="button"
@@ -628,12 +672,18 @@ export default function StorePage() {
               </div>
 
               <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 select-none">
-                {recentlyViewed.slice(0, 10).map((rv) => (
-                  <div
-                    key={rv.id}
-                    onClick={() => handleOpenProductModal(rv)}
-                    className="w-36 flex-shrink-0 bg-white border border-gray-200 hover:border-[#FC7A00] rounded-2xl p-2.5 space-y-2 cursor-pointer transition-all shadow-3xs"
-                  >
+                {recentlyViewed.slice(0, 10).map((rv) => {
+                  const rvBorderColor = settings.recentlyViewedBorderEnabled
+                    ? hexToRgba(settings.recentlyViewedBorderColor || "#FC7A00", settings.recentlyViewedBorderOpacity ?? 1)
+                    : "#E5E7EB";
+
+                  return (
+                    <div
+                      key={rv.id}
+                      onClick={() => handleOpenProductModal(rv)}
+                      style={{ borderColor: rvBorderColor }}
+                      className="w-36 flex-shrink-0 bg-white border rounded-2xl p-2.5 space-y-2 cursor-pointer transition-all shadow-3xs"
+                    >
                     <div className="w-full h-24 rounded-xl bg-gray-50 border border-gray-100 relative overflow-hidden flex items-center justify-center">
                       {rv.imageUrl ? (
                         <img src={rv.imageUrl} alt={rv.title} className="w-full h-full object-cover" />
@@ -649,8 +699,8 @@ export default function StorePage() {
                         ₦{rv.price.toLocaleString()}
                       </p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -699,18 +749,30 @@ export default function StorePage() {
             </motion.div>
           ) : (
             <div className="grid grid-cols-2 gap-3.5">
-              {filteredItems.map((item) => (
-                <motion.div
-                  key={item.id}
-                  whileTap={{ scale: 0.98 }}
-                  style={{
-                    borderColor: hideBorders ? "transparent" : customBorderColor,
-                  }}
-                  className={`bg-white rounded-2xl p-3.5 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative border ${
-                    hideBorders ? "border-transparent" : ""
-                  }`}
-                  onClick={() => handleOpenProductModal(item)}
-                >
+              {filteredItems.map((item) => {
+                const productBorderColor = settings.hideBorders
+                  ? "transparent"
+                  : settings.enableGradientBorder
+                  ? settings.gradientColorStart || "#FC7A00"
+                  : hexToRgba(settings.borderColor || "#FC7A00", settings.borderOpacity ?? 1);
+
+                return (
+                  <motion.div
+                    key={item.id}
+                    whileTap={{ scale: 0.98 }}
+                    style={{
+                      borderColor: productBorderColor,
+                      ...(settings.enableGradientBorder && !settings.hideBorders
+                        ? {
+                            borderImage: `linear-gradient(135deg, ${settings.gradientColorStart || "#FC7A00"}, ${settings.gradientColorEnd || "#E06600"}) 1`,
+                          }
+                        : {}),
+                    }}
+                    className={`bg-white rounded-2xl p-3.5 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative border ${
+                      hideBorders ? "border-transparent" : ""
+                    }`}
+                    onClick={() => handleOpenProductModal(item)}
+                  >
                   <div className="space-y-2.5">
                     {/* Product Image Thumbnail */}
                     <div className="w-full h-28 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden relative flex items-center justify-center">
@@ -777,7 +839,8 @@ export default function StorePage() {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>
