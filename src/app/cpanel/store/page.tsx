@@ -47,10 +47,14 @@ interface StoreSettings {
   storeName?: string;
   storeLogoUrl?: string;
   borderColor?: string;
+  borderOpacity?: number;
   hideBorders?: boolean;
   enableGradientBorder?: boolean;
   gradientColorStart?: string;
   gradientColorEnd?: string;
+  recentlyViewedBorderEnabled?: boolean;
+  recentlyViewedBorderColor?: string;
+  recentlyViewedBorderOpacity?: number;
   orderStatuses?: string[];
   searchBarMarginTop?: number;
   bannerOverlayFadeEnabled?: boolean;
@@ -142,10 +146,14 @@ export default function CpanelStorePage() {
   const [storeLogoUrl, setStoreLogoUrl] = useState("");
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
+  const [borderOpacity, setBorderOpacity] = useState(100);
   const [hideBorders, setHideBorders] = useState(false);
   const [enableGradientBorder, setEnableGradientBorder] = useState(false);
   const [gradientColorStart, setGradientColorStart] = useState("#FC7A00");
   const [gradientColorEnd, setGradientColorEnd] = useState("#0b513d");
+  const [recentlyViewedBorderEnabled, setRecentlyViewedBorderEnabled] = useState(true);
+  const [recentlyViewedBorderColor, setRecentlyViewedBorderColor] = useState("#FC7A00");
+  const [recentlyViewedBorderOpacity, setRecentlyViewedBorderOpacity] = useState(20);
   const [orderStatuses, setOrderStatuses] = useState<string[]>([
     "Pending",
     "Processing",
@@ -271,10 +279,14 @@ export default function CpanelStorePage() {
           setStoreName(data.settings.storeName || "E-Tech Store");
           setStoreLogoUrl(data.settings.storeLogoUrl || "");
           setBorderColor(data.settings.borderColor || "#FC7A00");
+          setBorderOpacity(data.settings.borderOpacity ?? 100);
           setHideBorders(Boolean(data.settings.hideBorders));
           setEnableGradientBorder(Boolean(data.settings.enableGradientBorder));
           setGradientColorStart(data.settings.gradientColorStart || "#FC7A00");
           setGradientColorEnd(data.settings.gradientColorEnd || "#0b513d");
+          setRecentlyViewedBorderEnabled(data.settings.recentlyViewedBorderEnabled !== false);
+          setRecentlyViewedBorderColor(data.settings.recentlyViewedBorderColor || "#FC7A00");
+          setRecentlyViewedBorderOpacity(data.settings.recentlyViewedBorderOpacity ?? 20);
           if (Array.isArray(data.settings.orderStatuses)) {
             setOrderStatuses(data.settings.orderStatuses);
           }
@@ -351,10 +363,14 @@ export default function CpanelStorePage() {
             storeName,
             storeLogoUrl,
             borderColor,
+            borderOpacity,
             hideBorders,
             enableGradientBorder,
             gradientColorStart,
             gradientColorEnd,
+            recentlyViewedBorderEnabled,
+            recentlyViewedBorderColor,
+            recentlyViewedBorderOpacity,
             orderStatuses,
             searchBarMarginTop,
             bannerOverlayFadeEnabled,
@@ -1498,8 +1514,8 @@ export default function CpanelStorePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 pt-1">
-                      <label className="text-[10px] font-black uppercase text-gray-400 block">Solid Border Color</label>
+                    <div className="space-y-3 pt-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 block">Solid Border Color & Opacity</label>
                       <div className="flex items-center gap-3">
                         <input
                           type="color"
@@ -1514,6 +1530,28 @@ export default function CpanelStorePage() {
                           placeholder="#FC7A00"
                           className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-mono font-bold uppercase outline-none border transition-all", inputClass)}
                         />
+                      </div>
+
+                      {/* Border Opacity Slider */}
+                      <div className="space-y-1.5 p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800">
+                        <div className="flex justify-between items-center text-[10.5px] font-bold">
+                          <span className="text-gray-500 dark:text-gray-400 uppercase">Product Border Opacity</span>
+                          <span className="font-mono text-[#FC7A00] font-black">{borderOpacity}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={borderOpacity}
+                          onChange={(e) => setBorderOpacity(Number(e.target.value))}
+                          className="w-full accent-[#FC7A00] cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[8.5px] font-bold text-gray-400 uppercase">
+                          <span>0% (Transparent)</span>
+                          <span>50%</span>
+                          <span>100% (Solid)</span>
+                        </div>
                       </div>
 
                       {/* Preset Colors */}
@@ -1531,6 +1569,64 @@ export default function CpanelStorePage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Recently Viewed Product Cards Border Control */}
+                  <div className="pt-3 border-t border-gray-200/40 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Recently Viewed Cards Border</span>
+                        <span className="text-[9.5px] text-gray-400 font-medium">Border styling for horizontal recently viewed product cards</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRecentlyViewedBorderEnabled(!recentlyViewedBorderEnabled)}
+                        className={cn(
+                          "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
+                          recentlyViewedBorderEnabled
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                            : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
+                        )}
+                      >
+                        {recentlyViewedBorderEnabled ? "Border Active" : "No Border"}
+                      </button>
+                    </div>
+
+                    {recentlyViewedBorderEnabled && (
+                      <div className="space-y-2.5 pt-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={recentlyViewedBorderColor}
+                            onChange={(e) => setRecentlyViewedBorderColor(e.target.value)}
+                            className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
+                          />
+                          <input
+                            type="text"
+                            value={recentlyViewedBorderColor}
+                            onChange={(e) => setRecentlyViewedBorderColor(e.target.value)}
+                            placeholder="#FC7A00"
+                            className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800">
+                          <div className="flex justify-between items-center text-[10.5px] font-bold">
+                            <span className="text-gray-500 dark:text-gray-400 uppercase">Recently Viewed Border Opacity</span>
+                            <span className="font-mono text-[#FC7A00] font-black">{recentlyViewedBorderOpacity}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="5"
+                            value={recentlyViewedBorderOpacity}
+                            onChange={(e) => setRecentlyViewedBorderOpacity(Number(e.target.value))}
+                            className="w-full accent-[#FC7A00] cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Hide Product Borders Toggle */}
                   <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200/50 bg-white dark:bg-gray-800 cursor-pointer select-none">
