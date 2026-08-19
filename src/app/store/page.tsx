@@ -47,8 +47,14 @@ export default function StorePage() {
   const [productQuantity, setProductQuantity] = useState(1);
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
 
-  // Recently Viewed products state
+  // Recently Viewed products state (saves up to 50 items locally)
   const [recentlyViewed, setRecentlyViewed] = useState<StoreItem[]>([]);
+  const [isAllRecentlyViewedOpen, setIsAllRecentlyViewedOpen] = useState(false);
+  const [visibleRecentlyViewedLimit, setVisibleRecentlyViewedLimit] = useState(10);
+
+  // Dedicated "Products You May Like" Modal state
+  const [isAllRecommendedOpen, setIsAllRecommendedOpen] = useState(false);
+  const [recommendedCategory, setRecommendedCategory] = useState<string>("ALL");
 
   // Load recently viewed products from localStorage
   useEffect(() => {
@@ -67,10 +73,10 @@ export default function StorePage() {
     }
   }, []);
 
-  // Track product view in recently viewed list
+  // Track product view in recently viewed list (up to 50 items max)
   const trackRecentlyViewed = (product: StoreItem) => {
     const filtered = recentlyViewed.filter((p) => p.id !== product.id);
-    const updated = [product, ...filtered].slice(0, 10);
+    const updated = [product, ...filtered].slice(0, 50);
     setRecentlyViewed(updated);
 
     if (typeof window !== "undefined") {
@@ -160,7 +166,15 @@ export default function StorePage() {
 
   // Prevent background body scrolling while any store drawer/modal is open to prevent scroll hooking/hanging
   useEffect(() => {
-    if (activeProduct || isCartOpen || isMyOrdersOpen || confirmedOrder || isSearchModalOpen) {
+    if (
+      activeProduct ||
+      isCartOpen ||
+      isMyOrdersOpen ||
+      confirmedOrder ||
+      isSearchModalOpen ||
+      isAllRecentlyViewedOpen ||
+      isAllRecommendedOpen
+    ) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -168,7 +182,15 @@ export default function StorePage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [activeProduct, isCartOpen, isMyOrdersOpen, confirmedOrder, isSearchModalOpen]);
+  }, [
+    activeProduct,
+    isCartOpen,
+    isMyOrdersOpen,
+    confirmedOrder,
+    isSearchModalOpen,
+    isAllRecentlyViewedOpen,
+    isAllRecommendedOpen,
+  ]);
 
   // Load Cart from localStorage on mount
   useEffect(() => {
@@ -411,14 +433,14 @@ export default function StorePage() {
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* High Fidelity History Icon */}
+              {/* High Fidelity Borderless History Icon */}
               <button
                 type="button"
                 onClick={() => {
                   fetchMyOrders();
                   setIsMyOrdersOpen(true);
                 }}
-                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-300 active:scale-90 transition-all cursor-pointer shadow-3xs"
+                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
                 title="Order History"
               >
                 <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]" style={{ fontVariationSettings: '"wght" 500' }}>
@@ -426,11 +448,11 @@ export default function StorePage() {
                 </span>
               </button>
 
-              {/* Cart Icon with badge */}
+              {/* High Fidelity Borderless Cart Icon */}
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-300 active:scale-90 transition-all cursor-pointer shadow-3xs"
+                className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
                 title="Shopping Cart"
               >
                 <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]">
@@ -578,23 +600,35 @@ export default function StorePage() {
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">history</span>
                   <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider text-black">
-                    Recently Viewed
+                    Recently Viewed ({recentlyViewed.length})
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRecentlyViewed([]);
-                    if (typeof window !== "undefined") localStorage.removeItem("e_tech_recently_viewed");
-                  }}
-                  className="text-[9.5px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider"
-                >
-                  Clear History
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVisibleRecentlyViewedLimit(10);
+                      setIsAllRecentlyViewedOpen(true);
+                    }}
+                    className="text-[9.5px] font-black text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer"
+                  >
+                    View All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecentlyViewed([]);
+                      if (typeof window !== "undefined") localStorage.removeItem("e_tech_recently_viewed");
+                    }}
+                    className="text-[9.5px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
 
               <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 select-none">
-                {recentlyViewed.map((rv) => (
+                {recentlyViewed.slice(0, 10).map((rv) => (
                   <div
                     key={rv.id}
                     onClick={() => handleOpenProductModal(rv)}
@@ -781,11 +815,11 @@ export default function StorePage() {
               className="fixed inset-0 bg-[#F8F9FB] z-[100001] flex flex-col text-black overflow-hidden select-none"
             >
               {/* Sleek Borderless App Header Bar */}
-              <div className="sticky top-0 bg-white/80 backdrop-blur-xl px-5 py-3.5 flex items-center justify-between z-10 shadow-xs border-0">
+              <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-3.5 flex items-center justify-between z-10 shadow-none border-0">
                 <button
                   type="button"
                   onClick={() => setActiveProduct(null)}
-                  className="w-10 h-10 rounded-full bg-gray-100/80 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer border-0 shadow-none"
+                  className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
@@ -800,19 +834,22 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(true)}
-                  className="relative w-10 h-10 rounded-full bg-gray-100/80 flex items-center justify-center text-gray-800 active:scale-90 transition-all cursor-pointer border-0 shadow-none"
+                  className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
+                  title="Shopping Cart"
                 >
-                  <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
+                  <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]">
+                    shopping_cart
+                  </span>
                   {totalCartItems > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white">
+                    <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
                       {totalCartItems}
                     </span>
                   )}
                 </button>
               </div>
 
-              {/* Full Screen Borderless Showcase Body */}
-              <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-36">
+              {/* Full Screen Borderless Showcase Body (with pb-72 so bottom bar never obscures content) */}
+              <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-72">
                 {/* Hero Showcase Floating Card */}
                 {(() => {
                   const gallery = getProductGallery(activeProduct);
@@ -944,7 +981,7 @@ export default function StorePage() {
                   const recommended = items.filter(
                     (i) => i.id !== activeProduct.id && i.category.toLowerCase() === activeProduct.category.toLowerCase()
                   );
-                  const displayRecs = recommended.length > 0 ? recommended : items.filter((i) => i.id !== activeProduct.id).slice(0, 6);
+                  const displayRecs = recommended.length > 0 ? recommended : items.filter((i) => i.id !== activeProduct.id);
 
                   if (displayRecs.length === 0) return null;
 
@@ -954,11 +991,20 @@ export default function StorePage() {
                         <h3 className="font-hanken font-black text-xs uppercase tracking-wider text-black">
                           Products You May Like
                         </h3>
-                        <span className="text-[10px] font-black text-[#FC7A00] uppercase">Recommended</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecommendedCategory(activeProduct.category);
+                            setIsAllRecommendedOpen(true);
+                          }}
+                          className="text-[10px] font-black text-[#FC7A00] uppercase hover:underline cursor-pointer"
+                        >
+                          View All ({displayRecs.length})
+                        </button>
                       </div>
 
                       <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 select-none">
-                        {displayRecs.map((rec) => (
+                        {displayRecs.slice(0, 10).map((rec) => (
                           <div
                             key={rec.id}
                             onClick={() => handleOpenProductModal(rec)}
@@ -966,7 +1012,7 @@ export default function StorePage() {
                           >
                             <div className="w-full h-24 rounded-2xl bg-gray-50 overflow-hidden relative flex items-center justify-center border-0">
                               {rec.imageUrl ? (
-                                <img src={rec.imageUrl} alt={rec.title} className="w-full h-full object-cover" />
+                                <img src={rec.imageUrl} alt={rec.title} className="w-full h-full object-contain p-2" />
                               ) : (
                                 <span className="material-symbols-outlined text-[24px] text-gray-300">storefront</span>
                               )}
@@ -1029,12 +1075,12 @@ export default function StorePage() {
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed inset-0 bg-white z-[100002] flex flex-col text-black overflow-hidden"
             >
-              {/* App-like Top Sticky Header Bar */}
-              <div className="sticky top-0 bg-white border-b border-gray-150 px-5 py-4 flex items-center justify-between z-10 shadow-3xs">
+              {/* App-like Top Sticky Header Bar - Borderless */}
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 shadow-none border-0">
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer"
+                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
@@ -1049,7 +1095,7 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[18px] font-bold">close</span>
                 </button>
@@ -1257,7 +1303,7 @@ export default function StorePage() {
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed inset-0 bg-white z-[100003] flex flex-col text-black overflow-hidden"
             >
-              <div className="sticky top-0 bg-white border-b border-gray-150 px-5 py-4 flex items-center justify-between z-10 shadow-3xs">
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 shadow-none border-0">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">receipt_long</span>
                   <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
@@ -1267,7 +1313,7 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setIsMyOrdersOpen(false)}
-                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[18px] font-bold">close</span>
                 </button>
@@ -1313,6 +1359,192 @@ export default function StorePage() {
                       )}
                     </div>
                   ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Dedicated "Products You May Like" Full-Screen Modal */}
+        <AnimatePresence>
+          {isAllRecommendedOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="fixed inset-0 bg-white z-[100006] flex flex-col text-black overflow-hidden overscroll-contain"
+            >
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 shadow-none border-0">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">thumb_up</span>
+                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    Products You May Like
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAllRecommendedOpen(false)}
+                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
+                >
+                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-24 overscroll-contain">
+                {(() => {
+                  const recs = items.filter(
+                    (i) =>
+                      recommendedCategory === "ALL" ||
+                      i.category.toLowerCase() === recommendedCategory.toLowerCase()
+                  );
+                  const displayRecs = recs.length > 0 ? recs : items;
+
+                  return (
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
+                        Recommended Hardware & Gear ({displayRecs.length} Products)
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-3.5">
+                        {displayRecs.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              setIsAllRecommendedOpen(false);
+                              handleOpenProductModal(item);
+                            }}
+                            className="bg-gray-50 rounded-2xl p-3.5 flex flex-col justify-between space-y-3 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
+                          >
+                            <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-2 border-0">
+                              {item.imageUrl ? (
+                                <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-2" />
+                              ) : (
+                                <span className="material-symbols-outlined text-[32px] text-gray-300">storefront</span>
+                              )}
+                              <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
+                                {item.category}
+                              </span>
+                            </div>
+
+                            <div>
+                              <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
+                                {item.title}
+                              </h4>
+                              <p className="font-hanken text-[10px] text-gray-400 line-clamp-2 mt-0.5">
+                                {item.description}
+                              </p>
+                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-2">
+                                ₦{item.price.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Dedicated Paginated "Recently Viewed" Full-Screen Modal (Loads 10 at a time on demand to minimize reads) */}
+        <AnimatePresence>
+          {isAllRecentlyViewedOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="fixed inset-0 bg-white z-[100007] flex flex-col text-black overflow-hidden overscroll-contain"
+            >
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 shadow-none border-0">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
+                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    Recently Viewed History
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAllRecentlyViewedOpen(false)}
+                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
+                >
+                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-24 overscroll-contain">
+                {recentlyViewed.length === 0 ? (
+                  <div className="py-16 text-center space-y-2">
+                    <span className="material-symbols-outlined text-[48px] text-gray-300">history_toggle_off</span>
+                    <p className="font-bold text-xs text-gray-500">Your recently viewed history is empty.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-gray-400">
+                      <span>
+                        Showing {Math.min(visibleRecentlyViewedLimit, recentlyViewed.length)} of {recentlyViewed.length} items
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRecentlyViewed([]);
+                          if (typeof window !== "undefined") localStorage.removeItem("e_tech_recently_viewed");
+                          setIsAllRecentlyViewedOpen(false);
+                        }}
+                        className="text-red-500 hover:underline cursor-pointer"
+                      >
+                        Clear All History
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3.5">
+                      {recentlyViewed.slice(0, visibleRecentlyViewedLimit).map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            setIsAllRecentlyViewedOpen(false);
+                            handleOpenProductModal(item);
+                          }}
+                          className="bg-gray-50 rounded-2xl p-3.5 flex flex-col justify-between space-y-3 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
+                        >
+                          <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-2 border-0">
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-2" />
+                            ) : (
+                              <span className="material-symbols-outlined text-[32px] text-gray-300">storefront</span>
+                            )}
+                            <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
+                              {item.category}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
+                              {item.title}
+                            </h4>
+                            <p className="font-mono font-black text-xs text-[#FC7A00] mt-1">
+                              ₦{item.price.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {recentlyViewed.length > visibleRecentlyViewedLimit && (
+                      <div className="pt-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setVisibleRecentlyViewedLimit((prev) => prev + 10)}
+                          className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
+                        >
+                          Load More History ({recentlyViewed.length - visibleRecentlyViewedLimit} remaining)
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </motion.div>
