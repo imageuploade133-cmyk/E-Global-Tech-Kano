@@ -414,11 +414,11 @@ export default function StorePage() {
                   fetchMyOrders();
                   setIsMyOrdersOpen(true);
                 }}
-                className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+                className="w-9 h-9 rounded-full bg-orange-500/10 text-[#FC7A00] flex items-center justify-center hover:bg-orange-500/20 active:scale-95 transition-all cursor-pointer"
                 title="Order History"
               >
-                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]" style={{ fontVariationSettings: '"wght" 500' }}>
-                  receipt_long
+                <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                  history_edu
                 </span>
               </button>
 
@@ -426,14 +426,14 @@ export default function StorePage() {
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+                className="relative w-9 h-9 rounded-full bg-gray-100 text-gray-800 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all cursor-pointer"
                 title="Shopping Cart"
               >
-                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]">
-                  shopping_cart
+                <span className="material-symbols-outlined text-[20px]">
+                  shopping_bag
                 </span>
                 {totalCartItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                  <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
                     {totalCartItems}
                   </span>
                 )}
@@ -628,7 +628,7 @@ export default function StorePage() {
                   >
                     <div className="w-full h-24 rounded-xl bg-gray-50 relative overflow-hidden flex items-center justify-center border-0">
                       {rv.imageUrl ? (
-                        <img src={rv.imageUrl} alt={rv.title} className="w-full h-full object-cover" />
+                            <img src={rv.imageUrl} alt={rv.title} className="w-full h-full object-contain p-1.5" />
                       ) : (
                         <span className="material-symbols-outlined text-[24px] text-gray-300">storefront</span>
                       )}
@@ -699,14 +699,14 @@ export default function StorePage() {
                   onClick={() => handleOpenProductModal(item)}
                 >
                   <div className="space-y-2.5">
-                    {/* Product Image Thumbnail */}
-                    <div className="w-full h-28 rounded-xl bg-gray-50 overflow-hidden relative flex items-center justify-center border-0">
+                    {/* Product Image Thumbnail - Keeps full image inside card without cutting off */}
+                    <div className="w-full h-28 rounded-xl bg-gray-50 overflow-hidden relative flex items-center justify-center border-0 p-2">
                       {item.imageUrl ? (
                         <Image
                           src={item.imageUrl}
                           alt={item.title}
                           fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="object-contain p-2"
                           unoptimized
                         />
                       ) : (
@@ -832,8 +832,8 @@ export default function StorePage() {
                 </button>
               </div>
 
-              {/* Full Screen Borderless Showcase Body */}
-              <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-36 overscroll-contain">
+              {/* Full Screen Borderless Showcase Body with ample bottom space */}
+              <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-56 overscroll-contain">
                 {/* Hero Showcase Floating Card */}
                 {(() => {
                   const gallery = getProductGallery(activeProduct);
@@ -1050,12 +1050,13 @@ export default function StorePage() {
               transition={{ type: "tween", ease: [0.32, 0.72, 0, 1], duration: 0.3 }}
               className="fixed inset-0 bg-white z-[100002] flex flex-col text-black overflow-hidden overscroll-contain"
             >
-              {/* App-like Top Sticky Header Bar */}
+              {/* App-like Top Sticky Header Bar - Single Back Arrow Icon */}
               <div className="sticky top-0 bg-white px-5 py-3.5 flex items-center justify-between z-10 shadow-none border-0">
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(false)}
                   className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer border-0 shadow-none"
+                  title="Back"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
@@ -1067,13 +1068,7 @@ export default function StorePage() {
                     {totalCartItems} {totalCartItems === 1 ? "Item" : "Items"} Selected
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCartOpen(false)}
-                  className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer border-0 shadow-none"
-                >
-                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
-                </button>
+                <div className="w-9 h-9" />
               </div>
 
               {/* Scrollable Cart Items List */}
