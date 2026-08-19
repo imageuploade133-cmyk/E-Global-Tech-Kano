@@ -684,20 +684,21 @@ export default function StorePage() {
                       style={{ borderColor: rvBorderColor }}
                       className="w-36 flex-shrink-0 bg-white border rounded-2xl p-2.5 space-y-2 cursor-pointer transition-all shadow-3xs"
                     >
-                    <div className="w-full h-24 rounded-xl bg-gray-50 border border-gray-100 relative overflow-hidden flex items-center justify-center">
-                      {rv.imageUrl ? (
-                        <img src={rv.imageUrl} alt={rv.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="material-symbols-outlined text-[24px] text-gray-300">storefront</span>
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="font-hanken font-bold text-[11px] text-black uppercase line-clamp-1 leading-tight">
-                        {rv.title}
-                      </h4>
-                      <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
-                        ₦{rv.price.toLocaleString()}
-                      </p>
+                      <div className="w-full h-24 rounded-xl bg-gray-50 border border-gray-100 relative overflow-hidden flex items-center justify-center">
+                        {rv.imageUrl ? (
+                          <img src={rv.imageUrl} alt={rv.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[24px] text-gray-300">storefront</span>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-hanken font-bold text-[11px] text-black uppercase line-clamp-1 leading-tight">
+                          {rv.title}
+                        </h4>
+                        <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
+                          ₦{rv.price.toLocaleString()}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}
