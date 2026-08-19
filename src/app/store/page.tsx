@@ -470,13 +470,17 @@ export default function StorePage() {
               exit: { opacity: 0 },
             };
 
+            const bannerBorderEnabled = settings.bannerBorderEnabled;
+            const bannerBorderColor = settings.bannerBorderColor || "#FC7A00";
+
             return (
               <div
-                className="relative w-full rounded-2xl overflow-hidden shadow-xs border-0 transition-all duration-300"
+                className="relative w-full rounded-2xl overflow-hidden shadow-xs transition-all duration-300"
                 style={{
                   height: `${mobileH}px`,
                   marginBottom: `${mb}px`,
                   backgroundColor: customBg,
+                  border: bannerBorderEnabled ? `1.5px solid ${bannerBorderColor}` : "0",
                 }}
               >
                 <AnimatePresence mode="wait">
@@ -691,13 +695,31 @@ export default function StorePage() {
             </motion.div>
           ) : (
             <div className="grid grid-cols-2 gap-3.5">
-              {filteredItems.map((item) => (
-                <motion.div
-                  key={item.id}
-                  whileTap={{ scale: 0.98 }}
-                  className="bg-white rounded-2xl p-3.5 flex flex-col justify-between space-y-3 shadow-xs hover:shadow-md transition-all cursor-pointer group relative border-0"
-                  onClick={() => handleOpenProductModal(item)}
-                >
+              {filteredItems.map((item) => {
+                const isGradient = settings.enableGradientBorder && !settings.hideBorders;
+                const isCustomBorder = settings.borderColor && !settings.hideBorders && !isGradient;
+                const gradStart = settings.gradientColorStart || "#FC7A00";
+                const gradEnd = settings.gradientColorEnd || "#0b513d";
+
+                return (
+                  <motion.div
+                    key={item.id}
+                    whileTap={{ scale: 0.98 }}
+                    style={
+                      isGradient
+                        ? {
+                            background: `linear-gradient(white, white) padding-box, linear-gradient(135deg, ${gradStart}, ${gradEnd}) border-box`,
+                            border: "1.5px solid transparent",
+                          }
+                        : isCustomBorder
+                        ? { border: `1.5px solid ${settings.borderColor}` }
+                        : {}
+                    }
+                    className={`bg-white rounded-2xl p-3.5 flex flex-col justify-between space-y-3 shadow-xs hover:shadow-md transition-all cursor-pointer group relative ${
+                      settings.hideBorders ? "border-0" : ""
+                    }`}
+                    onClick={() => handleOpenProductModal(item)}
+                  >
                   <div className="space-y-2.5">
                     {/* Product Image Thumbnail - Keeps full image inside card without cutting off */}
                     <div className="w-full h-28 rounded-xl bg-gray-50 overflow-hidden relative flex items-center justify-center border-0 p-2">
@@ -763,8 +785,9 @@ export default function StorePage() {
                       </button>
                     </div>
                   </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </main>

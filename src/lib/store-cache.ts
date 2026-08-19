@@ -47,6 +47,9 @@ export interface StoreSettings {
   storeLogoUrl?: string;
   borderColor?: string;
   hideBorders?: boolean;
+  enableGradientBorder?: boolean;
+  gradientColorStart?: string;
+  gradientColorEnd?: string;
   orderStatuses?: string[];
   searchBarMarginTop?: number;
   bannerOverlayFadeEnabled?: boolean;

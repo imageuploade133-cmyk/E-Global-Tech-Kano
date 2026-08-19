@@ -48,6 +48,9 @@ interface StoreSettings {
   storeLogoUrl?: string;
   borderColor?: string;
   hideBorders?: boolean;
+  enableGradientBorder?: boolean;
+  gradientColorStart?: string;
+  gradientColorEnd?: string;
   orderStatuses?: string[];
   searchBarMarginTop?: number;
   bannerOverlayFadeEnabled?: boolean;
@@ -140,6 +143,9 @@ export default function CpanelStorePage() {
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [hideBorders, setHideBorders] = useState(false);
+  const [enableGradientBorder, setEnableGradientBorder] = useState(false);
+  const [gradientColorStart, setGradientColorStart] = useState("#FC7A00");
+  const [gradientColorEnd, setGradientColorEnd] = useState("#0b513d");
   const [orderStatuses, setOrderStatuses] = useState<string[]>([
     "Pending",
     "Processing",
@@ -266,6 +272,9 @@ export default function CpanelStorePage() {
           setStoreLogoUrl(data.settings.storeLogoUrl || "");
           setBorderColor(data.settings.borderColor || "#FC7A00");
           setHideBorders(Boolean(data.settings.hideBorders));
+          setEnableGradientBorder(Boolean(data.settings.enableGradientBorder));
+          setGradientColorStart(data.settings.gradientColorStart || "#FC7A00");
+          setGradientColorEnd(data.settings.gradientColorEnd || "#0b513d");
           if (Array.isArray(data.settings.orderStatuses)) {
             setOrderStatuses(data.settings.orderStatuses);
           }
@@ -343,6 +352,9 @@ export default function CpanelStorePage() {
             storeLogoUrl,
             borderColor,
             hideBorders,
+            enableGradientBorder,
+            gradientColorStart,
+            gradientColorEnd,
             orderStatuses,
             searchBarMarginTop,
             bannerOverlayFadeEnabled,
@@ -1311,6 +1323,62 @@ export default function CpanelStorePage() {
                       {bannerShowIndicators ? "Dots Visible" : "Dots Hidden"}
                     </button>
                   </div>
+
+                  {/* Banner Background Color & Border Controls */}
+                  <div className="space-y-2 pt-2 border-t border-gray-200/40">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block">Banner Background Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={bannerBackgroundColor}
+                        onChange={(e) => setBannerBackgroundColor(e.target.value)}
+                        className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
+                      />
+                      <input
+                        type="text"
+                        value={bannerBackgroundColor}
+                        onChange={(e) => setBannerBackgroundColor(e.target.value)}
+                        placeholder="#111827"
+                        className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">Banner Border</span>
+                      <button
+                        type="button"
+                        onClick={() => setBannerBorderEnabled(!bannerBorderEnabled)}
+                        className={cn(
+                          "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
+                          bannerBorderEnabled
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                            : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
+                        )}
+                      >
+                        {bannerBorderEnabled ? "Border Active" : "Border Disabled"}
+                      </button>
+                    </div>
+
+                    {bannerBorderEnabled && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="color"
+                          value={bannerBorderColor}
+                          onChange={(e) => setBannerBorderColor(e.target.value)}
+                          className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
+                        />
+                        <input
+                          type="text"
+                          value={bannerBorderColor}
+                          onChange={(e) => setBannerBorderColor(e.target.value)}
+                          placeholder="#FC7A00"
+                          className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Store Name Input */}
@@ -1368,53 +1436,116 @@ export default function CpanelStorePage() {
                   </div>
                 </div>
 
-                {/* Product Border Color */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Product Card Border Color</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={borderColor}
-                      onChange={(e) => setBorderColor(e.target.value)}
-                      className="w-12 h-10 rounded-xl border border-gray-300 p-1 cursor-pointer bg-white"
-                    />
-                    <input
-                      type="text"
-                      value={borderColor}
-                      onChange={(e) => setBorderColor(e.target.value)}
-                      placeholder="#FC7A00"
-                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-mono font-bold uppercase outline-none border transition-all", inputClass)}
-                    />
+                {/* Product Border Color & Gradient Settings */}
+                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Product Card Border Style</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Configure single color or multi-color gradient border</span>
+                    </div>
                   </div>
 
-                  {/* Preset Colors */}
-                  <div className="flex items-center gap-2 pt-1">
-                    {["#FC7A00", "#000000", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6", "#E5E7EB"].map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setBorderColor(c)}
-                        className="w-6 h-6 rounded-full border-2 border-white shadow-xs cursor-pointer transition-transform hover:scale-110"
-                        style={{ backgroundColor: c }}
-                        title={c}
-                      />
-                    ))}
-                  </div>
+                  {/* Enable Gradient Border Toggle */}
+                  <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200/50 bg-white dark:bg-gray-800 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={enableGradientBorder}
+                      onChange={(e) => setEnableGradientBorder(e.target.checked)}
+                      className="w-4 h-4 text-[#FC7A00] rounded"
+                    />
+                    <div>
+                      <span className="text-xs font-bold uppercase text-gray-800 dark:text-gray-200 block">Enable Gradient Border</span>
+                      <span className="text-[9.5px] text-gray-400 font-medium">Renders product card borders with a multi-color gradient</span>
+                    </div>
+                  </label>
+
+                  {enableGradientBorder ? (
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400 block">Gradient Start Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={gradientColorStart}
+                            onChange={(e) => setGradientColorStart(e.target.value)}
+                            className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
+                          />
+                          <input
+                            type="text"
+                            value={gradientColorStart}
+                            onChange={(e) => setGradientColorStart(e.target.value)}
+                            className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400 block">Gradient End Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={gradientColorEnd}
+                            onChange={(e) => setGradientColorEnd(e.target.value)}
+                            className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
+                          />
+                          <input
+                            type="text"
+                            value={gradientColorEnd}
+                            onChange={(e) => setGradientColorEnd(e.target.value)}
+                            className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 pt-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 block">Solid Border Color</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={borderColor}
+                          onChange={(e) => setBorderColor(e.target.value)}
+                          className="w-12 h-10 rounded-xl border border-gray-300 p-1 cursor-pointer bg-white"
+                        />
+                        <input
+                          type="text"
+                          value={borderColor}
+                          onChange={(e) => setBorderColor(e.target.value)}
+                          placeholder="#FC7A00"
+                          className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-mono font-bold uppercase outline-none border transition-all", inputClass)}
+                        />
+                      </div>
+
+                      {/* Preset Colors */}
+                      <div className="flex items-center gap-2 pt-1">
+                        {["#FC7A00", "#000000", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6", "#E5E7EB"].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setBorderColor(c)}
+                            className="w-6 h-6 rounded-full border-2 border-white shadow-xs cursor-pointer transition-transform hover:scale-110"
+                            style={{ backgroundColor: c }}
+                            title={c}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hide Product Borders Toggle */}
+                  <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200/50 bg-white dark:bg-gray-800 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={hideBorders}
+                      onChange={(e) => setHideBorders(e.target.checked)}
+                      className="w-4 h-4 text-[#FC7A00] rounded"
+                    />
+                    <div>
+                      <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Hide Card Borders Completely</span>
+                      <span className="text-[9.5px] text-gray-400 font-medium">When checked, product cards render without any border line.</span>
+                    </div>
+                  </label>
                 </div>
-
-                {/* Hide Product Borders Toggle */}
-                <label className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-200/50 bg-gray-50/50 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={hideBorders}
-                    onChange={(e) => setHideBorders(e.target.checked)}
-                    className="w-4 h-4 text-[#FC7A00] rounded"
-                  />
-                  <div>
-                    <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Hide Card Borders Completely</span>
-                    <span className="text-[10px] text-gray-400 font-medium">When checked, storefront product cards render without any border line.</span>
-                  </div>
-                </label>
 
                 {/* Order Processing Statuses Manager */}
                 <div className="space-y-3 pt-4 border-t border-gray-200/40">

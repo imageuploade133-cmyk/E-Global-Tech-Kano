@@ -7,6 +7,9 @@ const DEFAULT_SETTINGS = {
   storeLogoUrl: "",
   borderColor: "#FC7A00",
   hideBorders: false,
+  enableGradientBorder: false,
+  gradientColorStart: "#FC7A00",
+  gradientColorEnd: "#0b513d",
   orderStatuses: ["Pending", "Processing", "Shipped", "Delivered", "Refunded", "Canceled"],
   searchBarMarginTop: 0,
   bannerOverlayFadeEnabled: true,
@@ -195,6 +198,9 @@ export async function POST(req: Request) {
         storeLogoUrl: settings.storeLogoUrl !== undefined ? String(settings.storeLogoUrl).trim() : currentSettings.storeLogoUrl,
         borderColor: (settings.borderColor || currentSettings.borderColor).trim(),
         hideBorders: settings.hideBorders !== undefined ? Boolean(settings.hideBorders) : currentSettings.hideBorders,
+        enableGradientBorder: settings.enableGradientBorder !== undefined ? Boolean(settings.enableGradientBorder) : currentSettings.enableGradientBorder,
+        gradientColorStart: settings.gradientColorStart ? String(settings.gradientColorStart).trim() : currentSettings.gradientColorStart,
+        gradientColorEnd: settings.gradientColorEnd ? String(settings.gradientColorEnd).trim() : currentSettings.gradientColorEnd,
         orderStatuses: Array.isArray(settings.orderStatuses) && settings.orderStatuses.length > 0
           ? settings.orderStatuses.map((s: string) => s.trim()).filter(Boolean)
           : currentSettings.orderStatuses,
