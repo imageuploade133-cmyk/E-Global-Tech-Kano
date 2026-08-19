@@ -36,6 +36,12 @@ export default function StorePage() {
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
+  // Full screen search modal state with paginated 20-item lazy load
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [searchModalQuery, setSearchModalQuery] = useState("");
+  const [searchModalCategory, setSearchModalCategory] = useState("ALL");
+  const [visibleSearchLimit, setVisibleSearchLimit] = useState(20);
+
   // Full screen product modal state & gallery slider index
   const [activeProduct, setActiveProduct] = useState<StoreItem | null>(null);
   const [productQuantity, setProductQuantity] = useState(1);
@@ -154,7 +160,7 @@ export default function StorePage() {
 
   // Prevent background body scrolling while any store drawer/modal is open to prevent scroll hooking/hanging
   useEffect(() => {
-    if (activeProduct || isCartOpen || isMyOrdersOpen || confirmedOrder) {
+    if (activeProduct || isCartOpen || isMyOrdersOpen || confirmedOrder || isSearchModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -162,7 +168,7 @@ export default function StorePage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [activeProduct, isCartOpen, isMyOrdersOpen, confirmedOrder]);
+  }, [activeProduct, isCartOpen, isMyOrdersOpen, confirmedOrder, isSearchModalOpen]);
 
   // Load Cart from localStorage on mount
   useEffect(() => {
@@ -536,11 +542,17 @@ export default function StorePage() {
             );
           })()}
 
-          {/* Robust Search Input with Custom Top Space */}
+          {/* Robust Search Input with Custom Top Space - Opens Full Screen Search Drawer */}
           <div
-            className="relative w-full mb-4 transition-all duration-300"
+            className="relative w-full mb-4 transition-all duration-300 cursor-pointer"
             style={{
               marginTop: `${settings.searchBarMarginTop || 0}px`,
+            }}
+            onClick={() => {
+              setSearchModalQuery(searchQuery);
+              setSearchModalCategory(activeCategory);
+              setVisibleSearchLimit(20);
+              setIsSearchModalOpen(true);
             }}
           >
             <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
@@ -548,15 +560,18 @@ export default function StorePage() {
             </span>
             <input
               type="text"
+              readOnly
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search store hardware, memberships, gear..."
-              className="w-full bg-gray-100/90 focus:bg-gray-150 rounded-2xl pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none transition-all"
+              className="w-full bg-gray-100/90 hover:bg-gray-150 rounded-2xl pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none transition-all cursor-pointer"
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchQuery("");
+                }}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
@@ -845,8 +860,9 @@ export default function StorePage() {
                   type="button"
                   onClick={() => setIsCartOpen(true)}
                   className="relative w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-800 active:scale-90 transition-all cursor-pointer border-0 shadow-none"
+                  title="Shopping Cart"
                 >
-                  <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
+                  <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
                   {totalCartItems > 0 && (
                     <span className="absolute -top-1 -right-1 bg-[#FC7A00] text-white text-[8.5px] font-black w-4 h-4 rounded-full flex items-center justify-center border-0">
                       {totalCartItems}
@@ -855,8 +871,8 @@ export default function StorePage() {
                 </button>
               </div>
 
-              {/* Full Screen Borderless Showcase Body with ample bottom space */}
-              <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-56 overscroll-contain">
+              {/* Full Screen Borderless Showcase Body with ample bottom space for "Products You May Like" */}
+              <div className="flex-1 overflow-y-auto p-4 min-[375px]:p-5 max-w-md mx-auto w-full space-y-5 custom-scrollbar pb-72 overscroll-contain">
                 {/* Hero Showcase Floating Card */}
                 {(() => {
                   const gallery = getProductGallery(activeProduct);
@@ -1353,6 +1369,172 @@ export default function StorePage() {
                     </div>
                   ))
                 )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Full-Screen Paginated Search Modal (Lazy loads 20 items at a time to minimize reads/renders) */}
+        <AnimatePresence>
+          {isSearchModalOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "tween", ease: [0.32, 0.72, 0, 1], duration: 0.3 }}
+              className="fixed inset-0 bg-white z-[100005] flex flex-col text-black overflow-hidden overscroll-contain"
+            >
+              {/* Sticky Top Header Bar */}
+              <div className="sticky top-0 bg-white px-5 py-3.5 flex items-center justify-between gap-3 z-10 shadow-none border-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(searchModalQuery);
+                    setActiveCategory(searchModalCategory);
+                    setIsSearchModalOpen(false);
+                  }}
+                  className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer border-0 shadow-none flex-shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+                </button>
+
+                {/* Live Search Input */}
+                <div className="relative flex-1">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={searchModalQuery}
+                    onChange={(e) => {
+                      setSearchModalQuery(e.target.value);
+                      setVisibleSearchLimit(20);
+                    }}
+                    placeholder="Search store products, gear, hardware..."
+                    className="w-full bg-gray-100 focus:bg-gray-150 rounded-2xl pl-10 pr-9 py-2.5 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none"
+                  />
+                  {searchModalQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchModalQuery("");
+                        setVisibleSearchLimit(20);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Category Filter Chips in Search Drawer */}
+              <div className="px-5 py-2 flex gap-2 overflow-x-auto no-scrollbar border-b border-gray-100 flex-shrink-0 select-none">
+                {categories.filter((c) => !c.isHidden).map((cat) => {
+                  const isActive = searchModalCategory.toLowerCase() === cat.name.toLowerCase();
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setSearchModalCategory(cat.name);
+                        setVisibleSearchLimit(20);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border-0 ${
+                        isActive
+                          ? "bg-[#FC7A00] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Scrollable Paginated Search Results List (20 items initially) */}
+              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-24 overscroll-contain">
+                {(() => {
+                  const q = searchModalQuery.toLowerCase().trim();
+                  const results = items.filter((item) => {
+                    const matchesCategory =
+                      searchModalCategory === "ALL" || item.category.toLowerCase() === searchModalCategory.toLowerCase();
+                    const matchesQuery =
+                      !q ||
+                      item.title.toLowerCase().includes(q) ||
+                      item.description.toLowerCase().includes(q) ||
+                      item.category.toLowerCase().includes(q);
+                    return matchesCategory && matchesQuery;
+                  });
+
+                  const paginatedResults = results.slice(0, visibleSearchLimit);
+
+                  if (results.length === 0) {
+                    return (
+                      <div className="py-16 text-center space-y-3">
+                        <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto text-gray-300">
+                          <span className="material-symbols-outlined text-[32px]">search_off</span>
+                        </div>
+                        <h3 className="font-bodoni font-bold text-base text-black">No Products Found</h3>
+                        <p className="font-hanken text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                          {q
+                            ? `No store items matched "${q}". Try searching another keyword.`
+                            : "No products match the selected category filter."}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
+                        Showing {paginatedResults.length} of {results.length} matched products
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        {paginatedResults.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              handleOpenProductModal(item);
+                            }}
+                            className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-between space-y-2.5 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
+                          >
+                            <div className="w-full h-24 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-2 border-0">
+                              {item.imageUrl ? (
+                                <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
+                              ) : (
+                                <span className="material-symbols-outlined text-[28px] text-gray-300">storefront</span>
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
+                                {item.title}
+                              </h4>
+                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
+                                ₦{item.price.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Load More Button for requesting 20 more items on demand */}
+                      {results.length > visibleSearchLimit && (
+                        <div className="pt-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setVisibleSearchLimit((prev) => prev + 20)}
+                            className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
+                          >
+                            Load More Products ({results.length - visibleSearchLimit} remaining)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </motion.div>
           )}
