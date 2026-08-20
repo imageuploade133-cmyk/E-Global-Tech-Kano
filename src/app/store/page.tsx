@@ -371,8 +371,8 @@ export default function StorePage() {
   return (
     <RouteGuard>
       <div id="store-page-root" className="min-h-dvh bg-background text-on-background pb-32">
-        {/* Sticky App Top Bar - Pinned at top with Modern UI Icons */}
-        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2 px-margin-mobile border-b border-gray-150/80 shadow-xs">
+        {/* Sticky App Top Bar - Borderless */}
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2.5 px-margin-mobile border-0 shadow-none">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               {settings.storeLogoUrl && (
@@ -424,7 +424,7 @@ export default function StorePage() {
                   favorite
                 </span>
                 {wishlist.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-0 shadow-none">
                     {wishlist.length}
                   </span>
                 )}
@@ -469,7 +469,7 @@ export default function StorePage() {
 
           {/* Dynamic Store Slideshow Banners */}
           {slides.length > 0 && (
-            <div className="relative w-full h-44 rounded-2xl overflow-hidden mb-5 border border-gray-150 shadow-xs bg-black">
+            <div className="relative w-full h-44 rounded-2xl overflow-hidden mb-5 border-0 shadow-xs bg-black">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={slides[activeSlideIndex]?.id || activeSlideIndex}
@@ -562,10 +562,10 @@ export default function StorePage() {
                   key={cat.id}
                   type="button"
                   onClick={() => setActiveCategory(cat.name)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border-0 ${
                     isActive
-                      ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-xs"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[#FC7A00]/50"
+                      ? "bg-[#FC7A00] text-white shadow-xs"
+                      : "bg-white text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {cat.imageUrl ? (
@@ -635,9 +635,9 @@ export default function StorePage() {
                       key={rv.id}
                       onClick={() => handleOpenProductPage(rv)}
                       style={{ borderColor: rvBorderColor }}
-                      className="w-36 flex-shrink-0 bg-white border rounded-2xl p-2.5 space-y-2 cursor-pointer transition-all shadow-3xs hover:shadow-xs"
+                      className="w-36 flex-shrink-0 bg-white border-0 rounded-2xl p-2.5 space-y-2 cursor-pointer transition-all shadow-3xs hover:shadow-xs"
                     >
-                      <div className="w-full h-24 rounded-xl bg-gray-50 border border-gray-100 relative overflow-hidden flex items-center justify-center p-1">
+                      <div className="w-full h-24 rounded-xl bg-gray-50 border-0 relative overflow-hidden flex items-center justify-center p-1">
                         {rv.imageUrl ? (
                           <img src={rv.imageUrl} alt={rv.title} className="w-full h-full object-contain p-1" />
                         ) : (
@@ -666,14 +666,14 @@ export default function StorePage() {
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl border border-gray-100 p-3.5 space-y-3 shadow-3xs animate-pulse"
+                  className="bg-white rounded-2xl border-0 p-3.5 space-y-3 shadow-3xs animate-pulse"
                 >
                   <div className="w-full h-28 rounded-xl bg-gray-100 skeleton-shimmer" />
                   <div className="space-y-2">
                     <div className="h-3.5 bg-gray-200 rounded w-3/4 skeleton-shimmer" />
                     <div className="h-2.5 bg-gray-100 rounded w-full skeleton-shimmer" />
                   </div>
-                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                  <div className="pt-2 border-0 flex items-center justify-between">
                     <div className="h-4 bg-gray-200 rounded w-12 skeleton-shimmer" />
                     <div className="h-7 bg-gray-200 rounded-xl w-16 skeleton-shimmer" />
                   </div>
@@ -685,9 +685,9 @@ export default function StorePage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
-              className="bg-white rounded-[24px] border border-gray-100 p-8 shadow-xs flex flex-col items-center text-center justify-center min-h-[260px]"
+              className="bg-white rounded-[24px] border-0 p-8 shadow-xs flex flex-col items-center text-center justify-center min-h-[260px]"
             >
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] flex items-center justify-center mb-4">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[32px]">
                   storefront
                 </span>
@@ -724,14 +724,14 @@ export default function StorePage() {
                           }
                         : {}),
                     }}
-                    className={`bg-white rounded-2xl p-3 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative border ${
-                      hideBorders ? "border-transparent" : ""
+                    className={`bg-white rounded-2xl p-3 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative ${
+                      hideBorders ? "border-0" : "border"
                     }`}
                     onClick={() => handleOpenProductPage(item)}
                   >
                     <div className="space-y-2">
                       {/* Product Image Thumbnail */}
-                      <div className="w-full h-28 min-[375px]:h-32 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden relative flex items-center justify-center p-1">
+                      <div className="w-full h-28 min-[375px]:h-32 rounded-xl bg-gray-50 border-0 overflow-hidden relative flex items-center justify-center p-1">
                         {item.imageUrl ? (
                           <Image
                             src={item.imageUrl}
@@ -793,7 +793,7 @@ export default function StorePage() {
                             e.stopPropagation();
                             handleAddToCart(item, 1);
                           }}
-                          className="p-2.5 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-900 rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                          className="p-2.5 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-900 rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center border-0 shadow-none"
                           title="Add to Cart"
                         >
                           <span className="material-symbols-outlined text-[16px] text-orange-600">add_shopping_cart</span>
@@ -808,7 +808,7 @@ export default function StorePage() {
                             handleAddToCart(item, 1);
                             setIsCartOpen(true);
                           }}
-                          className="flex-1 py-2 bg-gradient-to-r from-[#FC7A00] to-[#E06600] hover:from-[#E06600] hover:to-[#FC7A00] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs"
+                          className="flex-1 py-2 bg-gradient-to-r from-[#FC7A00] to-[#E06600] hover:from-[#E06600] hover:to-[#FC7A00] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs border-0"
                         >
                           <span className="material-symbols-outlined text-[14px]">bolt</span>
                           <span>Buy Now</span>
@@ -830,11 +830,11 @@ export default function StorePage() {
             exit={{ scale: 0, opacity: 0 }}
             type="button"
             onClick={() => setIsCartOpen(true)}
-            className="fixed bottom-24 right-4 z-[90] px-4 py-3 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-full shadow-lg border border-white/20 flex items-center gap-2.5 active:scale-95 transition-all cursor-pointer"
+            className="fixed bottom-24 right-4 z-[90] px-4 py-3 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-full shadow-lg border-0 flex items-center gap-2.5 active:scale-95 transition-all cursor-pointer"
           >
             <div className="relative">
               <span className="material-symbols-outlined text-[22px]">shopping_bag</span>
-              <span className="absolute -top-1 -right-2.5 bg-black text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border border-white">
+              <span className="absolute -top-1 -right-2.5 bg-black text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border-0">
                 {totalCartItems}
               </span>
             </div>
@@ -844,7 +844,7 @@ export default function StorePage() {
           </motion.button>
         )}
 
-        {/* Wishlist Full Screen Modal */}
+        {/* Wishlist Full Screen Modal - Borderless */}
         <AnimatePresence>
           {isWishlistModalOpen && (
             <motion.div
@@ -854,7 +854,7 @@ export default function StorePage() {
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed inset-0 bg-white z-[100008] flex flex-col text-black overflow-hidden overscroll-contain"
             >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-b border-gray-150">
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-red-500 text-[22px]">favorite</span>
                   <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
@@ -864,7 +864,7 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setIsWishlistModalOpen(false)}
-                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[18px] font-bold">close</span>
                 </button>
@@ -873,7 +873,7 @@ export default function StorePage() {
               <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-24 overscroll-contain">
                 {wishlist.length === 0 ? (
                   <div className="py-20 flex flex-col items-center text-center space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-400">
+                    <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-400">
                       <span className="material-symbols-outlined text-[36px]">favorite_border</span>
                     </div>
                     <h3 className="font-bodoni font-bold text-base text-black">Your Wishlist is Empty</h3>
@@ -895,7 +895,7 @@ export default function StorePage() {
                             setIsWishlistModalOpen(false);
                             handleOpenProductPage(item);
                           }}
-                          className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-between space-y-2.5 cursor-pointer hover:bg-gray-100 transition-all border border-gray-200/80 shadow-3xs"
+                          className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-between space-y-2.5 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-3xs"
                         >
                           <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
                             {item.imageUrl ? (
@@ -906,7 +906,7 @@ export default function StorePage() {
                             <button
                               type="button"
                               onClick={(e) => handleToggleWishlistProduct(e, item)}
-                              className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center shadow-xs"
+                              className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center shadow-xs border-0"
                               title="Remove"
                             >
                               <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: '"FILL" 1' }}>
@@ -930,7 +930,7 @@ export default function StorePage() {
                               e.stopPropagation();
                               handleAddToCart(item, 1);
                             }}
-                            className="w-full py-2 bg-[#FC7A00] text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs"
+                            className="w-full py-2 bg-[#FC7A00] text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs border-0"
                           >
                             <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
                             <span>Add to Cart</span>
@@ -945,7 +945,7 @@ export default function StorePage() {
           )}
         </AnimatePresence>
 
-        {/* Full Screen Shopping Cart Modal */}
+        {/* Full Screen Shopping Cart Modal - Borderless */}
         <AnimatePresence>
           {isCartOpen && (
             <motion.div
@@ -955,11 +955,11 @@ export default function StorePage() {
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed inset-0 bg-white z-[100002] flex flex-col text-black overflow-hidden"
             >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-b border-gray-150">
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer"
+                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
@@ -974,7 +974,7 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[18px] font-bold">close</span>
                 </button>
@@ -983,7 +983,7 @@ export default function StorePage() {
               <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-36">
                 {cart.length === 0 ? (
                   <div className="py-20 flex flex-col items-center text-center space-y-3">
-                    <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
+                    <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center">
                       <span className="material-symbols-outlined text-[48px] text-gray-300">remove_shopping_cart</span>
                     </div>
                     <h3 className="font-bodoni font-bold text-lg text-black">Your Cart is Empty</h3>
@@ -993,7 +993,7 @@ export default function StorePage() {
                     <button
                       type="button"
                       onClick={() => setIsCartOpen(false)}
-                      className="mt-2 px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-xs"
+                      className="mt-2 px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-xs border-0"
                     >
                       Browse Products
                     </button>
@@ -1002,10 +1002,10 @@ export default function StorePage() {
                   cart.map(({ product, quantity }) => (
                     <div
                       key={product.id}
-                      className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between gap-3 shadow-3xs"
+                      className="p-4 bg-gray-50 border-0 rounded-2xl flex items-center justify-between gap-3 shadow-3xs"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-14 h-14 rounded-xl border border-gray-200 bg-white overflow-hidden relative flex-shrink-0">
+                        <div className="w-14 h-14 rounded-xl border-0 bg-white overflow-hidden relative flex-shrink-0">
                           {product.imageUrl ? (
                             <Image src={product.imageUrl} alt={product.title} fill className="object-cover" unoptimized />
                           ) : (
@@ -1024,7 +1024,7 @@ export default function StorePage() {
                         <button
                           type="button"
                           onClick={() => handleUpdateCartQuantity(product.id, -1)}
-                          className="w-8 h-8 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                          className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
                         >
                           -
                         </button>
@@ -1032,7 +1032,7 @@ export default function StorePage() {
                         <button
                           type="button"
                           onClick={() => handleUpdateCartQuantity(product.id, 1)}
-                          className="w-8 h-8 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                          className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
                         >
                           +
                         </button>
@@ -1051,7 +1051,7 @@ export default function StorePage() {
               </div>
 
               {cart.length > 0 && !isCheckoutStep && (
-                <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-150 space-y-3 shadow-lg z-20 max-w-md mx-auto">
+                <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-0 space-y-3 shadow-lg z-20 max-w-md mx-auto">
                   <div className="flex justify-between items-center text-xs font-bold">
                     <span className="text-gray-500 uppercase tracking-wider">Subtotal ({totalCartItems} items)</span>
                     <span className="font-mono text-lg font-black text-black">₦{cartSubtotal.toLocaleString()}</span>
@@ -1060,7 +1060,7 @@ export default function StorePage() {
                   <button
                     type="button"
                     onClick={() => setIsCheckoutStep(true)}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
                   >
                     <span className="material-symbols-outlined text-[18px]">local_shipping</span>
                     <span>Proceed to Delivery & Payment</span>
@@ -1079,7 +1079,7 @@ export default function StorePage() {
               {isCheckoutStep && (
                 <div className="absolute inset-0 bg-white z-30 p-5 overflow-y-auto flex flex-col justify-between max-w-md mx-auto">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-gray-150">
+                    <div className="flex items-center justify-between pb-3 border-0">
                       <button
                         type="button"
                         onClick={() => setIsCheckoutStep(false)}
@@ -1102,7 +1102,7 @@ export default function StorePage() {
                           value={customerDeliveryName}
                           onChange={(e) => setCustomerDeliveryName(e.target.value)}
                           placeholder="e.g. Captain Jules"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00]"
+                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
                         />
                       </div>
 
@@ -1116,7 +1116,7 @@ export default function StorePage() {
                           value={customerDeliveryPhone}
                           onChange={(e) => setCustomerDeliveryPhone(e.target.value)}
                           placeholder="e.g. 08012345678"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00]"
+                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
                         />
                       </div>
 
@@ -1130,11 +1130,11 @@ export default function StorePage() {
                           value={customerDeliveryAddress}
                           onChange={(e) => setCustomerDeliveryAddress(e.target.value)}
                           placeholder="e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00] resize-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00] resize-none"
                         />
                       </div>
 
-                      <div className="p-3.5 rounded-2xl bg-orange-50/60 border border-orange-200/80 space-y-1">
+                      <div className="p-3.5 rounded-2xl bg-orange-50/60 border-0 space-y-1">
                         <div className="flex items-center justify-between text-xs font-bold text-gray-800">
                           <span>Payment Method:</span>
                           <span className="text-emerald-600 font-black">Main NGN Wallet</span>
@@ -1147,12 +1147,12 @@ export default function StorePage() {
                     </form>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-150 space-y-2">
+                  <div className="pt-4 border-0 space-y-2">
                     <button
                       type="submit"
                       form="checkout-form"
                       disabled={isPlacingOrder}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 border-0"
                     >
                       {isPlacingOrder ? (
                         <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1178,7 +1178,7 @@ export default function StorePage() {
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed inset-0 bg-white z-[100003] flex flex-col text-black overflow-hidden"
             >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-b border-gray-150">
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">receipt_long</span>
                   <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
@@ -1206,13 +1206,13 @@ export default function StorePage() {
                   </div>
                 ) : (
                   myOrders.map((ord) => (
-                    <div key={ord.id} className="p-4 bg-gray-50 border border-gray-150 rounded-2xl space-y-2.5 shadow-3xs">
-                      <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
+                    <div key={ord.id} className="p-4 bg-gray-50 border-0 rounded-2xl space-y-2.5 shadow-3xs">
+                      <div className="flex items-center justify-between pb-2">
                         <div>
                           <span className="font-mono font-black text-xs text-[#FC7A00]">{ord.id}</span>
                           <span className="text-[10px] text-gray-400 block">{new Date(ord.createdAt).toLocaleString()}</span>
                         </div>
-                        <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase border bg-orange-100 text-orange-800 border-orange-300">
+                        <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase border-0 bg-orange-100 text-orange-800">
                           {ord.status}
                         </span>
                       </div>
@@ -1228,7 +1228,7 @@ export default function StorePage() {
                       </div>
 
                       {ord.adminNotes && (
-                        <div className="p-2 rounded-xl bg-orange-50 border border-orange-200/60 text-[10px] text-orange-800 font-medium">
+                        <div className="p-2 rounded-xl bg-orange-50 border-0 text-[10px] text-orange-800 font-medium">
                           <strong>Admin Note:</strong> {ord.adminNotes}
                         </div>
                       )}
@@ -1250,7 +1250,7 @@ export default function StorePage() {
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed inset-0 bg-white z-[100007] flex flex-col text-black overflow-hidden overscroll-contain"
             >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-b border-gray-150">
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
                   <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
@@ -1260,7 +1260,7 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={() => setIsAllRecentlyViewedOpen(false)}
-                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[18px] font-bold">close</span>
                 </button>
@@ -1352,7 +1352,7 @@ export default function StorePage() {
               transition={{ type: "tween", ease: [0.32, 0.72, 0, 1], duration: 0.3 }}
               className="fixed inset-0 bg-white z-[100005] flex flex-col text-black overflow-hidden overscroll-contain"
             >
-              <div className="sticky top-0 bg-white px-5 py-3.5 flex items-center justify-between gap-3 z-10 border-b border-gray-150">
+              <div className="sticky top-0 bg-white px-5 py-3.5 flex items-center justify-between gap-3 z-10 border-0 shadow-none">
                 <button
                   type="button"
                   onClick={() => {
@@ -1395,7 +1395,7 @@ export default function StorePage() {
                 </div>
               </div>
 
-              <div className="px-5 py-2 flex gap-2 overflow-x-auto no-scrollbar border-b border-gray-100 flex-shrink-0 select-none">
+              <div className="px-5 py-2 flex gap-2 overflow-x-auto no-scrollbar border-0 flex-shrink-0 select-none">
                 {categories.filter((c) => !c.isHidden).map((cat) => {
                   const isActive = searchModalCategory.toLowerCase() === cat.name.toLowerCase();
                   return (
@@ -1507,8 +1507,8 @@ export default function StorePage() {
         {/* Confirmed Order Modal Dialog */}
         {confirmedOrder && (
           <div className="fixed inset-0 z-[100004] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="w-full max-w-sm p-6 rounded-3xl bg-white text-black space-y-4 shadow-2xl text-center">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center mx-auto text-emerald-600">
+            <div className="w-full max-w-sm p-6 rounded-3xl bg-white text-black space-y-4 shadow-2xl text-center border-0">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600">
                 <span className="material-symbols-outlined text-[36px]">check_circle</span>
               </div>
 
@@ -1519,7 +1519,7 @@ export default function StorePage() {
                 </p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-gray-50 border border-gray-150 text-left text-xs space-y-1">
+              <div className="p-3 rounded-2xl bg-gray-50 border-0 text-left text-xs space-y-1">
                 <div className="flex justify-between font-bold">
                   <span className="text-gray-500">Amount Charged:</span>
                   <span className="text-emerald-600 font-black">₦{confirmedOrder.totalAmount?.toLocaleString()}</span>
@@ -1537,7 +1537,7 @@ export default function StorePage() {
               <button
                 type="button"
                 onClick={() => setConfirmedOrder(null)}
-                className="w-full py-3 bg-[#FC7A00] text-white rounded-xl font-black text-xs uppercase tracking-wider hover:opacity-90"
+                className="w-full py-3 bg-[#FC7A00] text-white rounded-xl font-black text-xs uppercase tracking-wider hover:opacity-90 border-0"
               >
                 Close & View Store
               </button>
