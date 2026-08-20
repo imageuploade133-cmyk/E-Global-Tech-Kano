@@ -50,6 +50,7 @@ export interface StoreCategory {
 export interface StoreSettings {
   storeName?: string;
   storeLogoUrl?: string;
+  enableProductSharing?: boolean;
   borderColor?: string;
   borderOpacity?: number;
   hideBorders?: boolean;
