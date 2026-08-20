@@ -28,10 +28,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { userData, user } = useAuth();
   const userName = (userData?.name || user?.displayName || "Customer") as string;
 
-  const [product, setProduct] = useState<StoreItem | null>(null);
-  const [allItems, setAllItems] = useState<StoreItem[]>([]);
-  const [settings, setSettings] = useState<StoreSettings>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [product, setProduct] = useState<StoreItem | null>(() => {
+    return getCachedProductDetail(productId);
+  });
+  const [allItems, setAllItems] = useState<StoreItem[]>(() => {
+    const cached = getCachedStore();
+    return cached ? cached.items : [];
+  });
+  const [settings, setSettings] = useState<StoreSettings>(() => {
+    const cached = getCachedStore();
+    return cached ? cached.settings : {};
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    return !getCachedProductDetail(productId);
+  });
 
   // Gallery slider state
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
@@ -81,8 +91,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     let isMounted = true;
 
     async function loadProduct() {
-      setIsLoading(true);
-
       // Check cache first
       const cachedProduct = getCachedProductDetail(productId);
       const cachedStore = getCachedStore();
@@ -100,6 +108,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       }
 
       // If not in cache, fetch from store API
+      setIsLoading(true);
       try {
         const res = await fetch("/api/store");
         const data = await res.json();
@@ -332,16 +341,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !product) {
     return (
       <RouteGuard>
-        <div className="min-h-dvh bg-gray-50 flex items-center justify-center p-4">
-          <div className="text-center space-y-3">
-            <div className="w-12 h-12 border-3 border-[#FC7A00] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="font-hanken font-extrabold text-xs uppercase tracking-wider text-gray-500">
-              Loading Product Details...
-            </p>
-          </div>
+        <div className="min-h-dvh bg-[#F4F5F7] text-black pb-32">
+          {/* Transparent Floating Header Skeleton */}
+          <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md px-4 py-2.5 border-0 shadow-none">
+            <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+              <div className="w-9 h-9 rounded-2xl bg-gray-200 animate-pulse" />
+              <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+              <div className="w-9 h-9 rounded-2xl bg-gray-200 animate-pulse" />
+            </div>
+          </header>
+
+          <main className="max-w-md mx-auto pt-1.5 px-3 min-[375px]:px-4 space-y-3">
+            <div className="w-full h-80 rounded-3xl bg-white p-3 shadow-3xs animate-pulse flex items-center justify-center">
+              <div className="w-full h-full bg-gray-100 rounded-2xl" />
+            </div>
+            <div className="bg-white rounded-3xl p-5 shadow-3xs space-y-3 animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-1/3" />
+              <div className="h-5 bg-gray-200 rounded w-3/4" />
+            </div>
+          </main>
         </div>
       </RouteGuard>
     );
@@ -351,7 +372,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return (
       <RouteGuard>
         <div className="min-h-dvh bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 rounded-3xl bg-orange-50 border border-orange-200 flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-3xl bg-orange-50 border-0 flex items-center justify-center mb-4">
             <span className="material-symbols-outlined text-[36px] text-[#FC7A00]">error_outline</span>
           </div>
           <h2 className="font-bodoni text-xl font-bold text-black mb-2">Product Not Found</h2>
@@ -361,7 +382,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <button
             type="button"
             onClick={() => router.push("/store")}
-            className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm cursor-pointer"
+            className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm cursor-pointer border-0"
           >
             Return to Store
           </button>
@@ -388,13 +409,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   return (
     <RouteGuard>
       <div className="min-h-dvh bg-[#F4F5F7] text-black pb-32">
-        {/* Sticky Top Bar Header with Modern UI/UX Icons */}
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-4 py-3 border-b border-gray-200/80 shadow-xs">
+        {/* Sticky Top Bar Header - Borderless */}
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-4 py-2.5 border-0 shadow-none">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => router.back()}
-              className="w-9 h-9 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 flex items-center justify-center active:scale-90 transition-all cursor-pointer shadow-none"
+              className="w-9 h-9 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 flex items-center justify-center active:scale-90 transition-all cursor-pointer shadow-none border-0"
               title="Go Back"
             >
               <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
@@ -414,7 +435,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <button
                 type="button"
                 onClick={handleShareProduct}
-                className="w-9 h-9 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-none"
+                className="w-9 h-9 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-none border-0"
                 title="Share Product"
               >
                 <span className="material-symbols-outlined text-[19px]">share</span>
@@ -424,10 +445,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <button
                 type="button"
                 onClick={handleToggleWishlist}
-                className={`w-9 h-9 rounded-2xl flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-none border ${
+                className={`w-9 h-9 rounded-2xl flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-none border-0 ${
                   isWishlisted
-                    ? "bg-red-50 text-red-500 border-red-200"
-                    : "bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200"
+                    ? "bg-red-50 text-red-500"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
                 title={isWishlisted ? "Remove from Wishlist" : "Save to Wishlist"}
               >
@@ -443,7 +464,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-9 h-9 rounded-2xl bg-gray-900 text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-xs"
+                className="relative w-9 h-9 rounded-2xl bg-gray-900 text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-xs border-0"
                 title="Shopping Cart"
               >
                 <span className="material-symbols-outlined text-[20px] text-orange-400">
@@ -459,11 +480,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </header>
 
-        {/* Main Content Container */}
-        <main className="max-w-md mx-auto pt-3 px-3 min-[375px]:px-4 space-y-3.5">
+        {/* Main Content Container with Reduced Top Space */}
+        <main className="max-w-md mx-auto pt-1.5 px-3 min-[375px]:px-4 space-y-3">
           {/* Temu-Style Full Page Hero Media Carousel Container */}
-          <div className="bg-white rounded-3xl p-3 shadow-xs space-y-3 border border-gray-200/60">
-            <div className="w-full h-80 min-[375px]:h-96 rounded-2xl bg-gray-50 relative overflow-hidden flex items-center justify-center p-3">
+          <div className="bg-white rounded-3xl p-3 shadow-xs space-y-3 border-0">
+            <div className="w-full h-80 min-[375px]:h-96 rounded-2xl bg-gray-50 relative overflow-hidden flex items-center justify-center p-3 border-0">
               {isShowingVideo ? (
                 renderVideoEmbed(product.videoUrl!)
               ) : activeImgUrl ? (
@@ -480,11 +501,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
               {/* Category & Stock Badges Overlay */}
               <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
-                <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-black/80 text-white backdrop-blur-md">
+                <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-black/80 text-white backdrop-blur-md border-0">
                   {product.category}
                 </span>
                 {discountPercent > 0 && (
-                  <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase bg-red-600 text-white shadow-xs flex items-center gap-0.5">
+                  <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase bg-red-600 text-white shadow-xs flex items-center gap-0.5 border-0">
                     <span className="material-symbols-outlined text-[12px]">local_fire_department</span>
                     {discountPercent}% OFF
                   </span>
@@ -507,8 +528,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       key={idx}
                       type="button"
                       onClick={() => setSelectedGalleryIndex(idx)}
-                      className={`w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-gray-50 border ${
-                        isSelected ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/30 scale-105" : "border-gray-200 opacity-60 hover:opacity-100"
+                      className={`w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-gray-50 border-0 ${
+                        isSelected ? "ring-2 ring-[#FC7A00] scale-105" : "opacity-60 hover:opacity-100"
                       }`}
                     >
                       <img src={img} alt={`Thumbnail ${idx}`} className="w-full h-full object-contain p-1" />
@@ -520,8 +541,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <button
                     type="button"
                     onClick={() => setSelectedGalleryIndex(gallery.length)}
-                    className={`w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-gray-900 text-white flex flex-col items-center justify-center border ${
-                      isShowingVideo ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/30 scale-105" : "border-gray-800 opacity-70 hover:opacity-100"
+                    className={`w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-gray-900 text-white flex flex-col items-center justify-center border-0 ${
+                      isShowingVideo ? "ring-2 ring-[#FC7A00] scale-105" : "opacity-70 hover:opacity-100"
                     }`}
                   >
                     <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">play_circle</span>
@@ -532,8 +553,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          {/* Temu-Style Title, Price & Ratings Section */}
-          <div className="bg-white rounded-3xl p-4 min-[375px]:p-5 shadow-xs space-y-3 border border-gray-200/60">
+          {/* Temu-Style Title, Price & Ratings Section - Borderless */}
+          <div className="bg-white rounded-3xl p-4 min-[375px]:p-5 shadow-xs space-y-3 border-0">
             {/* Price Box */}
             <div className="flex items-baseline justify-between gap-2">
               <div className="flex items-baseline gap-2">
@@ -547,8 +568,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
-              <span className={`px-3 py-1 rounded-full text-[9.5px] font-black uppercase ${
-                product.inStock ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"
+              <span className={`px-3 py-1 rounded-full text-[9.5px] font-black uppercase border-0 ${
+                product.inStock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
               }`}>
                 {product.inStock ? "In Stock • Fast Dispatch" : "Out of Stock"}
               </span>
@@ -560,7 +581,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </h2>
 
             {/* Rating Stars & Sold Counter */}
-            <div className="flex items-center gap-3 pt-1 border-t border-gray-100 text-xs">
+            <div className="flex items-center gap-3 pt-1 border-0 text-xs">
               <div className="flex items-center gap-1 text-amber-500 font-black">
                 <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: '"FILL" 1' }}>
                   star
@@ -577,7 +598,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Trust & Guarantee Badges Card */}
-          <div className="bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-orange-50/80 rounded-3xl p-4 shadow-3xs border border-orange-200/60 space-y-2.5">
+          <div className="bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-orange-50/80 rounded-3xl p-4 shadow-3xs border-0 space-y-2.5">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-[#FC7A00] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
                 <span className="material-symbols-outlined text-[18px]">verified_user</span>
@@ -588,7 +609,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-orange-200/60 text-[10.5px] font-bold text-gray-700">
+            <div className="grid grid-cols-2 gap-2 pt-1 border-0 text-[10.5px] font-bold text-gray-700">
               <div className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
                 <span>Instant Wallet Charge</span>
@@ -601,7 +622,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Quantity Selector Card */}
-          <div className="bg-white rounded-3xl p-4 shadow-xs flex items-center justify-between border border-gray-200/60">
+          <div className="bg-white rounded-3xl p-4 shadow-xs flex items-center justify-between border-0">
             <span className="font-hanken text-xs font-black uppercase text-gray-700">Quantity</span>
             <div className="flex items-center gap-3 bg-gray-100 p-1.5 rounded-2xl">
               <button
@@ -623,8 +644,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Detailed Product Description & Specifications */}
-          <div className="bg-white rounded-3xl p-4 min-[375px]:p-5 shadow-xs space-y-3.5 border border-gray-200/60">
-            <div className="flex items-center gap-2 text-black pb-2 border-b border-gray-150">
+          <div className="bg-white rounded-3xl p-4 min-[375px]:p-5 shadow-xs space-y-3.5 border-0">
+            <div className="flex items-center gap-2 text-black pb-2 border-0">
               <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">description</span>
               <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider text-black">
                 Product Specifications & Overview
@@ -641,7 +662,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <h4 className="font-hanken font-black text-[11px] uppercase tracking-wider text-gray-500">Key Features:</h4>
                 <div className="grid grid-cols-1 gap-2">
                   {product.specs.map((spec, i) => (
-                    <div key={i} className="flex items-center gap-2 p-2.5 rounded-xl bg-gray-50 text-xs font-semibold text-gray-800 border border-gray-150">
+                    <div key={i} className="flex items-center gap-2 p-2.5 rounded-xl bg-gray-50 text-xs font-semibold text-gray-800 border-0">
                       <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check</span>
                       <span>{spec}</span>
                     </div>
@@ -666,9 +687,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <div
                     key={rec.id}
                     onClick={() => router.push(`/store/product/${rec.id}`)}
-                    className="w-36 flex-shrink-0 bg-white shadow-xs rounded-2xl p-2.5 space-y-2 cursor-pointer hover:shadow-md transition-all border border-gray-200/70"
+                    className="w-36 flex-shrink-0 bg-white shadow-xs rounded-2xl p-2.5 space-y-2 cursor-pointer hover:shadow-md transition-all border-0"
                   >
-                    <div className="w-full h-24 rounded-xl bg-gray-50 overflow-hidden relative flex items-center justify-center p-1">
+                    <div className="w-full h-24 rounded-xl bg-gray-50 overflow-hidden relative flex items-center justify-center p-1 border-0">
                       {rec.imageUrl ? (
                         <img src={rec.imageUrl} alt={rec.title} className="w-full h-full object-contain p-1" />
                       ) : (
@@ -690,8 +711,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           )}
         </main>
 
-        {/* Fixed Temu-Style Bottom Action Bar with Modern UI Icons */}
-        <div className="fixed bottom-0 left-0 right-0 p-3 min-[375px]:p-4 bg-white/95 backdrop-blur-xl border-t border-gray-200/90 flex items-center gap-2 min-[375px]:gap-3 shadow-2xl z-50 max-w-md mx-auto">
+        {/* Fixed Temu-Style Bottom Action Bar - Borderless */}
+        <div className="fixed bottom-0 left-0 right-0 p-3 min-[375px]:p-4 bg-white/95 backdrop-blur-xl border-0 flex items-center gap-2 min-[375px]:gap-3 shadow-2xl z-50 max-w-md mx-auto">
           {/* Heart Wishlist Icon Button */}
           <button
             type="button"
@@ -715,7 +736,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             type="button"
             disabled={!product.inStock}
             onClick={() => handleAddToCart(productQuantity)}
-            className="flex-1 py-3.5 bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+            className="flex-1 py-3.5 bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm border-0"
           >
             <span className="material-symbols-outlined text-[18px] text-orange-400">add_shopping_cart</span>
             <span>Add to Cart</span>
@@ -729,7 +750,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               handleAddToCart(productQuantity, false);
               setIsCartOpen(true);
             }}
-            className="flex-1 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20"
+            className="flex-1 py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20 border-0"
           >
             <span className="material-symbols-outlined text-[18px]">bolt</span>
             <span>Buy Now</span>
@@ -746,11 +767,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               transition={{ type: "spring", damping: 28, stiffness: 260 }}
               className="fixed inset-0 bg-white z-[100002] flex flex-col text-black overflow-hidden"
             >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-b border-gray-150">
+              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer"
+                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
@@ -765,7 +786,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <button
                   type="button"
                   onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
                 >
                   <span className="material-symbols-outlined text-[18px] font-bold">close</span>
                 </button>
@@ -774,7 +795,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-36">
                 {cart.length === 0 ? (
                   <div className="py-20 flex flex-col items-center text-center space-y-3">
-                    <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
+                    <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center">
                       <span className="material-symbols-outlined text-[48px] text-gray-300">remove_shopping_cart</span>
                     </div>
                     <h3 className="font-bodoni font-bold text-lg text-black">Your Cart is Empty</h3>
@@ -784,7 +805,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     <button
                       type="button"
                       onClick={() => setIsCartOpen(false)}
-                      className="mt-2 px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all"
+                      className="mt-2 px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all border-0 shadow-xs"
                     >
                       Browse Products
                     </button>
@@ -793,10 +814,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   cart.map(({ product, quantity }) => (
                     <div
                       key={product.id}
-                      className="p-4 bg-gray-50 border border-gray-150 rounded-2xl flex items-center justify-between gap-3 shadow-3xs"
+                      className="p-4 bg-gray-50 border-0 rounded-2xl flex items-center justify-between gap-3 shadow-3xs"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-14 h-14 rounded-xl border border-gray-200 bg-white overflow-hidden relative flex-shrink-0">
+                        <div className="w-14 h-14 rounded-xl border-0 bg-white overflow-hidden relative flex-shrink-0">
                           {product.imageUrl ? (
                             <Image src={product.imageUrl} alt={product.title} fill className="object-cover" unoptimized />
                           ) : (
@@ -815,7 +836,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <button
                           type="button"
                           onClick={() => handleUpdateCartQuantity(product.id, -1)}
-                          className="w-8 h-8 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer"
+                          className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
                         >
                           -
                         </button>
@@ -823,7 +844,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <button
                           type="button"
                           onClick={() => handleUpdateCartQuantity(product.id, 1)}
-                          className="w-8 h-8 rounded-lg border border-gray-300 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer"
+                          className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
                         >
                           +
                         </button>
@@ -842,7 +863,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
 
               {cart.length > 0 && !isCheckoutStep && (
-                <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-t border-gray-150 space-y-3 shadow-lg z-20 max-w-md mx-auto">
+                <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-0 space-y-3 shadow-lg z-20 max-w-md mx-auto">
                   <div className="flex justify-between items-center text-xs font-bold">
                     <span className="text-gray-500 uppercase tracking-wider">Subtotal ({totalCartItems} items)</span>
                     <span className="font-mono text-lg font-black text-black">₦{cartSubtotal.toLocaleString()}</span>
@@ -851,7 +872,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <button
                     type="button"
                     onClick={() => setIsCheckoutStep(true)}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
                   >
                     <span className="material-symbols-outlined text-[18px]">local_shipping</span>
                     <span>Proceed to Delivery & Payment</span>
@@ -862,7 +883,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {isCheckoutStep && (
                 <div className="absolute inset-0 bg-white z-30 p-5 overflow-y-auto flex flex-col justify-between max-w-md mx-auto">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-gray-150">
+                    <div className="flex items-center justify-between pb-3 border-0">
                       <button
                         type="button"
                         onClick={() => setIsCheckoutStep(false)}
@@ -885,7 +906,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           value={customerDeliveryName}
                           onChange={(e) => setCustomerDeliveryName(e.target.value)}
                           placeholder="e.g. Captain Jules"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00]"
+                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
                         />
                       </div>
 
@@ -899,7 +920,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           value={customerDeliveryPhone}
                           onChange={(e) => setCustomerDeliveryPhone(e.target.value)}
                           placeholder="e.g. 08012345678"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00]"
+                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
                         />
                       </div>
 
@@ -913,11 +934,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           value={customerDeliveryAddress}
                           onChange={(e) => setCustomerDeliveryAddress(e.target.value)}
                           placeholder="e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-[#FC7A00] resize-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00] resize-none"
                         />
                       </div>
 
-                      <div className="p-3.5 rounded-2xl bg-orange-50/60 border border-orange-200/80 space-y-1">
+                      <div className="p-3.5 rounded-2xl bg-orange-50/60 border-0 space-y-1">
                         <div className="flex items-center justify-between text-xs font-bold text-gray-800">
                           <span>Payment Method:</span>
                           <span className="text-emerald-600 font-black">Main NGN Wallet</span>
@@ -930,12 +951,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     </form>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-150 space-y-2">
+                  <div className="pt-4 border-0 space-y-2">
                     <button
                       type="submit"
                       form="checkout-form"
                       disabled={isPlacingOrder}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 border-0"
                     >
                       {isPlacingOrder ? (
                         <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -954,8 +975,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {/* Confirmed Order Modal */}
         {confirmedOrder && (
           <div className="fixed inset-0 z-[100004] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="w-full max-w-sm p-6 rounded-3xl bg-white text-black space-y-4 shadow-2xl text-center">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center mx-auto text-emerald-600">
+            <div className="w-full max-w-sm p-6 rounded-3xl bg-white text-black space-y-4 shadow-2xl text-center border-0">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600">
                 <span className="material-symbols-outlined text-[36px]">check_circle</span>
               </div>
 
@@ -966,7 +987,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 </p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-gray-50 border border-gray-150 text-left text-xs space-y-1">
+              <div className="p-3 rounded-2xl bg-gray-50 border-0 text-left text-xs space-y-1">
                 <div className="flex justify-between font-bold">
                   <span className="text-gray-500">Amount Charged:</span>
                   <span className="text-emerald-600 font-black">₦{confirmedOrder.totalAmount?.toLocaleString()}</span>
@@ -987,7 +1008,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   setConfirmedOrder(null);
                   router.push("/store");
                 }}
-                className="w-full py-3 bg-[#FC7A00] text-white rounded-xl font-black text-xs uppercase tracking-wider hover:opacity-90"
+                className="w-full py-3 bg-[#FC7A00] text-white rounded-xl font-black text-xs uppercase tracking-wider hover:opacity-90 border-0"
               >
                 Close & Return to Store
               </button>
