@@ -10,8 +10,13 @@ export interface StoreItem {
   videoUrl?: string;
   autoSlide?: boolean;
   inStock: boolean;
+  stockQuantity?: number;
+  unlimitedStock?: boolean;
   specs?: string[];
   features?: string[];
+  rating?: number;
+  soldCount?: number;
+  originalPrice?: number;
 }
 
 export interface StoreSlide {
@@ -77,6 +82,7 @@ export interface CartItem {
 
 const CACHE_KEY = "e_tech_store_cache";
 const CART_KEY = "e_tech_store_cart";
+const WISHLIST_KEY = "e_tech_store_wishlist";
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache TTL for low Firestore reads
 
 let memoryStoreCache: { items: StoreItem[]; slides: StoreSlide[]; categories: StoreCategory[]; settings: StoreSettings; timestamp: number } | null = null;
@@ -168,4 +174,41 @@ export const saveCart = (cart: CartItem[]) => {
   } catch {
     // Ignore storage errors
   }
+};
+
+export const getSavedWishlist = (): StoreItem[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(WISHLIST_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveWishlist = (wishlist: StoreItem[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlist));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+export const isInWishlist = (productId: string): boolean => {
+  const list = getSavedWishlist();
+  return list.some((item) => item.id === productId);
+};
+
+export const toggleWishlist = (product: StoreItem): boolean => {
+  const list = getSavedWishlist();
+  const exists = list.some((item) => item.id === product.id);
+  let updated: StoreItem[];
+  if (exists) {
+    updated = list.filter((item) => item.id !== product.id);
+  } else {
+    updated = [product, ...list];
+  }
+  saveWishlist(updated);
+  return !exists;
 };
