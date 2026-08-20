@@ -365,7 +365,7 @@ export default function StorePage() {
   return (
     <RouteGuard>
       <div id="store-page-root" className="min-h-dvh bg-background text-on-background pb-32">
-        {/* Sticky App Top Bar - Borderless */}
+        {/* Sticky App Top Bar - Clean Wallet-Style Top Bar UI */}
         <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2.5 px-margin-mobile border-0 shadow-none">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -391,15 +391,16 @@ export default function StorePage() {
               </div>
             </div>
 
+            {/* Wallet Header Uniform Circular Icon Buttons */}
             <div className="flex items-center gap-2 flex-shrink-0">
               {/* Refresh Cache Button */}
               <button
                 type="button"
                 onClick={handleClearStoreCache}
-                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-2xl border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 hover:text-black active:scale-95 transition-all cursor-pointer shadow-none"
+                className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Clear Cache & Refresh Store Data"
               >
-                <span className="material-symbols-outlined text-[19px] min-[375px]:text-[21px]">
+                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]">
                   cached
                 </span>
               </button>
@@ -411,14 +412,14 @@ export default function StorePage() {
                   setWishlist(getSavedWishlist());
                   setIsWishlistModalOpen(true);
                 }}
-                className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-2xl border-0 bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-none"
+                className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Wishlist / Favorites"
               >
-                <span className="material-symbols-outlined text-[19px] min-[375px]:text-[21px]">
+                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-red-500">
                   favorite
                 </span>
                 {wishlist.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-0 shadow-none">
+                  <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center border border-white">
                     {wishlist.length}
                   </span>
                 )}
@@ -431,26 +432,26 @@ export default function StorePage() {
                   fetchMyOrders();
                   setIsMyOrdersOpen(true);
                 }}
-                className="w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-2xl border-0 bg-orange-50 hover:bg-orange-100 text-[#FC7A00] flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-none"
+                className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Order History"
               >
-                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px]" style={{ fontVariationSettings: '"wght" 600' }}>
+                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-[#FC7A00]" style={{ fontVariationSettings: '"wght" 600' }}>
                   receipt_long
                 </span>
               </button>
 
-              {/* Premium Dark Cart Icon Button */}
+              {/* Shopping Cart Icon Button */}
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-9 h-9 min-[375px]:w-10 min-[375px]:h-10 rounded-2xl border-0 bg-gray-900 hover:bg-black text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-sm"
+                className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Shopping Cart"
               >
-                <span className="material-symbols-outlined text-[20px] min-[375px]:text-[22px] text-orange-400">
+                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-gray-800">
                   shopping_bag
                 </span>
                 {totalCartItems > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-[#FC7A00] text-white text-[8.5px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-bounce">
+                  <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-[#FC7A00] text-white text-[8px] font-bold rounded-full flex items-center justify-center border border-white">
                     {totalCartItems}
                   </span>
                 )}
@@ -859,7 +860,7 @@ export default function StorePage() {
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
                 className="relative bg-white rounded-t-[28px] max-h-[85vh] h-[80vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
               >
-                {/* Drag / Drawer Handle */}
+                {/* Drag Handle */}
                 <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
 
                 {/* Header with single close icon */}
@@ -1111,7 +1112,7 @@ export default function StorePage() {
                           className="flex items-center gap-1 text-xs font-bold text-gray-600 hover:text-black border-0"
                         >
                           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                          Back to Items
+                          Back to Cart
                         </button>
                         <span className="text-xs font-black uppercase text-[#FC7A00]">Delivery Profile</span>
                       </div>
