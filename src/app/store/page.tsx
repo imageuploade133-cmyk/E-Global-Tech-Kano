@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import Image from "next/image";
+import BannerSlideshow from "@/components/BannerSlideshow";
 import {
   StoreItem,
   StoreSlide,
@@ -52,7 +53,6 @@ export default function StorePage() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
-  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
   // Full screen search drawer state with paginated 20-item lazy load
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -204,15 +204,6 @@ export default function StorePage() {
     toast.success("Clearing store cache and reloading fresh data...");
     fetchStoreData(true);
   };
-
-  // Slide autoplay interval
-  useEffect(() => {
-    if (slides.length <= 1) return;
-    const timer = setInterval(() => {
-      setActiveSlideIndex((prev) => (prev + 1) % slides.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [slides.length]);
 
   // Open Real Product Detail Page
   const handleOpenProductPage = (item: StoreItem) => {
@@ -425,7 +416,7 @@ export default function StorePage() {
                 )}
               </button>
 
-              {/* Order History Icon Button */}
+              {/* Order History Icon Button - Uses Exact Wallet History Icon */}
               <button
                 type="button"
                 onClick={() => {
@@ -435,8 +426,8 @@ export default function StorePage() {
                 className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Order History"
               >
-                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-[#FC7A00]" style={{ fontVariationSettings: '"wght" 600' }}>
-                  receipt_long
+                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-[#FC7A00]">
+                  history
                 </span>
               </button>
 
@@ -462,54 +453,25 @@ export default function StorePage() {
 
         <main className="max-w-md mx-auto pt-3 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
 
-          {/* Dynamic Store Slideshow Banners */}
-          {slides.length > 0 && (
-            <div className="relative w-full h-44 rounded-2xl overflow-hidden mb-5 border-0 shadow-xs bg-black">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={slides[activeSlideIndex]?.id || activeSlideIndex}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="absolute inset-0 w-full h-full"
-                >
-                  <img
-                    src={slides[activeSlideIndex].imageUrl}
-                    alt={slides[activeSlideIndex].title || "Store Slide"}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-4 flex flex-col justify-end text-left text-white">
-                    {slides[activeSlideIndex].title && (
-                      <h3 className="font-hanken font-extrabold text-sm uppercase tracking-tight text-[#FC7A00]">
-                        {slides[activeSlideIndex].title}
-                      </h3>
-                    )}
-                    {slides[activeSlideIndex].subtitle && (
-                      <p className="font-hanken text-[11px] font-medium text-gray-200 mt-0.5 line-clamp-1">
-                        {slides[activeSlideIndex].subtitle}
-                      </p>
-                    )}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-
-              {/* Indicator dots */}
-              {slides.length > 1 && (
-                <div className="absolute bottom-2 right-3 flex gap-1 z-10">
-                  {slides.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveSlideIndex(idx)}
-                      className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                        activeSlideIndex === idx ? "bg-[#FC7A00] w-4" : "bg-white/50"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Robust Dynamic Store Slideshow - Standardized with Bills & Investment Slideshow */}
+          <BannerSlideshow
+            page="store"
+            fallbackSlides={slides.map((s) => ({
+              id: s.id,
+              imageUrl: s.imageUrl,
+              title: s.title,
+              description: s.subtitle,
+              targetPage: "store" as const,
+              link: s.link,
+              customWidth: s.customWidth,
+              customHeight: s.customHeight,
+              mobileHeight: s.mobileHeight,
+              desktopHeight: s.desktopHeight,
+              marginBottom: s.marginBottom,
+              isCrop: s.isCrop,
+              isHidden: s.isHidden,
+            }))}
+          />
 
           {/* Robust Search Input - Opens Full Screen Search Drawer */}
           <div
@@ -1222,7 +1184,7 @@ export default function StorePage() {
                 {/* Header with single close icon */}
                 <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">receipt_long</span>
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
                     <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
                       My Order History
                     </h2>
