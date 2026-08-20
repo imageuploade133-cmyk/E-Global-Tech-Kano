@@ -53,6 +53,8 @@ interface StoreSettings {
   enableGradientBorder?: boolean;
   gradientColorStart?: string;
   gradientColorEnd?: string;
+  cardBorderRadius?: number;
+  borderWidth?: number;
   recentlyViewedBorderEnabled?: boolean;
   recentlyViewedBorderColor?: string;
   recentlyViewedBorderOpacity?: number;
@@ -152,6 +154,8 @@ export default function CpanelStorePage() {
   const [enableGradientBorder, setEnableGradientBorder] = useState(false);
   const [gradientColorStart, setGradientColorStart] = useState("#FC7A00");
   const [gradientColorEnd, setGradientColorEnd] = useState("#0b513d");
+  const [cardBorderRadius, setCardBorderRadius] = useState<number>(16);
+  const [borderWidth, setBorderWidth] = useState<number>(1);
   const [recentlyViewedBorderEnabled, setRecentlyViewedBorderEnabled] = useState(true);
   const [recentlyViewedBorderColor, setRecentlyViewedBorderColor] = useState("#FC7A00");
   const [recentlyViewedBorderOpacity, setRecentlyViewedBorderOpacity] = useState(20);
@@ -270,6 +274,8 @@ export default function CpanelStorePage() {
           setEnableGradientBorder(Boolean(data.settings.enableGradientBorder));
           setGradientColorStart(data.settings.gradientColorStart || "#FC7A00");
           setGradientColorEnd(data.settings.gradientColorEnd || "#0b513d");
+          setCardBorderRadius(data.settings.cardBorderRadius ?? 16);
+          setBorderWidth(data.settings.borderWidth ?? 1);
           setRecentlyViewedBorderEnabled(data.settings.recentlyViewedBorderEnabled !== false);
           setRecentlyViewedBorderColor(data.settings.recentlyViewedBorderColor || "#FC7A00");
           setRecentlyViewedBorderOpacity(data.settings.recentlyViewedBorderOpacity ?? 20);
@@ -355,6 +361,8 @@ export default function CpanelStorePage() {
             enableGradientBorder,
             gradientColorStart,
             gradientColorEnd,
+            cardBorderRadius,
+            borderWidth,
             recentlyViewedBorderEnabled,
             recentlyViewedBorderColor,
             recentlyViewedBorderOpacity,
@@ -1154,6 +1162,56 @@ export default function CpanelStorePage() {
                     >
                       {enableProductSharing ? "SHARING ON" : "SHARING OFF"}
                     </button>
+                  </div>
+                </div>
+
+                {/* Product Card Border Radius Slider */}
+                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">rounded_corner</span>
+                      Product Card Border Radius ({cardBorderRadius}px)
+                    </label>
+                    <span className="font-mono text-xs font-black text-[#FC7A00]">{cardBorderRadius}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="32"
+                    step="1"
+                    value={cardBorderRadius}
+                    onChange={(e) => setCardBorderRadius(Number(e.target.value))}
+                    className="w-full accent-[#FC7A00] cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 font-bold uppercase">
+                    <span>0px (Square)</span>
+                    <span>16px (Medium)</span>
+                    <span>32px (Fully Rounded)</span>
+                  </div>
+                </div>
+
+                {/* Product Card Border Width Slider */}
+                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">line_weight</span>
+                      Product Card Border Width ({borderWidth}px)
+                    </label>
+                    <span className="font-mono text-xs font-black text-[#FC7A00]">{borderWidth}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    step="1"
+                    value={borderWidth}
+                    onChange={(e) => setBorderWidth(Number(e.target.value))}
+                    className="w-full accent-[#FC7A00] cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 font-bold uppercase">
+                    <span>1px (Thin)</span>
+                    <span>4px (Medium)</span>
+                    <span>8px (Thick)</span>
                   </div>
                 </div>
 
