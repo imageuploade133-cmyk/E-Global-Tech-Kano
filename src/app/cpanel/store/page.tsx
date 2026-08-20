@@ -46,6 +46,7 @@ interface StoreSlide {
 interface StoreSettings {
   storeName?: string;
   storeLogoUrl?: string;
+  enableProductSharing?: boolean;
   borderColor?: string;
   borderOpacity?: number;
   hideBorders?: boolean;
@@ -82,13 +83,12 @@ export default function CpanelStorePage() {
   const [isDark, setIsDark] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [activeTab, setActiveTab] = useState<"items" | "slides" | "settings">("items");
-  const [imgbbApiKey, setImgbbApiKey] = useState("");
 
   // Data states
   const [items, setItems] = useState<StoreItem[]>([]);
   const [slides, setSlides] = useState<StoreSlide[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false });
+  const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false, enableProductSharing: true });
   const [isLoading, setIsLoading] = useState(true);
 
   // Item Form & Edit Modal state
@@ -144,6 +144,7 @@ export default function CpanelStorePage() {
   // Store Settings Form
   const [storeName, setStoreName] = useState("E-Tech Store");
   const [storeLogoUrl, setStoreLogoUrl] = useState("");
+  const [enableProductSharing, setEnableProductSharing] = useState(true);
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [borderOpacity, setBorderOpacity] = useState(100);
@@ -240,22 +241,6 @@ export default function CpanelStorePage() {
     checkSession();
   }, [router]);
 
-  // Fetch Admin App Config for ImgBB Key
-  useEffect(() => {
-    async function fetchConfig() {
-      try {
-        const res = await fetch("/api/admin/config");
-        const data = await res.json();
-        if (data.config?.imgbbApiKey) {
-          setImgbbApiKey(data.config.imgbbApiKey);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch admin config:", err);
-      }
-    }
-    fetchConfig();
-  }, []);
-
   // Fetch Store Data & Dynamic Categories
   const fetchStoreData = async () => {
     setIsLoading(true);
@@ -278,6 +263,7 @@ export default function CpanelStorePage() {
           setSettings(data.settings);
           setStoreName(data.settings.storeName || "E-Tech Store");
           setStoreLogoUrl(data.settings.storeLogoUrl || "");
+          setEnableProductSharing(data.settings.enableProductSharing !== false);
           setBorderColor(data.settings.borderColor || "#FC7A00");
           setBorderOpacity(data.settings.borderOpacity ?? 100);
           setHideBorders(Boolean(data.settings.hideBorders));
@@ -362,6 +348,7 @@ export default function CpanelStorePage() {
           settings: {
             storeName,
             storeLogoUrl,
+            enableProductSharing,
             borderColor,
             borderOpacity,
             hideBorders,
@@ -391,7 +378,7 @@ export default function CpanelStorePage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success("Storefront border settings updated!");
+        toast.success("Storefront settings updated!");
         if (data.settings) setSettings(data.settings);
       } else {
         toast.error(data.error || "Failed to update store settings.");
@@ -728,7 +715,7 @@ export default function CpanelStorePage() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Storefront Manager</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Add products, gear, memberships, customize store slide banners, and configure border styles.
+                Add products, gear, memberships, customize store slide banners, manage product reviews, and configure border styles.
               </p>
             </div>
           </div>
@@ -752,7 +739,7 @@ export default function CpanelStorePage() {
           </div>
         </div>
 
-        {/* Navigation Tabs (Products vs Slides vs Settings) */}
+        {/* Navigation Tabs */}
         <div className="flex items-center gap-3 border-b border-gray-200/40 pb-2 overflow-x-auto no-scrollbar">
           <button
             type="button"
@@ -776,6 +763,16 @@ export default function CpanelStorePage() {
           >
             <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
             <span>Dispatch Orders</span>
+          </Link>
+
+          <Link
+            href="/cpanel/store/reviews"
+            className={cn(
+              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+            )}
+          >
+            <span className="material-symbols-outlined text-[18px]">rate_review</span>
+            <span>Customer Reviews</span>
           </Link>
 
           <Link
@@ -828,7 +825,7 @@ export default function CpanelStorePage() {
           </button>
         </div>
 
-        {/* TAB 1: Store Items Grid with Action Bar */}
+        {/* TAB 1: Store Items Grid */}
         {activeTab === "items" && (
           <div className="space-y-4">
             <div className={cn("p-4 rounded-2xl border flex items-center justify-between gap-4", panelClass)}>
@@ -847,7 +844,6 @@ export default function CpanelStorePage() {
               </button>
             </div>
 
-            {/* Items Grid */}
             <div className="w-full">
               {isLoading ? (
                 <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
@@ -993,7 +989,6 @@ export default function CpanelStorePage() {
                   </div>
                 </div>
 
-                {/* Crop vs Contain Fitting Control */}
                 <div className="space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
                   <label className="text-[10px] font-black uppercase text-orange-500 block">
                     Image Fit & Size (Don&apos;t Cut Off)
@@ -1024,63 +1019,6 @@ export default function CpanelStorePage() {
                       Keep Size (Contain)
                     </button>
                   </div>
-                  <p className="text-[9.5px] text-gray-400 font-medium leading-tight pt-0.5">
-                    {slideIsCrop
-                      ? "Cover mode crops outer edges to fill container without blank gaps."
-                      : "Keep Size retains entire image without cutting off any details."}
-                  </p>
-                </div>
-
-                {/* Bottom Space / Margin Selector */}
-                <div className="space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">
-                      Bottom Space / Margin
-                    </label>
-                    <span className="text-[11px] font-mono font-bold text-[#FC7A00]">
-                      {slideMarginBottom}px
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="2"
-                    value={slideMarginBottom}
-                    onChange={(e) => setSlideMarginBottom(Number(e.target.value))}
-                    className="w-full accent-[#FC7A00] cursor-pointer"
-                  />
-                  <div className="flex items-center justify-between text-[9px] text-gray-400 font-bold uppercase">
-                    <span>0px (No Gap)</span>
-                    <span>50px</span>
-                    <span>100px</span>
-                  </div>
-                </div>
-
-                {/* Heights Customization */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Mobile Height (px)</label>
-                    <input
-                      type="number"
-                      min={100}
-                      max={500}
-                      value={slideMobileHeight}
-                      onChange={(e) => setSlideMobileHeight(Number(e.target.value))}
-                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Desktop Height (px)</label>
-                    <input
-                      type="number"
-                      min={100}
-                      max={800}
-                      value={slideDesktopHeight}
-                      onChange={(e) => setSlideDesktopHeight(Number(e.target.value))}
-                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                    />
-                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -1101,17 +1039,6 @@ export default function CpanelStorePage() {
                     placeholder="e.g. Get 20% discount on all POS hardware."
                     value={slideSubtitle}
                     onChange={(e) => setSlideSubtitle(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Target Action Link (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. /store, /support, or https://..."
-                    value={slideLink}
-                    onChange={(e) => setSlideLink(e.target.value)}
                     className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
                   />
                 </div>
@@ -1153,24 +1080,10 @@ export default function CpanelStorePage() {
                               alt={slide.title || "Slide"}
                               className={cn("w-full h-full", slide.isCrop !== false ? "object-cover" : "object-contain bg-gray-900")}
                             />
-                            <span className={cn(
-                              "absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase text-white backdrop-blur-xs",
-                              slide.isCrop !== false ? "bg-black/70" : "bg-emerald-600/90"
-                            )}>
-                              {slide.isCrop !== false ? "Cropped" : "Keep Size"}
-                            </span>
                           </div>
                           <div className="min-w-0 flex-1 space-y-1">
                             <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{slide.title || "Untitled Slide"}</h4>
                             <p className="text-[11px] text-gray-400 font-medium truncate">{slide.subtitle || "No subtitle provided."}</p>
-                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold text-gray-500">
-                              <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200/50 dark:border-gray-700">
-                                Gap: {slide.marginBottom !== undefined ? slide.marginBottom : 20}px
-                              </span>
-                              <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 border border-gray-200/50 dark:border-gray-700">
-                                Height: {slide.mobileHeight || 176}px / {slide.desktopHeight || 220}px
-                              </span>
-                            </div>
                           </div>
                         </div>
 
@@ -1210,19 +1123,46 @@ export default function CpanelStorePage() {
               <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
                 <span className="material-symbols-outlined text-orange-500 text-[22px]">tune</span>
                 <div>
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Name, Brand Logo & Display Configurations</h3>
-                  <p className="text-[10.5px] text-gray-400">Customize search bar top space, slide display settings, storefront name, header logo, and product styling.</p>
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Name, Brand Logo & Product Sharing Toggle</h3>
+                  <p className="text-[10.5px] text-gray-400">Configure store settings, social product sharing ON/OFF, and layout parameters.</p>
                 </div>
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-4">
 
-                {/* Search Bar Top Space Adjustment Slider */}
+                {/* Product Sharing ON/OFF Toggle */}
                 <div className="p-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-xs font-extrabold uppercase text-[#FC7A00] flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[18px]">share</span>
+                        Product Sharing Toggle
+                      </label>
+                      <span className="text-[10px] text-gray-500 font-medium block mt-0.5">
+                        Allow users to copy or share product links directly from product detail page
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEnableProductSharing(!enableProductSharing)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
+                        enableProductSharing
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-red-500/10 text-red-500 border-red-500/30"
+                      )}
+                    >
+                      {enableProductSharing ? "SHARING ON" : "SHARING OFF"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search Bar Top Space Adjustment Slider */}
+                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-extrabold uppercase text-[#FC7A00] flex items-center gap-1.5">
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[18px]">search</span>
-                      Search Bar Top Space / Margin ({searchBarMarginTop}px)
+                      Search Bar Top Space ({searchBarMarginTop}px)
                     </label>
                     <span className="font-mono text-xs font-black text-[#FC7A00]">{searchBarMarginTop}px</span>
                   </div>
@@ -1235,166 +1175,6 @@ export default function CpanelStorePage() {
                     onChange={(e) => setSearchBarMarginTop(Number(e.target.value))}
                     className="w-full accent-[#FC7A00] cursor-pointer"
                   />
-                  <div className="flex justify-between text-[9px] font-bold text-gray-400 uppercase">
-                    <span>0px (Flush)</span>
-                    <span>50px</span>
-                    <span>100px (Extra Space)</span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 font-medium leading-tight pt-1">
-                    Adjust space above the search input on the Store page.
-                  </p>
-                </div>
-
-                {/* Slide Display Configurations */}
-                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-3.5">
-                  <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block border-b border-gray-200/40 pb-2">
-                    Store Slideshow Display Settings
-                  </span>
-
-                  {/* Remove Overlay Fade */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">Overlay Fade Gradient</span>
-                    <button
-                      type="button"
-                      onClick={() => setBannerOverlayFadeEnabled(!bannerOverlayFadeEnabled)}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
-                        bannerOverlayFadeEnabled
-                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                          : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
-                      )}
-                    >
-                      {bannerOverlayFadeEnabled ? "Fade Active" : "Fade Removed"}
-                    </button>
-                  </div>
-
-                  {/* Slideshow Interval */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Slideshow Autoplay Interval (Seconds)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={bannerSlideIntervalSeconds}
-                      onChange={(e) => setBannerSlideIntervalSeconds(Number(e.target.value))}
-                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                    />
-                  </div>
-
-                  {/* Transition Effect */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Transition Effect</label>
-                    <select
-                      value={bannerSlideEffect}
-                      onChange={(e) => setBannerSlideEffect(e.target.value as "fade" | "slide")}
-                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
-                    >
-                      <option value="fade">Seamless Cross-Fade</option>
-                      <option value="slide">Smooth Slide-In (Right-to-Left)</option>
-                    </select>
-                  </div>
-
-                  {/* Image Size Mode (Cover vs Contain) */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Global Image Size Mode</label>
-                    <select
-                      value={bannerImageMode}
-                      onChange={(e) => setBannerImageMode(e.target.value as "cover" | "contain")}
-                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
-                    >
-                      <option value="cover">Crop to Fit Container (Cover)</option>
-                      <option value="contain">Keep Full Image Aspect Ratio (Contain - Don&apos;t Cut Off)</option>
-                    </select>
-                  </div>
-
-                  {/* Crop Position Alignment */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Crop Alignment Position</label>
-                    <select
-                      value={bannerImagePosition}
-                      onChange={(e) => setBannerImagePosition(e.target.value)}
-                      className={cn("h-9 px-3 rounded-xl text-xs font-semibold outline-none border cursor-pointer w-full", inputClass)}
-                    >
-                      <option value="center">Center</option>
-                      <option value="top">Top</option>
-                      <option value="bottom">Bottom</option>
-                      <option value="left">Left</option>
-                      <option value="right">Right</option>
-                    </select>
-                  </div>
-
-                  {/* Slide Indicator Dots Toggle */}
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">Slide Indicator Dots</span>
-                    <button
-                      type="button"
-                      onClick={() => setBannerShowIndicators(!bannerShowIndicators)}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
-                        bannerShowIndicators
-                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                          : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
-                      )}
-                    >
-                      {bannerShowIndicators ? "Dots Visible" : "Dots Hidden"}
-                    </button>
-                  </div>
-
-                  {/* Banner Background Color & Border Controls */}
-                  <div className="space-y-2 pt-2 border-t border-gray-200/40">
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Banner Background Color</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={bannerBackgroundColor}
-                        onChange={(e) => setBannerBackgroundColor(e.target.value)}
-                        className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
-                      />
-                      <input
-                        type="text"
-                        value={bannerBackgroundColor}
-                        onChange={(e) => setBannerBackgroundColor(e.target.value)}
-                        placeholder="#111827"
-                        className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">Banner Border</span>
-                      <button
-                        type="button"
-                        onClick={() => setBannerBorderEnabled(!bannerBorderEnabled)}
-                        className={cn(
-                          "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
-                          bannerBorderEnabled
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                            : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
-                        )}
-                      >
-                        {bannerBorderEnabled ? "Border Active" : "Border Disabled"}
-                      </button>
-                    </div>
-
-                    {bannerBorderEnabled && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <input
-                          type="color"
-                          value={bannerBorderColor}
-                          onChange={(e) => setBannerBorderColor(e.target.value)}
-                          className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
-                        />
-                        <input
-                          type="text"
-                          value={bannerBorderColor}
-                          onChange={(e) => setBannerBorderColor(e.target.value)}
-                          placeholder="#FC7A00"
-                          className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
-                        />
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 {/* Store Name Input */}
@@ -1449,245 +1229,6 @@ export default function CpanelStorePage() {
                         {isUploadingStoreLogo ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
                       </button>
                     </div>
-                  </div>
-                </div>
-
-                {/* Product Border Color & Gradient Settings */}
-                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Product Card Border Style</span>
-                      <span className="text-[10px] text-gray-400 font-medium">Configure single color or multi-color gradient border</span>
-                    </div>
-                  </div>
-
-                  {/* Enable Gradient Border Toggle */}
-                  <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200/50 bg-white dark:bg-gray-800 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={enableGradientBorder}
-                      onChange={(e) => setEnableGradientBorder(e.target.checked)}
-                      className="w-4 h-4 text-[#FC7A00] rounded"
-                    />
-                    <div>
-                      <span className="text-xs font-bold uppercase text-gray-800 dark:text-gray-200 block">Enable Gradient Border</span>
-                      <span className="text-[9.5px] text-gray-400 font-medium">Renders product card borders with a multi-color gradient</span>
-                    </div>
-                  </label>
-
-                  {enableGradientBorder ? (
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-gray-400 block">Gradient Start Color</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={gradientColorStart}
-                            onChange={(e) => setGradientColorStart(e.target.value)}
-                            className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
-                          />
-                          <input
-                            type="text"
-                            value={gradientColorStart}
-                            onChange={(e) => setGradientColorStart(e.target.value)}
-                            className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-gray-400 block">Gradient End Color</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={gradientColorEnd}
-                            onChange={(e) => setGradientColorEnd(e.target.value)}
-                            className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
-                          />
-                          <input
-                            type="text"
-                            value={gradientColorEnd}
-                            onChange={(e) => setGradientColorEnd(e.target.value)}
-                            className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 pt-1">
-                      <label className="text-[10px] font-black uppercase text-gray-400 block">Solid Border Color & Opacity</label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={borderColor}
-                          onChange={(e) => setBorderColor(e.target.value)}
-                          className="w-12 h-10 rounded-xl border border-gray-300 p-1 cursor-pointer bg-white"
-                        />
-                        <input
-                          type="text"
-                          value={borderColor}
-                          onChange={(e) => setBorderColor(e.target.value)}
-                          placeholder="#FC7A00"
-                          className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-mono font-bold uppercase outline-none border transition-all", inputClass)}
-                        />
-                      </div>
-
-                      {/* Border Opacity Slider */}
-                      <div className="space-y-1.5 p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800">
-                        <div className="flex justify-between items-center text-[10.5px] font-bold">
-                          <span className="text-gray-500 dark:text-gray-400 uppercase">Product Border Opacity</span>
-                          <span className="font-mono text-[#FC7A00] font-black">{borderOpacity}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={borderOpacity}
-                          onChange={(e) => setBorderOpacity(Number(e.target.value))}
-                          className="w-full accent-[#FC7A00] cursor-pointer"
-                        />
-                        <div className="flex justify-between text-[8.5px] font-bold text-gray-400 uppercase">
-                          <span>0% (Transparent)</span>
-                          <span>50%</span>
-                          <span>100% (Solid)</span>
-                        </div>
-                      </div>
-
-                      {/* Preset Colors */}
-                      <div className="flex items-center gap-2 pt-1">
-                        {["#FC7A00", "#000000", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6", "#E5E7EB"].map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => setBorderColor(c)}
-                            className="w-6 h-6 rounded-full border-2 border-white shadow-xs cursor-pointer transition-transform hover:scale-110"
-                            style={{ backgroundColor: c }}
-                            title={c}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recently Viewed Product Cards Border Control */}
-                  <div className="pt-3 border-t border-gray-200/40 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Recently Viewed Cards Border</span>
-                        <span className="text-[9.5px] text-gray-400 font-medium">Border styling for horizontal recently viewed product cards</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setRecentlyViewedBorderEnabled(!recentlyViewedBorderEnabled)}
-                        className={cn(
-                          "px-3 py-1 rounded-lg text-[10px] font-black uppercase border transition-all cursor-pointer",
-                          recentlyViewedBorderEnabled
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                            : "bg-gray-200 dark:bg-gray-800 border-gray-300 text-gray-600"
-                        )}
-                      >
-                        {recentlyViewedBorderEnabled ? "Border Active" : "No Border"}
-                      </button>
-                    </div>
-
-                    {recentlyViewedBorderEnabled && (
-                      <div className="space-y-2.5 pt-1">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={recentlyViewedBorderColor}
-                            onChange={(e) => setRecentlyViewedBorderColor(e.target.value)}
-                            className="w-10 h-9 rounded-lg border border-gray-300 p-0.5 cursor-pointer bg-white"
-                          />
-                          <input
-                            type="text"
-                            value={recentlyViewedBorderColor}
-                            onChange={(e) => setRecentlyViewedBorderColor(e.target.value)}
-                            placeholder="#FC7A00"
-                            className={cn("h-9 px-2 rounded-lg text-xs font-mono font-bold uppercase outline-none border transition-all w-full", inputClass)}
-                          />
-                        </div>
-
-                        <div className="space-y-1.5 p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800">
-                          <div className="flex justify-between items-center text-[10.5px] font-bold">
-                            <span className="text-gray-500 dark:text-gray-400 uppercase">Recently Viewed Border Opacity</span>
-                            <span className="font-mono text-[#FC7A00] font-black">{recentlyViewedBorderOpacity}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="5"
-                            value={recentlyViewedBorderOpacity}
-                            onChange={(e) => setRecentlyViewedBorderOpacity(Number(e.target.value))}
-                            className="w-full accent-[#FC7A00] cursor-pointer"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Hide Product Borders Toggle */}
-                  <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200/50 bg-white dark:bg-gray-800 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={hideBorders}
-                      onChange={(e) => setHideBorders(e.target.checked)}
-                      className="w-4 h-4 text-[#FC7A00] rounded"
-                    />
-                    <div>
-                      <span className="text-xs font-extrabold uppercase text-gray-800 dark:text-gray-200 block">Hide Card Borders Completely</span>
-                      <span className="text-[9.5px] text-gray-400 font-medium">When checked, product cards render without any border line.</span>
-                    </div>
-                  </label>
-                </div>
-
-                {/* Order Processing Statuses Manager */}
-                <div className="space-y-3 pt-4 border-t border-gray-200/40">
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400 block">Custom Order Processing Statuses</label>
-                    <p className="text-[10.5px] text-gray-400">Add custom status tags for your order fulfillment workflow.</p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {orderStatuses.map((st) => (
-                      <span key={st} className="px-3 py-1 rounded-xl bg-orange-50 dark:bg-gray-800 text-[#FC7A00] dark:text-orange-400 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border border-orange-200/60 dark:border-gray-700">
-                        {st}
-                        {st !== "Pending" && st !== "Delivered" && (
-                          <button
-                            type="button"
-                            onClick={() => setOrderStatuses(orderStatuses.filter((s) => s !== st))}
-                            className="text-gray-400 hover:text-red-500 font-bold"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newStatusInput}
-                      onChange={(e) => setNewStatusInput(e.target.value)}
-                      placeholder="Add custom status (e.g. In Transit, Verification...)"
-                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border", inputClass)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const trimmed = newStatusInput.trim();
-                        if (trimmed && !orderStatuses.includes(trimmed)) {
-                          setOrderStatuses([...orderStatuses, trimmed]);
-                          setNewStatusInput("");
-                        }
-                      }}
-                      className="px-4 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
-                    >
-                      Add
-                    </button>
                   </div>
                 </div>
 
@@ -1783,7 +1324,6 @@ export default function CpanelStorePage() {
                 />
               </div>
 
-              {/* Category & Pricing Fields */}
               <div className="space-y-3">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
@@ -1853,7 +1393,6 @@ export default function CpanelStorePage() {
                 </div>
               </div>
 
-              {/* Stock Quantity & Unlimited Stock Controls */}
               <div className="p-3.5 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold uppercase text-[#FC7A00]">Inventory & Stock Control</span>
@@ -1887,7 +1426,6 @@ export default function CpanelStorePage() {
                 )}
               </div>
 
-              {/* Multiple Images Upload Manager */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 block">
                   Product Images ({itemImages.length})
@@ -1933,7 +1471,6 @@ export default function CpanelStorePage() {
                   </div>
                 </div>
 
-                {/* Thumbnail gallery list with Cover Image selector */}
                 {itemImages.length > 0 && (
                   <div className="grid grid-cols-4 gap-2 pt-1">
                     {itemImages.map((imgUrl, idx) => {
@@ -1979,35 +1516,6 @@ export default function CpanelStorePage() {
                 )}
               </div>
 
-              {/* Product Video URL Field */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 block">Product Video URL (YouTube or Direct MP4)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. https://www.youtube.com/watch?v=... or .mp4"
-                  value={itemVideoUrl}
-                  onChange={(e) => setItemVideoUrl(e.target.value)}
-                  className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                />
-              </div>
-
-              {/* Auto Slide ON/OFF Toggle */}
-              <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200/50 bg-gray-50/50">
-                <div>
-                  <span className="text-xs font-extrabold uppercase block">Auto Slide Gallery</span>
-                  <span className="text-[9.5px] text-gray-400">Auto advance product image slides for users</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={itemAutoSlide}
-                    onChange={(e) => setItemAutoSlide(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FC7A00]" />
-                </label>
-              </div>
-
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 block">Description</label>
                 <textarea
@@ -2017,16 +1525,6 @@ export default function CpanelStorePage() {
                   className={cn("w-full h-20 p-3 rounded-xl text-xs font-semibold outline-none border transition-all resize-none", inputClass)}
                 />
               </div>
-
-              <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
-                <input
-                  type="checkbox"
-                  checked={itemInStock}
-                  onChange={(e) => setItemInStock(e.target.checked)}
-                  className="w-4 h-4 text-[#FC7A00] rounded"
-                />
-                <span className="text-xs font-bold uppercase text-gray-400">In Stock for Ordering</span>
-              </label>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-gray-200/40">
                 <button
