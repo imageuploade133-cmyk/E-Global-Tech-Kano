@@ -675,13 +675,15 @@ export default function StorePage() {
                     whileTap={{ scale: 0.98 }}
                     style={{
                       borderColor: productBorderColor,
+                      borderRadius: `${settings.cardBorderRadius ?? 16}px`,
+                      borderWidth: `${settings.borderWidth ?? 1}px`,
                       ...(settings.enableGradientBorder && !settings.hideBorders
                         ? {
                             borderImage: `linear-gradient(135deg, ${settings.gradientColorStart || "#FC7A00"}, ${settings.gradientColorEnd || "#E06600"}) 1`,
                           }
                         : {}),
                     }}
-                    className={`bg-white rounded-2xl p-3 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative ${
+                    className={`bg-white p-3 flex flex-col justify-between space-y-3 shadow-xs transition-all cursor-pointer group relative ${
                       hideBorders ? "border-0" : "border"
                     }`}
                     onClick={() => handleOpenProductPage(item)}

@@ -53,6 +53,8 @@ export interface StoreSettings {
   enableProductSharing?: boolean;
   borderColor?: string;
   borderOpacity?: number;
+  borderWidth?: number;
+  cardBorderRadius?: number;
   hideBorders?: boolean;
   enableGradientBorder?: boolean;
   gradientColorStart?: string;
