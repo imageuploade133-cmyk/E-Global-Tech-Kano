@@ -11,7 +11,7 @@ interface BannerSlide {
   imageUrl: string;
   title?: string;
   description?: string;
-  targetPage: "all" | "bills" | "investment" | "referral" | "transfer";
+  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "store";
   link?: string;
   customWidth?: number | null;
   customHeight?: number | null;
@@ -23,12 +23,13 @@ interface BannerSlide {
 }
 
 interface BannerSlideshowProps {
-  page: "bills" | "investment" | "referral" | "transfer";
+  page: "bills" | "investment" | "referral" | "transfer" | "store";
   isDark?: boolean;
+  fallbackSlides?: BannerSlide[];
 }
 
-export default function BannerSlideshow({ page, isDark = false }: BannerSlideshowProps) {
-  const [slides, setSlides] = useState<BannerSlide[]>([]);
+export default function BannerSlideshow({ page, isDark = false, fallbackSlides = [] }: BannerSlideshowProps) {
+  const [slides, setSlides] = useState<BannerSlide[]>(fallbackSlides);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -49,21 +50,36 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
   const showIndicators = config.bannerShowIndicators !== false;
 
   useEffect(() => {
+    let isMounted = true;
     const fetchSlides = async () => {
       try {
         const res = await fetch(`/api/banners?page=${page}`);
         const data = await res.json();
-        if (res.ok && data.success) {
-          setSlides(data.banners || []);
+        if (res.ok && data.success && Array.isArray(data.banners) && data.banners.length > 0) {
+          if (isMounted) setSlides(data.banners);
+        } else if (fallbackSlides.length > 0 && isMounted) {
+          setSlides(fallbackSlides);
         }
       } catch (err) {
         console.error("Failed to load banner slideshow slides:", err);
+        if (fallbackSlides.length > 0 && isMounted) setSlides(fallbackSlides);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     fetchSlides();
+
+    return () => {
+      isMounted = false;
+    };
   }, [page]);
+
+  // Sync fallback slides if available and primary fetch returned empty
+  useEffect(() => {
+    if (slides.length === 0 && fallbackSlides.length > 0) {
+      setSlides(fallbackSlides);
+    }
+  }, [fallbackSlides]);
 
   // Autoplay loop Setup
   useEffect(() => {
@@ -86,7 +102,6 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
 
   const handleDotClick = (idx: number) => {
     setCurrentIndex(idx);
-    // Reset autoplay timer on manual slide shift
     if (autoplayRef.current) {
       clearInterval(autoplayRef.current);
     }
@@ -102,28 +117,28 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
     }
   };
 
-  if (loading || slides.length === 0) {
+  if (loading && slides.length === 0) {
     return null;
   }
 
-  const activeSlide = slides[currentIndex];
+  if (slides.length === 0) {
+    return null;
+  }
+
+  const activeSlide = slides[currentIndex] || slides[0];
 
   const borderStyles = borderEnabled
     ? { border: `1px solid ${borderColor}` }
     : { border: "none" };
 
-  // Determine slide container height, bottom margin, and mode overrides (per-slide setting takes precedence over global fallback)
   const effectiveHeightMobile = activeSlide.mobileHeight || activeSlide.customHeight || heightMobile;
   const effectiveHeightDesktop = activeSlide.desktopHeight || activeSlide.customHeight || heightDesktop;
   const effectiveWidth = activeSlide.customWidth ? `${activeSlide.customWidth}px` : "100%";
   const effectiveMarginBottom = activeSlide.marginBottom !== undefined && activeSlide.marginBottom !== null
     ? activeSlide.marginBottom
-    : (config.bannerMarginBottom !== undefined ? config.bannerMarginBottom : 24);
-  const isSlideCrop = activeSlide.isCrop !== false; // default true (cover)
+    : (config.bannerMarginBottom !== undefined ? config.bannerMarginBottom : 20);
+  const isSlideCrop = activeSlide.isCrop !== false;
 
-  // To solve the "blinking" issue, we remove mode="wait" so old and new slides cross-transition simultaneously.
-  // We use absolute positioning inside a relative container to hold the height constant during transitions.
-  // The transition variants change based on slideEffect settings:
   const slideVariants = {
     initial: (effect: string) => ({
       opacity: 0,
@@ -154,7 +169,6 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
         marginBottom: `${effectiveMarginBottom}px`,
       }}
     >
-      {/* Responsive height adjustments on desktop screens */}
       <style jsx global>{`
         @media (min-width: 768px) {
           .banner-slideshow-container {
@@ -176,7 +190,6 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
             onClick={() => handleSlideClick(activeSlide)}
             className="absolute inset-0 w-full h-full flex items-center cursor-pointer group overflow-hidden rounded-2xl md:rounded-[24px]"
           >
-            {/* Main Background Image */}
             <img
               src={activeSlide.imageUrl}
               alt={activeSlide.title || "Marketing Campaign"}
@@ -189,12 +202,10 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
               }}
             />
 
-            {/* Premium Dark Glassmorphic Vignette Backdrop Mask */}
             {overlayFadeEnabled && (
               <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent flex flex-col justify-center p-6 md:p-10 text-left" />
             )}
 
-            {/* Slide Caption Texts */}
             <div className="relative z-10 max-w-[70%] space-y-1.5 md:space-y-2 select-text cursor-default pl-6 md:pl-10">
               {activeSlide.title && (
                 <motion.h3
@@ -217,7 +228,6 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
                 </motion.p>
               )}
 
-              {/* Optional Interactive CTA Button */}
               {activeSlide.link && (
                 <motion.div
                   initial={{ y: 8, opacity: 0 }}
@@ -236,7 +246,6 @@ export default function BannerSlideshow({ page, isDark = false }: BannerSlidesho
         </AnimatePresence>
       </div>
 
-      {/* Slide Indicators Dots (Only if multiple slides exist and showIndicators is enabled) */}
       {slides.length > 1 && showIndicators && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 p-1.5 bg-black/35 backdrop-blur-xs rounded-full">
           {slides.map((_, idx) => {
