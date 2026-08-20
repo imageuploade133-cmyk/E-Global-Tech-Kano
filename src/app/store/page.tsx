@@ -54,7 +54,7 @@ export default function StorePage() {
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
-  // Full screen search modal state with paginated 20-item lazy load
+  // Full screen search drawer state with paginated 20-item lazy load
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchModalQuery, setSearchModalQuery] = useState("");
   const [searchModalCategory, setSearchModalCategory] = useState("ALL");
@@ -65,13 +65,9 @@ export default function StorePage() {
   const [isAllRecentlyViewedOpen, setIsAllRecentlyViewedOpen] = useState(false);
   const [visibleRecentlyViewedLimit, setVisibleRecentlyViewedLimit] = useState(10);
 
-  // Wishlist state & Wishlist Modal
+  // Wishlist state & Wishlist Drawer
   const [wishlist, setWishlist] = useState<StoreItem[]>([]);
   const [isWishlistModalOpen, setIsWishlistModalOpen] = useState(false);
-
-  // Dedicated "Products You May Like" Modal state
-  const [isAllRecommendedOpen, setIsAllRecommendedOpen] = useState(false);
-  const [recommendedCategory, setRecommendedCategory] = useState<string>("ALL");
 
   // Load recently viewed & wishlist on mount
   useEffect(() => {
@@ -100,7 +96,7 @@ export default function StorePage() {
     }
   };
 
-  // Full screen Cart modal state
+  // Full screen Cart drawer state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
@@ -112,12 +108,12 @@ export default function StorePage() {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
 
-  // Customer Order History Modal state
+  // Customer Order History Drawer state
   const [isMyOrdersOpen, setIsMyOrdersOpen] = useState(false);
   const [myOrders, setMyOrders] = useState<any[]>([]);
   const [isLoadingMyOrders, setIsLoadingMyOrders] = useState(false);
 
-  // Prevent background body scrolling while any store drawer/modal is open
+  // Prevent background body scrolling while any store drawer is open
   useEffect(() => {
     if (
       isCartOpen ||
@@ -125,7 +121,6 @@ export default function StorePage() {
       confirmedOrder ||
       isSearchModalOpen ||
       isAllRecentlyViewedOpen ||
-      isAllRecommendedOpen ||
       isWishlistModalOpen
     ) {
       document.body.style.overflow = "hidden";
@@ -141,7 +136,6 @@ export default function StorePage() {
     confirmedOrder,
     isSearchModalOpen,
     isAllRecentlyViewedOpen,
-    isAllRecommendedOpen,
     isWishlistModalOpen,
   ]);
 
@@ -844,640 +838,544 @@ export default function StorePage() {
           </motion.button>
         )}
 
-        {/* Wishlist Full Screen Modal - Borderless */}
+        {/* Wishlist Smooth Bottom Drawer */}
         <AnimatePresence>
           {isWishlistModalOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: "100%" }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 260 }}
-              className="fixed inset-0 bg-white z-[100008] flex flex-col text-black overflow-hidden overscroll-contain"
-            >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-red-500 text-[22px]">favorite</span>
-                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
-                    My Saved Wishlist
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsWishlistModalOpen(false)}
-                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
-                >
-                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
-                </button>
-              </div>
+            <div className="fixed inset-0 z-[100008] flex flex-col justify-end">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsWishlistModalOpen(false)}
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+              />
 
-              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-24 overscroll-contain">
-                {wishlist.length === 0 ? (
-                  <div className="py-20 flex flex-col items-center text-center space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-400">
-                      <span className="material-symbols-outlined text-[36px]">favorite_border</span>
-                    </div>
-                    <h3 className="font-bodoni font-bold text-base text-black">Your Wishlist is Empty</h3>
-                    <p className="font-hanken text-xs text-gray-400 max-w-xs leading-relaxed">
-                      Tap the heart icon on any product to save it to your personal wishlist.
-                    </p>
+              {/* Drawer Box */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="relative bg-white rounded-t-[28px] max-h-[85vh] h-[80vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+              >
+                {/* Drag / Drawer Handle */}
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
+
+                {/* Header with single close icon */}
+                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-red-500 text-[22px]">favorite</span>
+                    <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                      My Saved Wishlist
+                    </h2>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
-                      Saved Items ({wishlist.length})
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-3.5">
-                      {wishlist.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            setIsWishlistModalOpen(false);
-                            handleOpenProductPage(item);
-                          }}
-                          className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-between space-y-2.5 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-3xs"
-                        >
-                          <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
-                            {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
-                            ) : (
-                              <span className="material-symbols-outlined text-[28px] text-gray-300">storefront</span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleWishlistProduct(e, item)}
-                              className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center shadow-xs border-0"
-                              title="Remove"
-                            >
-                              <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                                favorite
-                              </span>
-                            </button>
-                          </div>
-
-                          <div>
-                            <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
-                              {item.title}
-                            </h4>
-                            <p className="font-mono font-black text-xs text-[#FC7A00] mt-1">
-                              ₦{item.price.toLocaleString()}
-                            </p>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(item, 1);
-                            }}
-                            className="w-full py-2 bg-[#FC7A00] text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs border-0"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
-                            <span>Add to Cart</span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Full Screen Shopping Cart Modal - Borderless */}
-        <AnimatePresence>
-          {isCartOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: "100%" }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 260 }}
-              className="fixed inset-0 bg-white z-[100002] flex flex-col text-black overflow-hidden"
-            >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
-                <button
-                  type="button"
-                  onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer shadow-none"
-                >
-                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
-                </button>
-                <div className="text-center">
-                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
-                    Shopping Cart
-                  </h2>
-                  <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
-                    {totalCartItems} {totalCartItems === 1 ? "Item" : "Items"} Selected
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCartOpen(false)}
-                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
-                >
-                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-36">
-                {cart.length === 0 ? (
-                  <div className="py-20 flex flex-col items-center text-center space-y-3">
-                    <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[48px] text-gray-300">remove_shopping_cart</span>
-                    </div>
-                    <h3 className="font-bodoni font-bold text-lg text-black">Your Cart is Empty</h3>
-                    <p className="font-hanken text-xs text-gray-400 max-w-xs leading-relaxed">
-                      Explore storefront hardware and gear to add items to your cart.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setIsCartOpen(false)}
-                      className="mt-2 px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-xs border-0"
-                    >
-                      Browse Products
-                    </button>
-                  </div>
-                ) : (
-                  cart.map(({ product, quantity }) => (
-                    <div
-                      key={product.id}
-                      className="p-4 bg-gray-50 border-0 rounded-2xl flex items-center justify-between gap-3 shadow-3xs"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-14 h-14 rounded-xl border-0 bg-white overflow-hidden relative flex-shrink-0">
-                          {product.imageUrl ? (
-                            <Image src={product.imageUrl} alt={product.title} fill className="object-cover" unoptimized />
-                          ) : (
-                            <span className="material-symbols-outlined text-[28px] text-gray-400 p-2">storefront</span>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-extrabold text-xs uppercase text-black truncate">{product.title}</h4>
-                          <p className="font-mono font-bold text-xs text-[#FC7A00] mt-0.5">
-                            ₦{product.price.toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateCartQuantity(product.id, -1)}
-                          className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
-                        >
-                          -
-                        </button>
-                        <span className="font-mono font-black text-xs w-4 text-center">{quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateCartQuantity(product.id, 1)}
-                          className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFromCart(product.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors ml-1 cursor-pointer"
-                          title="Remove item"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {cart.length > 0 && !isCheckoutStep && (
-                <div className="absolute bottom-0 left-0 right-0 p-5 bg-white border-0 space-y-3 shadow-lg z-20 max-w-md mx-auto">
-                  <div className="flex justify-between items-center text-xs font-bold">
-                    <span className="text-gray-500 uppercase tracking-wider">Subtotal ({totalCartItems} items)</span>
-                    <span className="font-mono text-lg font-black text-black">₦{cartSubtotal.toLocaleString()}</span>
-                  </div>
-
                   <button
                     type="button"
-                    onClick={() => setIsCheckoutStep(true)}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
+                    onClick={() => setIsWishlistModalOpen(false)}
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                    title="Close"
                   >
-                    <span className="material-symbols-outlined text-[18px]">local_shipping</span>
-                    <span>Proceed to Delivery & Payment</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => updateCart([])}
-                    className="w-full text-center text-[10px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider cursor-pointer transition-colors"
-                  >
-                    Clear Shopping Cart
+                    <span className="material-symbols-outlined text-[18px]">close</span>
                   </button>
                 </div>
-              )}
 
-              {isCheckoutStep && (
-                <div className="absolute inset-0 bg-white z-30 p-5 overflow-y-auto flex flex-col justify-between max-w-md mx-auto">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-0">
-                      <button
-                        type="button"
-                        onClick={() => setIsCheckoutStep(false)}
-                        className="flex items-center gap-1 text-xs font-bold text-gray-600 hover:text-black"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                        Back to Items
-                      </button>
-                      <span className="text-xs font-black uppercase text-[#FC7A00]">Delivery Profile</span>
+                {/* Scrollable Wishlist Content */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+                  {wishlist.length === 0 ? (
+                    <div className="py-20 flex flex-col items-center text-center space-y-3">
+                      <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-400">
+                        <span className="material-symbols-outlined text-[36px]">favorite_border</span>
+                      </div>
+                      <h3 className="font-bodoni font-bold text-base text-black">Your Wishlist is Empty</h3>
+                      <p className="font-hanken text-xs text-gray-400 max-w-xs leading-relaxed">
+                        Tap the heart icon on any product to save it to your personal wishlist.
+                      </p>
                     </div>
-
-                    <form id="checkout-form" onSubmit={handleConfirmCheckout} className="space-y-3.5">
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
-                          Full Recipient Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={customerDeliveryName}
-                          onChange={(e) => setCustomerDeliveryName(e.target.value)}
-                          placeholder="e.g. Captain Jules"
-                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
-                          Phone Number for Delivery Updates *
-                        </label>
-                        <input
-                          type="tel"
-                          required
-                          value={customerDeliveryPhone}
-                          onChange={(e) => setCustomerDeliveryPhone(e.target.value)}
-                          placeholder="e.g. 08012345678"
-                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
-                          Full Delivery Address *
-                        </label>
-                        <textarea
-                          rows={3}
-                          required
-                          value={customerDeliveryAddress}
-                          onChange={(e) => setCustomerDeliveryAddress(e.target.value)}
-                          placeholder="e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"
-                          className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00] resize-none"
-                        />
-                      </div>
-
-                      <div className="p-3.5 rounded-2xl bg-orange-50/60 border-0 space-y-1">
-                        <div className="flex items-center justify-between text-xs font-bold text-gray-800">
-                          <span>Payment Method:</span>
-                          <span className="text-emerald-600 font-black">Main NGN Wallet</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs font-black">
-                          <span className="text-gray-600">Total Order Charge:</span>
-                          <span className="text-[#FC7A00] text-sm">₦{cartSubtotal.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-
-                  <div className="pt-4 border-0 space-y-2">
-                    <button
-                      type="submit"
-                      form="checkout-form"
-                      disabled={isPlacingOrder}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 border-0"
-                    >
-                      {isPlacingOrder ? (
-                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <span className="material-symbols-outlined text-[18px]">verified</span>
-                      )}
-                      <span>Confirm Order & Pay ₦{cartSubtotal.toLocaleString()}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Customer Order History Modal */}
-        <AnimatePresence>
-          {isMyOrdersOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: "100%" }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 260 }}
-              className="fixed inset-0 bg-white z-[100003] flex flex-col text-black overflow-hidden"
-            >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">receipt_long</span>
-                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
-                    My Order History
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMyOrdersOpen(false)}
-                  className="w-10 h-10 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
-                >
-                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-3.5 custom-scrollbar pb-24">
-                {isLoadingMyOrders ? (
-                  <div className="py-16 text-center text-xs font-bold uppercase tracking-wider text-gray-400">
-                    Loading Order History...
-                  </div>
-                ) : myOrders.length === 0 ? (
-                  <div className="py-16 text-center space-y-2">
-                    <span className="material-symbols-outlined text-[48px] text-gray-300">shopping_bag</span>
-                    <p className="font-bold text-xs text-gray-500">You have not placed any store orders yet.</p>
-                  </div>
-                ) : (
-                  myOrders.map((ord) => (
-                    <div key={ord.id} className="p-4 bg-gray-50 border-0 rounded-2xl space-y-2.5 shadow-3xs">
-                      <div className="flex items-center justify-between pb-2">
-                        <div>
-                          <span className="font-mono font-black text-xs text-[#FC7A00]">{ord.id}</span>
-                          <span className="text-[10px] text-gray-400 block">{new Date(ord.createdAt).toLocaleString()}</span>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase border-0 bg-orange-100 text-orange-800">
-                          {ord.status}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1 text-xs">
-                        <div className="flex justify-between font-bold text-gray-700">
-                          <span>Items ({ord.items?.length || 0}):</span>
-                          <span>₦{ord.totalAmount?.toLocaleString()}</span>
-                        </div>
-                        <p className="text-[10.5px] text-gray-500 line-clamp-2">
-                          {ord.items?.map((i: any) => `${i.title} (x${i.quantity})`).join(", ")}
-                        </p>
-                      </div>
-
-                      {ord.adminNotes && (
-                        <div className="p-2 rounded-xl bg-orange-50 border-0 text-[10px] text-orange-800 font-medium">
-                          <strong>Admin Note:</strong> {ord.adminNotes}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Dedicated Paginated "Recently Viewed" Full-Screen Modal */}
-        <AnimatePresence>
-          {isAllRecentlyViewedOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: "100%" }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 260 }}
-              className="fixed inset-0 bg-white z-[100007] flex flex-col text-black overflow-hidden overscroll-contain"
-            >
-              <div className="sticky top-0 bg-white px-5 py-4 flex items-center justify-between z-10 border-0 shadow-none">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
-                  <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
-                    Recently Viewed History
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAllRecentlyViewedOpen(false)}
-                  className="w-9 h-9 rounded-full border-0 bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer shadow-none"
-                >
-                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-24 overscroll-contain">
-                {recentlyViewed.length === 0 ? (
-                  <div className="py-16 text-center space-y-2">
-                    <span className="material-symbols-outlined text-[48px] text-gray-300">history_toggle_off</span>
-                    <p className="font-bold text-xs text-gray-500">Your recently viewed history is empty.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-gray-400">
-                      <span>
-                        Showing {Math.min(visibleRecentlyViewedLimit, recentlyViewed.length)} of {recentlyViewed.length} items
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRecentlyViewed([]);
-                          if (typeof window !== "undefined") localStorage.removeItem("e_tech_recently_viewed");
-                          setIsAllRecentlyViewedOpen(false);
-                        }}
-                        className="text-red-500 hover:underline cursor-pointer"
-                      >
-                        Clear All History
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3.5">
-                      {recentlyViewed.slice(0, visibleRecentlyViewedLimit).map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            setIsAllRecentlyViewedOpen(false);
-                            handleOpenProductPage(item);
-                          }}
-                          className="bg-gray-50 rounded-2xl p-3.5 flex flex-col justify-between space-y-3 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
-                        >
-                          <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
-                            {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
-                            ) : (
-                              <span className="material-symbols-outlined text-[32px] text-gray-300">storefront</span>
-                            )}
-                            <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
-                              {item.category}
-                            </span>
-                          </div>
-
-                          <div>
-                            <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
-                              {item.title}
-                            </h4>
-                            <p className="font-mono font-black text-xs text-[#FC7A00] mt-1">
-                              ₦{item.price.toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {recentlyViewed.length > visibleRecentlyViewedLimit && (
-                      <div className="pt-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setVisibleRecentlyViewedLimit((prev) => prev + 10)}
-                          className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
-                        >
-                          Load More History ({recentlyViewed.length - visibleRecentlyViewedLimit} remaining)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Full-Screen Paginated Search Modal */}
-        <AnimatePresence>
-          {isSearchModalOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: "100%" }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: "100%" }}
-              transition={{ type: "tween", ease: [0.32, 0.72, 0, 1], duration: 0.3 }}
-              className="fixed inset-0 bg-white z-[100005] flex flex-col text-black overflow-hidden overscroll-contain"
-            >
-              <div className="sticky top-0 bg-white px-5 py-3.5 flex items-center justify-between gap-3 z-10 border-0 shadow-none">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery(searchModalQuery);
-                    setActiveCategory(searchModalCategory);
-                    setIsSearchModalOpen(false);
-                  }}
-                  className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-800 hover:text-black active:scale-90 transition-all cursor-pointer border-0 shadow-none flex-shrink-0"
-                >
-                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
-                </button>
-
-                <div className="relative flex-1">
-                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
-                    search
-                  </span>
-                  <input
-                    type="text"
-                    autoFocus
-                    value={searchModalQuery}
-                    onChange={(e) => {
-                      setSearchModalQuery(e.target.value);
-                      setVisibleSearchLimit(20);
-                    }}
-                    placeholder="Search store products, gear, hardware..."
-                    className="w-full bg-gray-100 focus:bg-gray-150 rounded-2xl pl-10 pr-9 py-2.5 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none"
-                  />
-                  {searchModalQuery && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchModalQuery("");
-                        setVisibleSearchLimit(20);
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">close</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="px-5 py-2 flex gap-2 overflow-x-auto no-scrollbar border-0 flex-shrink-0 select-none">
-                {categories.filter((c) => !c.isHidden).map((cat) => {
-                  const isActive = searchModalCategory.toLowerCase() === cat.name.toLowerCase();
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setSearchModalCategory(cat.name);
-                        setVisibleSearchLimit(20);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border-0 ${
-                        isActive
-                          ? "bg-[#FC7A00] text-white shadow-xs"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 max-w-md mx-auto w-full space-y-4 custom-scrollbar pb-24 overscroll-contain">
-                {(() => {
-                  const q = searchModalQuery.toLowerCase().trim();
-                  const results = items.filter((item) => {
-                    const matchesCategory =
-                      searchModalCategory === "ALL" || item.category.toLowerCase() === searchModalCategory.toLowerCase();
-                    const matchesQuery =
-                      !q ||
-                      item.title.toLowerCase().includes(q) ||
-                      item.description.toLowerCase().includes(q) ||
-                      item.category.toLowerCase().includes(q);
-                    return matchesCategory && matchesQuery;
-                  });
-
-                  const paginatedResults = results.slice(0, visibleSearchLimit);
-
-                  if (results.length === 0) {
-                    return (
-                      <div className="py-16 text-center space-y-3">
-                        <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto text-gray-300">
-                          <span className="material-symbols-outlined text-[32px]">search_off</span>
-                        </div>
-                        <h3 className="font-bodoni font-bold text-base text-black">No Products Found</h3>
-                        <p className="font-hanken text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
-                          {q
-                            ? `No store items matched "${q}". Try searching another keyword.`
-                            : "No products match the selected category filter."}
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="space-y-4">
+                  ) : (
+                    <div className="space-y-3">
                       <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
-                        Showing {paginatedResults.length} of {results.length} matched products
+                        Saved Items ({wishlist.length})
                       </p>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        {paginatedResults.map((item) => (
+                      <div className="grid grid-cols-2 gap-3.5">
+                        {wishlist.map((item) => (
                           <div
                             key={item.id}
                             onClick={() => {
-                              setIsSearchModalOpen(false);
+                              setIsWishlistModalOpen(false);
                               handleOpenProductPage(item);
                             }}
-                            className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-between space-y-2.5 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
+                            className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-between space-y-2.5 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-3xs"
                           >
-                            <div className="w-full h-24 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
+                            <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
                               {item.imageUrl ? (
                                 <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
                               ) : (
                                 <span className="material-symbols-outlined text-[28px] text-gray-300">storefront</span>
                               )}
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleWishlistProduct(e, item)}
+                                className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center shadow-xs border-0"
+                                title="Remove"
+                              >
+                                <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                                  favorite
+                                </span>
+                              </button>
                             </div>
+
                             <div>
                               <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
                                 {item.title}
                               </h4>
-                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
+                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-1">
+                                ₦{item.price.toLocaleString()}
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(item, 1);
+                              }}
+                              className="w-full py-2 bg-[#FC7A00] text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs border-0"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+                              <span>Add to Cart</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Shopping Cart Smooth Bottom Drawer */}
+        <AnimatePresence>
+          {isCartOpen && (
+            <div className="fixed inset-0 z-[100002] flex flex-col justify-end">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsCartOpen(false)}
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+              />
+
+              {/* Drawer Box */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="relative bg-white rounded-t-[28px] max-h-[90vh] h-[85vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+              >
+                {/* Drag Handle */}
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
+
+                {/* Header with single close button */}
+                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">shopping_bag</span>
+                    <div>
+                      <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                        Shopping Cart
+                      </h2>
+                      <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
+                        {totalCartItems} {totalCartItems === 1 ? "Item" : "Items"} Selected
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCartOpen(false)}
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                    title="Close"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                {/* Cart Drawer Items */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar pb-32">
+                  {cart.length === 0 ? (
+                    <div className="py-20 flex flex-col items-center text-center space-y-3">
+                      <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[48px] text-gray-300">remove_shopping_cart</span>
+                      </div>
+                      <h3 className="font-bodoni font-bold text-lg text-black">Your Cart is Empty</h3>
+                      <p className="font-hanken text-xs text-gray-400 max-w-xs leading-relaxed">
+                        Explore storefront hardware and gear to add items to your cart.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsCartOpen(false)}
+                        className="mt-2 px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-xs border-0"
+                      >
+                        Browse Products
+                      </button>
+                    </div>
+                  ) : (
+                    cart.map(({ product, quantity }) => (
+                      <div
+                        key={product.id}
+                        className="p-4 bg-gray-50 border-0 rounded-2xl flex items-center justify-between gap-3 shadow-3xs"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-14 h-14 rounded-xl border-0 bg-white overflow-hidden relative flex-shrink-0">
+                            {product.imageUrl ? (
+                              <Image src={product.imageUrl} alt={product.title} fill className="object-cover" unoptimized />
+                            ) : (
+                              <span className="material-symbols-outlined text-[28px] text-gray-400 p-2">storefront</span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-extrabold text-xs uppercase text-black truncate">{product.title}</h4>
+                            <p className="font-mono font-bold text-xs text-[#FC7A00] mt-0.5">
+                              ₦{product.price.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateCartQuantity(product.id, -1)}
+                            className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                          >
+                            -
+                          </button>
+                          <span className="font-mono font-black text-xs w-4 text-center">{quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateCartQuantity(product.id, 1)}
+                            className="w-8 h-8 rounded-lg border-0 bg-white text-xs font-bold flex items-center justify-center active:scale-90 cursor-pointer shadow-3xs"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFromCart(product.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 transition-colors ml-1 cursor-pointer border-0"
+                            title="Remove item"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {cart.length > 0 && !isCheckoutStep && (
+                  <div className="p-5 bg-white border-t border-gray-100 space-y-3 shadow-lg z-20 flex-shrink-0">
+                    <div className="flex justify-between items-center text-xs font-bold">
+                      <span className="text-gray-500 uppercase tracking-wider">Subtotal ({totalCartItems} items)</span>
+                      <span className="font-mono text-lg font-black text-black">₦{cartSubtotal.toLocaleString()}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCheckoutStep(true)}
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">local_shipping</span>
+                      <span>Proceed to Delivery & Payment</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateCart([])}
+                      className="w-full text-center text-[10px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider cursor-pointer transition-colors border-0"
+                    >
+                      Clear Shopping Cart
+                    </button>
+                  </div>
+                )}
+
+                {isCheckoutStep && (
+                  <div className="absolute inset-0 bg-white z-30 p-5 overflow-y-auto flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => setIsCheckoutStep(false)}
+                          className="flex items-center gap-1 text-xs font-bold text-gray-600 hover:text-black border-0"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                          Back to Items
+                        </button>
+                        <span className="text-xs font-black uppercase text-[#FC7A00]">Delivery Profile</span>
+                      </div>
+
+                      <form id="checkout-form" onSubmit={handleConfirmCheckout} className="space-y-3.5">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                            Full Recipient Name *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={customerDeliveryName}
+                            onChange={(e) => setCustomerDeliveryName(e.target.value)}
+                            placeholder="e.g. Captain Jules"
+                            className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                            Phone Number for Delivery Updates *
+                          </label>
+                          <input
+                            type="tel"
+                            required
+                            value={customerDeliveryPhone}
+                            onChange={(e) => setCustomerDeliveryPhone(e.target.value)}
+                            placeholder="e.g. 08012345678"
+                            className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
+                            Full Delivery Address *
+                          </label>
+                          <textarea
+                            rows={3}
+                            required
+                            value={customerDeliveryAddress}
+                            onChange={(e) => setCustomerDeliveryAddress(e.target.value)}
+                            placeholder="e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"
+                            className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00] resize-none"
+                          />
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-orange-50/60 border-0 space-y-1">
+                          <div className="flex items-center justify-between text-xs font-bold text-gray-800">
+                            <span>Payment Method:</span>
+                            <span className="text-emerald-600 font-black">Main NGN Wallet</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs font-black">
+                            <span className="text-gray-600">Total Order Charge:</span>
+                            <span className="text-[#FC7A00] text-sm">₦{cartSubtotal.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </form>
+                    </div>
+
+                    <div className="pt-4 border-0 space-y-2">
+                      <button
+                        type="submit"
+                        form="checkout-form"
+                        disabled={isPlacingOrder}
+                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 border-0"
+                      >
+                        {isPlacingOrder ? (
+                          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[18px]">verified</span>
+                        )}
+                        <span>Confirm Order & Pay ₦{cartSubtotal.toLocaleString()}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Customer Order History Smooth Bottom Drawer */}
+        <AnimatePresence>
+          {isMyOrdersOpen && (
+            <div className="fixed inset-0 z-[100003] flex flex-col justify-end">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMyOrdersOpen(false)}
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+              />
+
+              {/* Drawer Box */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="relative bg-white rounded-t-[28px] max-h-[85vh] h-[80vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+              >
+                {/* Drag Handle */}
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
+
+                {/* Header with single close icon */}
+                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">receipt_long</span>
+                    <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                      My Order History
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMyOrdersOpen(false)}
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                    title="Close"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar pb-24">
+                  {isLoadingMyOrders ? (
+                    <div className="py-16 text-center text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Loading Order History...
+                    </div>
+                  ) : myOrders.length === 0 ? (
+                    <div className="py-16 text-center space-y-2">
+                      <span className="material-symbols-outlined text-[48px] text-gray-300">shopping_bag</span>
+                      <p className="font-bold text-xs text-gray-500">You have not placed any store orders yet.</p>
+                    </div>
+                  ) : (
+                    myOrders.map((ord) => (
+                      <div key={ord.id} className="p-4 bg-gray-50 border-0 rounded-2xl space-y-2.5 shadow-3xs">
+                        <div className="flex items-center justify-between pb-2">
+                          <div>
+                            <span className="font-mono font-black text-xs text-[#FC7A00]">{ord.id}</span>
+                            <span className="text-[10px] text-gray-400 block">{new Date(ord.createdAt).toLocaleString()}</span>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase border-0 bg-orange-100 text-orange-800">
+                            {ord.status}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between font-bold text-gray-700">
+                            <span>Items ({ord.items?.length || 0}):</span>
+                            <span>₦{ord.totalAmount?.toLocaleString()}</span>
+                          </div>
+                          <p className="text-[10.5px] text-gray-500 line-clamp-2">
+                            {ord.items?.map((i: any) => `${i.title} (x${i.quantity})`).join(", ")}
+                          </p>
+                        </div>
+
+                        {ord.adminNotes && (
+                          <div className="p-2 rounded-xl bg-orange-50 border-0 text-[10px] text-orange-800 font-medium">
+                            <strong>Admin Note:</strong> {ord.adminNotes}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Dedicated Paginated "Recently Viewed" Smooth Bottom Drawer */}
+        <AnimatePresence>
+          {isAllRecentlyViewedOpen && (
+            <div className="fixed inset-0 z-[100007] flex flex-col justify-end">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsAllRecentlyViewedOpen(false)}
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+              />
+
+              {/* Drawer Box */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="relative bg-white rounded-t-[28px] max-h-[85vh] h-[80vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+              >
+                {/* Drag Handle */}
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
+
+                {/* Header */}
+                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
+                    <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                      Recently Viewed History
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAllRecentlyViewedOpen(false)}
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                    title="Close"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar pb-24">
+                  {recentlyViewed.length === 0 ? (
+                    <div className="py-16 text-center space-y-2">
+                      <span className="material-symbols-outlined text-[48px] text-gray-300">history_toggle_off</span>
+                      <p className="font-bold text-xs text-gray-500">Your recently viewed history is empty.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-gray-400">
+                        <span>
+                          Showing {Math.min(visibleRecentlyViewedLimit, recentlyViewed.length)} of {recentlyViewed.length} items
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecentlyViewed([]);
+                            if (typeof window !== "undefined") localStorage.removeItem("e_tech_recently_viewed");
+                            setIsAllRecentlyViewedOpen(false);
+                          }}
+                          className="text-red-500 hover:underline cursor-pointer border-0"
+                        >
+                          Clear All History
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3.5">
+                        {recentlyViewed.slice(0, visibleRecentlyViewedLimit).map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              setIsAllRecentlyViewedOpen(false);
+                              handleOpenProductPage(item);
+                            }}
+                            className="bg-gray-50 rounded-2xl p-3.5 flex flex-col justify-between space-y-3 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
+                          >
+                            <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
+                              {item.imageUrl ? (
+                                <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
+                              ) : (
+                                <span className="material-symbols-outlined text-[32px] text-gray-300">storefront</span>
+                              )}
+                              <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
+                                {item.category}
+                              </span>
+                            </div>
+
+                            <div>
+                              <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
+                                {item.title}
+                              </h4>
+                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-1">
                                 ₦{item.price.toLocaleString()}
                               </p>
                             </div>
@@ -1485,26 +1383,209 @@ export default function StorePage() {
                         ))}
                       </div>
 
-                      {results.length > visibleSearchLimit && (
+                      {recentlyViewed.length > visibleRecentlyViewedLimit && (
                         <div className="pt-3 text-center">
                           <button
                             type="button"
-                            onClick={() => setVisibleSearchLimit((prev) => prev + 20)}
+                            onClick={() => setVisibleRecentlyViewedLimit((prev) => prev + 10)}
                             className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
                           >
-                            Load More Products ({results.length - visibleSearchLimit} remaining)
+                            Load More History ({recentlyViewed.length - visibleRecentlyViewedLimit} remaining)
                           </button>
                         </div>
                       )}
                     </div>
-                  );
-                })()}
-              </div>
-            </motion.div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
-        {/* Confirmed Order Modal Dialog */}
+        {/* Full-Screen Search Smooth Drawer */}
+        <AnimatePresence>
+          {isSearchModalOpen && (
+            <div className="fixed inset-0 z-[100005] flex flex-col justify-end">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => {
+                  setSearchQuery(searchModalQuery);
+                  setActiveCategory(searchModalCategory);
+                  setIsSearchModalOpen(false);
+                }}
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+              />
+
+              {/* Drawer Box */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="relative bg-white rounded-t-[28px] max-h-[92vh] h-[90vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+              >
+                {/* Drag Handle */}
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
+
+                {/* Header with Search Input & Close */}
+                <div className="px-5 pb-3 flex items-center justify-between gap-3 flex-shrink-0 border-b border-gray-100">
+                  <div className="relative flex-1">
+                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={searchModalQuery}
+                      onChange={(e) => {
+                        setSearchModalQuery(e.target.value);
+                        setVisibleSearchLimit(20);
+                      }}
+                      placeholder="Search store products, gear, hardware..."
+                      className="w-full bg-gray-100 focus:bg-gray-150 rounded-2xl pl-10 pr-9 py-2.5 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none"
+                    />
+                    {searchModalQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchModalQuery("");
+                          setVisibleSearchLimit(20);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black border-0"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery(searchModalQuery);
+                      setActiveCategory(searchModalCategory);
+                      setIsSearchModalOpen(false);
+                    }}
+                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0 flex-shrink-0"
+                    title="Close"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <div className="px-5 py-2 flex gap-2 overflow-x-auto no-scrollbar border-b border-gray-100 flex-shrink-0 select-none">
+                  {categories.filter((c) => !c.isHidden).map((cat) => {
+                    const isActive = searchModalCategory.toLowerCase() === cat.name.toLowerCase();
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setSearchModalCategory(cat.name);
+                          setVisibleSearchLimit(20);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border-0 ${
+                          isActive
+                            ? "bg-[#FC7A00] text-white shadow-xs"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {cat.name}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar pb-24">
+                  {(() => {
+                    const q = searchModalQuery.toLowerCase().trim();
+                    const results = items.filter((item) => {
+                      const matchesCategory =
+                        searchModalCategory === "ALL" || item.category.toLowerCase() === searchModalCategory.toLowerCase();
+                      const matchesQuery =
+                        !q ||
+                        item.title.toLowerCase().includes(q) ||
+                        item.description.toLowerCase().includes(q) ||
+                        item.category.toLowerCase().includes(q);
+                      return matchesCategory && matchesQuery;
+                    });
+
+                    const paginatedResults = results.slice(0, visibleSearchLimit);
+
+                    if (results.length === 0) {
+                      return (
+                        <div className="py-16 text-center space-y-3">
+                          <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto text-gray-300">
+                            <span className="material-symbols-outlined text-[32px]">search_off</span>
+                          </div>
+                          <h3 className="font-bodoni font-bold text-base text-black">No Products Found</h3>
+                          <p className="font-hanken text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                            {q
+                              ? `No store items matched "${q}". Try searching another keyword.`
+                              : "No products match the selected category filter."}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-4">
+                        <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
+                          Showing {paginatedResults.length} of {results.length} matched products
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          {paginatedResults.map((item) => (
+                            <div
+                              key={item.id}
+                              onClick={() => {
+                                setIsSearchModalOpen(false);
+                                handleOpenProductPage(item);
+                              }}
+                              className="bg-gray-50 rounded-2xl p-3 flex flex-col justify-between space-y-2.5 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
+                            >
+                              <div className="w-full h-24 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
+                                {item.imageUrl ? (
+                                  <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
+                                ) : (
+                                  <span className="material-symbols-outlined text-[28px] text-gray-300">storefront</span>
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
+                                  {item.title}
+                                </h4>
+                                <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
+                                  ₦{item.price.toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {results.length > visibleSearchLimit && (
+                          <div className="pt-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setVisibleSearchLimit((prev) => prev + 20)}
+                              className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
+                            >
+                              Load More Products ({results.length - visibleSearchLimit} remaining)
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Confirmed Order Dialog */}
         {confirmedOrder && (
           <div className="fixed inset-0 z-[100004] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
             <div className="w-full max-w-sm p-6 rounded-3xl bg-white text-black space-y-4 shadow-2xl text-center border-0">
