@@ -36,12 +36,25 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark" || cached === "light") {
-        setTheme(cached);
+    const syncTheme = () => {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("cpanel_theme");
+        if (cached === "dark" || cached === "light") {
+          setTheme(cached);
+        }
       }
-    }
+    };
+
+    syncTheme();
+
+    const handleThemeChange = () => syncTheme();
+    window.addEventListener("cpanel_theme_change", handleThemeChange);
+    window.addEventListener("storage", handleThemeChange);
+
+    return () => {
+      window.removeEventListener("cpanel_theme_change", handleThemeChange);
+      window.removeEventListener("storage", handleThemeChange);
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -49,6 +62,7 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
       const next = prev === "light" ? "dark" : "light";
       if (typeof window !== "undefined") {
         localStorage.setItem("cpanel_theme", next);
+        window.dispatchEvent(new Event("cpanel_theme_change"));
       }
       return next;
     });
