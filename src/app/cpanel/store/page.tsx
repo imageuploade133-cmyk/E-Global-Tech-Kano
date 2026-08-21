@@ -26,54 +26,6 @@ interface StoreItem {
   createdAt: string;
 }
 
-interface StoreSlide {
-  id: string;
-  imageUrl: string;
-  title: string;
-  subtitle: string;
-  description?: string;
-  link: string;
-  customWidth?: number | null;
-  customHeight?: number | null;
-  mobileHeight?: number | null;
-  desktopHeight?: number | null;
-  marginBottom?: number | null;
-  isCrop?: boolean;
-  isHidden?: boolean;
-  createdAt?: string;
-}
-
-interface StoreSettings {
-  storeName?: string;
-  storeLogoUrl?: string;
-  enableProductSharing?: boolean;
-  borderColor?: string;
-  borderOpacity?: number;
-  hideBorders?: boolean;
-  enableGradientBorder?: boolean;
-  gradientColorStart?: string;
-  gradientColorEnd?: string;
-  cardBorderRadius?: number;
-  borderWidth?: number;
-  recentlyViewedBorderEnabled?: boolean;
-  recentlyViewedBorderColor?: string;
-  recentlyViewedBorderOpacity?: number;
-  orderStatuses?: string[];
-  searchBarMarginTop?: number;
-  bannerOverlayFadeEnabled?: boolean;
-  bannerSlideIntervalSeconds?: number;
-  bannerBorderEnabled?: boolean;
-  bannerBorderColor?: string;
-  bannerBackgroundColor?: string;
-  bannerImageMode?: "cover" | "contain";
-  bannerSlideEffect?: "fade" | "slide";
-  bannerImagePosition?: string;
-  bannerShowIndicators?: boolean;
-  bannerMarginBottom?: number;
-  bannerHeightMobile?: number;
-  bannerHeightDesktop?: number;
-}
-
 function ButtonSpinner() {
   return (
     <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -84,13 +36,10 @@ export default function CpanelStorePage() {
   const router = useRouter();
   const [isDark, setIsDark] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
-  const [activeTab, setActiveTab] = useState<"items" | "slides" | "settings">("items");
 
   // Data states
   const [items, setItems] = useState<StoreItem[]>([]);
-  const [slides, setSlides] = useState<StoreSlide[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [settings, setSettings] = useState<StoreSettings>({ borderColor: "#FC7A00", hideBorders: false, enableProductSharing: true });
   const [isLoading, setIsLoading] = useState(true);
 
   // Item Form & Edit Modal state
@@ -113,64 +62,7 @@ export default function CpanelStorePage() {
   const [isUploadingItemImage, setIsUploadingItemImage] = useState(false);
   const [isSavingItem, setIsSavingItem] = useState(false);
 
-  // New Slide Form & Edit state
-  const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
-  const [slideImageUrl, setSlideImageUrl] = useState("");
-  const [slideTitle, setSlideTitle] = useState("");
-  const [slideSubtitle, setSlideSubtitle] = useState("");
-  const [slideLink, setSlideLink] = useState("");
-  const [slideCustomWidth, setSlideCustomWidth] = useState<string>("");
-  const [slideIsCrop, setSlideIsCrop] = useState(true);
-  const [slideIsHidden, setSlideIsHidden] = useState(false);
-  const [slideMarginBottom, setSlideMarginBottom] = useState(20);
-  const [slideMobileHeight, setSlideMobileHeight] = useState(176);
-  const [slideDesktopHeight, setSlideDesktopHeight] = useState(220);
-  const [isUploadingSlideImage, setIsUploadingSlideImage] = useState(false);
-  const [isSavingSlide, setIsSavingSlide] = useState(false);
-
-  // Slide Display Settings Form
-  const [searchBarMarginTop, setSearchBarMarginTop] = useState(0);
-  const [bannerOverlayFadeEnabled, setBannerOverlayFadeEnabled] = useState(true);
-  const [bannerSlideIntervalSeconds, setBannerSlideIntervalSeconds] = useState(5);
-  const [bannerBorderEnabled, setBannerBorderEnabled] = useState(false);
-  const [bannerBorderColor, setBannerBorderColor] = useState("#FC7A00");
-  const [bannerBackgroundColor, setBannerBackgroundColor] = useState("#111827");
-  const [bannerImageMode, setBannerImageMode] = useState<"cover" | "contain">("cover");
-  const [bannerSlideEffect, setBannerSlideEffect] = useState<"fade" | "slide">("fade");
-  const [bannerImagePosition, setBannerImagePosition] = useState("center");
-  const [bannerShowIndicators, setBannerShowIndicators] = useState(true);
-  const [bannerMarginBottom, setBannerMarginBottom] = useState(20);
-  const [bannerHeightMobile, setBannerHeightMobile] = useState(176);
-  const [bannerHeightDesktop, setBannerHeightDesktop] = useState(220);
-
-  // Store Settings Form
-  const [storeName, setStoreName] = useState("E-Tech Store");
-  const [storeLogoUrl, setStoreLogoUrl] = useState("");
-  const [enableProductSharing, setEnableProductSharing] = useState(true);
-  const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
-  const [borderColor, setBorderColor] = useState("#FC7A00");
-  const [borderOpacity, setBorderOpacity] = useState(100);
-  const [hideBorders, setHideBorders] = useState(false);
-  const [enableGradientBorder, setEnableGradientBorder] = useState(false);
-  const [gradientColorStart, setGradientColorStart] = useState("#FC7A00");
-  const [gradientColorEnd, setGradientColorEnd] = useState("#0b513d");
-  const [cardBorderRadius, setCardBorderRadius] = useState<number>(16);
-  const [borderWidth, setBorderWidth] = useState<number>(1);
-  const [recentlyViewedBorderEnabled, setRecentlyViewedBorderEnabled] = useState(true);
-  const [recentlyViewedBorderColor, setRecentlyViewedBorderColor] = useState("#FC7A00");
-  const [recentlyViewedBorderOpacity, setRecentlyViewedBorderOpacity] = useState(20);
-  const [orderStatuses, setOrderStatuses] = useState<string[]>([
-    "Pending",
-    "Processing",
-    "Shipped",
-    "Delivered",
-    "Refunded",
-    "Canceled",
-  ]);
-  const [newStatusInput, setNewStatusInput] = useState("");
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
-
-  // Deleting item/slide ID
+  // Deleting item ID
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Custom Confirmation Modal State
@@ -262,40 +154,6 @@ export default function CpanelStorePage() {
 
       if (data.success) {
         setItems(data.items || []);
-        setSlides(data.slides || []);
-        if (data.settings) {
-          setSettings(data.settings);
-          setStoreName(data.settings.storeName || "E-Tech Store");
-          setStoreLogoUrl(data.settings.storeLogoUrl || "");
-          setEnableProductSharing(data.settings.enableProductSharing !== false);
-          setBorderColor(data.settings.borderColor || "#FC7A00");
-          setBorderOpacity(data.settings.borderOpacity ?? 100);
-          setHideBorders(Boolean(data.settings.hideBorders));
-          setEnableGradientBorder(Boolean(data.settings.enableGradientBorder));
-          setGradientColorStart(data.settings.gradientColorStart || "#FC7A00");
-          setGradientColorEnd(data.settings.gradientColorEnd || "#0b513d");
-          setCardBorderRadius(data.settings.cardBorderRadius ?? 16);
-          setBorderWidth(data.settings.borderWidth ?? 1);
-          setRecentlyViewedBorderEnabled(data.settings.recentlyViewedBorderEnabled !== false);
-          setRecentlyViewedBorderColor(data.settings.recentlyViewedBorderColor || "#FC7A00");
-          setRecentlyViewedBorderOpacity(data.settings.recentlyViewedBorderOpacity ?? 20);
-          if (Array.isArray(data.settings.orderStatuses)) {
-            setOrderStatuses(data.settings.orderStatuses);
-          }
-          setSearchBarMarginTop(data.settings.searchBarMarginTop ?? 0);
-          setBannerOverlayFadeEnabled(data.settings.bannerOverlayFadeEnabled !== false);
-          setBannerSlideIntervalSeconds(data.settings.bannerSlideIntervalSeconds || 5);
-          setBannerBorderEnabled(Boolean(data.settings.bannerBorderEnabled));
-          setBannerBorderColor(data.settings.bannerBorderColor || "#FC7A00");
-          setBannerBackgroundColor(data.settings.bannerBackgroundColor || "#111827");
-          setBannerImageMode(data.settings.bannerImageMode || "cover");
-          setBannerSlideEffect(data.settings.bannerSlideEffect || "fade");
-          setBannerImagePosition(data.settings.bannerImagePosition || "center");
-          setBannerShowIndicators(data.settings.bannerShowIndicators !== false);
-          setBannerMarginBottom(data.settings.bannerMarginBottom ?? 20);
-          setBannerHeightMobile(data.settings.bannerHeightMobile || 176);
-          setBannerHeightDesktop(data.settings.bannerHeightDesktop || 220);
-        }
       } else {
         toast.error(data.error || "Failed to load store data.");
       }
@@ -333,68 +191,6 @@ export default function CpanelStorePage() {
       toast.error(err.message || "Network error uploading image.", { id: "img-upload" });
     } finally {
       setUploading(false);
-    }
-  };
-
-  // Save Store Settings
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingSettings(true);
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const headers: Record<string, string> = isMock
-        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-        : { "Content-Type": "application/json" };
-
-      const res = await fetch("/api/admin/store", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          action: "update_settings",
-          settings: {
-            storeName,
-            storeLogoUrl,
-            enableProductSharing,
-            borderColor,
-            borderOpacity,
-            hideBorders,
-            enableGradientBorder,
-            gradientColorStart,
-            gradientColorEnd,
-            cardBorderRadius,
-            borderWidth,
-            recentlyViewedBorderEnabled,
-            recentlyViewedBorderColor,
-            recentlyViewedBorderOpacity,
-            orderStatuses,
-            searchBarMarginTop,
-            bannerOverlayFadeEnabled,
-            bannerSlideIntervalSeconds,
-            bannerBorderEnabled,
-            bannerBorderColor,
-            bannerBackgroundColor,
-            bannerImageMode,
-            bannerSlideEffect,
-            bannerImagePosition,
-            bannerShowIndicators,
-            bannerMarginBottom,
-            bannerHeightMobile,
-            bannerHeightDesktop,
-          },
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Storefront settings updated!");
-        if (data.settings) setSettings(data.settings);
-      } else {
-        toast.error(data.error || "Failed to update store settings.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Network error updating settings.");
-    } finally {
-      setIsSavingSettings(false);
     }
   };
 
@@ -511,6 +307,7 @@ export default function CpanelStorePage() {
       if (res.ok && data.success) {
         toast.success(editingItemId ? "Store item updated successfully!" : "Store item added successfully!");
         setItems(data.items || []);
+        setIsProductModalOpen(false);
         resetItemForm();
       } else {
         toast.error(data.error || "Failed to save store item.");
@@ -565,128 +362,6 @@ export default function CpanelStorePage() {
     );
   };
 
-  const resetSlideForm = () => {
-    setEditingSlideId(null);
-    setSlideImageUrl("");
-    setSlideTitle("");
-    setSlideSubtitle("");
-    setSlideLink("");
-    setSlideCustomWidth("");
-    setSlideIsCrop(true);
-    setSlideIsHidden(false);
-    setSlideMarginBottom(20);
-    setSlideMobileHeight(176);
-    setSlideDesktopHeight(220);
-  };
-
-  const handleStartEditSlide = (s: StoreSlide) => {
-    setEditingSlideId(s.id);
-    setSlideImageUrl(s.imageUrl || "");
-    setSlideTitle(s.title || "");
-    setSlideSubtitle(s.subtitle || s.description || "");
-    setSlideLink(s.link || "");
-    setSlideCustomWidth(s.customWidth !== null && s.customWidth !== undefined ? String(s.customWidth) : "");
-    setSlideIsCrop(s.isCrop !== false);
-    setSlideIsHidden(Boolean(s.isHidden));
-    setSlideMarginBottom(s.marginBottom !== undefined && s.marginBottom !== null ? s.marginBottom : 20);
-    setSlideMobileHeight(s.mobileHeight !== undefined && s.mobileHeight !== null ? s.mobileHeight : 176);
-    setSlideDesktopHeight(s.desktopHeight !== undefined && s.desktopHeight !== null ? s.desktopHeight : 220);
-  };
-
-  // Add/Edit Slide Submit
-  const handleAddSlide = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!slideImageUrl.trim()) {
-      toast.error("Slide image URL is required.");
-      return;
-    }
-
-    setIsSavingSlide(true);
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const headers: Record<string, string> = isMock
-        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-        : { "Content-Type": "application/json" };
-
-      const action = editingSlideId ? "edit_slide" : "add_slide";
-
-      const res = await fetch("/api/admin/store", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          action,
-          slide: {
-            id: editingSlideId || undefined,
-            imageUrl: slideImageUrl,
-            title: slideTitle,
-            subtitle: slideSubtitle,
-            description: slideSubtitle,
-            link: slideLink,
-            customWidth: slideCustomWidth !== "" ? Number(slideCustomWidth) : null,
-            isCrop: slideIsCrop,
-            isHidden: slideIsHidden,
-            marginBottom: Number(slideMarginBottom) || 0,
-            mobileHeight: Number(slideMobileHeight) || 176,
-            desktopHeight: Number(slideDesktopHeight) || 220,
-          },
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(editingSlideId ? "Store slide updated!" : "Store slide added!");
-        setSlides(data.slides || []);
-        resetSlideForm();
-      } else {
-        toast.error(data.error || "Failed to save slide image.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Network error saving slide image.");
-    } finally {
-      setIsSavingSlide(false);
-    }
-  };
-
-  // Delete Slide with Confirmation Modal
-  const handleDeleteSlide = async (slideId: string) => {
-    triggerConfirm(
-      "Delete Store Slide?",
-      "Are you sure you want to permanently delete this storefront slideshow banner?",
-      "Delete Slide",
-      "danger",
-      async () => {
-        setDeletingId(slideId);
-        try {
-          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-          const headers: Record<string, string> = isMock
-            ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-            : { "Content-Type": "application/json" };
-
-          const res = await fetch("/api/admin/store", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              action: "delete_slide",
-              slideId,
-            }),
-          });
-
-          const data = await res.json();
-          if (res.ok && data.success) {
-            toast.success("Store slide image deleted.");
-            setSlides(data.slides || []);
-          } else {
-            toast.error(data.error || "Failed to delete slide image.");
-          }
-        } catch (err: any) {
-          toast.error(err.message || "Network error deleting slide image.");
-        } finally {
-          setDeletingId(null);
-        }
-      }
-    );
-  };
-
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
   const panelClass = isDark ? "bg-[#131927] border-gray-800" : "bg-white border-gray-200 shadow-sm";
   const inputClass = isDark
@@ -719,11 +394,11 @@ export default function CpanelStorePage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-orange-500 text-[22px]">storefront</span>
-                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Storefront Manager</h1>
+                <span className="material-symbols-outlined text-orange-500 text-[22px]">inventory_2</span>
+                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Store Products Manager</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Add products, gear, memberships, customize store slide banners, manage product reviews, and configure border styles.
+                Add, update, or remove product catalog items for end-users on your digital store.
               </p>
             </div>
           </div>
@@ -747,561 +422,108 @@ export default function CpanelStorePage() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-3 border-b border-gray-200/40 pb-2 overflow-x-auto no-scrollbar">
-          <button
-            type="button"
-            onClick={() => setActiveTab("items")}
-            className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
-              activeTab === "items"
-                ? "bg-[#FC7A00] text-white shadow-sm"
-                : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]">inventory_2</span>
-            <span>Store Products ({items.length})</span>
-          </button>
-
-          <Link
-            href="/cpanel/store/orders"
-            className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap bg-gradient-to-r from-orange-500 to-[#FC7A00] text-white shadow-sm hover:opacity-95"
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
-            <span>Dispatch Orders</span>
-          </Link>
-
-          <Link
-            href="/cpanel/store/reviews"
-            className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]">rate_review</span>
-            <span>Customer Reviews</span>
-          </Link>
-
-          <Link
-            href="/cpanel/store/stock"
-            className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap border border-orange-500/30 text-orange-600 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20"
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]">trending_up</span>
-            <span>Stock Income</span>
-          </Link>
-
-          <Link
-            href="/cpanel/store/categories"
-            className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
-              isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]">category</span>
-            <span>Manage Categories ({categories.length})</span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("slides")}
-            className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
-              activeTab === "slides"
-                ? "bg-[#FC7A00] text-white shadow-sm"
-                : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]">view_carousel</span>
-            <span>Store Slides ({slides.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("settings")}
-            className={cn(
-              "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap",
-              activeTab === "settings"
-                ? "bg-[#FC7A00] text-white shadow-sm"
-                : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]">settings</span>
-            <span>Store Settings</span>
-          </button>
-        </div>
-
-        {/* TAB 1: Store Items Grid */}
-        {activeTab === "items" && (
-          <div className="space-y-4">
-            <div className={cn("p-4 rounded-2xl border flex items-center justify-between gap-4", panelClass)}>
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">inventory_2</span>
-                <h3 className="font-extrabold text-sm uppercase">Products Directory ({items.length})</h3>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleOpenAddModal}
-                className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-              >
-                <span className="material-symbols-outlined text-[18px]">add</span>
-                <span>Add Product</span>
-              </button>
+        {/* Store Items Grid */}
+        <div className="space-y-4">
+          <div className={cn("p-4 rounded-2xl border flex items-center justify-between gap-4", panelClass)}>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">inventory_2</span>
+              <h3 className="font-extrabold text-sm uppercase">Products Directory ({items.length})</h3>
             </div>
 
-            <div className="w-full">
-              {isLoading ? (
-                <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
-                  <ButtonSpinner />
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Storefront Products...</p>
-                </div>
-              ) : items.length === 0 ? (
-                <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
-                  <span className="material-symbols-outlined text-[48px] text-gray-400">inventory_2</span>
-                  <p className="text-xs font-black uppercase text-gray-400">No Store Products Added</p>
-                  <p className="text-[11px] text-gray-500 max-w-md mx-auto">Use the form on the left to create and display items for end-users on the Store page.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {items.map((item) => {
-                    const isDeleting = deletingId === item.id;
-                    return (
-                      <div key={item.id} className={cn("p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition-all", panelClass)}>
-                        <div className="space-y-3">
-                          <div className="w-full h-36 rounded-xl border border-gray-200/50 bg-white overflow-hidden relative flex items-center justify-center">
-                            {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="material-symbols-outlined text-[48px] text-gray-300">storefront</span>
-                            )}
-                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-black/70 text-white backdrop-blur-xs">
-                              {item.category}
-                            </span>
-                          </div>
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              <span>Add Product</span>
+            </button>
+          </div>
 
-                          <div>
-                            <div className="flex items-center justify-between gap-2">
-                              <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{item.title}</h4>
-                              <div className="text-right">
-                                {item.discountPrice ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-mono text-[10px] text-gray-400 line-through">₦{item.price.toLocaleString()}</span>
-                                    <span className="font-mono font-black text-sm text-emerald-600">₦{item.discountPrice.toLocaleString()}</span>
-                                  </div>
-                                ) : (
-                                  <span className="font-mono font-black text-sm text-[#FC7A00]">₦{item.price.toLocaleString()}</span>
-                                )}
-                              </div>
-                            </div>
-                            <p className="text-[10.5px] text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{item.description || "No description provided."}</p>
-                          </div>
+          <div className="w-full">
+            {isLoading ? (
+              <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
+                <ButtonSpinner />
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Storefront Products...</p>
+              </div>
+            ) : items.length === 0 ? (
+              <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
+                <span className="material-symbols-outlined text-[48px] text-gray-400">inventory_2</span>
+                <p className="text-xs font-black uppercase text-gray-400">No Store Products Added</p>
+                <p className="text-[11px] text-gray-500 max-w-md mx-auto">Click &quot;Add Product&quot; above to create and display items for end-users on the Store page.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {items.map((item) => {
+                  const isDeleting = deletingId === item.id;
+                  return (
+                    <div key={item.id} className={cn("p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition-all", panelClass)}>
+                      <div className="space-y-3">
+                        <div className="w-full h-36 rounded-xl border border-gray-200/50 bg-white overflow-hidden relative flex items-center justify-center">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="material-symbols-outlined text-[48px] text-gray-300">storefront</span>
+                          )}
+                          <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-black/70 text-white backdrop-blur-xs">
+                            {item.category}
+                          </span>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-200/40">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
-                            item.inStock ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"
-                          )}>
-                            {item.inStock ? "IN STOCK" : "OUT OF STOCK"}
-                          </span>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEditItem(item)}
-                              className="text-[10px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">edit</span>
-                              <span>Edit</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={isDeleting}
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-                            >
-                              {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">delete</span>}
-                              <span>Delete</span>
-                            </button>
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{item.title}</h4>
+                            <div className="text-right">
+                              {item.discountPrice ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[10px] text-gray-400 line-through">₦{item.price.toLocaleString()}</span>
+                                  <span className="font-mono font-black text-sm text-emerald-600">₦{item.discountPrice.toLocaleString()}</span>
+                                </div>
+                              ) : (
+                                <span className="font-mono font-black text-sm text-[#FC7A00]">₦{item.price.toLocaleString()}</span>
+                              )}
+                            </div>
                           </div>
+                          <p className="text-[10.5px] text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{item.description || "No description provided."}</p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
-          </div>
-        )}
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200/40">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
+                          item.inStock ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"
+                        )}>
+                          {item.inStock ? "IN STOCK" : "OUT OF STOCK"}
+                        </span>
 
-        {/* TAB 2: Store Slides Form & List */}
-        {activeTab === "slides" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {/* Add / Edit Slide Form */}
-            <div className={cn("p-5 rounded-2xl border space-y-4 lg:col-span-1 h-fit", panelClass)}>
-              <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider">
-                    {editingSlideId ? "Edit Store Banner Slide" : "Add Store Banner Slide"}
-                  </h3>
-                </div>
-                {editingSlideId && (
-                  <button
-                    type="button"
-                    onClick={resetSlideForm}
-                    className="text-[10px] font-bold text-gray-400 hover:text-black dark:hover:text-white uppercase cursor-pointer"
-                  >
-                    Cancel Edit
-                  </button>
-                )}
-              </div>
-
-              <form onSubmit={handleAddSlide} className="space-y-3.5">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Image URL or File</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Paste image URL (https://...)"
-                      value={slideImageUrl}
-                      onChange={(e) => setSlideImageUrl(e.target.value)}
-                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
-                    />
-                    <div className="relative flex-shrink-0">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) uploadImageToImgBB(file, setSlideImageUrl, setIsUploadingSlideImage);
-                        }}
-                        disabled={isUploadingSlideImage}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                      />
-                      <button
-                        type="button"
-                        disabled={isUploadingSlideImage}
-                        className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
-                      >
-                        {isUploadingSlideImage ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
-                  <label className="text-[10px] font-black uppercase text-orange-500 block">
-                    Image Fit & Size (Don&apos;t Cut Off)
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSlideIsCrop(true)}
-                      className={cn(
-                        "py-2 px-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider border transition-all cursor-pointer",
-                        slideIsCrop
-                          ? "bg-[#FC7A00] text-white border-[#FC7A00]"
-                          : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:text-black dark:hover:text-white"
-                      )}
-                    >
-                      Cropped (Cover)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSlideIsCrop(false)}
-                      className={cn(
-                        "py-2 px-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider border transition-all cursor-pointer",
-                        !slideIsCrop
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:text-black dark:hover:text-white"
-                      )}
-                    >
-                      Keep Size (Contain)
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Title</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Exclusive E-Tech Gear!"
-                    value={slideTitle}
-                    onChange={(e) => setSlideTitle(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Subtitle / Caption</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Get 20% discount on all POS hardware."
-                    value={slideSubtitle}
-                    onChange={(e) => setSlideSubtitle(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSavingSlide || isUploadingSlideImage}
-                  className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {isSavingSlide ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">{editingSlideId ? "save" : "add_photo_alternate"}</span>}
-                  <span>{editingSlideId ? "Save Slide Changes" : "Add Slide Banner"}</span>
-                </button>
-              </form>
-            </div>
-
-            {/* Slides List */}
-            <div className="lg:col-span-2 space-y-4">
-              {isLoading ? (
-                <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
-                  <ButtonSpinner />
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Store Slides...</p>
-                </div>
-              ) : slides.length === 0 ? (
-                <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
-                  <span className="material-symbols-outlined text-[48px] text-gray-400">view_carousel</span>
-                  <p className="text-xs font-black uppercase text-gray-400">No Store Slides Added</p>
-                  <p className="text-[11px] text-gray-500 max-w-md mx-auto">Upload slideshow banner images to showcase store promotions to end-users.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {slides.map((slide) => {
-                    const isDeleting = deletingId === slide.id;
-                    return (
-                      <div key={slide.id} className={cn("p-4 rounded-2xl border flex flex-col md:flex-row gap-4 items-center justify-between transition-all", panelClass)}>
-                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                          <div className="w-28 h-16 rounded-xl border border-gray-200/50 bg-white overflow-hidden flex-shrink-0 relative">
-                            <img
-                              src={slide.imageUrl}
-                              alt={slide.title || "Slide"}
-                              className={cn("w-full h-full", slide.isCrop !== false ? "object-cover" : "object-contain bg-gray-900")}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{slide.title || "Untitled Slide"}</h4>
-                            <p className="text-[11px] text-gray-400 font-medium truncate">{slide.subtitle || "No subtitle provided."}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleStartEditSlide(slide)}
-                            className="px-3 h-9 border border-orange-500/30 text-[#FC7A00] bg-orange-500/10 hover:bg-orange-500/20 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1"
+                            onClick={() => handleStartEditItem(item)}
+                            className="text-[10px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[15px]">edit</span>
+                            <span className="material-symbols-outlined text-[14px]">edit</span>
                             <span>Edit</span>
                           </button>
+
                           <button
                             type="button"
                             disabled={isDeleting}
-                            onClick={() => handleDeleteSlide(slide.id)}
-                            className="px-3 h-9 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
                           >
-                            {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">delete</span>}
+                            {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">delete</span>}
                             <span>Delete</span>
                           </button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-          </div>
-        )}
-
-        {/* TAB 3: Storefront Settings */}
-        {activeTab === "settings" && (
-          <div className="max-w-xl mx-auto">
-            <div className={cn("p-6 rounded-2xl border space-y-5", panelClass)}>
-              <div className="flex items-center gap-2 border-b border-gray-200/40 pb-3">
-                <span className="material-symbols-outlined text-orange-500 text-[22px]">tune</span>
-                <div>
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider">Store Name, Brand Logo & Product Sharing Toggle</h3>
-                  <p className="text-[10.5px] text-gray-400">Configure store settings, social product sharing ON/OFF, and layout parameters.</p>
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              <form onSubmit={handleSaveSettings} className="space-y-4">
-
-                {/* Product Sharing ON/OFF Toggle */}
-                <div className="p-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-xs font-extrabold uppercase text-[#FC7A00] flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[18px]">share</span>
-                        Product Sharing Toggle
-                      </label>
-                      <span className="text-[10px] text-gray-500 font-medium block mt-0.5">
-                        Allow users to copy or share product links directly from product detail page
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEnableProductSharing(!enableProductSharing)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
-                        enableProductSharing
-                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                          : "bg-red-500/10 text-red-500 border-red-500/30"
-                      )}
-                    >
-                      {enableProductSharing ? "SHARING ON" : "SHARING OFF"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Product Card Border Radius Slider */}
-                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[18px]">rounded_corner</span>
-                      Product Card Border Radius ({cardBorderRadius}px)
-                    </label>
-                    <span className="font-mono text-xs font-black text-[#FC7A00]">{cardBorderRadius}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="32"
-                    step="1"
-                    value={cardBorderRadius}
-                    onChange={(e) => setCardBorderRadius(Number(e.target.value))}
-                    className="w-full accent-[#FC7A00] cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[10px] text-gray-400 font-bold uppercase">
-                    <span>0px (Square)</span>
-                    <span>16px (Medium)</span>
-                    <span>32px (Fully Rounded)</span>
-                  </div>
-                </div>
-
-                {/* Product Card Border Width Slider */}
-                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[18px]">line_weight</span>
-                      Product Card Border Width ({borderWidth}px)
-                    </label>
-                    <span className="font-mono text-xs font-black text-[#FC7A00]">{borderWidth}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="8"
-                    step="1"
-                    value={borderWidth}
-                    onChange={(e) => setBorderWidth(Number(e.target.value))}
-                    className="w-full accent-[#FC7A00] cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[10px] text-gray-400 font-bold uppercase">
-                    <span>1px (Thin)</span>
-                    <span>4px (Medium)</span>
-                    <span>8px (Thick)</span>
-                  </div>
-                </div>
-
-                {/* Search Bar Top Space Adjustment Slider */}
-                <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[18px]">search</span>
-                      Search Bar Top Space ({searchBarMarginTop}px)
-                    </label>
-                    <span className="font-mono text-xs font-black text-[#FC7A00]">{searchBarMarginTop}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="2"
-                    value={searchBarMarginTop}
-                    onChange={(e) => setSearchBarMarginTop(Number(e.target.value))}
-                    className="w-full accent-[#FC7A00] cursor-pointer"
-                  />
-                </div>
-
-                {/* Store Name Input */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Store Name / Brand Title</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. E-Tech Store"
-                    value={storeName}
-                    onChange={(e) => setStoreName(e.target.value)}
-                    className={cn("h-10 px-3 rounded-xl text-xs font-extrabold outline-none border transition-all w-full", inputClass)}
-                  />
-                </div>
-
-                {/* Store Logo Upload & Preview */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Store Header Logo</label>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl border border-gray-200/80 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0 relative">
-                      {storeLogoUrl ? (
-                        <img src={storeLogoUrl} alt="Store Logo" className="w-full h-full object-contain p-1" />
-                      ) : (
-                        <span className="material-symbols-outlined text-gray-400 text-[22px]">storefront</span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Paste logo URL (https://...)"
-                      value={storeLogoUrl}
-                      onChange={(e) => setStoreLogoUrl(e.target.value)}
-                      className={cn("flex-1 h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all truncate", inputClass)}
-                    />
-                    <div className="relative flex-shrink-0">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            uploadImageToImgBB(file, setStoreLogoUrl, setIsUploadingStoreLogo);
-                          }
-                        }}
-                        disabled={isUploadingStoreLogo}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                      />
-                      <button
-                        type="button"
-                        disabled={isUploadingStoreLogo}
-                        className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
-                      >
-                        {isUploadingStoreLogo ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSavingSettings}
-                  className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                >
-                  {isSavingSettings ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">save</span>}
-                  <span>Save Store Settings</span>
-                </button>
-              </form>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
       </div>
 
