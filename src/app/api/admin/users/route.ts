@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { adminDb, adminApp } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import { createFirebaseAuthUser, setFirebaseAuthCustomClaims } from "@/lib/firebase-auth-rest";
 
 const ALLOWED_PERMISSIONS = [
   "can_transact",
@@ -268,17 +269,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A user with this email address already exists." }, { status: 400 });
       }
 
-      // Create in Firebase Authentication
-      const { getAuth } = await import("firebase-admin/auth");
-      const userRecord = await getAuth(adminApp).createUser({
+      // Create in Firebase Authentication via REST API (avoids CommonJS/ESM bundle conflicts)
+      const userRecord = await createFirebaseAuthUser({
         email: cleanEmail,
         password,
         displayName: `${firstName.trim()} ${lastName.trim()}`.toUpperCase(),
       });
 
-      // Synchronize role Custom Claims instantly
-      await getAuth(adminApp).setCustomUserClaims(userRecord.uid, {
-        admin: role === "admin"
+      // Synchronize role Custom Claims instantly via REST API
+      await setFirebaseAuthCustomClaims(userRecord.uid, {
+        admin: role === "admin",
       });
 
       // Write user document to Firestore
@@ -341,10 +341,9 @@ export async function POST(req: Request) {
         permissions: cleanPermissions
       });
 
-      // Update Firebase Auth Custom Claims
-      const { getAuth } = await import("firebase-admin/auth");
-      await getAuth(adminApp).setCustomUserClaims(targetUid, {
-        admin: role === "admin"
+      // Update Firebase Auth Custom Claims via REST API
+      await setFirebaseAuthCustomClaims(targetUid, {
+        admin: role === "admin",
       });
 
       return NextResponse.json({

@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -38,7 +41,7 @@ export interface StoreOrder {
 
 export default function CpanelStoreOrdersPage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   // Orders & Metrics State
@@ -70,11 +73,6 @@ export default function CpanelStoreOrdersPage() {
   const [adminNotes, setAdminNotes] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Theme Sync
-  useEffect(() => {
-    const isDarkTheme = document.documentElement.classList.contains("dark");
-    setIsDark(isDarkTheme);
-  }, []);
 
   // Check Admin Unlock Session via /api/admin/auth/session
   useEffect(() => {

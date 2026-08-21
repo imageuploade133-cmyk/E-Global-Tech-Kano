@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { adminDb, adminApp } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import { createFirebaseAuthUser, setFirebaseAuthCustomClaims, getFirebaseAuthUserByEmail } from "@/lib/firebase-auth-rest";
 
 const GRANULAR_PERMISSIONS_CATALOG = [
   { key: "users.view", label: "View Users", category: "Users" },
@@ -116,19 +117,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "An administrator with this email already exists." }, { status: 400 });
       }
 
-      // Create in Firebase Authentication if password provided, or create invitation record
-      const { getAuth } = await import("firebase-admin/auth");
+      // Create or look up in Firebase Authentication via REST API
       let firebaseUid = "";
 
-      try {
-        const userByEmail = await getAuth(adminApp).getUserByEmail(cleanEmail);
-        firebaseUid = userByEmail.uid;
-      } catch {
-        // Create new Firebase User
+      const existingUser = await getFirebaseAuthUserByEmail(cleanEmail);
+      if (existingUser) {
+        firebaseUid = existingUser.uid;
+      } else {
         if (!password || password.length < 6) {
           return NextResponse.json({ error: "Password must be at least 6 characters long." }, { status: 400 });
         }
-        const createdUser = await getAuth(adminApp).createUser({
+        const createdUser = await createFirebaseAuthUser({
           email: cleanEmail,
           password,
           displayName: displayName || cleanEmail.split("@")[0],
@@ -153,9 +152,9 @@ export async function POST(req: Request) {
 
       await adminDb.collection("admin_users").doc(firebaseUid).set(newAdminRecord);
 
-      // Set Custom Claims
+      // Set Custom Claims via REST API
       try {
-        await getAuth(adminApp).setCustomUserClaims(firebaseUid, {
+        await setFirebaseAuthCustomClaims(firebaseUid, {
           admin: true,
           role: role || "admin",
         });

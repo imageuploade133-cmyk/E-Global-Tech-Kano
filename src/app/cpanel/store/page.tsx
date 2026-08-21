@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -366,8 +365,8 @@ export default function CpanelStorePage() {
     <div className={cn("min-h-screen p-4 md:p-8 font-hanken transition-colors duration-300", bgClass)}>
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* Top Header */}
-        <div className={cn("p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
+        {/* Sticky Top Header Bar */}
+        <div className={cn("sticky top-0 z-30 p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md shadow-xs", panelClass)}>
           <div className="flex items-center gap-3">
             <Link
               href="/cpanel"

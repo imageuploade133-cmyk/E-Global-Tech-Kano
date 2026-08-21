@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -16,7 +19,7 @@ function ButtonSpinner() {
 
 export default function CpanelStoreCategoriesPage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   const [categories, setCategories] = useState<StoreCategoryDoc[]>([]);
@@ -66,11 +69,6 @@ export default function CpanelStoreCategoriesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [actionCategoryId, setActionCategoryId] = useState<string | null>(null);
 
-  // Theme Sync
-  useEffect(() => {
-    const isDarkTheme = document.documentElement.classList.contains("dark");
-    setIsDark(isDarkTheme);
-  }, []);
 
   // Check Admin Unlock Session via /api/admin/auth/session
   useEffect(() => {

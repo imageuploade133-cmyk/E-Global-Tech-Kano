@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -34,7 +37,7 @@ function ButtonSpinner() {
 
 export default function CpanelStoreSlidesPage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   const [slides, setSlides] = useState<StoreSlide[]>([]);
@@ -81,32 +84,6 @@ export default function CpanelStoreSlidesPage() {
     setConfirmModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
   };
 
-  useEffect(() => {
-    const syncTheme = () => {
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem("cpanel_theme");
-        setIsDark(cached === "dark");
-      }
-    };
-    syncTheme();
-    window.addEventListener("cpanel_theme_change", syncTheme);
-    window.addEventListener("storage", syncTheme);
-    return () => {
-      window.removeEventListener("cpanel_theme_change", syncTheme);
-      window.removeEventListener("storage", syncTheme);
-    };
-  }, []);
-
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-        window.dispatchEvent(new Event("cpanel_theme_change"));
-      }
-      return next;
-    });
-  };
 
   useEffect(() => {
     async function checkSession() {
