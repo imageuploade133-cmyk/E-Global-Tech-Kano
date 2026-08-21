@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -19,7 +22,7 @@ export default function CpanelSettingsPage() {
   const { config, updateConfig } = useAppConfig();
   const router = useRouter();
 
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [logoInput, setLogoInput] = useState(config.logoUrl);
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
@@ -30,24 +33,9 @@ export default function CpanelSettingsPage() {
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
-      }
-    }
-  }, []);
 
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      }
-      return next;
-    });
-  };
+
+
 
   useEffect(() => {
     setLogoInput(config.logoUrl);

@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -40,7 +43,7 @@ export default function CpanelUsersPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [usersList, setUsersList] = useState<AdminUser[]>([]);
   const [searchUserTerm, setSearchUserTerm] = useState("");
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
@@ -87,24 +90,9 @@ export default function CpanelUsersPage() {
     setAdminActionModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
   };
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
-      }
-    }
-  }, []);
 
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      }
-      return next;
-    });
-  };
+
+
 
   const fetchUsersDirectory = async (searchTermVal?: string) => {
     setIsLoadingUsers(true);
@@ -240,8 +228,8 @@ export default function CpanelUsersPage() {
     <div className={cn("min-h-screen p-4 md:p-8 font-hanken transition-colors duration-300", bgClass)}>
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* Header */}
-        <div className={cn("p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
+        {/* Sticky Header Bar */}
+        <div className={cn("sticky top-0 z-30 p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md shadow-xs", panelClass)}>
           <div className="flex items-center gap-3">
             <Link
               href="/cpanel"

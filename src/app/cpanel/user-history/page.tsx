@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -58,14 +61,7 @@ export default function AdminUserHistoryPage() {
   // Theme support
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark" || cached === "light") {
-        setTheme(cached);
-      }
-    }
-  }, []);
+
 
   const toggleTheme = () => {
     setTheme((prev) => {

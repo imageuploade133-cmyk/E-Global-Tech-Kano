@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -31,7 +34,7 @@ export default function CpanelKycPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [pendingKycList, setPendingKycUser] = useState<PendingKycUser[]>([]);
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
   const [selectedProvider, setSelectedProvider] = useState<Record<string, "flutterwave" | "squad">>({});
@@ -70,24 +73,9 @@ export default function CpanelKycPage() {
     setAdminActionModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
   };
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
-      }
-    }
-  }, []);
 
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      }
-      return next;
-    });
-  };
+
+
 
   const fetchPendingKyc = async (isLoadMore: boolean = false, customTab?: "pending" | "verified_today" | "unverified") => {
     setIsLoadingKyc(true);

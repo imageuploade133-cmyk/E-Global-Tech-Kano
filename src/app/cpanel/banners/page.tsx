@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,14 +45,7 @@ export default function AdminBannersPage() {
   // Theme support
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark" || cached === "light") {
-        setTheme(cached);
-      }
-    }
-  }, []);
+
 
   const isDark = theme === "dark";
   const panelClass = isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border border-gray-200 text-gray-800";

@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -18,7 +21,7 @@ export default function CpanelWhatsappPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [whatsappStatus, setWhatsappStatus] = useState<"LINKED" | "UNLINKED">("UNLINKED");
   const [whatsappPhoneNumber, setWhatsappPhoneNumber] = useState<string | null>(null);
   const [whatsappLinkedAt, setWhatsappLinkedAt] = useState<string | null>(null);
@@ -66,24 +69,9 @@ export default function CpanelWhatsappPage() {
     setAdminActionModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
   };
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
-      }
-    }
-  }, []);
 
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      }
-      return next;
-    });
-  };
+
+
 
   const addWhatsappLog = (msg: string) => {
     const time = new Date().toLocaleTimeString();

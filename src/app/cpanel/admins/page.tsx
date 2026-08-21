@@ -1,4 +1,7 @@
 "use client";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+
+
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -35,7 +38,7 @@ function ButtonSpinner() {
 
 export default function CpanelAdminsPage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [admins, setAdmins] = useState<AdminUserRecord[]>([]);
   const [permissionCatalog, setPermissionCatalog] = useState<PermissionCatalogItem[]>([]);
@@ -57,24 +60,9 @@ export default function CpanelAdminsPage() {
   const [deletingUid, setDeletingUid] = useState<string | null>(null);
 
   // Theme Syncing
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
-      }
-    }
-  }, []);
 
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      }
-      return next;
-    });
-  };
+
+
 
   // Auth & Session Check
   useEffect(() => {
