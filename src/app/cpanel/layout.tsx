@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { CpanelThemeProvider, useCpanelTheme } from "@/lib/CpanelThemeContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -26,49 +27,12 @@ interface NavItem {
   badge?: number;
 }
 
-export default function CpanelLayout({ children }: { children: React.ReactNode }) {
+function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const { config, syncRealFirebaseData } = useAppConfig();
+  const { config } = useAppConfig();
+  const { isDark } = useCpanelTheme();
   const pathname = usePathname();
   const router = useRouter();
-
-  // Dark/Light Theme state
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    const syncTheme = () => {
-      if (typeof window !== "undefined") {
-        const cached = localStorage.getItem("cpanel_theme");
-        if (cached === "dark" || cached === "light") {
-          setTheme(cached);
-        }
-      }
-    };
-
-    syncTheme();
-
-    const handleThemeChange = () => syncTheme();
-    window.addEventListener("cpanel_theme_change", handleThemeChange);
-    window.addEventListener("storage", handleThemeChange);
-
-    return () => {
-      window.removeEventListener("cpanel_theme_change", handleThemeChange);
-      window.removeEventListener("storage", handleThemeChange);
-    };
-  }, []);
-
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const next = prev === "light" ? "dark" : "light";
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next);
-        window.dispatchEvent(new Event("cpanel_theme_change"));
-      }
-      return next;
-    });
-  };
-
-  const isDark = theme === "dark";
 
   // Admin lock validation
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
@@ -904,5 +868,13 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
         )}
       </AnimatePresence>
     </main>
+  );
+}
+
+export default function CpanelLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <CpanelThemeProvider>
+      <CpanelLayoutContent>{children}</CpanelLayoutContent>
+    </CpanelThemeProvider>
   );
 }

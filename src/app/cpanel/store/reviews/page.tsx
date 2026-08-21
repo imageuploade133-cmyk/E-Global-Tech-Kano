@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 interface Review {
   id: string;
@@ -29,7 +30,7 @@ function ButtonSpinner() {
 
 export default function AdminStoreReviewsPage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   // Paginated reviews state
@@ -69,20 +70,6 @@ export default function AdminStoreReviewsPage() {
     setConfirmModal({ isOpen: true, title, message, actionLabel, onConfirm });
   };
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") setIsDark(true);
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      return next;
-    });
-  };
 
   useEffect(() => {
     async function checkSession() {

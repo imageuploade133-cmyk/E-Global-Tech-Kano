@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 interface FrozenUser {
   uid: string;
@@ -23,7 +24,7 @@ function ButtonSpinner() {
 
 export default function CpanelFreezePage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<FrozenUser[]>([]);
@@ -31,25 +32,6 @@ export default function CpanelFreezePage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [savingUid, setSavingUid] = useState<string | null>(null);
 
-  // Theme Syncing
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
-      }
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      }
-      return next;
-    });
-  };
 
   // Auth & Session Check
   useEffect(() => {

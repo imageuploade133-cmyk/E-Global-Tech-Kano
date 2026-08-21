@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 interface StoreSettings {
   storeName?: string;
@@ -46,7 +47,7 @@ function ButtonSpinner() {
 
 export default function CpanelStoreSettingsPage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   // Store Settings Form States
@@ -77,24 +78,6 @@ export default function CpanelStoreSettingsPage() {
 
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
-      }
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("cpanel_theme", next ? "dark" : "light");
-      }
-      return next;
-    });
-  };
 
   useEffect(() => {
     async function checkSession() {
