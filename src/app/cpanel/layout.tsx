@@ -289,21 +289,46 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
     }
   };
 
-  const navItems: NavItem[] = [
-    { id: "dashboard", label: "Metrics & Operations", icon: "cell_tower", href: "/cpanel", exact: true },
-    { id: "admins", label: "Admin Management", icon: "admin_panel_settings", href: "/cpanel/admins" },
-    { id: "users", label: "Users & Permissions", icon: "group", href: "/cpanel/users" },
-    { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc" },
-    { id: "settings", label: "Branding & Support", icon: "diamond", href: "/cpanel/settings" },
-    { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze" },
-    { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits" },
-    { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos" },
-    { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos" },
-    { id: "whatsapp", label: "WhatsApp Link", icon: "hub", href: "/cpanel/whatsapp" },
-    { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit" },
-    { id: "banners", label: "Slide Banners", icon: "photo_library", href: "/cpanel/banners" },
-    { id: "investments", label: "Fixed Deposits", icon: "savings", href: "/cpanel/investments" },
-    { id: "history", label: "User Ledger Audits", icon: "history", href: "/cpanel/user-history" },
+  interface NavCategory {
+    title: string;
+    items: NavItem[];
+  }
+
+  const navCategories: NavCategory[] = [
+    {
+      title: "System Overview",
+      items: [
+        { id: "dashboard", label: "Metrics & Operations", icon: "cell_tower", href: "/cpanel", exact: true },
+        { id: "admins", label: "Admin Management", icon: "admin_panel_settings", href: "/cpanel/admins" },
+      ]
+    },
+    {
+      title: "User Management",
+      items: [
+        { id: "users", label: "Users & Permissions", icon: "group", href: "/cpanel/users" },
+        { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc" },
+        { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze" },
+        { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits" },
+      ]
+    },
+    {
+      title: "Branding & Customization",
+      items: [
+        { id: "settings", label: "Branding & Support", icon: "diamond", href: "/cpanel/settings" },
+        { id: "banners", label: "Slide Banners", icon: "photo_library", href: "/cpanel/banners" },
+        { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos" },
+        { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos" },
+        { id: "whatsapp", label: "WhatsApp Link", icon: "hub", href: "/cpanel/whatsapp" },
+      ]
+    },
+    {
+      title: "Financials & Markups",
+      items: [
+        { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit" },
+        { id: "investments", label: "Fixed Deposits", icon: "savings", href: "/cpanel/investments" },
+        { id: "history", label: "User Ledger Audits", icon: "history", href: "/cpanel/user-history" },
+      ]
+    }
   ];
 
   const storeNavItems: NavItem[] = [
@@ -618,25 +643,32 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
                 </div>
 
                 <nav className="p-4 space-y-1 flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1">
-                  {navItems.map((item) => {
-                    const active = isNavActive(item);
-                    return (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={cn(
-                          "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                          active
-                            ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
-                            : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                        <span className="flex-1 text-left">{item.label}</span>
-                      </Link>
-                    );
-                  })}
+                  {navCategories.map((cat, catIdx) => (
+                    <div key={cat.title} className="space-y-1 pt-2">
+                      <div className="px-3 pb-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                        {cat.title}
+                      </div>
+                      {cat.items.map((item) => {
+                        const active = isNavActive(item);
+                        return (
+                          <Link
+                            key={item.id}
+                            href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={cn(
+                              "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                              active
+                                ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
+                                : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                            )}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                            <span className="flex-1 text-left">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ))}
 
                   {/* Storefront Manager Accordion / Submenu */}
                   <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
@@ -714,18 +746,20 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
       >
         <div className="flex flex-col h-full">
           {/* Brand Row */}
-          <div className={cn("p-5 border-b flex items-center justify-between min-h-[73px]", isDark ? "border-gray-800" : "border-gray-100")}>
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-8 h-8 rounded bg-gray-100 p-1 flex-shrink-0 flex items-center justify-center">
+          <div className={cn("p-4 border-b flex items-center justify-between min-h-[73px]", isDark ? "border-gray-800" : "border-gray-100")}>
+            <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", isSidebarMinimized && "justify-center")}>
+              <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 p-1 flex-shrink-0 flex items-center justify-center shadow-xs">
                 <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
               </div>
               {!isSidebarMinimized && (
                 <motion.div
-                  initial={{ opacity: 0, x: -10 }}
+                  initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="flex flex-col"
+                  className="flex flex-col min-w-0"
                 >
-                  <h1 className={cn("font-hanken font-black text-sm tracking-tight", isDark ? "text-white" : "text-gray-900")}>E-TECH</h1>
+                  <h1 className={cn("font-hanken font-black text-sm tracking-tight truncate", isDark ? "text-white" : "text-gray-900")}>
+                    E-TECH
+                  </h1>
                   <p className="text-[8px] font-black tracking-widest text-[#FC7A00] uppercase mt-0.5">Control Panel</p>
                 </motion.div>
               )}
@@ -734,9 +768,10 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
             <button
               onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
               className={cn(
-                "hidden md:flex w-7 h-7 rounded-lg border items-center justify-center cursor-pointer active:scale-90 transition-all ml-1.5",
-                isDark ? "border-gray-700 hover:bg-gray-800 text-gray-400" : "border-gray-150 hover:bg-gray-50 text-gray-500"
+                "hidden md:flex w-7 h-7 rounded-lg border items-center justify-center cursor-pointer active:scale-90 transition-all ml-1 flex-shrink-0",
+                isDark ? "border-gray-700 hover:bg-gray-800 text-gray-400" : "border-gray-200 hover:bg-gray-50 text-gray-500"
               )}
+              title={isSidebarMinimized ? "Expand sidebar" : "Minimize sidebar"}
             >
               <span className="material-symbols-outlined text-[16px] font-bold">
                 {isSidebarMinimized ? "chevron_right" : "chevron_left"}
@@ -744,26 +779,40 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
             </button>
           </div>
 
-          {/* Nav Items */}
-          <nav className="p-4 space-y-1 flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1">
-            {navItems.map((item) => {
-              const active = isNavActive(item);
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                    active
-                      ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
-                      : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                  )}
-                >
-                  <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                  {!isSidebarMinimized && <span className="flex-1 text-left">{item.label}</span>}
-                </Link>
-              );
-            })}
+          {/* Categorized Nav Items */}
+          <nav className="p-3 space-y-3 flex flex-col overflow-y-auto no-scrollbar flex-1">
+            {navCategories.map((cat, catIdx) => (
+              <div key={cat.title} className="space-y-1">
+                {!isSidebarMinimized ? (
+                  <div className="px-2 pt-1 pb-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    {cat.title}
+                  </div>
+                ) : (
+                  catIdx > 0 && <div className="border-t border-gray-200/40 dark:border-gray-800 my-1" />
+                )}
+
+                {cat.items.map((item) => {
+                  const active = isNavActive(item);
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      title={isSidebarMinimized ? item.label : undefined}
+                      className={cn(
+                        "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                        isSidebarMinimized && "justify-center px-0 py-2.5",
+                        active
+                          ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
+                          : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[18px] flex-shrink-0">{item.icon}</span>
+                      {!isSidebarMinimized && <span className="flex-1 text-left truncate">{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
 
             {/* Storefront Manager Accordion / Submenu */}
             <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
