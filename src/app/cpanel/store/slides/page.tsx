@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { StoreSliderSettingsPanel } from "@/components/cpanel/StoreSliderSettingsPanel";
 
 interface StoreSlide {
   id: string;
@@ -383,8 +384,11 @@ export default function CpanelStoreSlidesPage() {
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Add Slide Form */}
-          <div className={cn("p-5 rounded-2xl border space-y-4 lg:col-span-1 h-fit", panelClass)}>
+          {/* Left Column: Add Slide Form & Global Slider Settings Panel */}
+          <div className="lg:col-span-1 space-y-6">
+            <StoreSliderSettingsPanel isDark={isDark} />
+
+            <div className={cn("p-5 rounded-2xl border space-y-4 h-fit", panelClass)}>
             <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
@@ -480,9 +484,10 @@ export default function CpanelStoreSlidesPage() {
               </button>
             </form>
           </div>
+        </div>
 
-          {/* Slides List */}
-          <div className="lg:col-span-2 space-y-4">
+        {/* Right Column: Slides List */}
+        <div className="lg:col-span-2 space-y-4">
             <div className={cn("p-4 rounded-2xl border flex items-center justify-between", panelClass)}>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-orange-500 text-[20px]">view_carousel</span>
