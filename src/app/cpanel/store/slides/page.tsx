@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadImageSecurely } from "@/lib/image-upload";
@@ -38,22 +39,21 @@ export default function CpanelStoreSlidesPage() {
   const [slides, setSlides] = useState<StoreSlide[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // New/Edit Slide Form State
-  const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
+  // New Slide Form State (Left Column)
   const [slideImageUrl, setSlideImageUrl] = useState("");
   const [slideTitle, setSlideTitle] = useState("");
   const [slideSubtitle, setSlideSubtitle] = useState("");
   const [slideLink, setSlideLink] = useState("");
-  const [slideCustomWidth, setSlideCustomWidth] = useState<string>("");
-  const [slideIsCrop, setSlideIsCrop] = useState(true);
-  const [slideIsHidden, setSlideIsHidden] = useState(false);
-  const [slideMarginBottom, setSlideMarginBottom] = useState(20);
-  const [slideMobileHeight, setSlideMobileHeight] = useState(176);
-  const [slideDesktopHeight, setSlideDesktopHeight] = useState(220);
   const [isUploadingSlideImage, setIsUploadingSlideImage] = useState(false);
   const [isSavingSlide, setIsSavingSlide] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Per-Slide Modal Customizer Drawer State (matching /cpanel/banners)
+  const [editingSlide, setEditingSlide] = useState<StoreSlide | null>(null);
+  const [isUpdatingModalSlide, setIsUpdatingModalSlide] = useState(false);
+  const [isUploadingModalImage, setIsUploadingModalImage] = useState(false);
+
+  // Custom Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -81,12 +81,19 @@ export default function CpanelStoreSlidesPage() {
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("cpanel_theme");
-      if (cached === "dark") {
-        setIsDark(true);
+    const syncTheme = () => {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("cpanel_theme");
+        setIsDark(cached === "dark");
       }
-    }
+    };
+    syncTheme();
+    window.addEventListener("cpanel_theme_change", syncTheme);
+    window.addEventListener("storage", syncTheme);
+    return () => {
+      window.removeEventListener("cpanel_theme_change", syncTheme);
+      window.removeEventListener("storage", syncTheme);
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -94,6 +101,7 @@ export default function CpanelStoreSlidesPage() {
       const next = !prev;
       if (typeof window !== "undefined") {
         localStorage.setItem("cpanel_theme", next ? "dark" : "light");
+        window.dispatchEvent(new Event("cpanel_theme_change"));
       }
       return next;
     });
@@ -169,32 +177,11 @@ export default function CpanelStoreSlidesPage() {
     }
   };
 
-  const resetSlideForm = () => {
-    setEditingSlideId(null);
+  const resetAddSlideForm = () => {
     setSlideImageUrl("");
     setSlideTitle("");
     setSlideSubtitle("");
     setSlideLink("");
-    setSlideCustomWidth("");
-    setSlideIsCrop(true);
-    setSlideIsHidden(false);
-    setSlideMarginBottom(20);
-    setSlideMobileHeight(176);
-    setSlideDesktopHeight(220);
-  };
-
-  const handleStartEditSlide = (s: StoreSlide) => {
-    setEditingSlideId(s.id);
-    setSlideImageUrl(s.imageUrl || "");
-    setSlideTitle(s.title || "");
-    setSlideSubtitle(s.subtitle || s.description || "");
-    setSlideLink(s.link || "");
-    setSlideCustomWidth(s.customWidth !== null && s.customWidth !== undefined ? String(s.customWidth) : "");
-    setSlideIsCrop(s.isCrop !== false);
-    setSlideIsHidden(Boolean(s.isHidden));
-    setSlideMarginBottom(s.marginBottom !== undefined && s.marginBottom !== null ? s.marginBottom : 20);
-    setSlideMobileHeight(s.mobileHeight !== undefined && s.mobileHeight !== null ? s.mobileHeight : 176);
-    setSlideDesktopHeight(s.desktopHeight !== undefined && s.desktopHeight !== null ? s.desktopHeight : 220);
   };
 
   const handleAddSlide = async (e: React.FormEvent) => {
@@ -211,35 +198,31 @@ export default function CpanelStoreSlidesPage() {
         ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
         : { "Content-Type": "application/json" };
 
-      const action = editingSlideId ? "edit_slide" : "add_slide";
-
       const res = await fetch("/api/admin/store", {
         method: "POST",
         headers,
         body: JSON.stringify({
-          action,
+          action: "add_slide",
           slide: {
-            id: editingSlideId || undefined,
-            imageUrl: slideImageUrl,
-            title: slideTitle,
-            subtitle: slideSubtitle,
-            description: slideSubtitle,
-            link: slideLink,
-            customWidth: slideCustomWidth !== "" ? Number(slideCustomWidth) : null,
-            isCrop: slideIsCrop,
-            isHidden: slideIsHidden,
-            marginBottom: Number(slideMarginBottom) || 0,
-            mobileHeight: Number(slideMobileHeight) || 176,
-            desktopHeight: Number(slideDesktopHeight) || 220,
+            imageUrl: slideImageUrl.trim(),
+            title: slideTitle.trim(),
+            subtitle: slideSubtitle.trim(),
+            description: slideSubtitle.trim(),
+            link: slideLink.trim(),
+            isCrop: true,
+            isHidden: false,
+            marginBottom: 20,
+            mobileHeight: 176,
+            desktopHeight: 220,
           },
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(editingSlideId ? "Store slide updated!" : "Store slide added!");
+        toast.success("Store slide added successfully!");
         setSlides(data.slides || []);
-        resetSlideForm();
+        resetAddSlideForm();
       } else {
         toast.error(data.error || "Failed to save slide image.");
       }
@@ -247,6 +230,54 @@ export default function CpanelStoreSlidesPage() {
       toast.error(err.message || "Network error saving slide image.");
     } finally {
       setIsSavingSlide(false);
+    }
+  };
+
+  const handleSaveModalCustomizations = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSlide) return;
+
+    setIsUpdatingModalSlide(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "edit_slide",
+          slide: {
+            id: editingSlide.id,
+            imageUrl: editingSlide.imageUrl,
+            title: editingSlide.title,
+            subtitle: editingSlide.subtitle,
+            description: editingSlide.description || editingSlide.subtitle,
+            link: editingSlide.link,
+            customWidth: editingSlide.customWidth,
+            mobileHeight: editingSlide.mobileHeight,
+            desktopHeight: editingSlide.desktopHeight,
+            marginBottom: editingSlide.marginBottom,
+            isCrop: editingSlide.isCrop,
+            isHidden: editingSlide.isHidden,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Slide customizations saved successfully!");
+        setSlides(data.slides || []);
+        setEditingSlide(null);
+      } else {
+        toast.error(data.error || "Failed to save slide customizations.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error updating slide customizations.");
+    } finally {
+      setIsUpdatingModalSlide(false);
     }
   };
 
@@ -290,10 +321,10 @@ export default function CpanelStoreSlidesPage() {
   };
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
-  const panelClass = isDark ? "bg-[#131927] border-gray-800" : "bg-white border-gray-200 shadow-sm";
+  const panelClass = isDark ? "bg-[#131927] border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900 shadow-sm";
   const inputClass = isDark
-    ? "bg-gray-900/80 border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00]"
-    : "bg-white border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00]";
+    ? "bg-gray-900/80 border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] rounded-xl px-3 py-2.5 text-xs outline-none transition-all w-full"
+    : "bg-white border border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2.5 text-xs outline-none transition-all w-full";
 
   if (isLoadingSession) {
     return (
@@ -325,7 +356,7 @@ export default function CpanelStoreSlidesPage() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Storefront Slides Manager</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Add and customize promotional slide banners displayed on the public Store page.
+                Deploy and customize promotional slideshow banners displayed on the public Store page.
               </p>
             </div>
           </div>
@@ -352,29 +383,20 @@ export default function CpanelStoreSlidesPage() {
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Add / Edit Form */}
+          {/* Add Slide Form */}
           <div className={cn("p-5 rounded-2xl border space-y-4 lg:col-span-1 h-fit", panelClass)}>
             <div className="flex items-center justify-between border-b border-gray-200/40 pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-orange-500 text-[20px]">add_photo_alternate</span>
                 <h3 className="font-extrabold text-xs uppercase tracking-wider">
-                  {editingSlideId ? "Edit Store Slide" : "Add Store Banner Slide"}
+                  Add Store Banner Slide
                 </h3>
               </div>
-              {editingSlideId && (
-                <button
-                  type="button"
-                  onClick={resetSlideForm}
-                  className="text-[10px] font-bold text-gray-400 hover:text-black dark:hover:text-white uppercase cursor-pointer"
-                >
-                  Cancel Edit
-                </button>
-              )}
             </div>
 
             <form onSubmit={handleAddSlide} className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Image URL or File</label>
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Image URL or Upload File *</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -406,38 +428,6 @@ export default function CpanelStoreSlidesPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
-                <label className="text-[10px] font-black uppercase text-orange-500 block">
-                  Image Fit Mode
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSlideIsCrop(true)}
-                    className={cn(
-                      "py-2 px-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider border transition-all cursor-pointer",
-                      slideIsCrop
-                        ? "bg-[#FC7A00] text-white border-[#FC7A00]"
-                        : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:text-black dark:hover:text-white"
-                    )}
-                  >
-                    Cropped (Cover)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSlideIsCrop(false)}
-                    className={cn(
-                      "py-2 px-2.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider border transition-all cursor-pointer",
-                      !slideIsCrop
-                        ? "bg-emerald-600 text-white border-emerald-600"
-                        : "bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:text-black dark:hover:text-white"
-                    )}
-                  >
-                    Keep Size (Contain)
-                  </button>
-                </div>
-              </div>
-
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 block">Slide Title</label>
                 <input
@@ -460,19 +450,53 @@ export default function CpanelStoreSlidesPage() {
                 />
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Action Link</label>
+                <input
+                  type="text"
+                  placeholder="e.g. /store or external URL"
+                  value={slideLink}
+                  onChange={(e) => setSlideLink(e.target.value)}
+                  className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                />
+              </div>
+
+              {slideImageUrl && (
+                <div className="p-3 bg-black/10 border border-gray-200/40 rounded-2xl overflow-hidden relative">
+                  <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Slide Image Preview</p>
+                  <div className="aspect-[3/1] rounded-lg overflow-hidden border bg-white relative">
+                    <img src={slideImageUrl} alt="Slide Preview" className="w-full h-full object-cover" />
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isSavingSlide || isUploadingSlideImage}
-                className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                className="w-full h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
               >
-                {isSavingSlide ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">{editingSlideId ? "save" : "add_photo_alternate"}</span>}
-                <span>{editingSlideId ? "Save Slide Changes" : "Add Slide Banner"}</span>
+                {isSavingSlide ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">add_photo_alternate</span>}
+                <span>Deploy Store Slide Banner</span>
               </button>
             </form>
           </div>
 
           {/* Slides List */}
           <div className="lg:col-span-2 space-y-4">
+            <div className={cn("p-4 rounded-2xl border flex items-center justify-between", panelClass)}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-orange-500 text-[20px]">view_carousel</span>
+                <h3 className="font-black text-xs uppercase tracking-wider">Active Store Slides ({slides.length})</h3>
+              </div>
+              <button
+                type="button"
+                onClick={fetchStoreSlides}
+                className={cn("p-2 border rounded-xl transition-all cursor-pointer", isDark ? "border-gray-800 hover:bg-gray-800" : "border-gray-200 hover:bg-gray-100")}
+              >
+                <span className="material-symbols-outlined text-[16px] font-bold block">refresh</span>
+              </button>
+            </div>
+
             {isLoading ? (
               <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
                 <ButtonSpinner />
@@ -481,7 +505,7 @@ export default function CpanelStoreSlidesPage() {
             ) : slides.length === 0 ? (
               <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
                 <span className="material-symbols-outlined text-[48px] text-gray-400">view_carousel</span>
-                <p className="text-xs font-black uppercase text-gray-400">No Store Slides Added</p>
+                <p className="text-xs font-black uppercase text-gray-400">No Store Slides Deployed</p>
                 <p className="text-[11px] text-gray-500 max-w-md mx-auto">Upload slideshow banner images to showcase store promotions to end-users.</p>
               </div>
             ) : (
@@ -500,27 +524,42 @@ export default function CpanelStoreSlidesPage() {
                         </div>
                         <div className="min-w-0 flex-1 space-y-1">
                           <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{slide.title || "Untitled Slide"}</h4>
-                          <p className="text-[11px] text-gray-400 font-medium truncate">{slide.subtitle || "No subtitle provided."}</p>
+                          <p className="text-[11px] text-gray-400 font-medium truncate">{slide.subtitle || slide.description || "No subtitle provided."}</p>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <span className={cn("px-2 py-0.5 rounded text-[8px] font-bold uppercase border", slide.isCrop !== false ? "bg-blue-500/10 border-blue-500/20 text-blue-500" : "bg-amber-500/10 border-amber-500/20 text-amber-500")}>
+                              {slide.isCrop !== false ? "Cropped (Cover)" : "Non-Crop (Contain)"}
+                            </span>
+                            {slide.isHidden && (
+                              <span className="px-2 py-0.5 rounded text-[8px] font-bold uppercase border bg-red-500/10 border-red-500/20 text-red-500">
+                                Hidden
+                              </span>
+                            )}
+                            {(slide.mobileHeight || slide.desktopHeight || slide.customWidth || slide.marginBottom !== undefined) && (
+                              <span className={cn("px-2 py-0.5 rounded text-[8px] font-mono border", isDark ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-gray-100 border-gray-200 text-gray-700")}>
+                                H: {slide.mobileHeight || 176}px | Bottom Space: {slide.marginBottom ?? 20}px
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                           type="button"
-                          onClick={() => handleStartEditSlide(slide)}
-                          className="px-3 h-9 border border-orange-500/30 text-[#FC7A00] bg-orange-500/10 hover:bg-orange-500/20 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1"
+                          onClick={() => setEditingSlide(slide)}
+                          className="px-3.5 h-10 border border-orange-500/30 text-[#FC7A00] bg-orange-500/10 hover:bg-orange-500/20 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
                         >
-                          <span className="material-symbols-outlined text-[15px]">edit</span>
-                          <span>Edit</span>
+                          <span className="material-symbols-outlined text-[16px]">edit</span>
+                          <span>Customize</span>
                         </button>
                         <button
                           type="button"
                           disabled={isDeleting}
                           onClick={() => handleDeleteSlide(slide.id)}
-                          className="px-3 h-9 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
+                          className="px-3.5 h-10 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
                         >
                           {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">delete</span>}
-                          <span>Delete</span>
+                          <span>Remove</span>
                         </button>
                       </div>
                     </div>
@@ -533,6 +572,282 @@ export default function CpanelStoreSlidesPage() {
         </div>
 
       </div>
+
+      {/* Per-Slide Customizer Modal Drawer (100% parity with /cpanel/banners) */}
+      <AnimatePresence>
+        {editingSlide && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setEditingSlide(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
+            />
+
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+              className={cn("fixed bottom-0 left-0 right-0 max-w-lg mx-auto rounded-t-[32px] z-[99999] p-6 pb-8 shadow-2xl border-t overflow-y-auto max-h-[90vh] no-scrollbar", isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900")}
+            >
+              <div className="w-12 h-1.5 bg-gray-300 rounded-full mb-5 mx-auto" />
+
+              <div className="flex items-center justify-between border-b pb-4 mb-5 border-gray-200/50">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500">tune</span>
+                  <h3 className="font-extrabold text-base">Customize Slide Parameters</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingSlide(null)}
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveModalCustomizations} className="space-y-4">
+                {/* Image Preview & URL with File Upload Button */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Image URL / Upload New File</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={editingSlide.imageUrl}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, imageUrl: e.target.value })}
+                      className={inputClass}
+                    />
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            uploadImageToImgBB(
+                              file,
+                              (uploadedUrl) => setEditingSlide({ ...editingSlide, imageUrl: uploadedUrl }),
+                              setIsUploadingModalImage
+                            );
+                          }
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                        disabled={isUploadingModalImage}
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingModalImage}
+                        className={cn("px-3 h-[42px] border rounded-xl flex items-center justify-center transition-all", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
+                      >
+                        {isUploadingModalImage ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Image Thumbnail Preview */}
+                {editingSlide.imageUrl && (
+                  <div className="p-2 bg-black/10 border border-gray-200/40 rounded-xl overflow-hidden relative">
+                    <p className="text-[8.5px] font-black uppercase text-gray-400 mb-1">Slide Image Preview</p>
+                    <div className="aspect-[3/1] rounded-lg overflow-hidden border bg-white relative">
+                      <img src={editingSlide.imageUrl} alt="Slide Preview" className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Title & Subtitle */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Title Caption</label>
+                    <input
+                      type="text"
+                      value={editingSlide.title || ""}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, title: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Subtitle</label>
+                    <input
+                      type="text"
+                      value={editingSlide.subtitle || ""}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, subtitle: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Description</label>
+                  <input
+                    type="text"
+                    value={editingSlide.description || ""}
+                    onChange={(e) => setEditingSlide({ ...editingSlide, description: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
+                  <input
+                    type="text"
+                    value={editingSlide.link || ""}
+                    onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Dedicated Per-Slide Height Customization (Mobile & Desktop) */}
+                <div className="p-3.5 bg-orange-500/5 border border-orange-500/20 rounded-2xl space-y-3">
+                  <p className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">stay_current_portrait</span>
+                    Per-Slide Mobile & Desktop Heights
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Mobile Height (px)</label>
+                      <input
+                        type="number"
+                        min={10}
+                        max={600}
+                        placeholder="Default (176px)"
+                        value={editingSlide.mobileHeight ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value ? parseInt(e.target.value) : null;
+                          setEditingSlide({ ...editingSlide, mobileHeight: val });
+                        }}
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Desktop Height (px)</label>
+                      <input
+                        type="number"
+                        min={50}
+                        max={800}
+                        placeholder="Default (220px)"
+                        value={editingSlide.desktopHeight ?? ""}
+                        onChange={(e) => setEditingSlide({ ...editingSlide, desktopHeight: e.target.value ? parseInt(e.target.value) : null })}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Container Width (px / blank = 100% full width)</label>
+                    <input
+                      type="number"
+                      min={10}
+                      max={1200}
+                      placeholder="Full Width (100%)"
+                      value={editingSlide.customWidth ?? ""}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, customWidth: e.target.value ? parseInt(e.target.value) : null })}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                {/* Per-Slide Bottom Space / Margin Adjuster (0 - 100 px) */}
+                <div className="p-3.5 bg-indigo-500/5 border border-indigo-500/20 rounded-2xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black uppercase text-indigo-500 tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">format_line_spacing</span>
+                      Slide Bottom Space / Margin (0 - 100 px)
+                    </label>
+                    <span className="font-mono text-xs font-extrabold text-indigo-600">
+                      {editingSlide.marginBottom ?? 20} px
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={editingSlide.marginBottom ?? 20}
+                    onChange={(e) => setEditingSlide({ ...editingSlide, marginBottom: parseInt(e.target.value) })}
+                    className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-gray-200 rounded-lg appearance-none"
+                  />
+
+                  <div className="flex justify-between text-[9px] font-bold text-gray-400">
+                    <span>0px (Tight)</span>
+                    <span>20px (Default)</span>
+                    <span>100px (Spacious)</span>
+                  </div>
+                </div>
+
+                {/* Manual Crop vs Remove Crop Toggle */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Manual Crop / Remove Crop Mode</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingSlide({ ...editingSlide, isCrop: true })}
+                      className={cn(
+                        "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                        editingSlide.isCrop !== false
+                          ? "bg-orange-500/10 border-orange-500 text-orange-500"
+                          : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-600"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">crop</span>
+                      Manual Crop (Cover)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingSlide({ ...editingSlide, isCrop: false })}
+                      className={cn(
+                        "py-2.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                        editingSlide.isCrop === false
+                          ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
+                          : isDark ? "bg-gray-800 border-gray-700 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-600"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">crop_free</span>
+                      Remove Crop (Contain)
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-gray-400 font-semibold leading-relaxed">
+                    Remove Crop renders the full original image without clipping edges.
+                  </p>
+                </div>
+
+                {/* Hide Slide Toggle */}
+                <div className="flex items-center justify-between p-3.5 bg-gray-50 border rounded-xl border-gray-200/50">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider">Hide Slide</p>
+                    <p className="text-[10px] text-gray-400 font-semibold">Temporarily disable slide without deleting</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingSlide({ ...editingSlide, isHidden: !editingSlide.isHidden })}
+                    className={cn(
+                      "px-3.5 py-1.5 rounded-xl text-xs font-extrabold uppercase border transition-all cursor-pointer",
+                      editingSlide.isHidden
+                        ? "bg-rose-500/10 border-rose-500/30 text-rose-500"
+                        : "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                    )}
+                  >
+                    {editingSlide.isHidden ? "Hidden" : "Visible"}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isUpdatingModalSlide}
+                  className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md"
+                >
+                  {isUpdatingModalSlide ? <ButtonSpinner /> : "Save Customizations"}
+                </button>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Confirmation Modal */}
       {confirmModal.isOpen && (
