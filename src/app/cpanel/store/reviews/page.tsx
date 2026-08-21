@@ -17,6 +17,7 @@ interface Review {
     repliedAt: string;
   } | null;
   isHidden: boolean;
+  isViewed?: boolean;
   createdAt: string;
 }
 
@@ -30,8 +31,15 @@ export default function AdminStoreReviewsPage() {
   const router = useRouter();
   const [isDark, setIsDark] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+
+  // Paginated reviews state
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [unrepliedCount, setUnrepliedCount] = useState<number>(0);
 
   // Search & Tab Filter
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,16 +108,58 @@ export default function AdminStoreReviewsPage() {
     checkSession();
   }, [router]);
 
-  const fetchReviews = async () => {
-    setIsLoading(true);
+  // Mark loaded unviewed reviews as viewed to clear slide-menu badge notification
+  const markReviewsAsViewed = async (reviewIdsToMark: string[], headers: Record<string, string>) => {
+    if (reviewIdsToMark.length === 0) return;
+    try {
+      await fetch("/api/admin/store/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ action: "mark_viewed", reviewIds: reviewIdsToMark }),
+      });
+      // Notify sidebar layout to update notification badge
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("cpanel_reviews_updated"));
+      }
+    } catch {
+      // Ignore errors for background mark_viewed
+    }
+  };
+
+  const fetchReviews = async (cursor?: string) => {
+    if (cursor) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+    }
+
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
       const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
-      const res = await fetch("/api/admin/store/reviews", { headers });
+      const queryUrl = cursor
+        ? `/api/admin/store/reviews?limit=10&startAfterId=${cursor}`
+        : `/api/admin/store/reviews?limit=10`;
+
+      const res = await fetch(queryUrl, { headers });
       const data = await res.json();
+
       if (data.success) {
-        setReviews(data.reviews || []);
+        const fetchedList: Review[] = data.reviews || [];
+        if (cursor) {
+          setReviews((prev) => [...prev, ...fetchedList]);
+        } else {
+          setReviews(fetchedList);
+        }
+
+        setHasMore(Boolean(data.hasMore));
+        setNextCursor(data.nextCursor || null);
+        setTotalCount(data.totalCount || 0);
+        setUnrepliedCount(data.unrepliedCount || 0);
+
+        // Auto mark unviewed reviews as viewed
+        const unviewedIds = fetchedList.filter((r) => !r.isViewed).map((r) => r.id);
+        markReviewsAsViewed(unviewedIds, headers);
       } else {
         toast.error(data.error || "Failed to load product reviews.");
       }
@@ -117,6 +167,7 @@ export default function AdminStoreReviewsPage() {
       toast.error(err.message || "Network error fetching product reviews.");
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -181,6 +232,10 @@ export default function AdminStoreReviewsPage() {
           if (res.ok && data.success) {
             toast.success("Review deleted successfully!");
             setReviews(reviews.filter((r) => r.id !== review.id));
+            setTotalCount((prev) => Math.max(0, prev - 1));
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("cpanel_reviews_updated"));
+            }
           } else {
             toast.error(data.error || "Failed to delete review.");
           }
@@ -218,12 +273,15 @@ export default function AdminStoreReviewsPage() {
         setReviews(
           reviews.map((r) =>
             r.id === replyingReview.id
-              ? { ...r, adminReply: { message: replyMessage, repliedAt: new Date().toISOString() } }
+              ? { ...r, isViewed: true, adminReply: { message: replyMessage, repliedAt: new Date().toISOString() } }
               : r
           )
         );
         setReplyingReview(null);
         setReplyMessage("");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("cpanel_reviews_updated"));
+        }
       } else {
         toast.error(data.error || "Failed to save reply.");
       }
@@ -281,6 +339,11 @@ export default function AdminStoreReviewsPage() {
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-orange-500 text-[22px]">rate_review</span>
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Customer Reviews Manager</h1>
+                {unrepliedCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500 text-white animate-pulse">
+                    {unrepliedCount} Pending Replies
+                  </span>
+                )}
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
                 View all storefront product reviews, reply to customer comments, hide inappropriate reviews, or delete feedback.
@@ -322,7 +385,7 @@ export default function AdminStoreReviewsPage() {
                     : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 )}
               >
-                {tab === "all" ? `All Reviews (${reviews.length})` : tab === "visible" ? `Published (${reviews.filter((r) => !r.isHidden).length})` : `Hidden (${reviews.filter((r) => r.isHidden).length})`}
+                {tab === "all" ? `All Reviews (${totalCount || reviews.length})` : tab === "visible" ? `Published (${reviews.filter((r) => !r.isHidden).length})` : `Hidden (${reviews.filter((r) => r.isHidden).length})`}
               </button>
             ))}
           </div>
@@ -354,103 +417,125 @@ export default function AdminStoreReviewsPage() {
             <p className="text-[11px] text-gray-500 max-w-md mx-auto">Customer feedback posted on product pages will appear here for admin moderation and replies.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredReviews.map((rev) => (
-              <div key={rev.id} className={cn("p-5 rounded-2xl border flex flex-col justify-between space-y-4 transition-all relative", panelClass)}>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2 border-b border-gray-200/40 pb-2">
-                    <div>
-                      <span className="font-extrabold text-xs uppercase text-gray-900 dark:text-white block">{rev.authorName}</span>
-                      <span className="text-[10px] text-gray-400 font-mono block">Product ID: {rev.productId}</span>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredReviews.map((rev) => (
+                <div key={rev.id} className={cn("p-5 rounded-2xl border flex flex-col justify-between space-y-4 transition-all relative", panelClass)}>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2 border-b border-gray-200/40 pb-2">
+                      <div>
+                        <span className="font-extrabold text-xs uppercase text-gray-900 dark:text-white flex items-center gap-1.5">
+                          {rev.authorName}
+                          {!rev.adminReply && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block" title="Needs Admin Reply" />
+                          )}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-mono block">Product ID: {rev.productId}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
+                          rev.isHidden ? "bg-red-500/10 text-red-500 border-red-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                        )}>
+                          {rev.isHidden ? "HIDDEN" : "PUBLISHED"}
+                        </span>
+                        <div className="flex items-center text-amber-400">
+                          {[...Array(rev.rating)].map((_, i) => (
+                            <span key={i} className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                              star
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
+
+                    <p className="text-xs text-gray-700 dark:text-gray-300 font-medium leading-relaxed bg-gray-50/50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-200/30">
+                      &ldquo;{rev.comment}&rdquo;
+                    </p>
+
+                    {/* Admin Reply Block */}
+                    {rev.adminReply ? (
+                      <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold uppercase text-[#FC7A00] text-[10.5px] flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">support_agent</span>
+                            Official Admin Reply:
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-mono">
+                            {new Date(rev.adminReply.repliedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-800 dark:text-gray-200 text-[11px] font-medium leading-relaxed">
+                          {rev.adminReply.message}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider italic">No admin reply sent yet.</p>
+                    )}
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-200/40">
+                    <span className="text-[9.5px] text-gray-400 font-mono">
+                      Posted: {new Date(rev.createdAt).toLocaleString()}
+                    </span>
 
                     <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
-                        rev.isHidden ? "bg-red-500/10 text-red-500 border-red-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                      )}>
-                        {rev.isHidden ? "HIDDEN" : "PUBLISHED"}
-                      </span>
-                      <div className="flex items-center text-amber-400">
-                        {[...Array(rev.rating)].map((_, i) => (
-                          <span key={i} className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                            star
-                          </span>
-                        ))}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyingReview(rev);
+                          setReplyMessage(rev.adminReply?.message || "");
+                        }}
+                        className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">reply</span>
+                        <span>{rev.adminReply ? "Edit Reply" : "Reply"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleHide(rev)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all border flex items-center gap-1",
+                          rev.isHidden
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/20"
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20"
+                        )}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{rev.isHidden ? "visibility" : "visibility_off"}</span>
+                        <span>{rev.isHidden ? "Unhide" : "Hide"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteReview(rev)}
+                        className="px-2.5 py-1.5 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all border border-red-500/20 flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">delete</span>
+                        <span>Delete</span>
+                      </button>
                     </div>
                   </div>
-
-                  <p className="text-xs text-gray-700 dark:text-gray-300 font-medium leading-relaxed bg-gray-50/50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-200/30">
-                    &ldquo;{rev.comment}&rdquo;
-                  </p>
-
-                  {/* Admin Reply Block */}
-                  {rev.adminReply ? (
-                    <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold uppercase text-[#FC7A00] text-[10.5px] flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">support_agent</span>
-                          Official Admin Reply:
-                        </span>
-                        <span className="text-[9px] text-gray-400 font-mono">
-                          {new Date(rev.adminReply.repliedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-gray-800 dark:text-gray-200 text-[11px] font-medium leading-relaxed">
-                        {rev.adminReply.message}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider italic">No admin reply sent yet.</p>
-                  )}
                 </div>
+              ))}
+            </div>
 
-                {/* Actions Bar */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-200/40">
-                  <span className="text-[9.5px] text-gray-400 font-mono">
-                    Posted: {new Date(rev.createdAt).toLocaleString()}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReplyingReview(rev);
-                        setReplyMessage(rev.adminReply?.message || "");
-                      }}
-                      className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">reply</span>
-                      <span>{rev.adminReply ? "Edit Reply" : "Reply"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleHide(rev)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all border flex items-center gap-1",
-                        rev.isHidden
-                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/20"
-                          : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20"
-                      )}
-                    >
-                      <span className="material-symbols-outlined text-[14px]">{rev.isHidden ? "visibility" : "visibility_off"}</span>
-                      <span>{rev.isHidden ? "Unhide" : "Hide"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteReview(rev)}
-                      className="px-2.5 py-1.5 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all border border-red-500/20 flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">delete</span>
-                      <span>Delete</span>
-                    </button>
-                  </div>
-                </div>
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="pt-4 text-center">
+                <button
+                  type="button"
+                  disabled={isLoadingMore}
+                  onClick={() => fetchReviews(nextCursor || undefined)}
+                  className="px-6 py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer disabled:opacity-50 shadow-md"
+                >
+                  {isLoadingMore ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">expand_more</span>}
+                  <span>Load More Customer Reviews</span>
+                </button>
               </div>
-            ))}
+            )}
           </div>
         )}
 

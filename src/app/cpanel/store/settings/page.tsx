@@ -376,6 +376,189 @@ export default function CpanelStoreSettingsPage() {
                 </div>
               </div>
 
+              {/* Product Card Border Colors & Gradient Settings */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">border_style</span>
+                      Card Border Visibility
+                    </label>
+                    <span className="text-[10px] text-gray-400 block">Show or completely remove border lines around products</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHideBorders(!hideBorders)}
+                    className={cn(
+                      "px-3 py-1 rounded-xl text-xs font-black uppercase cursor-pointer border transition-all",
+                      hideBorders
+                        ? "bg-red-500/10 text-red-500 border-red-500/30"
+                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                    )}
+                  >
+                    {hideBorders ? "BORDER HIDDEN" : "BORDER VISIBLE"}
+                  </button>
+                </div>
+
+                {!hideBorders && (
+                  <div className="space-y-3 pt-2 border-t border-gray-200/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-[11px] font-bold uppercase text-gray-600 dark:text-gray-300">
+                          Gradient Border Effect
+                        </label>
+                        <span className="text-[9.5px] text-gray-400 block">Apply 2-color gradient across product borders</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEnableGradientBorder(!enableGradientBorder)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase cursor-pointer border transition-all",
+                          enableGradientBorder
+                            ? "bg-orange-500/10 text-[#FC7A00] border-orange-500/30"
+                            : "bg-gray-200/50 text-gray-500 border-gray-300/40"
+                        )}
+                      >
+                        {enableGradientBorder ? "GRADIENT ON" : "SOLID COLOR"}
+                      </button>
+                    </div>
+
+                    {enableGradientBorder ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">Start Color</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={gradientColorStart}
+                              onChange={(e) => setGradientColorStart(e.target.value)}
+                              className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent"
+                            />
+                            <input
+                              type="text"
+                              value={gradientColorStart}
+                              onChange={(e) => setGradientColorStart(e.target.value)}
+                              className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">End Color</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={gradientColorEnd}
+                              onChange={(e) => setGradientColorEnd(e.target.value)}
+                              className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent"
+                            />
+                            <input
+                              type="text"
+                              value={gradientColorEnd}
+                              onChange={(e) => setGradientColorEnd(e.target.value)}
+                              className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">Border Color</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={borderColor}
+                              onChange={(e) => setBorderColor(e.target.value)}
+                              className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent"
+                            />
+                            <input
+                              type="text"
+                              value={borderColor}
+                              onChange={(e) => setBorderColor(e.target.value)}
+                              className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">Opacity ({borderOpacity}%)</label>
+                          <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            step="5"
+                            value={borderOpacity}
+                            onChange={(e) => setBorderOpacity(Number(e.target.value))}
+                            className="w-full accent-[#FC7A00] cursor-pointer mt-2"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Recently Viewed Product Border Styling */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">history</span>
+                      Recently Viewed Cards Border
+                    </label>
+                    <span className="text-[10px] text-gray-400 block">Custom border styling for recently viewed products ribbon</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRecentlyViewedBorderEnabled(!recentlyViewedBorderEnabled)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase cursor-pointer border transition-all",
+                      recentlyViewedBorderEnabled
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                        : "bg-gray-200/50 text-gray-500 border-gray-300/40"
+                    )}
+                  >
+                    {recentlyViewedBorderEnabled ? "ENABLED" : "DISABLED"}
+                  </button>
+                </div>
+
+                {recentlyViewedBorderEnabled && (
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Border Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={recentlyViewedBorderColor}
+                          onChange={(e) => setRecentlyViewedBorderColor(e.target.value)}
+                          className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent"
+                        />
+                        <input
+                          type="text"
+                          value={recentlyViewedBorderColor}
+                          onChange={(e) => setRecentlyViewedBorderColor(e.target.value)}
+                          className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Opacity ({recentlyViewedBorderOpacity}%)</label>
+                      <input
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        value={recentlyViewedBorderOpacity}
+                        onChange={(e) => setRecentlyViewedBorderOpacity(Number(e.target.value))}
+                        className="w-full accent-[#FC7A00] cursor-pointer mt-2"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Search Bar Top Space Adjustment Slider */}
               <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
                 <div className="flex justify-between items-center">

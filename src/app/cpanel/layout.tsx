@@ -91,10 +91,41 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
   const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
-  // Sidebar state (single open/minimize system for mobile and desktop)
+  // Sidebar state & Unreplied Customer Reviews Badge state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isStoreExpanded, setIsStoreExpanded] = useState(pathname.startsWith("/cpanel/store"));
+  const [unrepliedReviewsBadge, setUnrepliedReviewsBadge] = useState<number>(0);
+
+  // Fetch unreplied reviews count for slide menu notification
+  useEffect(() => {
+    const fetchUnrepliedCount = async () => {
+      try {
+        const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+        const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+        const res = await fetch("/api/admin/store/reviews?countOnly=true", { headers });
+        const data = await res.json();
+        if (data.success && typeof data.unrepliedCount === "number") {
+          setUnrepliedReviewsBadge(data.unrepliedCount);
+        }
+      } catch {
+        // Ignore background polling errors
+      }
+    };
+
+    if (isAdminUnlocked) {
+      fetchUnrepliedCount();
+      const interval = setInterval(fetchUnrepliedCount, 15000); // Polling every 15s
+
+      const handleReviewsUpdated = () => fetchUnrepliedCount();
+      window.addEventListener("cpanel_reviews_updated", handleReviewsUpdated);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener("cpanel_reviews_updated", handleReviewsUpdated);
+      };
+    }
+  }, [isAdminUnlocked]);
 
   useEffect(() => {
     if (pathname.startsWith("/cpanel/store")) {
@@ -353,7 +384,7 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
   const storeNavItems: NavItem[] = [
     { id: "store_products", label: "Store Products", icon: "inventory_2", href: "/cpanel/store", exact: true },
     { id: "store_orders", label: "Dispatch Orders", icon: "shopping_bag", href: "/cpanel/store/orders" },
-    { id: "store_reviews", label: "Customer Reviews", icon: "rate_review", href: "/cpanel/store/reviews" },
+    { id: "store_reviews", label: "Customer Reviews", icon: "rate_review", href: "/cpanel/store/reviews", badge: unrepliedReviewsBadge },
     { id: "store_stock", label: "Stock Income", icon: "trending_up", href: "/cpanel/store/stock" },
     { id: "store_categories", label: "Manage Categories", icon: "category", href: "/cpanel/store/categories" },
     { id: "store_slides", label: "Store Slides", icon: "view_carousel", href: "/cpanel/store/slides" },
@@ -763,14 +794,21 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
                         href={sub.href}
                         onClick={() => setIsMenuOpen(false)}
                         className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                          "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full justify-between",
                           active
                             ? "text-[#FC7A00] bg-orange-500/10 font-black"
                             : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
                         )}
                       >
-                        <span className="material-symbols-outlined text-[15px]">{sub.icon}</span>
-                        <span className="flex-1 text-left">{sub.label}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="material-symbols-outlined text-[15px]">{sub.icon}</span>
+                          <span className="flex-1 text-left truncate">{sub.label}</span>
+                        </div>
+                        {sub.badge && sub.badge > 0 ? (
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
+                            {sub.badge}
+                          </span>
+                        ) : null}
                       </Link>
                     );
                   })}
