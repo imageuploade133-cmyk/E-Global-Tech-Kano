@@ -91,8 +91,8 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
   const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
-  // Mobile navigation drawer toggle
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Sidebar state (single open/minimize system for mobile and desktop)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isStoreExpanded, setIsStoreExpanded] = useState(pathname.startsWith("/cpanel/store"));
 
@@ -100,6 +100,11 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
     if (pathname.startsWith("/cpanel/store")) {
       setIsStoreExpanded(true);
     }
+  }, [pathname]);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setIsMenuOpen(false);
   }, [pathname]);
 
   // Check cookie-based admin session on mount
@@ -596,176 +601,61 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
       )}
       style={{ marginTop: 0 }}
     >
-      {/* Mobile Top Navigation Bar */}
+      {/* Mobile Header Bar */}
       <div className={cn(
         "md:hidden flex items-center justify-between px-5 py-4 w-full z-40 shrink-0 border-b transition-colors duration-300",
         isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
       )}>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded bg-gray-100 p-1 flex items-center justify-center">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 p-1 flex items-center justify-center">
             <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
           </div>
           <span className={cn("font-hanken font-black text-sm tracking-tight", isDark ? "text-white" : "text-gray-900")}>E-TECH CP</span>
         </div>
 
         <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
           className={cn(
             "w-10 h-10 rounded-full border flex items-center justify-center active:scale-90 transition-all cursor-pointer",
             isDark ? "border-gray-700 text-gray-200" : "border-gray-200 text-gray-700"
           )}
         >
           <span className="material-symbols-outlined text-[24px]">
-            {isMobileMenuOpen ? "close" : "menu"}
+            {isMenuOpen ? "close" : "menu"}
           </span>
         </button>
       </div>
 
-      {/* Mobile Drawer Menu */}
+      {/* Single Mobile Backdrop Overlay */}
       <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden"
-            />
-
-            <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 280 }}
-              className={cn(
-                "fixed top-0 bottom-0 left-0 w-[270px] border-r z-50 flex flex-col justify-between md:hidden transition-colors duration-300",
-                isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
-              )}
-            >
-              <div className="flex flex-col h-full">
-                <div className={cn("p-5 border-b flex items-center justify-between min-h-[73px]", isDark ? "border-gray-800" : "border-gray-100")}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded bg-gray-100 p-1 flex items-center justify-center">
-                      <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
-                    </div>
-                    <div>
-                      <h1 className={cn("font-hanken font-black text-sm tracking-tight", isDark ? "text-white" : "text-gray-900")}>E-TECH</h1>
-                      <p className="text-[8px] font-black tracking-widest text-[#FC7A00] uppercase mt-0.5">Control Panel</p>
-                    </div>
-                  </div>
-                </div>
-
-                <nav className="p-4 space-y-1 flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1">
-                  {navCategories.map((cat, catIdx) => (
-                    <div key={cat.title} className="space-y-1 pt-2">
-                      <div className="px-3 pb-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                        {cat.title}
-                      </div>
-                      {cat.items.map((item) => {
-                        const active = isNavActive(item);
-                        return (
-                          <Link
-                            key={item.id}
-                            href={item.href}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className={cn(
-                              "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                              active
-                                ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
-                                : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                            )}
-                          >
-                            <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                            <span className="flex-1 text-left">{item.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  ))}
-
-                  {/* Storefront Manager Accordion / Submenu */}
-                  <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
-                    <button
-                      onClick={() => setIsStoreExpanded(!isStoreExpanded)}
-                      className={cn(
-                        "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                        pathname.startsWith("/cpanel/store")
-                          ? "bg-orange-500/10 text-[#FC7A00]"
-                          : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-50"
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="material-symbols-outlined text-[18px]">storefront</span>
-                        <span>Storefront Manager</span>
-                      </div>
-                      <span className="material-symbols-outlined text-[16px]">
-                        {isStoreExpanded ? "expand_less" : "expand_more"}
-                      </span>
-                    </button>
-
-                    {isStoreExpanded && (
-                      <div className="pl-6 pt-1 space-y-1">
-                        {storeNavItems.map((sub) => {
-                          const active = isNavActive(sub);
-                          return (
-                            <Link
-                              key={sub.id}
-                              href={sub.href}
-                              onClick={() => setIsMobileMenuOpen(false)}
-                              className={cn(
-                                "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                                active
-                                  ? "text-[#FC7A00] bg-orange-500/10"
-                                  : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-                              )}
-                            >
-                              <span className="material-symbols-outlined text-[15px]">{sub.icon}</span>
-                              <span className="flex-1 text-left">{sub.label}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </nav>
-              </div>
-
-              <div className={cn("p-4 border-t", isDark ? "border-gray-800" : "border-gray-100")}>
-                <button
-                  onClick={() => setShowLockConfirm(true)}
-                  className={cn(
-                    "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
-                    isDark
-                      ? "bg-gray-800 hover:bg-red-950/20 hover:text-red-400 border-gray-700 text-gray-400"
-                      : "bg-gray-50 hover:bg-red-50 hover:text-red-600 border-gray-200 text-gray-500"
-                  )}
-                >
-                  <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
-                  <span>Lock Console</span>
-                </button>
-              </div>
-            </motion.aside>
-          </>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMenuOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden"
+          />
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar Navigation */}
+      {/* SINGLE UNIFIED CPANEL SIDEBAR NAVIGATION */}
       <motion.aside
-        animate={{ width: isSidebarMinimized ? 80 : 256 }}
         className={cn(
-          "hidden md:flex w-full md:w-64 border-b md:border-b-0 md:border-r flex-col justify-between flex-shrink-0 relative overflow-hidden transition-colors duration-300",
+          "fixed top-0 bottom-0 left-0 z-50 md:z-auto md:static h-full border-r flex flex-col justify-between flex-shrink-0 overflow-hidden transition-all duration-300",
+          isMenuOpen ? "translate-x-0 w-[270px]" : "-translate-x-full md:translate-x-0",
+          isSidebarMinimized ? "md:w-20" : "md:w-64",
           isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
         )}
       >
         <div className="flex flex-col h-full">
           {/* Brand Row */}
           <div className={cn("p-4 border-b flex items-center justify-between min-h-[73px]", isDark ? "border-gray-800" : "border-gray-100")}>
-            <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", isSidebarMinimized && "justify-center")}>
+            <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", isSidebarMinimized && "md:justify-center")}>
               <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 p-1 flex-shrink-0 flex items-center justify-center shadow-xs">
                 <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
               </div>
-              {!isSidebarMinimized && (
+              {(!isSidebarMinimized || isMenuOpen) && (
                 <motion.div
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -779,6 +669,7 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
               )}
             </div>
 
+            {/* Desktop Minimize Toggle */}
             <button
               onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
               className={cn(
@@ -791,13 +682,24 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
                 {isSidebarMinimized ? "chevron_right" : "chevron_left"}
               </span>
             </button>
+
+            {/* Mobile Close Button */}
+            <button
+              onClick={() => setIsMenuOpen(false)}
+              className={cn(
+                "md:hidden w-8 h-8 rounded-full border flex items-center justify-center cursor-pointer active:scale-90 transition-all",
+                isDark ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-500"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
           </div>
 
-          {/* Categorized Nav Items */}
+          {/* Categorized Navigation Items */}
           <nav className="p-3 space-y-3 flex flex-col overflow-y-auto no-scrollbar flex-1">
             {navCategories.map((cat, catIdx) => (
               <div key={cat.title} className="space-y-1">
-                {!isSidebarMinimized ? (
+                {(!isSidebarMinimized || isMenuOpen) ? (
                   <div className="px-2 pt-1 pb-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
                     {cat.title}
                   </div>
@@ -811,17 +713,18 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
                     <Link
                       key={item.id}
                       href={item.href}
-                      title={isSidebarMinimized ? item.label : undefined}
+                      onClick={() => setIsMenuOpen(false)}
+                      title={isSidebarMinimized && !isMenuOpen ? item.label : undefined}
                       className={cn(
                         "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                        isSidebarMinimized && "justify-center px-0 py-2.5",
+                        isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
                         active
                           ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
                           : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                       )}
                     >
                       <span className="material-symbols-outlined text-[18px] flex-shrink-0">{item.icon}</span>
-                      {!isSidebarMinimized && <span className="flex-1 text-left truncate">{item.label}</span>}
+                      {(!isSidebarMinimized || isMenuOpen) && <span className="flex-1 text-left truncate">{item.label}</span>}
                     </Link>
                   );
                 })}
@@ -841,16 +744,16 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
               >
                 <div className="flex items-center gap-2.5">
                   <span className="material-symbols-outlined text-[18px]">storefront</span>
-                  {!isSidebarMinimized && <span>Storefront Manager</span>}
+                  {(!isSidebarMinimized || isMenuOpen) && <span>Storefront Manager</span>}
                 </div>
-                {!isSidebarMinimized && (
+                {(!isSidebarMinimized || isMenuOpen) && (
                   <span className="material-symbols-outlined text-[16px]">
                     {isStoreExpanded ? "expand_less" : "expand_more"}
                   </span>
                 )}
               </button>
 
-              {isStoreExpanded && !isSidebarMinimized && (
+              {isStoreExpanded && (!isSidebarMinimized || isMenuOpen) && (
                 <div className="pl-6 pt-1 space-y-1">
                   {storeNavItems.map((sub) => {
                     const active = isNavActive(sub);
@@ -858,6 +761,7 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
                       <Link
                         key={sub.id}
                         href={sub.href}
+                        onClick={() => setIsMenuOpen(false)}
                         className={cn(
                           "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
                           active
@@ -876,7 +780,8 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
           </nav>
         </div>
 
-        <div className={cn("p-4 border-t hidden md:block", isDark ? "border-gray-800" : "border-gray-100")}>
+        {/* Lock Console Footer Button */}
+        <div className={cn("p-4 border-t", isDark ? "border-gray-800" : "border-gray-100")}>
           <button
             onClick={() => setShowLockConfirm(true)}
             className={cn(
@@ -887,7 +792,7 @@ export default function CpanelLayout({ children }: { children: React.ReactNode }
             )}
           >
             <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
-            {!isSidebarMinimized && <span>Lock Console</span>}
+            {(!isSidebarMinimized || isMenuOpen) && <span>Lock Console</span>}
           </button>
         </div>
       </motion.aside>
