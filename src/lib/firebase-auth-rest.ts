@@ -11,6 +11,16 @@ function base64url(input: string | Buffer): string {
     .replace(/\//g, "_");
 }
 
+function cleanPrivateKey(key: string): string {
+  if (!key) return "";
+  let k = key.trim();
+  // Strip outer quotes if environment variable was wrapped in quotes in .env / Vercel dashboard
+  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+    k = k.slice(1, -1);
+  }
+  return k.replace(/\\n/g, "\n").replace(/\\"/g, '"').trim();
+}
+
 /**
  * Mint a Google Identity Toolkit OAuth2 Access Token using Node.js native crypto RSA-SHA256.
  * Zero external libraries (100% immune to jwks-rsa/jose ESM/CommonJS bundle conflicts).
@@ -23,23 +33,23 @@ export async function getGoogleOAuth2AccessToken(): Promise<string> {
   }
 
   let clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  let rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
     try {
       const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
       clientEmail = clientEmail || parsed.client_email;
-      privateKey = privateKey || parsed.private_key;
+      rawPrivateKey = rawPrivateKey || parsed.private_key;
     } catch (err: any) {
       console.warn("[getGoogleOAuth2AccessToken] Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", err.message);
     }
   }
 
-  if (!clientEmail || !privateKey) {
+  if (!clientEmail || !rawPrivateKey) {
     throw new Error("Missing FIREBASE_CLIENT_EMAIL or FIREBASE_PRIVATE_KEY environment variables.");
   }
 
-  const cleanPrivateKey = privateKey.replace(/\\n/g, "\n");
+  const privateKey = cleanPrivateKey(rawPrivateKey);
 
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
@@ -55,7 +65,7 @@ export async function getGoogleOAuth2AccessToken(): Promise<string> {
 
   const signer = crypto.createSign("RSA-SHA256");
   signer.update(unsignedToken);
-  const signatureBase64 = signer.sign(cleanPrivateKey, "base64");
+  const signatureBase64 = signer.sign(privateKey, "base64");
   const signedJwt = `${unsignedToken}.${signatureBase64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")}`;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {

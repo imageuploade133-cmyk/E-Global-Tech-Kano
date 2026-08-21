@@ -42,12 +42,8 @@ export default function AdminBannersPage() {
   const { config, updateConfig } = useAppConfig();
   const router = useRouter();
 
-  // Theme support
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-
-
-  const isDark = theme === "dark";
+  // Global CPanel Theme
+  const { isDark, toggleTheme } = useCpanelTheme();
   const panelClass = isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border border-gray-200 text-gray-800";
   const inputClass = isDark
     ? "bg-gray-800 border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2.5 text-xs outline-none transition-all w-full"
@@ -413,11 +409,6 @@ export default function AdminBannersPage() {
     }
   };
 
-  const handleToggleTheme = () => {
-    const next = isDark ? "light" : "dark";
-    setTheme(next);
-    localStorage.setItem("cpanel_theme", next);
-  };
 
   if (!isAdminUnlocked) {
     return (
@@ -495,7 +486,7 @@ export default function AdminBannersPage() {
           </div>
         </div>
 
-        <button onClick={handleToggleTheme} className={cn("w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-amber-400 hover:bg-gray-800" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50")}>
+        <button onClick={toggleTheme} className={cn("w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-amber-400 hover:bg-gray-800" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50")}>
           <span className="material-symbols-outlined text-[20px]">{isDark ? "light_mode" : "dark_mode"}</span>
         </button>
       </div>
