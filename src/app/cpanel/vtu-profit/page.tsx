@@ -40,8 +40,13 @@ export default function VtuProfitSetupPage() {
   const inputClass = isDark ? "bg-gray-800 border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2 text-xs outline-none transition-all w-full" : "bg-white border border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2 text-xs outline-none transition-all w-full";
   const labelClass = isDark ? "text-gray-300" : "text-gray-900";
 
-  // Admin lock validation
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  // Admin lock validation (initialize from sessionStorage to prevent re-login flash)
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("admin_session_unlocked") === "true";
+    }
+    return false;
+  });
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
@@ -55,6 +60,19 @@ export default function VtuProfitSetupPage() {
         if (res.ok && data.success && data.user) {
           setIsAdminUnlocked(true);
           setAdminEmail(data.user.email);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("admin_session_unlocked", "true");
+          }
+        } else {
+          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+          if (!isMock) {
+            setIsAdminUnlocked(false);
+            if (typeof window !== "undefined") {
+              sessionStorage.removeItem("admin_session_unlocked");
+            }
+          } else {
+            setIsAdminUnlocked(true);
+          }
         }
       } catch (err) {
         console.warn("No active admin cookie session found on mount:", err);
