@@ -254,3 +254,57 @@ body:not(:has(#store-page-root)) main {
     margin-top: 96px !important;
   }
 }
+
+/* CPanel Global Input & Select UI Standards */
+.cpanel-input,
+.cpanel-select,
+.cpanel-textarea {
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  border-color: #d1d5db !important; /* border-gray-300: visible crisp border line always displayed in light mode */
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-radius: 0.75rem !important; /* rounded-xl */
+  font-size: 0.75rem !important; /* text-xs */
+  font-weight: 600 !important;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out !important;
+  outline: none !important;
+  max-width: 100% !important;
+}
+
+.cpanel-input:focus,
+.cpanel-select:focus,
+.cpanel-textarea:focus {
+  border-color: #FC7A00 !important;
+  box-shadow: 0 0 0 2px rgba(252, 122, 0, 0.2) !important;
+  background-color: #ffffff !important;
+}
+
+.dark .cpanel-input,
+.dark .cpanel-select,
+.dark .cpanel-textarea {
+  border-color: #374151 !important; /* border-gray-700: clear border in dark mode */
+  background-color: #111827 !important;
+  color: #ffffff !important;
+}
+
+.dark .cpanel-input:focus,
+.dark .cpanel-select:focus,
+.dark .cpanel-textarea:focus {
+  border-color: #FC7A00 !important;
+  background-color: #0c0f17 !important;
+}
+
+/* Dropdown select options styling */
+select.cpanel-select option,
+select option {
+  background-color: #ffffff;
+  color: #111827;
+  padding: 8px;
+}
+
+.dark select.cpanel-select option,
+.dark select option {
+  background-color: #111827;
+  color: #ffffff;
+}

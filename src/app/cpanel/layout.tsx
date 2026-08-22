@@ -402,7 +402,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                       value={adminEmail}
                       onChange={(e) => setAdminEmail(e.target.value)}
                       placeholder="e.g. abdulkadir123shaba@gmail.com"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                      className="w-full bg-[#F9FAFB] dark:bg-[#111827] border border-gray-300 dark:border-gray-700 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] transition-all"
                     />
                   </div>
 
@@ -414,7 +414,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                       value={resetPhone}
                       onChange={(e) => setResetPhone(e.target.value)}
                       placeholder="e.g. +2348033123456 or 08033123456"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                      className="w-full bg-[#F9FAFB] dark:bg-[#111827] border border-gray-300 dark:border-gray-700 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] transition-all"
                     />
                   </div>
 
@@ -460,7 +460,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                       value={resetOtp}
                       onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ""))}
                       placeholder="e.g. 123456"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-center font-mono text-lg tracking-widest text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                      className="w-full bg-[#F9FAFB] dark:bg-[#111827] border border-gray-300 dark:border-gray-700 rounded-2xl px-4 py-3.5 text-center font-mono text-lg tracking-widest text-gray-900 dark:text-white placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] transition-all"
                     />
                   </div>
 
@@ -536,7 +536,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
                   placeholder="e.g. abdulkadir123shaba@gmail.com"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                  className="w-full bg-[#F9FAFB] dark:bg-[#111827] border border-gray-300 dark:border-gray-700 rounded-2xl px-4 py-3.5 text-left font-sans text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] transition-all"
                 />
               </div>
 
@@ -558,7 +558,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     placeholder="Enter Password"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-4 pr-11 py-3.5 text-left font-sans text-xs text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                    className="w-full bg-[#F9FAFB] dark:bg-[#111827] border border-gray-300 dark:border-gray-700 rounded-2xl pl-4 pr-11 py-3.5 text-left font-sans text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] transition-all"
                   />
                   <button
                     type="button"

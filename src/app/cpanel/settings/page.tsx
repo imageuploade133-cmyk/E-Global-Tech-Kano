@@ -99,8 +99,8 @@ export default function CpanelSettingsPage() {
     ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
     : "bg-white border-gray-200/90 text-gray-900 shadow-3xs";
   const inputClass = isDark
-    ? "bg-[#111827] border-gray-700/80 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-medium"
-    : "bg-[#F9FAFB] border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-medium";
+    ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
+    : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
 
   return (
     <div className={cn("min-h-screen p-4 md:p-8 font-hanken transition-colors duration-300", bgClass)}>
@@ -193,12 +193,7 @@ export default function CpanelSettingsPage() {
                     accept="image/*"
                     disabled={isUploadingLogo}
                     onChange={handleLogoUpload}
-                    className={cn(
-                      "w-full rounded-xl px-4 py-2 text-xs cursor-pointer disabled:opacity-50",
-                      isDark
-                        ? "bg-gray-800 border border-gray-700 text-white file:bg-gray-700 file:text-white"
-                        : "bg-gray-50 border border-gray-200 text-black file:bg-orange-50 file:text-[#FC7A00]"
-                    )}
+                    className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-[#FC7A00]/10 file:text-[#FC7A00]")}
                   />
                 </div>
               </div>
