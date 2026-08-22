@@ -431,7 +431,7 @@ export default function CpanelUsersPage() {
                     value={searchUserTerm}
                     onChange={(e) => setSearchUserTerm(e.target.value)}
                     placeholder="Search by name, email, phone number, or BVN..."
-                    className={cn(inputClass, "pl-9 pr-3 h-11")}
+                    className={cn(inputClass, "pl-10 pr-4 h-11")}
                   />
                 </div>
                 <button

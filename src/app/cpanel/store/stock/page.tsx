@@ -366,7 +366,7 @@ export default function CpanelStockIncomePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search product title, category..."
-              className={cn("w-full pl-9 pr-3 py-2 rounded-xl border text-xs font-semibold outline-none", inputClass)}
+              className={cn(inputClass, "pl-10 pr-4 h-10")}
             />
           </div>
         </div>

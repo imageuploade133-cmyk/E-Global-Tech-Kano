@@ -339,10 +339,7 @@ export default function AdminUserHistoryPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Enter exact email address or complete phone prefix (e.g. jules@example.com)"
-                className={cn(
-                  "w-full rounded-xl pl-9 pr-3 py-3 text-xs outline-none transition-all",
-                  isDark ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500" : "bg-gray-50 border border-gray-200 text-black focus:border-[#FC7A00]"
-                )}
+                className={cn(inputClass, "pl-10 pr-4 h-11")}
               />
             </div>
             <button
