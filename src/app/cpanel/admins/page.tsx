@@ -243,10 +243,12 @@ export default function CpanelAdminsPage() {
   };
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
-  const panelClass = isDark ? "bg-[#131927] border-gray-800" : "bg-white border-gray-200 shadow-sm";
+  const panelClass = isDark
+    ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
+    : "bg-white border-gray-200/90 text-gray-900 shadow-3xs";
   const inputClass = isDark
-    ? "bg-gray-900/80 border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00]"
-    : "bg-white border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00]";
+    ? "bg-[#111827] border-gray-700/80 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs"
+    : "bg-[#F9FAFB] border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs";
 
   if (isLoadingSession) {
     return (

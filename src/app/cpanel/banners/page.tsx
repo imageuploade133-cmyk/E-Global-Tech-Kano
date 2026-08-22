@@ -44,10 +44,12 @@ export default function AdminBannersPage() {
 
   // Global CPanel Theme
   const { isDark, toggleTheme } = useCpanelTheme();
-  const panelClass = isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border border-gray-200 text-gray-800";
+  const panelClass = isDark
+    ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
+    : "bg-white border-gray-200/90 text-gray-900 shadow-3xs";
   const inputClass = isDark
-    ? "bg-gray-800 border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2.5 text-xs outline-none transition-all w-full"
-    : "bg-white border border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2.5 text-xs outline-none transition-all w-full";
+    ? "bg-[#111827] border-gray-700/80 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs"
+    : "bg-[#F9FAFB] border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs";
   const labelClass = isDark ? "text-gray-300" : "text-gray-900";
 
   // Admin lock validation (initialize from sessionStorage to prevent re-login flash)

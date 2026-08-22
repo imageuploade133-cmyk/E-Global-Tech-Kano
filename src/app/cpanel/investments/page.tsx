@@ -1,7 +1,4 @@
 "use client";
-import { useCpanelTheme } from "@/lib/CpanelThemeContext";
-
-
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -39,19 +36,39 @@ export default function AdminFixedDepositsPage() {
   const { config } = useAppConfig();
   const router = useRouter();
 
-  // Global CPanel Theme
-  const { isDark, toggleTheme } = useCpanelTheme();
-  const panelClass = isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border border-gray-200 text-gray-800";
-  const inputClass = isDark ? "bg-gray-800 border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2 text-xs outline-none transition-all w-full" : "bg-white border border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2 text-xs outline-none transition-all w-full";
+  // Theme support
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("cpanel_theme");
+      if (cached === "dark" || cached === "light") {
+        setTheme(cached);
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === "light" ? "dark" : "light";
+      if (typeof window !== "undefined") {
+        localStorage.setItem("cpanel_theme", next);
+      }
+      return next;
+    });
+  };
+
+  const isDark = theme === "dark";
+  const panelClass = isDark
+    ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
+    : "bg-white border-gray-200/90 text-gray-900 shadow-3xs";
+  const inputClass = isDark
+    ? "bg-[#111827] border-gray-700/80 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs"
+    : "bg-[#F9FAFB] border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs";
   const labelClass = isDark ? "text-gray-300" : "text-gray-900";
 
-  // Admin lock validation (initialize from sessionStorage to prevent re-login flash)
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("admin_session_unlocked") === "true";
-    }
-    return false;
-  });
+  // Admin lock validation
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
@@ -65,19 +82,6 @@ export default function AdminFixedDepositsPage() {
         if (res.ok && data.success && data.user) {
           setIsAdminUnlocked(true);
           setAdminEmail(data.user.email);
-          if (typeof window !== "undefined") {
-            sessionStorage.setItem("admin_session_unlocked", "true");
-          }
-        } else {
-          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-          if (!isMock) {
-            setIsAdminUnlocked(false);
-            if (typeof window !== "undefined") {
-              sessionStorage.removeItem("admin_session_unlocked");
-            }
-          } else {
-            setIsAdminUnlocked(true);
-          }
         }
       } catch (err) {
         console.warn("No active admin cookie session found on mount:", err);
