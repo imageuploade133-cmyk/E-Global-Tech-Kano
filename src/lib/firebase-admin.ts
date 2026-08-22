@@ -1,21 +1,21 @@
 import { getApps, initializeApp, cert, App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { cleanPrivateKey } from "./firebase-auth-rest";
 
 let adminApp: App;
 
 const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 const projectId = process.env.FIREBASE_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-if (privateKey) {
-  privateKey = privateKey.replace(/\\n/g, "\n");
-}
+const privateKey = process.env.FIREBASE_PRIVATE_KEY ? cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY) : "";
 
 function getCredentials() {
   if (serviceAccountJson) {
     try {
       const parsed = JSON.parse(serviceAccountJson);
+      if (parsed.private_key) {
+        parsed.private_key = cleanPrivateKey(parsed.private_key);
+      }
       return cert(parsed);
     } catch (e) {
       console.error("[Firebase Admin Init] Error parsing FIREBASE_SERVICE_ACCOUNT_KEY JSON string:", e);
