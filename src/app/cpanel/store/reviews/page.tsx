@@ -387,7 +387,7 @@ export default function AdminStoreReviewsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search author, comment, product..."
-              className={cn("w-full pl-9 pr-3 h-10 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+              className={cn(inputClass, "pl-10 pr-4 h-10")}
             />
           </div>
         </div>

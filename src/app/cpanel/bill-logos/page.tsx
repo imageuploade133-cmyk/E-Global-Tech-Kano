@@ -368,7 +368,7 @@ export default function CpanelBillLogosPage() {
                 placeholder="Filter biller name or code (e.g. MTN, KEDCO, DStv)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={cn("w-full h-11 pl-10 pr-4 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                className={cn(inputClass, "pl-10 pr-4 h-11")}
               />
             </div>
             <div className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">

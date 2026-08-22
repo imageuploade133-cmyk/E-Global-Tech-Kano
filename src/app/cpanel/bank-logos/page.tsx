@@ -329,7 +329,7 @@ export default function CpanelBankLogosPage() {
                 placeholder="Search bank name or bank code (e.g. GTBank, 058, Opay)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={cn("w-full h-11 pl-10 pr-4 rounded-xl text-xs font-semibold outline-none border transition-all", inputClass)}
+                className={cn(inputClass, "pl-10 pr-4 h-11")}
               />
             </div>
             <button
