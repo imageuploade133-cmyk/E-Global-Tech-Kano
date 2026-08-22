@@ -135,9 +135,11 @@ html.material-symbols-loaded .material-symbols-outlined {
     background: transparent !important;
   }
 
-  /* Prevent auto-zoom on iOS by guaranteeing 16px minimum font on inputs */
-  input, select, textarea {
-    font-size: 16px !important;
+  /* Prevent auto-zoom on iOS while allowing font size overrides */
+  @media (max-width: 767px) {
+    input, select, textarea {
+      font-size: 16px;
+    }
   }
 
   /* Smooth scroll reset support */
