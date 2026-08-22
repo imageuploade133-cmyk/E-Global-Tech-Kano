@@ -222,8 +222,8 @@ export default function CpanelUsersPage() {
     ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
     : "bg-white border-gray-200/90 text-gray-900 shadow-3xs";
   const inputClass = isDark
-    ? "bg-[#111827] border-gray-700/80 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-medium"
-    : "bg-[#F9FAFB] border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-medium";
+    ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
+    : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
   const labelClass = isDark ? "text-gray-300" : "text-gray-900";
 
   return (
@@ -332,10 +332,7 @@ export default function CpanelUsersPage() {
                     <select
                       value={newUserForm.phonePrefix}
                       onChange={(e) => setNewUserForm({ ...newUserForm, phonePrefix: e.target.value })}
-                      className={cn(
-                        "w-full rounded-xl px-2 py-2.5 text-xs outline-none transition-all",
-                        isDark ? "bg-gray-800 border border-gray-700 text-white" : "bg-white border border-gray-200 text-black"
-                      )}
+                      className={cn(inputClass, "cursor-pointer font-bold")}
                     >
                       <option value="+234">+234</option>
                       <option value="+227">+227</option>
@@ -368,10 +365,7 @@ export default function CpanelUsersPage() {
                   <select
                     value={newUserForm.role}
                     onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as "admin" | "agent" | "user" })}
-                    className={cn(
-                      "w-full rounded-xl px-3 py-2 text-xs outline-none transition-all",
-                      isDark ? "bg-gray-800 border border-gray-700 text-white" : "bg-white border border-gray-200 text-black"
-                    )}
+                    className={cn(inputClass, "cursor-pointer font-bold")}
                   >
                     <option value="user">USER (Standard Account)</option>
                     <option value="agent">AGENT (Privileged Operative)</option>
@@ -437,10 +431,7 @@ export default function CpanelUsersPage() {
                     value={searchUserTerm}
                     onChange={(e) => setSearchUserTerm(e.target.value)}
                     placeholder="Search by name, email, phone number, or BVN..."
-                    className={cn(
-                      "w-full rounded-xl pl-9 pr-3 py-3 text-xs outline-none transition-all",
-                      isDark ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500" : "bg-gray-50 border border-gray-200 text-black focus:border-[#FC7A00]"
-                    )}
+                    className={cn(inputClass, "pl-9 pr-3 h-11")}
                   />
                 </div>
                 <button
@@ -529,10 +520,7 @@ export default function CpanelUsersPage() {
                                 <select
                                   value={editingUser.role}
                                   onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as "admin" | "agent" | "user" })}
-                                  className={cn(
-                                    "w-full rounded-lg px-2.5 py-1.5 text-xs outline-none",
-                                    isDark ? "bg-gray-700 text-white border border-gray-600" : "bg-gray-50 text-black border border-gray-200"
-                                  )}
+                                  className={cn(inputClass, "cursor-pointer font-bold")}
                                 >
                                   <option value="user">USER</option>
                                   <option value="agent">AGENT</option>
@@ -593,10 +581,7 @@ export default function CpanelUsersPage() {
                                   <label className="text-[9px] font-black uppercase text-gray-400">Currency</label>
                                   <select
                                     id={`deposit-currency-${u.uid}`}
-                                    className={cn(
-                                      "w-full rounded-lg px-2.5 py-2 text-xs outline-none",
-                                      isDark ? "bg-gray-800 text-white border border-gray-700" : "bg-white text-black border border-gray-250"
-                                    )}
+                                    className={cn(inputClass, "cursor-pointer font-bold")}
                                   >
                                     <option value="NGN">NGN (₦)</option>
                                     <option value="USD">USD ($)</option>

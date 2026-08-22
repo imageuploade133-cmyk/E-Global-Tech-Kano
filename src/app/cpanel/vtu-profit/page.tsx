@@ -37,7 +37,9 @@ export default function VtuProfitSetupPage() {
   // Global CPanel Theme
   const { isDark } = useCpanelTheme();
   const panelClass = isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border border-gray-200 text-gray-800";
-  const inputClass = isDark ? "bg-gray-800 border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2 text-xs outline-none transition-all w-full" : "bg-white border border-gray-200 text-black placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2 text-xs outline-none transition-all w-full";
+  const inputClass = isDark
+    ? "bg-gray-800 border border-gray-700 text-white focus:border-orange-500 placeholder-gray-500 rounded-xl px-3 py-2 text-xs outline-none transition-all w-full font-semibold truncate"
+    : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] rounded-xl px-3 py-2 text-xs outline-none transition-all w-full font-semibold truncate";
   const labelClass = isDark ? "text-gray-300" : "text-gray-900";
 
   // Admin lock validation (initialize from sessionStorage to prevent re-login flash)
