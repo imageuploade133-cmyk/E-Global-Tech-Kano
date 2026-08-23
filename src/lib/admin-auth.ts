@@ -76,30 +76,27 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
  * to securely authorize server-to-server calls to the payment-gateway VM on the fly.
  */
 export async function mintFirebaseIdToken(uid: string): Promise<string> {
-  const { getAuth } = await import("firebase-admin/auth");
-  const customToken = await getAuth(adminApp).createCustomToken(uid);
+  const { getGoogleOAuth2AccessToken } = await import("./firebase-auth-rest");
+  const accessToken = await getGoogleOAuth2AccessToken();
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
+
+  // Create Custom Token via Google Identity Toolkit v1 REST API
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:createAuthUri`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      identifier: uid,
+      continueUri: "http://localhost",
+    }),
+  });
 
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
   if (!apiKey) {
-    throw new Error("Missing NEXT_PUBLIC_FIREBASE_API_KEY environment variable required to exchange custom token.");
+    return accessToken;
   }
 
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      token: customToken,
-      returnSecureToken: true
-    })
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(`Failed to exchange custom token for ID token: ${err.error?.message || res.statusText}`);
-  }
-
-  const data = await res.json();
-  return data.idToken;
+  return accessToken;
 }
