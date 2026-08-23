@@ -781,19 +781,19 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        {/* Lock Console Footer Button */}
+        {/* Logout / Lock Console Footer Button */}
         <div className={cn("p-4 border-t", isDark ? "border-gray-800" : "border-gray-100")}>
           <button
             onClick={() => setShowLockConfirm(true)}
             className={cn(
               "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
               isDark
-                ? "bg-gray-800 hover:bg-red-950/20 hover:text-red-400 border-gray-700 text-gray-400"
-                : "bg-gray-50 hover:bg-red-50 hover:text-red-600 border-gray-200 text-gray-500"
+                ? "bg-red-950/30 hover:bg-red-900/50 text-red-400 border-red-900/50"
+                : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
             )}
           >
-            <span className="material-symbols-outlined text-[16px]">power_settings_new</span>
-            {(!isSidebarMinimized || isMenuOpen) && <span>Lock Console</span>}
+            <span className="material-symbols-outlined text-[16px]">logout</span>
+            {(!isSidebarMinimized || isMenuOpen) && <span>Sign Out / Logout</span>}
           </button>
         </div>
       </motion.aside>
@@ -824,14 +824,14 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
               className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 max-w-sm md:w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[32px] p-6 text-center shadow-2xl z-[100000] font-hanken"
             >
               <div className="w-14 h-14 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>lock_reset</span>
+                <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: '"FILL" 1' }}>logout</span>
               </div>
 
               <h4 className="font-extrabold text-base text-gray-900 dark:text-white leading-tight">
-                Lock Console Session?
+                Confirm Admin Logout
               </h4>
               <p className="text-[11.5px] text-gray-500 dark:text-gray-400 mt-2 font-medium leading-relaxed">
-                Are you sure you want to lock the administrative console session? This will immediately secure all system configurations and log out your active session.
+                Are you sure you want to sign out of the Control Panel? Your active administrative session cookie and session tokens will be cleared immediately.
               </p>
 
               <div className="grid grid-cols-2 gap-3 mt-6">
@@ -855,11 +855,15 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                     if (typeof window !== "undefined") {
                       sessionStorage.removeItem("admin_session_unlocked");
                     }
-                    toast.info("Console session locked.");
+                    toast.success("Logged out successfully from Control Panel.");
+                    if (typeof window !== "undefined") {
+                      window.location.href = "/auth/login";
+                    }
                   }}
-                  className="py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 transition-all cursor-pointer active:scale-95"
+                  className="py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
                 >
-                  Yes, Lock
+                  <span className="material-symbols-outlined text-sm">logout</span>
+                  Yes, Log Out
                 </button>
               </div>
             </motion.div>
