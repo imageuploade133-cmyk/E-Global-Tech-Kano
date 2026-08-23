@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { adminDb } from "@/lib/firebase-admin";
-import { createFirebaseAuthUser, setFirebaseAuthCustomClaims, getFirebaseAuthUserByEmail } from "@/lib/firebase-auth-rest";
+import { adminDb, adminApp } from "@/lib/firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
 const GRANULAR_PERMISSIONS_CATALOG = [
   { key: "users.view", label: "View Users", category: "Users" },
@@ -117,20 +117,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "An administrator with this email already exists." }, { status: 400 });
       }
 
-      // Create or look up in Firebase Authentication via REST API
+      // Create or look up in Firebase Authentication via Firebase Admin SDK
       let firebaseUid = "";
 
-      const existingUser = await getFirebaseAuthUserByEmail(cleanEmail);
-      if (existingUser) {
+      try {
+        const existingUser = await getAuth(adminApp).getUserByEmail(cleanEmail);
         firebaseUid = existingUser.uid;
-      } else {
+      } catch (notFoundErr: any) {
         if (!password || password.length < 6) {
           return NextResponse.json({ error: "Password must be at least 6 characters long." }, { status: 400 });
         }
-        const createdUser = await createFirebaseAuthUser({
+        const createdUser = await getAuth(adminApp).createUser({
           email: cleanEmail,
           password,
           displayName: displayName || cleanEmail.split("@")[0],
+          emailVerified: true,
         });
         firebaseUid = createdUser.uid;
       }
@@ -152,9 +153,9 @@ export async function POST(req: Request) {
 
       await adminDb.collection("admin_users").doc(firebaseUid).set(newAdminRecord);
 
-      // Set Custom Claims via REST API
+      // Set Custom Claims via Firebase Admin SDK
       try {
-        await setFirebaseAuthCustomClaims(firebaseUid, {
+        await getAuth(adminApp).setCustomUserClaims(firebaseUid, {
           admin: true,
           role: role || "admin",
         });

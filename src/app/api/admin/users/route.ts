@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth";
-import { adminDb } from "@/lib/firebase-admin";
-import { createFirebaseAuthUser, setFirebaseAuthCustomClaims } from "@/lib/firebase-auth-rest";
+import { adminDb, adminApp } from "@/lib/firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
 const ALLOWED_PERMISSIONS = [
   "can_transact",
@@ -269,15 +269,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A user with this email address already exists." }, { status: 400 });
       }
 
-      // Create in Firebase Authentication via REST API (avoids CommonJS/ESM bundle conflicts)
-      const userRecord = await createFirebaseAuthUser({
+      // Create in Firebase Authentication via Firebase Admin SDK
+      const userRecord = await getAuth(adminApp).createUser({
         email: cleanEmail,
         password,
         displayName: `${firstName.trim()} ${lastName.trim()}`.toUpperCase(),
+        emailVerified: true,
       });
 
-      // Synchronize role Custom Claims instantly via REST API
-      await setFirebaseAuthCustomClaims(userRecord.uid, {
+      // Synchronize role Custom Claims instantly via Firebase Admin SDK
+      await getAuth(adminApp).setCustomUserClaims(userRecord.uid, {
         admin: role === "admin",
       });
 
@@ -341,8 +342,8 @@ export async function POST(req: Request) {
         permissions: cleanPermissions
       });
 
-      // Update Firebase Auth Custom Claims via REST API
-      await setFirebaseAuthCustomClaims(targetUid, {
+      // Update Firebase Auth Custom Claims via Firebase Admin SDK
+      await getAuth(adminApp).setCustomUserClaims(targetUid, {
         admin: role === "admin",
       });
 
