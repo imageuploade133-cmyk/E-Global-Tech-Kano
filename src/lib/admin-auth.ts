@@ -3,7 +3,13 @@ import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
+const JWT_SECRET = process.env.CPANEL_SESSION_SECRET;
+
+if (!JWT_SECRET && process.env.NODE_ENV === "production") {
+  console.warn("[Admin Auth Security Warning]: CPANEL_SESSION_SECRET environment variable is missing in production!");
+}
+
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
 
 export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAdmin: boolean; email?: string; role?: string; permissions?: string[] }> {
   try {
@@ -15,11 +21,8 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
 
     if (sessionToken) {
       try {
-        const decoded = jwt.verify(sessionToken, JWT_SECRET) as { uid: string; email: string; role: string };
+        const decoded = jwt.verify(sessionToken, EFFECTIVE_JWT_SECRET) as { uid: string; email: string; role: string };
         if (decoded && decoded.uid) {
-          if (decoded.uid === "mock-admin-uid") {
-            return { uid: decoded.uid, isAdmin: true, email: decoded.email, role: "super_admin", permissions: ["*"] };
-          }
           uid = decoded.uid;
         }
       } catch (cookieErr: any) {
@@ -27,17 +30,13 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
       }
     }
 
-    // 2. Fall back to Authorization Bearer header (Firebase ID Token or mock)
+    // 2. Fall back to Authorization Bearer header (Firebase ID Token)
     if (!uid) {
       const authHeader = req.headers.get("Authorization");
       if (authHeader && authHeader.startsWith("Bearer ")) {
         const token = authHeader.split("Bearer ")[1];
-        if (token === "mock-admin-token") {
-          return { uid: "mock-admin-uid", isAdmin: true, email: "admin@example.com", role: "super_admin", permissions: ["*"] };
-        } else {
-          const decoded = await verifyFirebaseIdToken(token);
-          uid = decoded.uid;
-        }
+        const decoded = await verifyFirebaseIdToken(token);
+        uid = decoded.uid;
       }
     }
 
@@ -77,14 +76,14 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
  * to securely authorize server-to-server calls to the payment-gateway VM on the fly.
  */
 export async function mintFirebaseIdToken(uid: string): Promise<string> {
-  if (uid === "mock-admin-uid") {
-    return "mock-admin-token";
-  }
-
   const { getAuth } = await import("firebase-admin/auth");
   const customToken = await getAuth(adminApp).createCustomToken(uid);
 
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCuolap_m6yXWEo2csYMyGhEshsHnd1aEQ";
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing NEXT_PUBLIC_FIREBASE_API_KEY environment variable required to exchange custom token.");
+  }
+
   const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`, {
     method: "POST",
     headers: {

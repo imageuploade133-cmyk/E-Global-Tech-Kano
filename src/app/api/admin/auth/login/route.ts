@@ -3,7 +3,13 @@ import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
+const JWT_SECRET = process.env.CPANEL_SESSION_SECRET;
+
+if (!JWT_SECRET && process.env.NODE_ENV === "production") {
+  console.warn("[CPanel Auth Security Warning]: CPANEL_SESSION_SECRET environment variable is missing in production!");
+}
+
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
 
 export async function POST(req: Request) {
   try {
@@ -19,16 +25,9 @@ export async function POST(req: Request) {
 
     const cleanEmail = String(email).trim().toLowerCase();
 
-    // Verify Firebase ID token natively using Node crypto + Google certs (no jwks-rsa/jose ESM conflict)
-    let uid = "";
-    const isMock = cleanEmail === "jules@example.com" || cleanEmail === "admin@example.com" || token === "mock-admin-token";
-
-    if (isMock) {
-      uid = "mock-admin-uid";
-    } else {
-      const decodedToken = await verifyFirebaseIdToken(token);
-      uid = decodedToken.uid;
-    }
+    // Verify Firebase ID token natively using Node crypto + Google certs
+    const decodedToken = await verifyFirebaseIdToken(token);
+    const uid = decodedToken.uid;
 
     if (!uid) {
       return NextResponse.json({ error: "Invalid or expired Firebase ID token." }, { status: 401 });
@@ -64,7 +63,7 @@ export async function POST(req: Request) {
       email: cleanEmail,
       role: finalRole
     };
-    const cpanelToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
+    const cpanelToken = jwt.sign(payload, EFFECTIVE_JWT_SECRET, { expiresIn: "24h" });
 
     const response = NextResponse.json({
       success: true,

@@ -101,21 +101,17 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
   }
 
   // 3. Fetch Google's public certificates (cached safely according to Cache-Control max-age)
-  const certs = await getGooglePublicCertificates();
-  const cert = certs[kid];
-  if (!cert) {
+  let certs = await getGooglePublicCertificates();
+  let activeCert = certs[kid];
+
+  if (!activeCert) {
     // Certificate not found in cache; invalidate cache and re-fetch once to support key rotation
     certsCache = null;
-    const freshCerts = await getGooglePublicCertificates();
-    const freshCert = freshCerts[kid];
-    if (!freshCert) {
-      throw new Error(`Public key not found for kid: ${kid}`);
+    certs = await getGooglePublicCertificates();
+    activeCert = certs[kid];
+    if (!activeCert) {
+      throw new Error(`Public key certificate not found for kid: ${kid}`);
     }
-  }
-
-  const activeCert = certs[kid] || (certsCache ? certsCache.certs[kid] : undefined);
-  if (!activeCert) {
-    throw new Error(`Public key certificate not found for kid: ${kid}`);
   }
 
   // 4. Verify RS256 signature using native Node.js crypto
@@ -176,22 +172,6 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   if (!idToken) {
     const url = new URL(req.url);
     idToken = url.searchParams.get("idToken") || "";
-  }
-
-  if (idToken === "mock-token") {
-    return {
-      uid: "mock-uid",
-      email: "mock-user@example.com",
-      name: "MOCK USER",
-    };
-  }
-
-  if (idToken === "mock-admin-token") {
-    return {
-      uid: "mock-admin-uid",
-      email: "mock-admin@example.com",
-      name: "MOCK ADMIN",
-    };
   }
 
   if (!idToken) {
