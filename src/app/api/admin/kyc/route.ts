@@ -304,9 +304,9 @@ export async function POST(req: Request) {
       }
 
       // Delete from Firebase Auth
-      const { getAuth } = await import("firebase-admin/auth");
+      const { deleteFirebaseAuthUser } = await import("@/lib/firebase-auth-rest");
       try {
-        await getAuth(adminApp).deleteUser(targetUid);
+        await deleteFirebaseAuthUser(targetUid);
       } catch (authErr: any) {
         console.warn(`[Admin KYC delete_unverified] User not found or error in Firebase Auth:`, authErr.message);
       }
