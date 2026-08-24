@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { verifyAdminAuth } from "@/lib/admin-auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 const DEFAULT_SETTINGS = {
   storeName: "E-Tech Store",
@@ -32,9 +32,9 @@ const DEFAULT_SETTINGS = {
 
 export async function GET(req: Request) {
   try {
-    const { isAdmin } = await verifyAdminAuth(req);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "store.view");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     const docSnap = await adminDb.collection("config").doc("store_data").get();
@@ -56,9 +56,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { isAdmin } = await verifyAdminAuth(req);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "store.manage");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     const body = await req.json();

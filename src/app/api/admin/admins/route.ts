@@ -1,33 +1,7 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
 import { createFirebaseAuthUser, setFirebaseAuthCustomClaims, getFirebaseAuthUserByEmail } from "@/lib/firebase-auth-rest";
-
-const GRANULAR_PERMISSIONS_CATALOG = [
-  { key: "users.view", label: "View Users", category: "Users" },
-  { key: "users.edit", label: "Edit Users", category: "Users" },
-  { key: "users.suspend", label: "Suspend Users", category: "Users" },
-  { key: "transactions.view", label: "View Transactions", category: "Transactions" },
-  { key: "deposits.view", label: "View Deposits", category: "Deposits" },
-  { key: "withdrawals.view", label: "View Withdrawals", category: "Withdrawals" },
-  { key: "withdrawals.approve", label: "Approve Withdrawals", category: "Withdrawals" },
-  { key: "withdrawals.reject", label: "Reject Withdrawals", category: "Withdrawals" },
-  { key: "kyc.view", label: "View KYC", category: "KYC" },
-  { key: "kyc.approve", label: "Approve KYC", category: "KYC" },
-  { key: "kyc.reject", label: "Reject KYC", category: "KYC" },
-  { key: "vtu.view", label: "View VTU", category: "VTU" },
-  { key: "vtu.manage", label: "Manage VTU", category: "VTU" },
-  { key: "virtual_accounts.view", label: "View Virtual Accounts", category: "Virtual Accounts" },
-  { key: "virtual_accounts.manage", label: "Manage Virtual Accounts", category: "Virtual Accounts" },
-  { key: "admins.view", label: "View Administrators", category: "Admin Management" },
-  { key: "admins.create", label: "Create Administrators", category: "Admin Management" },
-  { key: "admins.edit", label: "Edit Administrators", category: "Admin Management" },
-  { key: "admins.disable", label: "Disable Administrators", category: "Admin Management" },
-  { key: "admins.delete", label: "Delete Administrators", category: "Admin Management" },
-  { key: "admins.change_role", label: "Change Admin Roles", category: "Admin Management" },
-  { key: "settings.view", label: "View Settings", category: "Settings" },
-  { key: "settings.manage", label: "Manage Settings", category: "Settings" },
-];
+import { requireAdminPermission, CPANEL_PERMISSIONS_CATALOG } from "@/lib/admin-permissions";
 
 async function logAdminAction(payload: {
   adminUid: string;
@@ -55,10 +29,11 @@ async function logAdminAction(payload: {
 
 export async function GET(req: Request) {
   try {
-    const auth = await verifyAdminAuth(req);
-    if (!auth.isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "admins.view");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const auth = perm.auth;
 
     // Return list of admins from admin_users collection
     const snap = await adminDb.collection("admin_users").orderBy("createdAt", "desc").get();
@@ -70,7 +45,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       success: true,
       admins,
-      catalog: GRANULAR_PERMISSIONS_CATALOG,
+      catalog: CPANEL_PERMISSIONS_CATALOG,
       callerRole: auth.role,
     });
   } catch (err: any) {
@@ -81,13 +56,14 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const auth = await verifyAdminAuth(req);
-    if (!auth.isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "admins.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const auth = perm.auth;
 
     const callerRole = (auth.role || "").toLowerCase();
-    const isSuperAdmin = callerRole === "super_admin" || auth.email === "abdulkadir123shaba@gmail.com";
+    const isSuperAdmin = callerRole === "super_admin" || auth.permissions?.includes("*") || auth.email === "abdulkadir123shaba@gmail.com";
 
     if (!isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden: Only Super Admins can manage administrator accounts." }, { status: 403 });

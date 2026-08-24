@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 interface Review {
@@ -27,7 +28,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function AdminStoreReviewsPage() {
+function AdminStoreReviewsPageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -623,5 +624,13 @@ export default function AdminStoreReviewsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminStoreReviewsPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="store.view">
+      <AdminStoreReviewsPageContent />
+    </CpanelRouteGuard>
   );
 }

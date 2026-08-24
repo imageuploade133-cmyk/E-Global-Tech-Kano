@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import { uploadImageSecurely } from "@/lib/image-upload";
 import { StoreSliderSettingsPanel } from "@/components/cpanel/StoreSliderSettingsPanel";
 
@@ -35,7 +36,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelStoreSlidesPage() {
+function CpanelStoreSlidesPageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -872,5 +873,13 @@ export default function CpanelStoreSlidesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CpanelStoreSlidesPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="store.manage">
+      <CpanelStoreSlidesPageContent />
+    </CpanelRouteGuard>
   );
 }

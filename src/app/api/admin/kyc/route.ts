@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth, mintFirebaseIdToken } from "@/lib/admin-auth";
+import { mintFirebaseIdToken } from "@/lib/admin-auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import { adminDb, adminApp } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
@@ -21,11 +22,11 @@ async function parseResponseJson(response: Response, defaultMessage: string) {
 
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "kyc.view");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     const { searchParams } = new URL(req.url);
     const tab = searchParams.get("tab") || "pending"; // pending, verified_today, unverified
@@ -127,11 +128,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "kyc.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     const { action, targetUid, reason, provider } = await req.json();
 

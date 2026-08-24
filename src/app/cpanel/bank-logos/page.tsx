@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import { uploadImageSecurely } from "@/lib/image-upload";
 
 interface BankItem {
@@ -26,7 +27,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelBankLogosPage() {
+function CpanelBankLogosPageContent() {
   const router = RouterHook();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -517,5 +518,13 @@ export default function CpanelBankLogosPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CpanelBankLogosPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="bank_logos.manage">
+      <CpanelBankLogosPageContent />
+    </CpanelRouteGuard>
   );
 }

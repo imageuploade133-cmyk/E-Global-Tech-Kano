@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import { uploadImageSecurely } from "@/lib/image-upload";
 
 interface BillerItem {
@@ -23,7 +24,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelBillLogosPage() {
+function CpanelBillLogosPageContent() {
   const router = RouterHook();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -517,5 +518,13 @@ export default function CpanelBillLogosPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CpanelBillLogosPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="bill_logos.manage">
+      <CpanelBillLogosPageContent />
+    </CpanelRouteGuard>
   );
 }

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface UserLimitItem {
   uid: string;
@@ -27,7 +28,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelLimitsPage() {
+function CpanelLimitsPageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -389,5 +390,13 @@ export default function CpanelLimitsPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CpanelLimitsPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="limits.manage">
+      <CpanelLimitsPageContent />
+    </CpanelRouteGuard>
   );
 }

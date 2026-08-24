@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface AdminUserRecord {
   uid: string;
@@ -36,7 +37,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelAdminsPage() {
+function CpanelAdminsPageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -549,6 +550,57 @@ export default function CpanelAdminsPage() {
                 </div>
 
                 <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Role</label>
+                  <select
+                    value={editingAdmin.role}
+                    onChange={(e) => {
+                      const selRole = e.target.value as AdminUserRecord["role"];
+                      setEditingAdmin({ ...editingAdmin, role: selRole });
+                    }}
+                    className={cn("h-10 px-3 rounded-xl text-xs font-bold outline-none border cursor-pointer w-full", inputClass)}
+                  >
+                    <option value="super_admin">SUPER ADMIN</option>
+                    <option value="admin">ADMIN</option>
+                    <option value="finance">FINANCE</option>
+                    <option value="kyc_admin">KYC ADMIN</option>
+                    <option value="support">SUPPORT</option>
+                    <option value="read_only">READ ONLY</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Granular Permissions ({editingAdmin.permissions.length})</label>
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
+                    {permissionCatalog.map((perm) => {
+                      const isChecked = editingAdmin.permissions.includes(perm.key) || editingAdmin.permissions.includes("*");
+                      return (
+                        <label key={perm.key} className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setEditingAdmin({
+                                  ...editingAdmin,
+                                  permissions: editingAdmin.permissions.filter((p) => p !== perm.key && p !== "*")
+                                });
+                              } else {
+                                setEditingAdmin({
+                                  ...editingAdmin,
+                                  permissions: [...editingAdmin.permissions, perm.key]
+                                });
+                              }
+                            }}
+                            className="w-3.5 h-3.5 text-[#FC7A00] rounded"
+                          />
+                          <span className="text-[10.5px] font-bold text-gray-700 dark:text-gray-300">{perm.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400 block">Account Status</label>
                   <select
                     value={editingAdmin.status}
@@ -583,5 +635,13 @@ export default function CpanelAdminsPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CpanelAdminsPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="admins.view">
+      <CpanelAdminsPageContent />
+    </CpanelRouteGuard>
   );
 }

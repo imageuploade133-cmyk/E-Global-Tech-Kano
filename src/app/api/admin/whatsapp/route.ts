@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import { formatQrCodePayload, callWhatsappBackend } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "whatsapp.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     // 1. Fetch dynamic WhatsApp API settings from Firestore config/whatsapp_api
     let whatsappApiUrl = process.env.WHATSAPP_API_URL || "";
@@ -191,11 +191,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "whatsapp.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     const body = await req.json();
     const { action } = body;

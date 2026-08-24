@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import { NotificationService } from "@/services/notification-service";
 
 export async function POST(req: Request) {
   try {
-    // 1. Enforce rigorous admin authorization check
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "deposit.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     const { targetUid, amount, currency } = await req.json();
 

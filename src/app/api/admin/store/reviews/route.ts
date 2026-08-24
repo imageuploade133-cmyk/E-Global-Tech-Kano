@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 // GET: Fetch paginated reviews for admin management (10 items per page by default) and unviewed/unreplied notification count
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "store.view");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     const { searchParams } = new URL(req.url);
@@ -89,10 +89,11 @@ export async function GET(req: Request) {
 // POST: Admin Actions (Reply, Hide/Show, Delete, Mark Viewed)
 export async function POST(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "store.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     const body = await req.json();
     const { action, reviewId, reviewIds, reply, isHidden } = body;

@@ -10,6 +10,7 @@ import { useAppConfig } from "@/lib/ConfigContext";
 import { uploadImageSecurely } from "@/lib/image-upload";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -37,7 +38,7 @@ interface BannerSlide {
   createdAt: string;
 }
 
-export default function AdminBannersPage() {
+function AdminBannersPageContent() {
   const { user } = useAuth();
   const { config, updateConfig } = useAppConfig();
   const router = useRouter();
@@ -1231,5 +1232,13 @@ export default function AdminBannersPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function AdminBannersPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="banners.manage">
+      <AdminBannersPageContent />
+    </CpanelRouteGuard>
   );
 }

@@ -10,6 +10,7 @@ import { useAppConfig } from "@/lib/ConfigContext";
 import { uploadImageSecurely } from "@/lib/image-upload";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 const ButtonSpinner = () => (
   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -18,7 +19,7 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function CpanelSettingsPage() {
+function CpanelSettingsPageContent() {
   const { config, updateConfig } = useAppConfig();
   const router = useRouter();
 
@@ -266,5 +267,13 @@ export default function CpanelSettingsPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CpanelSettingsPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="branding.manage">
+      <CpanelSettingsPageContent />
+    </CpanelRouteGuard>
   );
 }

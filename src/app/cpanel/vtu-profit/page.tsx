@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface ProfitMargins {
   dataProfitMargin: number;
@@ -29,7 +30,7 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function VtuProfitSetupPage() {
+function AdminVtuProfitPageContent() {
   const { user, userData } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
@@ -457,5 +458,13 @@ export default function VtuProfitSetupPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function AdminVtuProfitPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="vtu.manage">
+      <AdminVtuProfitPageContent />
+    </CpanelRouteGuard>
   );
 }
