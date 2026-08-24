@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { verifyAdminAuth } from "@/lib/admin-auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import { BankService } from "@/services/bank-service";
 
 export async function GET(req: Request) {
@@ -24,9 +24,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { isAdmin } = await verifyAdminAuth(req);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "bank_logos.manage");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     const body = await req.json();

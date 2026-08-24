@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface UserProfile {
   uid: string;
@@ -50,7 +51,7 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function AdminUserHistoryPage() {
+function AdminUserHistoryPageContent() {
   const { user, userData } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
@@ -638,5 +639,13 @@ export default function AdminUserHistoryPage() {
         </AnimatePresence>
       </div>
     </main>
+  );
+}
+
+export default function AdminUserHistoryPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="user_history.view">
+      <AdminUserHistoryPageContent />
+    </CpanelRouteGuard>
   );
 }

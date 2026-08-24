@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import {
   getWhatsappServerConfig,
   callWhatsappBackend,
@@ -11,10 +11,11 @@ import {
 
 export async function POST(req: Request) {
   try {
-    const admin = await verifyAdminAuth(req);
-    if (!admin.isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "whatsapp.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const admin = perm.auth;
 
     if (!acquireWhatsappActionLock()) {
       return NextResponse.json(

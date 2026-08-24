@@ -3,7 +3,13 @@ import { cookies } from "next/headers";
 import { adminDb } from "@/lib/firebase-admin";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.CPANEL_SESSION_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
+const JWT_SECRET = process.env.CPANEL_SESSION_SECRET;
+
+if (!JWT_SECRET && process.env.NODE_ENV === "production") {
+  console.warn("[Admin Session Security Warning]: CPANEL_SESSION_SECRET environment variable is missing in production!");
+}
+
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || "cpanel_secure_session_secret_987654321_etech_global";
 
 export async function GET() {
   try {
@@ -16,7 +22,7 @@ export async function GET() {
 
     let decoded: any;
     try {
-      decoded = jwt.verify(sessionToken, JWT_SECRET);
+      decoded = jwt.verify(sessionToken, EFFECTIVE_JWT_SECRET);
     } catch (jwtErr) {
       return NextResponse.json({ success: false, error: "Session expired or invalid." }, { status: 401 });
     }

@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "vtu.manage");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     // Default system fallback profit margins
@@ -55,10 +54,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "vtu.manage");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     const body = await req.json();

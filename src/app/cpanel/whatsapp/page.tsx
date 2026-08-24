@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 const ButtonSpinner = () => (
   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -17,7 +18,7 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function CpanelWhatsappPage() {
+function CpanelWhatsappPageContent() {
   const { user } = useAuth();
   const router = useRouter();
 
@@ -738,5 +739,13 @@ export default function CpanelWhatsappPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CpanelWhatsappPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="whatsapp.manage">
+      <CpanelWhatsappPageContent />
+    </CpanelRouteGuard>
   );
 }

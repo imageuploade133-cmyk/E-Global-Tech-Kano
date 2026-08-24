@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth, mintFirebaseIdToken } from "@/lib/admin-auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
+import { mintFirebaseIdToken } from "@/lib/admin-auth";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
 export async function POST(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "vtu.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     // Try to get token from header, otherwise programmatically mint a fresh one
     const authHeader = req.headers.get("Authorization") || "";

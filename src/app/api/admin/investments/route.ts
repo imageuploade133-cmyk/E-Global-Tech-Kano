@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "investments.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     // Playtesting mock bypass
     if (uid === "mock-admin-uid") {

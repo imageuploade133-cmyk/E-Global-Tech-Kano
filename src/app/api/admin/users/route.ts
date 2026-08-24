@@ -1,24 +1,17 @@
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/firebase-admin";
 import { createFirebaseAuthUser, setFirebaseAuthCustomClaims } from "@/lib/firebase-auth-rest";
+import { requireAdminPermission, CPANEL_PERMISSIONS_CATALOG } from "@/lib/admin-permissions";
 
-const ALLOWED_PERMISSIONS = [
-  "can_transact",
-  "can_verify_kyc",
-  "can_manage_gateways",
-  "can_view_audit_logs",
-  "can_moderate_users"
-];
-
+const ALLOWED_PERMISSIONS = CPANEL_PERMISSIONS_CATALOG.map((p) => p.key);
 
 export async function GET(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "users.view");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     const { searchParams } = new URL(req.url);
     const searchTerm = searchParams.get("search")?.trim().toLowerCase() || "";
@@ -185,11 +178,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { uid, isAdmin } = await verifyAdminAuth(req);
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Administrative access required." }, { status: 403 });
+    const perm = await requireAdminPermission(req, "users.manage");
+    if (!perm.authorized || !perm.auth) {
+      return perm.response!;
     }
+    const { uid } = perm.auth;
 
     const body = await req.json();
     const { action } = body;

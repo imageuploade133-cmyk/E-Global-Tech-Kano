@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface FixedDeposit {
   id: string;
@@ -31,7 +32,7 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function AdminFixedDepositsPage() {
+function AdminFixedDepositsPageContent() {
   const { user, userData } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
@@ -464,5 +465,13 @@ export default function AdminFixedDepositsPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function AdminInvestmentsPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="investments.manage">
+      <AdminFixedDepositsPageContent />
+    </CpanelRouteGuard>
   );
 }

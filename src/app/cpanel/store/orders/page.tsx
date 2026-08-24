@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 function ButtonSpinner() {
   return (
@@ -39,7 +40,7 @@ export interface StoreOrder {
   updatedAt: string;
 }
 
-export default function CpanelStoreOrdersPage() {
+function CpanelStoreOrdersPageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -630,5 +631,13 @@ export default function CpanelStoreOrdersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CpanelStoreOrdersPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="store.view">
+      <CpanelStoreOrdersPageContent />
+    </CpanelRouteGuard>
   );
 }

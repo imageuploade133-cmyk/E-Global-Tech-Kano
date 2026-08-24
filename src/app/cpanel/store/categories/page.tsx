@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import { uploadImageSecurely } from "@/lib/image-upload";
 import { StoreCategoryDoc } from "@/app/api/admin/store/categories/route";
 
@@ -17,7 +18,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelStoreCategoriesPage() {
+function CpanelStoreCategoriesPageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -685,5 +686,13 @@ export default function CpanelStoreCategoriesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CpanelStoreCategoriesPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="store.manage">
+      <CpanelStoreCategoriesPageContent />
+    </CpanelRouteGuard>
   );
 }

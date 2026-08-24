@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface AdminUser {
   uid: string;
@@ -39,7 +40,7 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function CpanelUsersPage() {
+function CpanelUsersPageContent() {
   const { user } = useAuth();
   const router = useRouter();
 
@@ -715,5 +716,13 @@ export default function CpanelUsersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CpanelUsersPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="users.view">
+      <CpanelUsersPageContent />
+    </CpanelRouteGuard>
   );
 }

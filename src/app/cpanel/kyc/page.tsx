@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface PendingKycUser {
   uid: string;
@@ -30,7 +31,7 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function CpanelKycPage() {
+function CpanelKycPageContent() {
   const { user } = useAuth();
   const router = useRouter();
 
@@ -523,5 +524,13 @@ export default function CpanelKycPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CpanelKycPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="kyc.view">
+      <CpanelKycPageContent />
+    </CpanelRouteGuard>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 interface FrozenUser {
@@ -21,7 +22,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelFreezePage() {
+function CpanelFreezePageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -304,5 +305,13 @@ export default function CpanelFreezePage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CpanelFreezePage() {
+  return (
+    <CpanelRouteGuard requiredPermission="freeze.manage">
+      <CpanelFreezePageContent />
+    </CpanelRouteGuard>
   );
 }

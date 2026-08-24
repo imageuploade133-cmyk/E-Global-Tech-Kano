@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
 interface StockItem {
   id: string;
@@ -48,7 +49,7 @@ function ButtonSpinner() {
   );
 }
 
-export default function CpanelStockIncomePage() {
+function CpanelStockIncomePageContent() {
   const router = useRouter();
   const { isDark, toggleTheme } = useCpanelTheme();
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -617,5 +618,13 @@ export default function CpanelStockIncomePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CpanelStockIncomePage() {
+  return (
+    <CpanelRouteGuard requiredPermission="store.view">
+      <CpanelStockIncomePageContent />
+    </CpanelRouteGuard>
   );
 }
