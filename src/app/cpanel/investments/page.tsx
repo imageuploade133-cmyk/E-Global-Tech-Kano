@@ -471,7 +471,7 @@ function AdminFixedDepositsPageContent() {
 export default function AdminInvestmentsPage() {
   return (
     <CpanelRouteGuard requiredPermission="investments.manage">
-      <AdminInvestmentsPageContent />
+      <AdminFixedDepositsPageContent />
     </CpanelRouteGuard>
   );
 }
