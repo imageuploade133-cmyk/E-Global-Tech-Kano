@@ -36,6 +36,8 @@ export interface AppConfig {
   bannerTransferPosition?: "top" | "bottom";
   bannerShowIndicators?: boolean;
   bannerMarginBottom?: number;
+  whatsappPollingEnabled?: boolean;
+  whatsappPollingIntervalMinutes?: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -70,6 +72,8 @@ const DEFAULT_CONFIG: AppConfig = {
   bannerTransferPosition: "top",
   bannerShowIndicators: true,
   bannerMarginBottom: 24,
+  whatsappPollingEnabled: true,
+  whatsappPollingIntervalMinutes: 1,
 };
 
 interface ConfigContextProps {
