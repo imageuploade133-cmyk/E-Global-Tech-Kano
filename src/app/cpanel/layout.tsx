@@ -636,16 +636,16 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       {/* SINGLE UNIFIED CPANEL SIDEBAR NAVIGATION */}
       <motion.aside
         className={cn(
-          "fixed top-0 bottom-0 left-0 z-50 md:z-auto md:static h-full border-r flex flex-col justify-between flex-shrink-0 overflow-hidden transition-all duration-300",
+          "fixed top-0 bottom-0 left-0 z-50 md:z-auto md:static h-full border-r flex flex-col flex-shrink-0 overflow-hidden transition-all duration-300",
           isMenuOpen ? "translate-x-0 w-[270px]" : "-translate-x-full md:translate-x-0",
           isSidebarMinimized ? "md:w-20" : "md:w-64",
           isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
         )}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col flex-1 min-h-0">
           {/* Brand Row */}
-          <div className={cn("p-4 border-b flex items-center justify-between min-h-[73px]", isDark ? "border-gray-800" : "border-gray-100")}>
-            <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", isSidebarMinimized && "md:justify-center")}>
+          <div className={cn("p-4 border-b flex items-center justify-between min-h-[73px] shrink-0", isDark ? "border-gray-800" : "border-gray-100")}>
+            <div className={cn("flex items-center gap-2.5 min-w-0 flex-1", isSidebarMinimized && !isMenuOpen && "md:justify-center")}>
               <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 p-1 flex-shrink-0 flex items-center justify-center shadow-xs">
                 <img src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"} alt="E-Tech" className="object-contain w-full h-full" />
               </div>
@@ -690,7 +690,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Categorized Navigation Items */}
-          <nav className="p-3 space-y-3 flex flex-col overflow-y-auto no-scrollbar flex-1">
+          <nav className="p-3 space-y-3 flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar">
             {navCategories.map((cat, catIdx) => (
               <div key={cat.title} className="space-y-1">
                 {(!isSidebarMinimized || isMenuOpen) ? (
@@ -728,16 +728,25 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
             {/* Storefront Manager Accordion / Submenu */}
             <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
               <button
-                onClick={() => setIsStoreExpanded(!isStoreExpanded)}
+                onClick={() => {
+                  if (isSidebarMinimized && !isMenuOpen) {
+                    setIsSidebarMinimized(false);
+                    setIsStoreExpanded(true);
+                  } else {
+                    setIsStoreExpanded(!isStoreExpanded);
+                  }
+                }}
+                title={isSidebarMinimized && !isMenuOpen ? "Storefront Manager" : undefined}
                 className={cn(
                   "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                  isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
                   pathname.startsWith("/cpanel/store")
                     ? "bg-orange-500/10 text-[#FC7A00]"
                     : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-50"
                 )}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-[18px]">storefront</span>
+                  <span className="material-symbols-outlined text-[18px] flex-shrink-0">storefront</span>
                   {(!isSidebarMinimized || isMenuOpen) && <span>Storefront Manager</span>}
                 </div>
                 {(!isSidebarMinimized || isMenuOpen) && (
@@ -764,7 +773,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                         )}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="material-symbols-outlined text-[15px]">{sub.icon}</span>
+                          <span className="material-symbols-outlined text-[15px] flex-shrink-0">{sub.icon}</span>
                           <span className="flex-1 text-left truncate">{sub.label}</span>
                         </div>
                         {sub.badge && sub.badge > 0 ? (
@@ -782,17 +791,19 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Logout / Lock Console Footer Button */}
-        <div className={cn("p-4 border-t", isDark ? "border-gray-800" : "border-gray-100")}>
+        <div className={cn("p-4 border-t shrink-0", isDark ? "border-gray-800" : "border-gray-100")}>
           <button
             onClick={() => setShowLockConfirm(true)}
+            title={isSidebarMinimized && !isMenuOpen ? "Sign Out / Logout" : undefined}
             className={cn(
               "w-full py-3 border rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1.5",
+              isSidebarMinimized && !isMenuOpen && "px-0 py-2.5",
               isDark
                 ? "bg-red-950/30 hover:bg-red-900/50 text-red-400 border-red-900/50"
                 : "bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
             )}
           >
-            <span className="material-symbols-outlined text-[16px]">logout</span>
+            <span className="material-symbols-outlined text-[16px] flex-shrink-0">logout</span>
             {(!isSidebarMinimized || isMenuOpen) && <span>Sign Out / Logout</span>}
           </button>
         </div>
