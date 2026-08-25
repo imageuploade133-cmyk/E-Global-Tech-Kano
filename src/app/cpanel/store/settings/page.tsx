@@ -19,6 +19,11 @@ interface StoreSettings {
   storeButtonColor?: string;
   storeButtonTextColor?: string;
   storeButtonIcon?: string;
+  hideClearCacheButton?: boolean;
+  topBarIconColor?: string;
+  topBarWishlistIconColor?: string;
+  topBarHistoryIconColor?: string;
+  topBarCartIconColor?: string;
   enableProductSharing?: boolean;
   borderColor?: string;
   borderOpacity?: number;
@@ -69,6 +74,11 @@ function CpanelStoreSettingsPageContent() {
   const [storeButtonColor, setStoreButtonColor] = useState("#FC7A00");
   const [storeButtonTextColor, setStoreButtonTextColor] = useState("#FFFFFF");
   const [storeButtonIcon, setStoreButtonIcon] = useState("bolt");
+  const [hideClearCacheButton, setHideClearCacheButton] = useState(false);
+  const [topBarIconColor, setTopBarIconColor] = useState("#374151");
+  const [topBarWishlistIconColor, setTopBarWishlistIconColor] = useState("#EF4444");
+  const [topBarHistoryIconColor, setTopBarHistoryIconColor] = useState("#FC7A00");
+  const [topBarCartIconColor, setTopBarCartIconColor] = useState("#1F2937");
   const [enableProductSharing, setEnableProductSharing] = useState(true);
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
@@ -138,6 +148,11 @@ function CpanelStoreSettingsPageContent() {
         setStoreButtonColor(data.settings.storeButtonColor || "#FC7A00");
         setStoreButtonTextColor(data.settings.storeButtonTextColor || "#FFFFFF");
         setStoreButtonIcon(data.settings.storeButtonIcon || "bolt");
+        setHideClearCacheButton(Boolean(data.settings.hideClearCacheButton));
+        setTopBarIconColor(data.settings.topBarIconColor || "#374151");
+        setTopBarWishlistIconColor(data.settings.topBarWishlistIconColor || "#EF4444");
+        setTopBarHistoryIconColor(data.settings.topBarHistoryIconColor || "#FC7A00");
+        setTopBarCartIconColor(data.settings.topBarCartIconColor || "#1F2937");
         setEnableProductSharing(data.settings.enableProductSharing !== false);
         setBorderColor(data.settings.borderColor || "#FC7A00");
         setBorderOpacity(data.settings.borderOpacity ?? 100);
@@ -210,6 +225,11 @@ function CpanelStoreSettingsPageContent() {
               storeButtonColor,
               storeButtonTextColor,
               storeButtonIcon,
+              hideClearCacheButton,
+              topBarIconColor,
+              topBarWishlistIconColor,
+              topBarHistoryIconColor,
+              topBarCartIconColor,
             enableProductSharing,
             borderColor,
             borderOpacity,
@@ -328,18 +348,176 @@ function CpanelStoreSettingsPageContent() {
                       Allow users to copy or share product links directly from product detail page
                     </span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEnableProductSharing(true)}
+                      className="text-[9.5px] font-bold text-gray-400 hover:text-[#FC7A00] uppercase tracking-wider cursor-pointer border-0"
+                    >
+                      Reset Default
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnableProductSharing(!enableProductSharing)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
+                        enableProductSharing
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-red-500/10 text-red-500 border-red-500/30"
+                      )}
+                    >
+                      {enableProductSharing ? "SHARING ON" : "SHARING OFF"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Bar Icons & Clear Cache Toggle Section */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-200/30 pb-2">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">tab</span>
+                      Store Top Bar Icons & Clear Cache Button
+                    </label>
+                    <span className="text-[10px] text-gray-400 block">Configure top bar icon colors and hide/show the Clear Cache button</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setEnableProductSharing(!enableProductSharing)}
+                    onClick={() => {
+                      setHideClearCacheButton(false);
+                      setTopBarIconColor("#374151");
+                      setTopBarWishlistIconColor("#EF4444");
+                      setTopBarHistoryIconColor("#FC7A00");
+                      setTopBarCartIconColor("#1F2937");
+                      toast.info("Reset Top Bar section to defaults.");
+                    }}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Section Default
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-gray-950 border border-gray-200/60 dark:border-gray-800">
+                  <div>
+                    <span className="text-xs font-bold uppercase text-gray-800 dark:text-gray-200 block">Clear Cache Button Visibility</span>
+                    <span className="text-[10px] text-gray-400 block">Hide or show the circular cache refresh icon button in store header</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHideClearCacheButton(!hideClearCacheButton)}
                     className={cn(
-                      "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
-                      enableProductSharing
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                        : "bg-red-500/10 text-red-500 border-red-500/30"
+                      "px-3 py-1 rounded-xl text-xs font-black uppercase cursor-pointer border transition-all",
+                      hideClearCacheButton
+                        ? "bg-red-500/10 text-red-500 border-red-500/30"
+                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
                     )}
                   >
-                    {enableProductSharing ? "SHARING ON" : "SHARING OFF"}
+                    {hideClearCacheButton ? "HIDDEN" : "VISIBLE"}
                   </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Refresh Cache Icon</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={topBarIconColor}
+                        onChange={(e) => setTopBarIconColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={topBarIconColor}
+                        onChange={(e) => setTopBarIconColor(e.target.value)}
+                        className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Wishlist Icon Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={topBarWishlistIconColor}
+                        onChange={(e) => setTopBarWishlistIconColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={topBarWishlistIconColor}
+                        onChange={(e) => setTopBarWishlistIconColor(e.target.value)}
+                        className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Order History Icon Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={topBarHistoryIconColor}
+                        onChange={(e) => setTopBarHistoryIconColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={topBarHistoryIconColor}
+                        onChange={(e) => setTopBarHistoryIconColor(e.target.value)}
+                        className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Cart Icon Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={topBarCartIconColor}
+                        onChange={(e) => setTopBarCartIconColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={topBarCartIconColor}
+                        onChange={(e) => setTopBarCartIconColor(e.target.value)}
+                        className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Top Bar Icons Preview */}
+                <div className="p-3 bg-white dark:bg-gray-950 rounded-xl border border-gray-200/60 dark:border-gray-800 space-y-1 text-center">
+                  <span className="text-[9px] font-extrabold text-[#FC7A00] uppercase tracking-widest block">Live Header Top Bar Icons Preview</span>
+                  <div className="flex items-center justify-center gap-3 pt-1">
+                    {!hideClearCacheButton && (
+                      <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[18px]" style={{ color: topBarIconColor }}>
+                          cached
+                        </span>
+                      </div>
+                    )}
+                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[18px]" style={{ color: topBarWishlistIconColor }}>
+                        favorite
+                      </span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[18px]" style={{ color: topBarHistoryIconColor }}>
+                        history
+                      </span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[18px]" style={{ color: topBarCartIconColor }}>
+                        shopping_bag
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -350,7 +528,16 @@ function CpanelStoreSettingsPageContent() {
                     <span className="material-symbols-outlined text-[18px]">rounded_corner</span>
                     Product Card Border Radius ({cardBorderRadius}px)
                   </label>
-                  <span className="font-mono text-xs font-black text-[#FC7A00]">{cardBorderRadius}px</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCardBorderRadius(16)}
+                      className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                    >
+                      Reset Default
+                    </button>
+                    <span className="font-mono text-xs font-black text-[#FC7A00]">{cardBorderRadius}px</span>
+                  </div>
                 </div>
                 <input
                   type="range"
@@ -375,7 +562,16 @@ function CpanelStoreSettingsPageContent() {
                     <span className="material-symbols-outlined text-[18px]">line_weight</span>
                     Product Card Border Width ({borderWidth}px)
                   </label>
-                  <span className="font-mono text-xs font-black text-[#FC7A00]">{borderWidth}px</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBorderWidth(1)}
+                      className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                    >
+                      Reset Default
+                    </button>
+                    <span className="font-mono text-xs font-black text-[#FC7A00]">{borderWidth}px</span>
+                  </div>
                 </div>
                 <input
                   type="range"
@@ -399,10 +595,29 @@ function CpanelStoreSettingsPageContent() {
                   <div>
                     <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[18px]">border_style</span>
-                      Card Border Visibility
+                      Card Border Styling & Gradient
                     </label>
                     <span className="text-[10px] text-gray-400 block">Show or completely remove border lines around products</span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHideBorders(false);
+                      setEnableGradientBorder(false);
+                      setBorderColor("#FC7A00");
+                      setBorderOpacity(100);
+                      setGradientColorStart("#FC7A00");
+                      setGradientColorEnd("#0b513d");
+                      toast.info("Reset Card Borders section to defaults.");
+                    }}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Section Default
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Border Visibility</span>
                   <button
                     type="button"
                     onClick={() => setHideBorders(!hideBorders)}
@@ -528,6 +743,22 @@ function CpanelStoreSettingsPageContent() {
                   </div>
                   <button
                     type="button"
+                    onClick={() => {
+                      setRecentlyViewedBorderEnabled(true);
+                      setRecentlyViewedBorderColor("#FC7A00");
+                      setRecentlyViewedBorderOpacity(20);
+                      toast.info("Reset Recently Viewed section to defaults.");
+                    }}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Section Default
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Recently Viewed Border Toggle</span>
+                  <button
+                    type="button"
                     onClick={() => setRecentlyViewedBorderEnabled(!recentlyViewedBorderEnabled)}
                     className={cn(
                       "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase cursor-pointer border transition-all",
@@ -583,7 +814,16 @@ function CpanelStoreSettingsPageContent() {
                     <span className="material-symbols-outlined text-[18px]">search</span>
                     Search Bar Top Space ({searchBarMarginTop}px)
                   </label>
-                  <span className="font-mono text-xs font-black text-[#FC7A00]">{searchBarMarginTop}px</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSearchBarMarginTop(0)}
+                      className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                    >
+                      Reset Default
+                    </button>
+                    <span className="font-mono text-xs font-black text-[#FC7A00]">{searchBarMarginTop}px</span>
+                  </div>
                 </div>
                 <input
                   type="range"
@@ -598,12 +838,27 @@ function CpanelStoreSettingsPageContent() {
 
               {/* Store Header Branding & Titles Section */}
               <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
-                <div className="border-b border-gray-200/30 pb-2">
-                  <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[18px]">badge</span>
-                    Store Branding Titles & Text Colors
-                  </label>
-                  <span className="text-[10px] text-gray-400 block">Customize store main title, subtitle text, and custom font colors</span>
+                <div className="flex items-center justify-between border-b border-gray-200/30 pb-2">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">badge</span>
+                      Store Branding Titles & Text Colors
+                    </label>
+                    <span className="text-[10px] text-gray-400 block">Customize store main title, subtitle text, and custom font colors</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStoreName("E-Tech Store");
+                      setStoreSubtitle("Hardware & Premium Gear");
+                      setStoreNameColor("#000000");
+                      setStoreSubtitleColor("#9CA3AF");
+                      toast.info("Reset Store Titles section to defaults.");
+                    }}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Section Default
+                  </button>
                 </div>
 
                 {/* Store Main Name / Brand Title */}
@@ -677,12 +932,25 @@ function CpanelStoreSettingsPageContent() {
 
               {/* Store Icon Colors & Sizing Controls */}
               <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
-                <div className="border-b border-gray-200/30 pb-2">
-                  <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[18px]">palette</span>
-                    Store Icon Color & Icon Resizing Controls
-                  </label>
-                  <span className="text-[10px] text-gray-400 block">Customize icon colors and resize icon scale across storefront cards and category chips</span>
+                <div className="flex items-center justify-between border-b border-gray-200/30 pb-2">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">palette</span>
+                      Store Icon Color & Icon Resizing Controls
+                    </label>
+                    <span className="text-[10px] text-gray-400 block">Customize icon colors and resize icon scale across storefront cards and category chips</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStoreIconColor("#FC7A00");
+                      setStoreIconSize(20);
+                      toast.info("Reset Store Icons section to defaults.");
+                    }}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Section Default
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -746,12 +1014,26 @@ function CpanelStoreSettingsPageContent() {
 
               {/* Store Button Colors & Icon Customization Section */}
               <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
-                <div className="border-b border-gray-200/30 pb-2">
-                  <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[18px]">smart_button</span>
-                    Store Action Button Customization
-                  </label>
-                  <span className="text-[10px] text-gray-400 block">Configure background color, text color, and icon for primary Buy Now action buttons</span>
+                <div className="flex items-center justify-between border-b border-gray-200/30 pb-2">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">smart_button</span>
+                      Store Action Button Customization
+                    </label>
+                    <span className="text-[10px] text-gray-400 block">Configure background color, text color, and icon for primary Buy Now action buttons</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStoreButtonColor("#FC7A00");
+                      setStoreButtonTextColor("#FFFFFF");
+                      setStoreButtonIcon("bolt");
+                      toast.info("Reset Action Button section to defaults.");
+                    }}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Section Default
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
