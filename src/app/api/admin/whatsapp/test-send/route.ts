@@ -55,16 +55,16 @@ export async function POST(req: Request) {
       caption: textToSend,
     };
 
-    // Candidates of standard Baileys/Evolution/Express WhatsApp endpoints
+    // Candidates of WhatsAPI Multi-Device Gateway endpoints
     const candidateEndpoints = [
+      `/send/text`,
+      `/sendText`,
       `/message/sendText/${instId}`,
       `/instances/${instId}/messages/send`,
       `/instances/${instId}/messages`,
       `/instances/${instId}/send-text`,
-      `/instances/${instId}/message`,
       `/message/sendText`,
       `/message/send`,
-      `/send-message`,
     ];
 
     let backendRes: any = { ok: false, status: 404, error: "No endpoint succeeded" };

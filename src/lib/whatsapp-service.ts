@@ -120,7 +120,14 @@ export async function callWhatsappBackend(
   if (config.apiKey) {
     headers["apikey"] = config.apiKey;
     headers["x-api-key"] = config.apiKey;
+    headers["X-API-Key"] = config.apiKey;
     headers["Authorization"] = `Bearer ${config.apiKey}`;
+  }
+
+  if (config.instanceId) {
+    headers["x-instance-id"] = config.instanceId;
+    headers["X-Instance-ID"] = config.instanceId;
+    headers["instanceid"] = config.instanceId;
   }
 
   const sessionCookie = await ensureVmSessionCookie(config);
