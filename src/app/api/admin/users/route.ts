@@ -207,8 +207,9 @@ export async function POST(req: Request) {
       const callerRole = (adminData.role || "").toLowerCase();
 
       const isCallerSuperAdmin = (callerRole === "super_admin" || uid === "mock-admin-uid");
+      const isAdminRole = ["super_admin", "admin", "finance", "kyc_admin", "support", "read_only"].includes(role);
 
-      if (role === "admin" || role === "SUPER_ADMIN") {
+      if (isAdminRole) {
         if (!isCallerSuperAdmin) {
           return NextResponse.json({ error: "Access denied: Only a SUPER_ADMIN can create administrative accounts." }, { status: 403 });
         }
@@ -271,13 +272,15 @@ export async function POST(req: Request) {
 
       // Synchronize role Custom Claims instantly via dependency-free REST API
       await setFirebaseAuthCustomClaims(userRecord.uid, {
-        admin: role === "admin",
+        admin: isAdminRole,
       });
+
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.toUpperCase();
 
       // Write user document to Firestore
       await adminDb.collection("users").doc(userRecord.uid).set({
         uid: userRecord.uid,
-        name: `${firstName.trim()} ${lastName.trim()}`.toUpperCase(),
+        name: fullName,
         firstName: firstName.trim().toUpperCase(),
         lastName: lastName.trim().toUpperCase(),
         email: cleanEmail,
@@ -288,6 +291,21 @@ export async function POST(req: Request) {
         permissions: cleanPermissions,
         createdAt: new Date().toISOString()
       });
+
+      if (isAdminRole) {
+        await adminDb.collection("admin_users").doc(userRecord.uid).set({
+          uid: userRecord.uid,
+          email: cleanEmail,
+          displayName: fullName,
+          phoneNumber: cleanPhone,
+          role: role,
+          permissions: cleanPermissions,
+          status: "active",
+          createdBy: uid,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
 
       return NextResponse.json({
         success: true,
@@ -312,8 +330,10 @@ export async function POST(req: Request) {
       const targetDoc = await adminDb.collection("users").doc(targetUid).get();
       const targetData = targetDoc.exists ? targetDoc.data() || {} : {};
       const targetCurrentRole = targetData.role || "user";
+      const isAdminRole = ["super_admin", "admin", "finance", "kyc_admin", "support", "read_only"].includes(role);
+      const isTargetCurrentlyAdmin = ["super_admin", "admin", "finance", "kyc_admin", "support", "read_only"].includes(targetCurrentRole);
 
-      if (role === "admin" || role === "SUPER_ADMIN" || targetCurrentRole === "admin" || targetCurrentRole === "SUPER_ADMIN") {
+      if (isAdminRole || isTargetCurrentlyAdmin) {
         if (!isCallerSuperAdmin) {
           return NextResponse.json({ error: "Access denied: Only a SUPER_ADMIN can manage administrative roles or privileges." }, { status: 403 });
         }
@@ -334,9 +354,24 @@ export async function POST(req: Request) {
         permissions: cleanPermissions
       });
 
+      if (isAdminRole) {
+        await adminDb.collection("admin_users").doc(targetUid).set({
+          uid: targetUid,
+          email: targetData.email || "",
+          displayName: targetData.name || targetData.displayName || "",
+          phoneNumber: targetData.phoneNumber || "",
+          role: role,
+          permissions: cleanPermissions,
+          status: "active",
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } else if (isTargetCurrentlyAdmin) {
+        await adminDb.collection("admin_users").doc(targetUid).delete();
+      }
+
       // Update Firebase Auth Custom Claims via dependency-free REST API
       await setFirebaseAuthCustomClaims(targetUid, {
-        admin: role === "admin",
+        admin: isAdminRole,
       });
 
       return NextResponse.json({
