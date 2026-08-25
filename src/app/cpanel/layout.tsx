@@ -57,6 +57,9 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
   const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
+  // Session / Permission loading state for skeleton rendering
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+
   // Sidebar state & Unreplied Customer Reviews Badge state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
@@ -107,6 +110,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
   // Check cookie-based admin session on mount
   useEffect(() => {
     const checkCPanelSession = async () => {
+      setIsLoadingSession(true);
       try {
         const res = await fetch("/api/admin/auth/session");
         const data = await res.json();
@@ -132,6 +136,8 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn("No active admin cookie session found on mount:", err);
+      } finally {
+        setIsLoadingSession(false);
       }
     };
     checkCPanelSession();
@@ -728,103 +734,132 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
 
           {/* Categorized Navigation Items */}
           <nav className="p-3 space-y-3 flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar">
-            {filteredNavCategories.map((cat, catIdx) => (
-              <div key={cat.title} className="space-y-1">
-                {(!isSidebarMinimized || isMenuOpen) ? (
-                  <div className="px-2 pt-1 pb-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                    {cat.title}
+            {isLoadingSession ? (
+              /* Sidebar Slide Menu Skeleton Loader */
+              <div className="space-y-4 animate-pulse">
+                {[1, 2, 3].map((section) => (
+                  <div key={section} className="space-y-2">
+                    {(!isSidebarMinimized || isMenuOpen) && (
+                      <div className="h-2.5 w-20 bg-gray-200 dark:bg-gray-800 rounded-md mx-2 my-1" />
+                    )}
+                    {[1, 2].map((item) => (
+                      <div
+                        key={item}
+                        className={cn(
+                          "h-9 rounded-xl bg-gray-200 dark:bg-gray-800/80 flex items-center gap-3 px-3",
+                          isSidebarMinimized && !isMenuOpen && "justify-center px-0"
+                        )}
+                      >
+                        <div className="w-4 h-4 rounded-md bg-gray-300 dark:bg-gray-700 shrink-0" />
+                        {(!isSidebarMinimized || isMenuOpen) && (
+                          <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded-md flex-1" />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  catIdx > 0 && <div className="border-t border-gray-200/40 dark:border-gray-800 my-1" />
-                )}
-
-                {cat.items.map((item) => {
-                  const active = isNavActive(item);
-                  return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={() => setIsMenuOpen(false)}
-                      title={isSidebarMinimized && !isMenuOpen ? item.label : undefined}
-                      className={cn(
-                        "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                        isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
-                        active
-                          ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
-                          : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                      )}
-                    >
-                      <span className="material-symbols-outlined text-[18px] flex-shrink-0">{item.icon}</span>
-                      {(!isSidebarMinimized || isMenuOpen) && <span className="flex-1 text-left truncate">{item.label}</span>}
-                    </Link>
-                  );
-                })}
+                ))}
               </div>
-            ))}
+            ) : (
+              <>
+                {filteredNavCategories.map((cat, catIdx) => (
+                  <div key={cat.title} className="space-y-1">
+                    {(!isSidebarMinimized || isMenuOpen) ? (
+                      <div className="px-2 pt-1 pb-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                        {cat.title}
+                      </div>
+                    ) : (
+                      catIdx > 0 && <div className="border-t border-gray-200/40 dark:border-gray-800 my-1" />
+                    )}
 
-            {/* Storefront Manager Accordion / Submenu */}
-            {filteredStoreNavItems.length > 0 && (
-              <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
-                <button
-                  onClick={() => {
-                    if (isSidebarMinimized && !isMenuOpen) {
-                      setIsSidebarMinimized(false);
-                      setIsStoreExpanded(true);
-                    } else {
-                      setIsStoreExpanded(!isStoreExpanded);
-                    }
-                  }}
-                  title={isSidebarMinimized && !isMenuOpen ? "Storefront Manager" : undefined}
-                  className={cn(
-                    "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                    isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
-                    pathname.startsWith("/cpanel/store")
-                      ? "bg-orange-500/10 text-[#FC7A00]"
-                      : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-50"
-                  )}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="material-symbols-outlined text-[18px] flex-shrink-0">storefront</span>
-                    {(!isSidebarMinimized || isMenuOpen) && <span>Storefront Manager</span>}
-                  </div>
-                  {(!isSidebarMinimized || isMenuOpen) && (
-                    <span className="material-symbols-outlined text-[16px]">
-                      {isStoreExpanded ? "expand_less" : "expand_more"}
-                    </span>
-                  )}
-                </button>
-
-                {isStoreExpanded && (!isSidebarMinimized || isMenuOpen) && (
-                  <div className="pl-6 pt-1 space-y-1">
-                    {filteredStoreNavItems.map((sub) => {
-                      const active = isNavActive(sub);
+                    {cat.items.map((item) => {
+                      const active = isNavActive(item);
                       return (
                         <Link
-                          key={sub.id}
-                          href={sub.href}
+                          key={item.id}
+                          href={item.href}
                           onClick={() => setIsMenuOpen(false)}
+                          title={isSidebarMinimized && !isMenuOpen ? item.label : undefined}
                           className={cn(
-                            "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full justify-between",
+                            "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                            isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
                             active
-                              ? "text-[#FC7A00] bg-orange-500/10 font-black"
-                              : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+                              ? "bg-orange-500/10 text-[#FC7A00] border border-orange-500/20"
+                              : isDark ? "text-gray-400 hover:bg-gray-800 hover:text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                           )}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="material-symbols-outlined text-[15px] flex-shrink-0">{sub.icon}</span>
-                            <span className="flex-1 text-left truncate">{sub.label}</span>
-                          </div>
-                          {sub.badge && sub.badge > 0 ? (
-                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
-                              {sub.badge}
-                            </span>
-                          ) : null}
+                          <span className="material-symbols-outlined text-[18px] flex-shrink-0">{item.icon}</span>
+                          {(!isSidebarMinimized || isMenuOpen) && <span className="flex-1 text-left truncate">{item.label}</span>}
                         </Link>
                       );
                     })}
                   </div>
+                ))}
+
+                {/* Storefront Manager Accordion / Submenu */}
+                {filteredStoreNavItems.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
+                    <button
+                      onClick={() => {
+                        if (isSidebarMinimized && !isMenuOpen) {
+                          setIsSidebarMinimized(false);
+                          setIsStoreExpanded(true);
+                        } else {
+                          setIsStoreExpanded(!isStoreExpanded);
+                        }
+                      }}
+                      title={isSidebarMinimized && !isMenuOpen ? "Storefront Manager" : undefined}
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                        isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
+                        pathname.startsWith("/cpanel/store")
+                          ? "bg-orange-500/10 text-[#FC7A00]"
+                          : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="material-symbols-outlined text-[18px] flex-shrink-0">storefront</span>
+                        {(!isSidebarMinimized || isMenuOpen) && <span>Storefront Manager</span>}
+                      </div>
+                      {(!isSidebarMinimized || isMenuOpen) && (
+                        <span className="material-symbols-outlined text-[16px]">
+                          {isStoreExpanded ? "expand_less" : "expand_more"}
+                        </span>
+                      )}
+                    </button>
+
+                    {isStoreExpanded && (!isSidebarMinimized || isMenuOpen) && (
+                      <div className="pl-6 pt-1 space-y-1">
+                        {filteredStoreNavItems.map((sub) => {
+                          const active = isNavActive(sub);
+                          return (
+                            <Link
+                              key={sub.id}
+                              href={sub.href}
+                              onClick={() => setIsMenuOpen(false)}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full justify-between",
+                                active
+                                  ? "text-[#FC7A00] bg-orange-500/10 font-black"
+                                  : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+                              )}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="material-symbols-outlined text-[15px] flex-shrink-0">{sub.icon}</span>
+                                <span className="flex-1 text-left truncate">{sub.label}</span>
+                              </div>
+                              {sub.badge && sub.badge > 0 ? (
+                                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
+                                  {sub.badge}
+                                </span>
+                              ) : null}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </nav>
         </div>
