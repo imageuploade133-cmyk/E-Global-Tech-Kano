@@ -38,20 +38,35 @@ export async function POST(req: Request) {
       textToSend = message.trim();
     }
 
-    // Attempt direct dispatch to WhatsApp VM Gateway
-    const backendRes = await callWhatsappBackend("/messages/send", "POST", {
+    const payload = {
       number: fullNum,
       phoneNumber: fullNum,
       recipient: fullNum,
-      message: textToSend,
+      remoteJid: `${fullNum}@s.whatsapp.net`,
       text: textToSend,
+      message: textToSend,
       body: textToSend,
-    }, 12000);
+      caption: textToSend,
+    };
+
+    // Attempt 1: Direct endpoint /message/sendText or /message/sendText/:instance
+    let backendRes = await callWhatsappBackend("/message/sendText", "POST", payload, 5000);
+
+    if (!backendRes.ok && (backendRes.status === 404 || backendRes.status === 502)) {
+      // Attempt 2: Endpoint /message/sendText/:instanceId
+      backendRes = await callWhatsappBackend(`/message/sendText/${fullNum}`, "POST", payload, 5000);
+    }
+
+    if (!backendRes.ok && (backendRes.status === 404 || backendRes.status === 502)) {
+      // Attempt 3: Endpoint /message/send
+      backendRes = await callWhatsappBackend("/message/send", "POST", payload, 5000);
+    }
 
     await logWhatsappAdminAudit(admin.uid, admin.email || "", "TEST_WHATSAPP_DISPATCH", {
       phoneNumber: fullNum,
       type: type || "custom",
       success: backendRes.ok,
+      status: backendRes.status,
     });
 
     if (backendRes.ok) {
@@ -64,26 +79,10 @@ export async function POST(req: Request) {
       });
     }
 
-    // Secondary fallback: Try alternative send endpoint on VM (/message/sendText)
-    const fallbackRes = await callWhatsappBackend("/message/sendText", "POST", {
-      number: fullNum,
-      text: textToSend,
-    }, 12000);
-
-    if (fallbackRes.ok) {
-      return NextResponse.json({
-        success: true,
-        message: `WhatsApp message dispatched via primary fallback to +${fullNum}!`,
-        sentText: textToSend,
-        recipient: `+${fullNum}`,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
     return NextResponse.json({
-      error: backendRes.error || fallbackRes.error || "Failed to deliver WhatsApp message via VM gateway.",
-      details: backendRes.data || fallbackRes.data,
-    }, { status: 502 });
+      error: backendRes.error || "Failed to deliver WhatsApp message via VM gateway.",
+      details: backendRes.data || { note: "All WhatsApp send routes (/message/sendText, /message/send) returned errors." },
+    }, { status: backendRes.status && backendRes.status >= 400 && backendRes.status < 500 ? backendRes.status : 502 });
 
   } catch (err: any) {
     console.error("[WhatsApp Test Send POST Exception]:", err.message);
