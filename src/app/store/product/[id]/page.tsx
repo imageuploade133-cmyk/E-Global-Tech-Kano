@@ -779,9 +779,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               handleAddToCart(productQuantity, false);
               setIsCartOpen(true);
             }}
-            className="flex-1 py-3 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-md shadow-orange-500/20 border-0"
+            style={{
+              backgroundColor: settings.storeButtonColor || "#FC7A00",
+              color: settings.storeButtonTextColor || "#FFFFFF",
+            }}
+            className="flex-1 py-3 hover:opacity-90 disabled:from-gray-300 disabled:to-gray-400 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-md border-0"
           >
-            <span className="material-symbols-outlined text-[16px]">bolt</span>
+            <span className="material-symbols-outlined text-[16px]">{settings.storeButtonIcon || "bolt"}</span>
             <span>Buy Now</span>
           </button>
         </div>
