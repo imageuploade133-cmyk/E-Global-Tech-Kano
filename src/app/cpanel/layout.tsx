@@ -179,13 +179,13 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         if (typeof window !== "undefined") {
           sessionStorage.setItem("admin_session_unlocked", "true");
         }
-        toast.success(data.message || "Firebase Admin Authentication Granted!");
+        toast.success(data.message || "Administrator Authentication Granted!");
       } else {
         toast.error(data.error || "Access Denied: Account is not an authorized administrator.");
       }
     } catch (err: any) {
-      console.error("[CPanel Firebase Auth Error]:", err);
-      let errMsg = "Firebase Authentication Failed.";
+      console.error("[CPanel Admin Auth Error]:", err);
+      let errMsg = "Administrator Authentication Failed.";
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
         errMsg = "Invalid administrator Email or Password.";
       } else if (err.code === "auth/too-many-requests") {
@@ -379,8 +379,8 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
             </h2>
             <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
               {isResetPasswordMode
-                ? "Enter your administrator email address to receive a secure Firebase password recovery link."
-                : "Welcome to the E-Tech Enterprise Control Panel. Authenticate using your Firebase Administrator credentials."}
+                ? "Enter your administrator email address to receive a secure password recovery link."
+                : "Welcome to the E-Tech Enterprise Control Panel. Authenticate using your Administrator credentials."}
             </p>
           </div>
 
@@ -578,7 +578,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                 disabled={isVerifyingPin}
                 className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
               >
-                {isVerifyingPin ? <><ButtonSpinner /> Authenticating Firebase Token...</> : "Authenticate Administrator"}
+                {isVerifyingPin ? <><ButtonSpinner /> Authenticating Credentials...</> : "Authenticate Administrator"}
               </button>
             </form>
           )}

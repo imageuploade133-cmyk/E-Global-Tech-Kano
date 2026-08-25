@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
     const response = NextResponse.json({
       success: true,
-      message: "Firebase Administrator Authentication Granted!",
+      message: "Administrator Authentication Granted!",
       user: {
         uid,
         name: adminData.displayName || "Administrator",

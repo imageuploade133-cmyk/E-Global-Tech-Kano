@@ -281,7 +281,7 @@ function CpanelAdminsPageContent() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Admin Management</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Provision Firebase Administrators, assign granular permissions, and enforce Role-Based Access Control (RBAC).
+                Provision Administrators, assign granular permissions, and enforce Role-Based Access Control (RBAC).
               </p>
             </div>
           </div>

@@ -62,7 +62,7 @@ function CpanelSettingsPageContent() {
       toast.success("Branding, Support and API configurations applied!");
     } catch (err: unknown) {
       console.error(err);
-      toast.error("Failed to commit settings updates to Firebase Firestore.");
+      toast.error("Failed to commit settings updates to system storage.");
     } finally {
       setIsSavingBranding(false);
     }
