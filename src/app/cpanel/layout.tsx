@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { CpanelThemeProvider, useCpanelTheme } from "@/lib/CpanelThemeContext";
+import { hasAdminPermission } from "@/lib/admin-permissions-client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ interface NavItem {
   exact?: boolean;
   category?: string;
   badge?: number;
+  permission?: string;
 }
 
 function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
@@ -40,6 +42,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     }
     return false;
   });
+  const [adminUser, setAdminUser] = useState<{ role?: string; permissions?: string[] } | null>(null);
   const [showLockConfirm, setShowLockConfirm] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -110,6 +113,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         if (res.ok && data.success && data.user) {
           setIsAdminUnlocked(true);
           setAdminEmail(data.user.email);
+          setAdminUser({ role: data.user.role, permissions: data.user.permissions });
           if (typeof window !== "undefined") {
             sessionStorage.setItem("admin_session_unlocked", "true");
           }
@@ -117,11 +121,13 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
           const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
           if (!isMock) {
             setIsAdminUnlocked(false);
+            setAdminUser(null);
             if (typeof window !== "undefined") {
               sessionStorage.removeItem("admin_session_unlocked");
             }
           } else {
             setIsAdminUnlocked(true);
+            setAdminUser({ role: "super_admin", permissions: ["*"] });
           }
         }
       } catch (err) {
@@ -176,6 +182,9 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       if (res.ok && data.success) {
         setIsAdminUnlocked(true);
+        if (data.user) {
+          setAdminUser({ role: data.user.role, permissions: data.user.permissions });
+        }
         if (typeof window !== "undefined") {
           sessionStorage.setItem("admin_session_unlocked", "true");
         }
@@ -311,48 +320,75 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     {
       title: "System Overview",
       items: [
-        { id: "dashboard", label: "Metrics & Operations", icon: "cell_tower", href: "/cpanel", exact: true },
-        { id: "admins", label: "Admin Management", icon: "admin_panel_settings", href: "/cpanel/admins" },
+        { id: "dashboard", label: "Metrics & Operations", icon: "cell_tower", href: "/cpanel", exact: true, permission: "metrics.view" },
+        { id: "admins", label: "Admin Management", icon: "admin_panel_settings", href: "/cpanel/admins", permission: "admins.view" },
       ]
     },
     {
       title: "User Management",
       items: [
-        { id: "users", label: "Users & Permissions", icon: "group", href: "/cpanel/users" },
-        { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc" },
-        { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze" },
-        { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits" },
+        { id: "users", label: "Users & Permissions", icon: "group", href: "/cpanel/users", permission: "users.view" },
+        { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc", permission: "kyc.view" },
+        { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze", permission: "freeze.manage" },
+        { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },
       ]
     },
     {
       title: "Branding & Customization",
       items: [
-        { id: "settings", label: "Branding & Support", icon: "diamond", href: "/cpanel/settings" },
-        { id: "banners", label: "Slide Banners", icon: "photo_library", href: "/cpanel/banners" },
-        { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos" },
-        { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos" },
-        { id: "whatsapp", label: "WhatsApp Link", icon: "hub", href: "/cpanel/whatsapp" },
+        { id: "settings", label: "Branding & Support", icon: "diamond", href: "/cpanel/settings", permission: "branding.manage" },
+        { id: "banners", label: "Slide Banners", icon: "photo_library", href: "/cpanel/banners", permission: "banners.manage" },
+        { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos", permission: "bank_logos.manage" },
+        { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos", permission: "bill_logos.manage" },
+        { id: "whatsapp", label: "WhatsApp Link", icon: "hub", href: "/cpanel/whatsapp", permission: "whatsapp.manage" },
       ]
     },
     {
       title: "Financials & Markups",
       items: [
-        { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit" },
-        { id: "investments", label: "Fixed Deposits", icon: "savings", href: "/cpanel/investments" },
-        { id: "history", label: "User Ledger Audits", icon: "history", href: "/cpanel/user-history" },
+        { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit", permission: "vtu.manage" },
+        { id: "investments", label: "Fixed Deposits", icon: "savings", href: "/cpanel/investments", permission: "investments.manage" },
+        { id: "history", label: "User Ledger Audits", icon: "history", href: "/cpanel/user-history", permission: "user_history.view" },
       ]
     }
   ];
 
   const storeNavItems: NavItem[] = [
-    { id: "store_products", label: "Store Products", icon: "inventory_2", href: "/cpanel/store", exact: true },
-    { id: "store_orders", label: "Dispatch Orders", icon: "shopping_bag", href: "/cpanel/store/orders" },
-    { id: "store_reviews", label: "Customer Reviews", icon: "rate_review", href: "/cpanel/store/reviews", badge: unrepliedReviewsBadge },
-    { id: "store_stock", label: "Stock Income", icon: "trending_up", href: "/cpanel/store/stock" },
-    { id: "store_categories", label: "Manage Categories", icon: "category", href: "/cpanel/store/categories" },
-    { id: "store_slides", label: "Store Slides", icon: "view_carousel", href: "/cpanel/store/slides" },
-    { id: "store_settings", label: "Store Settings", icon: "settings", href: "/cpanel/store/settings" },
+    { id: "store_products", label: "Store Products", icon: "inventory_2", href: "/cpanel/store", exact: true, permission: "store.view" },
+    { id: "store_orders", label: "Dispatch Orders", icon: "shopping_bag", href: "/cpanel/store/orders", permission: "store.view" },
+    { id: "store_reviews", label: "Customer Reviews", icon: "rate_review", href: "/cpanel/store/reviews", badge: unrepliedReviewsBadge, permission: "store.view" },
+    { id: "store_stock", label: "Stock Income", icon: "trending_up", href: "/cpanel/store/stock", permission: "store.view" },
+    { id: "store_categories", label: "Manage Categories", icon: "category", href: "/cpanel/store/categories", permission: "store.view" },
+    { id: "store_slides", label: "Store Slides", icon: "view_carousel", href: "/cpanel/store/slides", permission: "store.view" },
+    { id: "store_settings", label: "Store Settings", icon: "settings", href: "/cpanel/store/settings", permission: "store.view" },
   ];
+
+  const checkItemPermission = (item: NavItem): boolean => {
+    if (!item.permission) return true;
+    if (!adminUser) return true;
+    if (item.permission === "admins.view") {
+      return hasAdminPermission(adminUser, "admins.view") || hasAdminPermission(adminUser, "admins.manage");
+    }
+    if (item.permission === "users.view") {
+      return hasAdminPermission(adminUser, "users.view") || hasAdminPermission(adminUser, "users.manage");
+    }
+    if (item.permission === "kyc.view") {
+      return hasAdminPermission(adminUser, "kyc.view") || hasAdminPermission(adminUser, "kyc.manage");
+    }
+    if (item.permission === "store.view") {
+      return hasAdminPermission(adminUser, "store.view") || hasAdminPermission(adminUser, "store.manage");
+    }
+    return hasAdminPermission(adminUser, item.permission);
+  };
+
+  const filteredNavCategories = navCategories
+    .map((cat) => ({
+      ...cat,
+      items: cat.items.filter((item) => checkItemPermission(item)),
+    }))
+    .filter((cat) => cat.items.length > 0);
+
+  const filteredStoreNavItems = storeNavItems.filter((item) => checkItemPermission(item));
 
   const isNavActive = (item: NavItem) => {
     if (item.exact) {
@@ -691,7 +727,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
 
           {/* Categorized Navigation Items */}
           <nav className="p-3 space-y-3 flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar">
-            {navCategories.map((cat, catIdx) => (
+            {filteredNavCategories.map((cat, catIdx) => (
               <div key={cat.title} className="space-y-1">
                 {(!isSidebarMinimized || isMenuOpen) ? (
                   <div className="px-2 pt-1 pb-1 text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
@@ -726,67 +762,69 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
             ))}
 
             {/* Storefront Manager Accordion / Submenu */}
-            <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
-              <button
-                onClick={() => {
-                  if (isSidebarMinimized && !isMenuOpen) {
-                    setIsSidebarMinimized(false);
-                    setIsStoreExpanded(true);
-                  } else {
-                    setIsStoreExpanded(!isStoreExpanded);
-                  }
-                }}
-                title={isSidebarMinimized && !isMenuOpen ? "Storefront Manager" : undefined}
-                className={cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
-                  isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
-                  pathname.startsWith("/cpanel/store")
-                    ? "bg-orange-500/10 text-[#FC7A00]"
-                    : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-50"
-                )}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-[18px] flex-shrink-0">storefront</span>
-                  {(!isSidebarMinimized || isMenuOpen) && <span>Storefront Manager</span>}
-                </div>
-                {(!isSidebarMinimized || isMenuOpen) && (
-                  <span className="material-symbols-outlined text-[16px]">
-                    {isStoreExpanded ? "expand_less" : "expand_more"}
-                  </span>
-                )}
-              </button>
+            {filteredStoreNavItems.length > 0 && (
+              <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
+                <button
+                  onClick={() => {
+                    if (isSidebarMinimized && !isMenuOpen) {
+                      setIsSidebarMinimized(false);
+                      setIsStoreExpanded(true);
+                    } else {
+                      setIsStoreExpanded(!isStoreExpanded);
+                    }
+                  }}
+                  title={isSidebarMinimized && !isMenuOpen ? "Storefront Manager" : undefined}
+                  className={cn(
+                    "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                    isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
+                    pathname.startsWith("/cpanel/store")
+                      ? "bg-orange-500/10 text-[#FC7A00]"
+                      : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-50"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-[18px] flex-shrink-0">storefront</span>
+                    {(!isSidebarMinimized || isMenuOpen) && <span>Storefront Manager</span>}
+                  </div>
+                  {(!isSidebarMinimized || isMenuOpen) && (
+                    <span className="material-symbols-outlined text-[16px]">
+                      {isStoreExpanded ? "expand_less" : "expand_more"}
+                    </span>
+                  )}
+                </button>
 
-              {isStoreExpanded && (!isSidebarMinimized || isMenuOpen) && (
-                <div className="pl-6 pt-1 space-y-1">
-                  {storeNavItems.map((sub) => {
-                    const active = isNavActive(sub);
-                    return (
-                      <Link
-                        key={sub.id}
-                        href={sub.href}
-                        onClick={() => setIsMenuOpen(false)}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full justify-between",
-                          active
-                            ? "text-[#FC7A00] bg-orange-500/10 font-black"
-                            : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-                        )}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="material-symbols-outlined text-[15px] flex-shrink-0">{sub.icon}</span>
-                          <span className="flex-1 text-left truncate">{sub.label}</span>
-                        </div>
-                        {sub.badge && sub.badge > 0 ? (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
-                            {sub.badge}
-                          </span>
-                        ) : null}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                {isStoreExpanded && (!isSidebarMinimized || isMenuOpen) && (
+                  <div className="pl-6 pt-1 space-y-1">
+                    {filteredStoreNavItems.map((sub) => {
+                      const active = isNavActive(sub);
+                      return (
+                        <Link
+                          key={sub.id}
+                          href={sub.href}
+                          onClick={() => setIsMenuOpen(false)}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full justify-between",
+                            active
+                              ? "text-[#FC7A00] bg-orange-500/10 font-black"
+                              : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="material-symbols-outlined text-[15px] flex-shrink-0">{sub.icon}</span>
+                            <span className="flex-1 text-left truncate">{sub.label}</span>
+                          </div>
+                          {sub.badge && sub.badge > 0 ? (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-red-500 text-white animate-pulse">
+                              {sub.badge}
+                            </span>
+                          ) : null}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
         </div>
 
