@@ -610,7 +610,7 @@ function CpanelWhatsappPageContent() {
               <div className="p-4 rounded-xl border border-gray-200/60 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 space-y-1">
                 <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Device Instance ID</span>
                 <strong className="font-extrabold text-sm text-gray-900 dark:text-white block font-mono">
-                  {whatsappInstanceIdInput || "inst_17506348"}
+                  {whatsappInstanceIdInput || "Active Instance"}
                 </strong>
               </div>
 
