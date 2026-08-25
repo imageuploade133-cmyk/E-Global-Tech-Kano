@@ -39,6 +39,12 @@ function CpanelWhatsappPageContent() {
   const [isSavingApiConfig, setIsSavingApiConfig] = useState(false);
   const [isLinkingWhatsapp, setIsLinkingWhatsapp] = useState(false);
 
+  // Test Message & OTP Dispatch Form States
+  const [testPhone, setTestPhone] = useState("");
+  const [testMessageType, setTestMessageType] = useState<"test_otp" | "custom">("test_otp");
+  const [testCustomMessage, setTestCustomMessage] = useState("");
+  const [isSendingTestMessage, setIsSendingTestMessage] = useState(false);
+
   const [whatsappLogs, setWhatsappLogs] = useState<string[]>([
     `[${new Date().toLocaleTimeString()}] WhatsApp Gateway engine ready.`,
     `[${new Date().toLocaleTimeString()}] Idle: Waiting for administrator action...`
@@ -285,6 +291,59 @@ function CpanelWhatsappPageContent() {
     );
   };
 
+  const handleSendTestWhatsappMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testPhone.trim()) {
+      toast.error("Please enter a recipient phone number.");
+      return;
+    }
+
+    if (testMessageType === "custom" && !testCustomMessage.trim()) {
+      toast.error("Please enter custom message content.");
+      return;
+    }
+
+    setIsSendingTestMessage(true);
+    addWhatsappLog(`Dispatching test ${testMessageType === "test_otp" ? "OTP code" : "custom message"} to +${testPhone.trim()}...`);
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/whatsapp/test-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          phoneNumber: testPhone.trim(),
+          type: testMessageType,
+          message: testCustomMessage.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Test message sent!");
+        addWhatsappLog(`[SUCCESS] Test message delivered to ${data.recipient || testPhone.trim()}`);
+        addWhatsappLog(`Content: ${data.sentText}`);
+        if (testMessageType === "custom") setTestCustomMessage("");
+      } else {
+        toast.error(data.error || "Failed to deliver WhatsApp message.");
+        addWhatsappLog(`[ERROR] Test dispatch failed: ${data.error}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network communication error.");
+      addWhatsappLog(`[ERROR] Test dispatch exception: ${err.message}`);
+    } finally {
+      setIsSendingTestMessage(false);
+    }
+  };
+
   const handleSaveWhatsappApiConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingApiConfig(true);
@@ -450,6 +509,79 @@ function CpanelWhatsappPageContent() {
               </>
             )}
           </div>
+        </div>
+
+        {/* Test WhatsApp Message & OTP Dispatch Card */}
+        <div className={cn("p-6 rounded-2xl border transition-all duration-300 space-y-4", panelClass)}>
+          <div className="border-b pb-3.5 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-orange-500 text-[22px]">send</span>
+              <div>
+                <h4 className="font-extrabold text-xs uppercase tracking-wider text-gray-900 dark:text-white">
+                  Test WhatsApp Message & OTP Dispatch Tool
+                </h4>
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">
+                  Send live test verification OTP codes or custom WhatsApp messages to any recipient phone number
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-orange-500/10 text-orange-500 border border-orange-500/20">
+              Admin Diagnostic Tool
+            </span>
+          </div>
+
+          <form onSubmit={handleSendTestWhatsappMessage} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1 sm:col-span-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Recipient Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. +2348033123456 or 08033123456"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Message Type</label>
+                <select
+                  value={testMessageType}
+                  onChange={(e) => setTestMessageType(e.target.value as any)}
+                  className={cn(inputClass, "cursor-pointer font-bold")}
+                >
+                  <option value="test_otp">Test Verification OTP Code</option>
+                  <option value="custom">Custom Text Message</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-1 flex items-end">
+                <button
+                  type="submit"
+                  disabled={isSendingTestMessage}
+                  className="w-full h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  {isSendingTestMessage ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">send</span>}
+                  <span>Dispatch WhatsApp Message</span>
+                </button>
+              </div>
+            </div>
+
+            {testMessageType === "custom" && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Custom Message Body *</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Enter message text to deliver via connected WhatsApp Gateway..."
+                  value={testCustomMessage}
+                  onChange={(e) => setTestCustomMessage(e.target.value)}
+                  className={cn("p-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full resize-none", inputClass)}
+                />
+              </div>
+            )}
+          </form>
         </div>
 
         {/* Device Information Card */}
