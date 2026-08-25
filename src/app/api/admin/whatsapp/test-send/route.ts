@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-import { callWhatsappBackend, logWhatsappAdminAudit } from "@/lib/whatsapp-service";
+import { callWhatsappBackend, getWhatsappServerConfig, logWhatsappAdminAudit } from "@/lib/whatsapp-service";
 
 export async function POST(req: Request) {
   try {
@@ -38,10 +38,16 @@ export async function POST(req: Request) {
       textToSend = message.trim();
     }
 
+    const config = await getWhatsappServerConfig();
+    const instId = config.instanceId || "default";
+
     const payload = {
+      instanceId: instId,
       number: fullNum,
       phoneNumber: fullNum,
       recipient: fullNum,
+      phone: fullNum,
+      to: fullNum,
       remoteJid: `${fullNum}@s.whatsapp.net`,
       text: textToSend,
       message: textToSend,
@@ -49,17 +55,25 @@ export async function POST(req: Request) {
       caption: textToSend,
     };
 
-    // Attempt 1: Direct endpoint /message/sendText or /message/sendText/:instance
-    let backendRes = await callWhatsappBackend("/message/sendText", "POST", payload, 5000);
+    // Candidates of standard Baileys/Evolution/Express WhatsApp endpoints
+    const candidateEndpoints = [
+      `/message/sendText/${instId}`,
+      `/instances/${instId}/messages/send`,
+      `/instances/${instId}/messages`,
+      `/instances/${instId}/send-text`,
+      `/instances/${instId}/message`,
+      `/message/sendText`,
+      `/message/send`,
+      `/send-message`,
+    ];
 
-    if (!backendRes.ok && (backendRes.status === 404 || backendRes.status === 502)) {
-      // Attempt 2: Endpoint /message/sendText/:instanceId
-      backendRes = await callWhatsappBackend(`/message/sendText/${fullNum}`, "POST", payload, 5000);
-    }
+    let backendRes: any = { ok: false, status: 404, error: "No endpoint succeeded" };
 
-    if (!backendRes.ok && (backendRes.status === 404 || backendRes.status === 502)) {
-      // Attempt 3: Endpoint /message/send
-      backendRes = await callWhatsappBackend("/message/send", "POST", payload, 5000);
+    for (const endpoint of candidateEndpoints) {
+      backendRes = await callWhatsappBackend(endpoint, "POST", payload, 3500);
+      if (backendRes.ok) {
+        break;
+      }
     }
 
     await logWhatsappAdminAudit(admin.uid, admin.email || "", "TEST_WHATSAPP_DISPATCH", {
@@ -81,7 +95,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       error: backendRes.error || "Failed to deliver WhatsApp message via VM gateway.",
-      details: backendRes.data || { note: "All WhatsApp send routes (/message/sendText, /message/send) returned errors." },
+      details: backendRes.data || { note: "Tried standard Baileys/Evolution WhatsApp endpoints." },
     }, { status: backendRes.status && backendRes.status >= 400 && backendRes.status < 500 ? backendRes.status : 502 });
 
   } catch (err: any) {

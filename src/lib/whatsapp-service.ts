@@ -107,12 +107,11 @@ export async function callWhatsappBackend(
     return { ok: false, status: 500, error: "WHATSAPP_API_URL is not configured on server." };
   }
 
-  let cleanPath = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
-  if (!cleanPath.startsWith("/api/")) {
-    cleanPath = `/api${cleanPath}`;
-  }
+  const cleanPath = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
+  const pathWithApi = cleanPath.startsWith("/api/") ? cleanPath : `/api${cleanPath}`;
+  const pathWithoutApi = cleanPath.startsWith("/api/") ? cleanPath.replace(/^\/api/, "") : cleanPath;
 
-  const targetUrl = `${config.apiUrl}${cleanPath}`;
+  const targetUrl = `${config.apiUrl}${pathWithApi}`;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -187,6 +186,29 @@ export async function callWhatsappBackend(
         }
       } catch (createErr: any) {
         console.warn("[callWhatsappBackend] Auto-create instance attempt failed:", createErr.message);
+      }
+    }
+
+    if (response.status === 404 && typeof resData?.textResponse === "string" && resData.textResponse.includes("Cannot")) {
+      // Endpoint with /api prefix was 404. Attempt non-api fallback endpoint URL
+      const fallbackUrl = `${config.apiUrl}${pathWithoutApi}`;
+      try {
+        const fallbackRes = await fetch(fallbackUrl, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+          cache: "no-store",
+        });
+        let fallbackData: any = null;
+        const fbText = await fallbackRes.text();
+        if (fbText) {
+          try { fallbackData = JSON.parse(fbText); } catch { fallbackData = { textResponse: fbText }; }
+        }
+        if (fallbackRes.ok) {
+          return { ok: true, status: fallbackRes.status, data: fallbackData };
+        }
+      } catch {
+        // Ignore fallback fetch error
       }
     }
 
