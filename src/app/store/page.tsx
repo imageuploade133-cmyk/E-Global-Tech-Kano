@@ -390,17 +390,22 @@ export default function StorePage() {
 
             {/* Wallet Header Uniform Circular Icon Buttons */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Refresh Cache Button */}
-              <button
-                type="button"
-                onClick={handleClearStoreCache}
-                className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
-                title="Clear Cache & Refresh Store Data"
-              >
-                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]">
-                  cached
-                </span>
-              </button>
+              {/* Refresh Cache Button - Controlled by Admin ON/OFF Toggle */}
+              {!settings.hideClearCacheButton && (
+                <button
+                  type="button"
+                  onClick={handleClearStoreCache}
+                  className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+                  title="Clear Cache & Refresh Store Data"
+                >
+                  <span
+                    className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]"
+                    style={{ color: settings.topBarIconColor || "#374151" }}
+                  >
+                    cached
+                  </span>
+                </button>
+              )}
 
               {/* Wishlist Button */}
               <button
@@ -409,10 +414,13 @@ export default function StorePage() {
                   setWishlist(getSavedWishlist());
                   setIsWishlistModalOpen(true);
                 }}
-                className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+                className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Wishlist / Favorites"
               >
-                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-red-500">
+                <span
+                  className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]"
+                  style={{ color: settings.topBarWishlistIconColor || "#EF4444" }}
+                >
                   favorite
                 </span>
                 {wishlist.length > 0 && (
@@ -422,17 +430,20 @@ export default function StorePage() {
                 )}
               </button>
 
-              {/* Order History Icon Button - Uses Exact Wallet History Icon */}
+              {/* Order History Icon Button */}
               <button
                 type="button"
                 onClick={() => {
                   fetchMyOrders();
                   setIsMyOrdersOpen(true);
                 }}
-                className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+                className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Order History"
               >
-                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-[#FC7A00]">
+                <span
+                  className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]"
+                  style={{ color: settings.topBarHistoryIconColor || "#FC7A00" }}
+                >
                   history
                 </span>
               </button>
@@ -441,10 +452,13 @@ export default function StorePage() {
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+                className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
                 title="Shopping Cart"
               >
-                <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] text-gray-800">
+                <span
+                  className="material-symbols-outlined text-[18px] min-[375px]:text-[20px]"
+                  style={{ color: settings.topBarCartIconColor || "#1F2937" }}
+                >
                   shopping_bag
                 </span>
                 {totalCartItems > 0 && (

@@ -58,6 +58,11 @@ export interface StoreSettings {
   storeButtonColor?: string;
   storeButtonTextColor?: string;
   storeButtonIcon?: string;
+  hideClearCacheButton?: boolean;
+  topBarIconColor?: string;
+  topBarWishlistIconColor?: string;
+  topBarHistoryIconColor?: string;
+  topBarCartIconColor?: string;
   enableProductSharing?: boolean;
   borderColor?: string;
   borderOpacity?: number;

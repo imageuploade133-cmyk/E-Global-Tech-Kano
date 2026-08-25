@@ -474,7 +474,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 className="relative w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer border-0"
                 title="Shopping Cart"
               >
-                <span className="material-symbols-outlined text-[18px] text-orange-400">
+                <span
+                  className="material-symbols-outlined text-[18px]"
+                  style={{ color: settings.topBarCartIconColor || "#FC7A00" }}
+                >
                   shopping_bag
                 </span>
                 {totalCartItems > 0 && (
