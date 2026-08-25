@@ -10,13 +10,14 @@ import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
+import { CPANEL_PERMISSIONS_CATALOG } from "@/lib/admin-permissions-client";
 
 interface AdminUser {
   uid: string;
   name: string;
   email: string;
   phoneNumber: string;
-  role: "admin" | "agent" | "user";
+  role: "super_admin" | "admin" | "finance" | "kyc_admin" | "support" | "read_only" | "agent" | "user";
   permissions: string[];
   balance: number;
   usdBalance?: number;
@@ -24,14 +25,6 @@ interface AdminUser {
   bonusBalance?: number;
   createdAt: string;
 }
-
-const PERMISSIONS_CATALOG = [
-  { key: "can_transact", label: "Allow Transactions" },
-  { key: "can_verify_kyc", label: "Verify KYC" },
-  { key: "can_manage_gateways", label: "Manage Gateways" },
-  { key: "can_view_audit_logs", label: "Audit Ledger" },
-  { key: "can_moderate_users", label: "Moderate Users" },
-];
 
 const ButtonSpinner = () => (
   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -61,7 +54,7 @@ function CpanelUsersPageContent() {
     phonePrefix: "+234",
     phoneNumber: "",
     balance: 0,
-    role: "user" as "admin" | "agent" | "user",
+    role: "user" as AdminUser["role"],
     permissions: [] as string[],
   });
 
@@ -365,20 +358,25 @@ function CpanelUsersPageContent() {
                   <label className="text-[10px] font-black uppercase text-gray-400">System Role</label>
                   <select
                     value={newUserForm.role}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as "admin" | "agent" | "user" })}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as any })}
                     className={cn(inputClass, "cursor-pointer font-bold")}
                   >
-                    <option value="user">USER (Standard Account)</option>
+                    <option value="user">USER (Standard Customer)</option>
                     <option value="agent">AGENT (Privileged Operative)</option>
-                    <option value="admin">ADMIN (Root Access)</option>
+                    <option value="super_admin">SUPER ADMIN (Full Platform Control)</option>
+                    <option value="admin">ADMIN (Standard Operations)</option>
+                    <option value="finance">FINANCE (Withdrawals & Deposits)</option>
+                    <option value="kyc_admin">KYC ADMIN (Document Approvals)</option>
+                    <option value="support">SUPPORT (Customer Helpdesk)</option>
+                    <option value="read_only">READ ONLY (Auditor)</option>
                   </select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Assign Security Permissions</label>
-                  <div className={cn("grid grid-cols-1 gap-1.5 p-3 rounded-xl border transition-colors duration-300", isDark ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200")}>
-                    {PERMISSIONS_CATALOG.map((p) => {
-                      const checked = newUserForm.permissions.includes(p.key);
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Assign Security Permissions ({newUserForm.permissions.length})</label>
+                  <div className={cn("max-h-48 overflow-y-auto space-y-1.5 p-3 rounded-xl border transition-colors duration-300", isDark ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200")}>
+                    {CPANEL_PERMISSIONS_CATALOG.map((p) => {
+                      const checked = newUserForm.permissions.includes(p.key) || newUserForm.permissions.includes("*");
                       return (
                         <label key={p.key} className={cn("flex items-center gap-2 cursor-pointer select-none text-[11px] font-bold hover:text-[#FC7A00]", isDark ? "text-gray-300 hover:text-white" : "text-gray-600 hover:text-gray-900")}>
                           <input
@@ -386,7 +384,7 @@ function CpanelUsersPageContent() {
                             checked={checked}
                             onChange={() => {
                               const updated = checked
-                                ? newUserForm.permissions.filter((k) => k !== p.key)
+                                ? newUserForm.permissions.filter((k) => k !== p.key && k !== "*")
                                 : [...newUserForm.permissions, p.key];
                               setNewUserForm({ ...newUserForm, permissions: updated });
                             }}
@@ -491,7 +489,7 @@ function CpanelUsersPageContent() {
                           <div className="flex justify-between items-center flex-wrap gap-2 pt-1 border-t border-gray-200/30">
                             <div className="flex flex-wrap gap-1">
                               {u.permissions.length === 0 ? (
-                                <span className="text-[9px] text-gray-400 font-bold uppercase italic">No Special Permissions</span>
+                                <span className="text-[9px] text-gray-400 font-bold uppercase italic">Standard Permissions</span>
                               ) : (
                                 u.permissions.map((p) => (
                                   <span key={p} className="px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 text-[#FC7A00] text-[8px] font-black uppercase tracking-wider">
@@ -520,20 +518,25 @@ function CpanelUsersPageContent() {
                                 <label className="text-[9px] font-black uppercase text-gray-400">Change Role</label>
                                 <select
                                   value={editingUser.role}
-                                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as "admin" | "agent" | "user" })}
+                                  onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
                                   className={cn(inputClass, "cursor-pointer font-bold")}
                                 >
-                                  <option value="user">USER</option>
-                                  <option value="agent">AGENT</option>
-                                  <option value="admin">ADMIN</option>
+                                  <option value="user">USER (Standard Customer)</option>
+                                  <option value="agent">AGENT (Privileged Operative)</option>
+                                  <option value="super_admin">SUPER ADMIN (Full Access)</option>
+                                  <option value="admin">ADMIN (Standard Operations)</option>
+                                  <option value="finance">FINANCE (Withdrawals & Deposits)</option>
+                                  <option value="kyc_admin">KYC ADMIN (Document Approvals)</option>
+                                  <option value="support">SUPPORT (Customer Helpdesk)</option>
+                                  <option value="read_only">READ ONLY (Auditor)</option>
                                 </select>
                               </div>
 
                               <div className="space-y-2">
-                                <label className="text-[9px] font-black uppercase text-gray-400 block">Manage Assigned Permissions</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {PERMISSIONS_CATALOG.map((p) => {
-                                    const isChecked = editingUser.permissions.includes(p.key);
+                                <label className="text-[9px] font-black uppercase text-gray-400 block">Manage Assigned Permissions ({editingUser.permissions.length})</label>
+                                <div className="max-h-40 overflow-y-auto space-y-1.5 p-3 rounded-xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50">
+                                  {CPANEL_PERMISSIONS_CATALOG.map((p) => {
+                                    const isChecked = editingUser.permissions.includes(p.key) || editingUser.permissions.includes("*");
                                     return (
                                       <label key={p.key} className={cn("flex items-center gap-1.5 cursor-pointer text-[10px] font-bold", isDark ? "text-gray-300" : "text-gray-600")}>
                                         <input
@@ -541,7 +544,7 @@ function CpanelUsersPageContent() {
                                           checked={isChecked}
                                           onChange={() => {
                                             const updated = isChecked
-                                              ? editingUser.permissions.filter((k) => k !== p.key)
+                                              ? editingUser.permissions.filter((k) => k !== p.key && k !== "*")
                                               : [...editingUser.permissions, p.key];
                                             setEditingUser({ ...editingUser, permissions: updated });
                                           }}
