@@ -4,6 +4,9 @@ import { requireAdminPermission } from "@/lib/admin-permissions";
 
 const DEFAULT_SETTINGS = {
   storeName: "E-Tech Store",
+  storeSubtitle: "Hardware & Premium Gear",
+  storeNameColor: "#000000",
+  storeSubtitleColor: "#9CA3AF",
   storeLogoUrl: "",
   borderColor: "#FC7A00",
   borderOpacity: 100,
@@ -199,6 +202,9 @@ export async function POST(req: Request) {
 
       currentSettings = {
         storeName: settings.storeName !== undefined ? String(settings.storeName).trim() : currentSettings.storeName,
+        storeSubtitle: settings.storeSubtitle !== undefined ? String(settings.storeSubtitle).trim() : currentSettings.storeSubtitle,
+        storeNameColor: settings.storeNameColor !== undefined ? String(settings.storeNameColor).trim() : currentSettings.storeNameColor,
+        storeSubtitleColor: settings.storeSubtitleColor !== undefined ? String(settings.storeSubtitleColor).trim() : currentSettings.storeSubtitleColor,
         storeLogoUrl: settings.storeLogoUrl !== undefined ? String(settings.storeLogoUrl).trim() : currentSettings.storeLogoUrl,
         borderColor: (settings.borderColor || currentSettings.borderColor).trim(),
         borderOpacity: typeof settings.borderOpacity === "number" ? settings.borderOpacity : currentSettings.borderOpacity,

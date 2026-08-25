@@ -373,11 +373,17 @@ export default function StorePage() {
                 </div>
               )}
               <div className="min-w-0">
-                <h1 className="font-hanken text-[18px] min-[375px]:text-[20px] font-black tracking-tight text-black leading-tight truncate">
+                <h1
+                  className="font-hanken text-[18px] min-[375px]:text-[20px] font-black tracking-tight leading-tight truncate"
+                  style={{ color: settings.storeNameColor || undefined }}
+                >
                   {settings.storeName || "E-Tech Store"}
                 </h1>
-                <p className="font-hanken text-[9.5px] text-gray-400 font-black uppercase tracking-widest mt-0.5 truncate">
-                  Hardware & Premium Gear
+                <p
+                  className="font-hanken text-[9.5px] font-black uppercase tracking-widest mt-0.5 truncate"
+                  style={{ color: settings.storeSubtitleColor || undefined }}
+                >
+                  {settings.storeSubtitle || "Hardware & Premium Gear"}
                 </p>
               </div>
             </div>
