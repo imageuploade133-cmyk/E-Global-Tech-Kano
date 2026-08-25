@@ -53,9 +53,45 @@ export function CpanelRouteGuard({ requiredPermission, children }: CpanelRouteGu
 
   if (status === "loading") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 space-y-4">
-        <div className="w-10 h-10 border-3 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-black uppercase tracking-wider text-gray-400">Verifying Route Authorization...</p>
+      <div className="min-h-screen p-4 md:p-8 font-hanken space-y-6 animate-pulse">
+        {/* Header Bar Skeleton */}
+        <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-800" />
+            <div className="space-y-2">
+              <div className="h-4 w-48 bg-gray-200 dark:bg-gray-800 rounded-md" />
+              <div className="h-3 w-72 bg-gray-200 dark:bg-gray-800 rounded-md" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-24 h-10 rounded-xl bg-gray-200 dark:bg-gray-800" />
+            <div className="w-32 h-10 rounded-xl bg-gray-200 dark:bg-gray-800" />
+          </div>
+        </div>
+
+        {/* Content Workspace Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 md:col-span-1 space-y-4">
+            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-800 rounded-md" />
+            <div className="space-y-3 pt-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 rounded-xl bg-gray-200 dark:bg-gray-800" />
+              ))}
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 md:col-span-2 space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="h-4 w-40 bg-gray-200 dark:bg-gray-800 rounded-md" />
+              <div className="h-8 w-24 bg-gray-200 dark:bg-gray-800 rounded-xl" />
+            </div>
+            <div className="space-y-3 pt-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-800/80" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
