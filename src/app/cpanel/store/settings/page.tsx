@@ -10,6 +10,9 @@ import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 interface StoreSettings {
   storeName?: string;
+  storeSubtitle?: string;
+  storeNameColor?: string;
+  storeSubtitleColor?: string;
   storeLogoUrl?: string;
   enableProductSharing?: boolean;
   borderColor?: string;
@@ -52,6 +55,9 @@ function CpanelStoreSettingsPageContent() {
 
   // Store Settings Form States
   const [storeName, setStoreName] = useState("E-Tech Store");
+  const [storeSubtitle, setStoreSubtitle] = useState("Hardware & Premium Gear");
+  const [storeNameColor, setStoreNameColor] = useState("#000000");
+  const [storeSubtitleColor, setStoreSubtitleColor] = useState("#9CA3AF");
   const [storeLogoUrl, setStoreLogoUrl] = useState("");
   const [enableProductSharing, setEnableProductSharing] = useState(true);
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
@@ -113,6 +119,9 @@ function CpanelStoreSettingsPageContent() {
 
       if (data.success && data.settings) {
         setStoreName(data.settings.storeName || "E-Tech Store");
+        setStoreSubtitle(data.settings.storeSubtitle || "Hardware & Premium Gear");
+        setStoreNameColor(data.settings.storeNameColor || "#000000");
+        setStoreSubtitleColor(data.settings.storeSubtitleColor || "#9CA3AF");
         setStoreLogoUrl(data.settings.storeLogoUrl || "");
         setEnableProductSharing(data.settings.enableProductSharing !== false);
         setBorderColor(data.settings.borderColor || "#FC7A00");
@@ -177,6 +186,9 @@ function CpanelStoreSettingsPageContent() {
           action: "update_settings",
           settings: {
             storeName,
+            storeSubtitle,
+            storeNameColor,
+            storeSubtitleColor,
             storeLogoUrl,
             enableProductSharing,
             borderColor,
@@ -564,17 +576,83 @@ function CpanelStoreSettingsPageContent() {
                 />
               </div>
 
-              {/* Store Name Input */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 block">Store Name / Brand Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. E-Tech Store"
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
-                  className={cn("h-10 px-3 rounded-xl text-xs font-extrabold outline-none border transition-all w-full", inputClass)}
-                />
+              {/* Store Header Branding & Titles Section */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
+                <div className="border-b border-gray-200/30 pb-2">
+                  <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px]">badge</span>
+                    Store Branding Titles & Text Colors
+                  </label>
+                  <span className="text-[10px] text-gray-400 block">Customize store main title, subtitle text, and custom font colors</span>
+                </div>
+
+                {/* Store Main Name / Brand Title */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Store Name / Brand Title</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. E-Tech Store"
+                      value={storeName}
+                      onChange={(e) => setStoreName(e.target.value)}
+                      className={cn("h-10 px-3 rounded-xl text-xs font-extrabold outline-none border transition-all flex-1", inputClass)}
+                    />
+                    <div className="flex items-center gap-1 flex-shrink-0" title="Store Title Text Color">
+                      <input
+                        type="color"
+                        value={storeNameColor}
+                        onChange={(e) => setStoreNameColor(e.target.value)}
+                        className="w-9 h-9 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={storeNameColor}
+                        onChange={(e) => setStoreNameColor(e.target.value)}
+                        className={cn("h-9 px-2 rounded-lg text-xs font-mono border w-20", inputClass)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Store Subtitle / Under Text */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Store Subtitle / Under Text</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. Hardware & Premium Gear"
+                      value={storeSubtitle}
+                      onChange={(e) => setStoreSubtitle(e.target.value)}
+                      className={cn("h-10 px-3 rounded-xl text-xs font-bold outline-none border transition-all flex-1", inputClass)}
+                    />
+                    <div className="flex items-center gap-1 flex-shrink-0" title="Store Subtitle Text Color">
+                      <input
+                        type="color"
+                        value={storeSubtitleColor}
+                        onChange={(e) => setStoreSubtitleColor(e.target.value)}
+                        className="w-9 h-9 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={storeSubtitleColor}
+                        onChange={(e) => setStoreSubtitleColor(e.target.value)}
+                        className={cn("h-9 px-2 rounded-lg text-xs font-mono border w-20", inputClass)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Header Text Preview Box */}
+                <div className="p-3 bg-white dark:bg-gray-950 rounded-xl border border-gray-200/60 dark:border-gray-800 space-y-1 text-center">
+                  <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest block">Live Header Title Preview</span>
+                  <h2 className="font-hanken text-[16px] font-black tracking-tight leading-tight truncate" style={{ color: storeNameColor }}>
+                    {storeName || "E-Tech Store"}
+                  </h2>
+                  <p className="font-hanken text-[10px] font-black uppercase tracking-widest truncate" style={{ color: storeSubtitleColor }}>
+                    {storeSubtitle || "Hardware & Premium Gear"}
+                  </p>
+                </div>
               </div>
 
               {/* Store Logo Upload & Preview */}

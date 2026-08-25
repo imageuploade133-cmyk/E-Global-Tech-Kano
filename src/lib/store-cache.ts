@@ -49,6 +49,9 @@ export interface StoreCategory {
 
 export interface StoreSettings {
   storeName?: string;
+  storeSubtitle?: string;
+  storeNameColor?: string;
+  storeSubtitleColor?: string;
   storeLogoUrl?: string;
   enableProductSharing?: boolean;
   borderColor?: string;
