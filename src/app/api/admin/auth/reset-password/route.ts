@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import bcrypt from "bcryptjs";
+import { callWhatsappBackend } from "@/lib/whatsapp-service";
 
 function normalizePhone(phone: string): string {
   let cleaned = phone.replace(/[^\d+]/g, "");
@@ -89,9 +90,29 @@ export async function POST(req: Request) {
 
       console.log(`[Admin Password Reset OTP Generated] Email: ${cleanEmail}, Raw OTP: ${rawOtp}`);
 
+      // Dispatch WhatsApp message with OTP code
+      const cleanNum = inputPhone.replace(/\D/g, "");
+      const fullNum = cleanNum.length === 10 || cleanNum.startsWith("0")
+        ? `234${cleanNum.startsWith("0") ? cleanNum.slice(1) : cleanNum}`
+        : cleanNum;
+
+      const whatsappMessage = `[E-Tech Security] Your Admin Password Reset OTP code is ${rawOtp}. Valid for 5 minutes. Do not share this code with anyone.`;
+
+      let whatsappSent = false;
+      try {
+        const waRes = await callWhatsappBackend("/send/text", "POST", {
+          number: fullNum,
+          message: whatsappMessage,
+        });
+        whatsappSent = waRes.ok;
+      } catch (waErr: any) {
+        console.warn("[Admin Reset Password WhatsApp Send Exception]:", waErr.message);
+      }
+
       return NextResponse.json({
         success: true,
-        message: `OTP sent successfully to ${inputPhone.slice(0, 6)}****${inputPhone.slice(-2)}`,
+        message: `OTP sent successfully via WhatsApp to ${inputPhone.slice(0, 6)}****${inputPhone.slice(-2)}`,
+        whatsappDispatched: whatsappSent,
         // Include rawOtp in response for local test/dev sandbox
         devOtp: process.env.NODE_ENV !== "production" ? rawOtp : undefined
       });
