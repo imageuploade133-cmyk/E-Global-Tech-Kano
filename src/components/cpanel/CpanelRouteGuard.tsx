@@ -83,11 +83,18 @@ export function CpanelRouteGuard({ requiredPermission, children }: CpanelRouteGu
 
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              href="/cpanel"
+              href="/cpanel/profile"
               className="w-full sm:w-auto px-6 py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2"
             >
+              <span className="material-symbols-outlined text-sm">account_circle</span>
+              Return to Admin Profile
+            </Link>
+            <Link
+              href="/cpanel"
+              className="w-full sm:w-auto px-5 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+            >
               <span className="material-symbols-outlined text-sm">dashboard</span>
-              Return to Dashboard
+              Dashboard
             </Link>
           </div>
         </motion.div>

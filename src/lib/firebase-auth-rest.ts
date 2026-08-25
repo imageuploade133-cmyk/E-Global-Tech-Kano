@@ -177,6 +177,40 @@ export async function setFirebaseAuthCustomClaims(uid: string, customClaims: Rec
 }
 
 /**
+ * Updates user account properties (such as password or display name) in Firebase Authentication using Google's Identity Toolkit v1 REST API.
+ */
+export async function updateFirebaseAuthUser(uid: string, params: { password?: string; displayName?: string; phoneNumber?: string }): Promise<void> {
+  const token = await getGoogleOAuth2AccessToken();
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
+
+  const bodyPayload: any = {};
+  if (params.password) bodyPayload.password = params.password;
+  if (params.displayName) bodyPayload.displayName = params.displayName;
+  if (params.phoneNumber) bodyPayload.phoneNumber = params.phoneNumber;
+
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:${uid}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(bodyPayload),
+  });
+
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error?.message || "Failed to update user in Firebase Authentication REST API.");
+  }
+}
+
+/**
+ * Convenience helper to update a user's password in Firebase Authentication.
+ */
+export async function updateFirebaseAuthPassword(uid: string, password: string): Promise<void> {
+  return updateFirebaseAuthUser(uid, { password });
+}
+
+/**
  * Lookup Firebase Auth User by Email using Google's Identity Toolkit v1 REST API.
  */
 export async function getFirebaseAuthUserByEmail(email: string): Promise<{ uid: string } | null> {

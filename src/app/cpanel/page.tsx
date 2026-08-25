@@ -16,7 +16,9 @@ const ButtonSpinner = () => (
   </svg>
 );
 
-export default function AdminDashboardPage() {
+import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
+
+function AdminDashboardContent() {
   const { config, syncRealFirebaseData } = useAppConfig();
 
   // Dark/Light Theme state
@@ -316,5 +318,13 @@ export default function AdminDashboardPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <CpanelRouteGuard requiredPermission="metrics.view">
+      <AdminDashboardContent />
+    </CpanelRouteGuard>
   );
 }
