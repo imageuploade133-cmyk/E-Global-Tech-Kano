@@ -53,6 +53,11 @@ export interface StoreSettings {
   storeNameColor?: string;
   storeSubtitleColor?: string;
   storeLogoUrl?: string;
+  storeIconColor?: string;
+  storeIconSize?: number;
+  storeButtonColor?: string;
+  storeButtonTextColor?: string;
+  storeButtonIcon?: string;
   enableProductSharing?: boolean;
   borderColor?: string;
   borderOpacity?: number;

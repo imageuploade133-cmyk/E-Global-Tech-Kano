@@ -14,6 +14,11 @@ interface StoreSettings {
   storeNameColor?: string;
   storeSubtitleColor?: string;
   storeLogoUrl?: string;
+  storeIconColor?: string;
+  storeIconSize?: number;
+  storeButtonColor?: string;
+  storeButtonTextColor?: string;
+  storeButtonIcon?: string;
   enableProductSharing?: boolean;
   borderColor?: string;
   borderOpacity?: number;
@@ -59,6 +64,11 @@ function CpanelStoreSettingsPageContent() {
   const [storeNameColor, setStoreNameColor] = useState("#000000");
   const [storeSubtitleColor, setStoreSubtitleColor] = useState("#9CA3AF");
   const [storeLogoUrl, setStoreLogoUrl] = useState("");
+  const [storeIconColor, setStoreIconColor] = useState("#FC7A00");
+  const [storeIconSize, setStoreIconSize] = useState<number>(20);
+  const [storeButtonColor, setStoreButtonColor] = useState("#FC7A00");
+  const [storeButtonTextColor, setStoreButtonTextColor] = useState("#FFFFFF");
+  const [storeButtonIcon, setStoreButtonIcon] = useState("bolt");
   const [enableProductSharing, setEnableProductSharing] = useState(true);
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
@@ -123,6 +133,11 @@ function CpanelStoreSettingsPageContent() {
         setStoreNameColor(data.settings.storeNameColor || "#000000");
         setStoreSubtitleColor(data.settings.storeSubtitleColor || "#9CA3AF");
         setStoreLogoUrl(data.settings.storeLogoUrl || "");
+        setStoreIconColor(data.settings.storeIconColor || "#FC7A00");
+        setStoreIconSize(data.settings.storeIconSize ?? 20);
+        setStoreButtonColor(data.settings.storeButtonColor || "#FC7A00");
+        setStoreButtonTextColor(data.settings.storeButtonTextColor || "#FFFFFF");
+        setStoreButtonIcon(data.settings.storeButtonIcon || "bolt");
         setEnableProductSharing(data.settings.enableProductSharing !== false);
         setBorderColor(data.settings.borderColor || "#FC7A00");
         setBorderOpacity(data.settings.borderOpacity ?? 100);
@@ -190,6 +205,11 @@ function CpanelStoreSettingsPageContent() {
             storeNameColor,
             storeSubtitleColor,
             storeLogoUrl,
+              storeIconColor,
+              storeIconSize,
+              storeButtonColor,
+              storeButtonTextColor,
+              storeButtonIcon,
             enableProductSharing,
             borderColor,
             borderOpacity,
@@ -652,6 +672,158 @@ function CpanelStoreSettingsPageContent() {
                   <p className="font-hanken text-[10px] font-black uppercase tracking-widest truncate" style={{ color: storeSubtitleColor }}>
                     {storeSubtitle || "Hardware & Premium Gear"}
                   </p>
+                </div>
+              </div>
+
+              {/* Store Icon Colors & Sizing Controls */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
+                <div className="border-b border-gray-200/30 pb-2">
+                  <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px]">palette</span>
+                    Store Icon Color & Icon Resizing Controls
+                  </label>
+                  <span className="text-[10px] text-gray-400 block">Customize icon colors and resize icon scale across storefront cards and category chips</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Icon Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={storeIconColor}
+                        onChange={(e) => setStoreIconColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={storeIconColor}
+                        onChange={(e) => setStoreIconColor(e.target.value)}
+                        className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Icon Size ({storeIconSize}px)</label>
+                      <span className="font-mono text-[10px] font-black text-[#FC7A00]">{storeIconSize}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="12"
+                      max="36"
+                      step="1"
+                      value={storeIconSize}
+                      onChange={(e) => setStoreIconSize(Number(e.target.value))}
+                      className="w-full accent-[#FC7A00] cursor-pointer mt-2"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Icon Color & Size Preview Box */}
+                <div className="p-3 bg-white dark:bg-gray-950 rounded-xl border border-gray-200/60 dark:border-gray-800 flex items-center justify-around">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase">Category Icon</span>
+                    <span className="material-symbols-outlined" style={{ color: storeIconColor, fontSize: `${storeIconSize}px` }}>
+                      category
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase">Cart Icon</span>
+                    <span className="material-symbols-outlined" style={{ color: storeIconColor, fontSize: `${storeIconSize}px` }}>
+                      add_shopping_cart
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[9px] font-bold text-gray-400 uppercase">History Icon</span>
+                    <span className="material-symbols-outlined" style={{ color: storeIconColor, fontSize: `${storeIconSize}px` }}>
+                      history
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Store Button Colors & Icon Customization Section */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
+                <div className="border-b border-gray-200/30 pb-2">
+                  <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px]">smart_button</span>
+                    Store Action Button Customization
+                  </label>
+                  <span className="text-[10px] text-gray-400 block">Configure background color, text color, and icon for primary Buy Now action buttons</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Button Background Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={storeButtonColor}
+                        onChange={(e) => setStoreButtonColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={storeButtonColor}
+                        onChange={(e) => setStoreButtonColor(e.target.value)}
+                        className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Button Text Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={storeButtonTextColor}
+                        onChange={(e) => setStoreButtonTextColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent p-0"
+                      />
+                      <input
+                        type="text"
+                        value={storeButtonTextColor}
+                        onChange={(e) => setStoreButtonTextColor(e.target.value)}
+                        className={cn("h-8 px-2 rounded-lg text-xs font-mono border w-full", inputClass)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Button Icon Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase block">Button Icon Selection</label>
+                  <div className="flex gap-2">
+                    {["bolt", "shopping_cart_checkout", "local_shipping", "verified", "arrow_forward", "shopping_bag"].map((icon) => (
+                      <button
+                        key={icon}
+                        type="button"
+                        onClick={() => setStoreButtonIcon(icon)}
+                        className={cn(
+                          "w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer",
+                          storeButtonIcon === icon
+                            ? "border-[#FC7A00] bg-[#FC7A00]/10 text-[#FC7A00]"
+                            : "border-gray-200 dark:border-gray-800 text-gray-500 hover:text-gray-900"
+                        )}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">{icon}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Button Preview Box */}
+                <div className="p-3 bg-white dark:bg-gray-950 rounded-xl border border-gray-200/60 dark:border-gray-800 space-y-1">
+                  <span className="text-[9px] font-extrabold text-[#FC7A00] uppercase tracking-widest block text-center">Live Button Preview</span>
+                  <div
+                    className="py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                    style={{ backgroundColor: storeButtonColor, color: storeButtonTextColor }}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{storeButtonIcon}</span>
+                    <span>Buy Now</span>
+                  </div>
                 </div>
               </div>
 

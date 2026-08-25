@@ -761,7 +761,15 @@ export default function StorePage() {
                           className="p-2.5 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-900 rounded-xl cursor-pointer active:scale-95 transition-all flex items-center justify-center border-0 shadow-none"
                           title="Add to Cart"
                         >
-                          <span className="material-symbols-outlined text-[16px] text-orange-600">add_shopping_cart</span>
+                          <span
+                            className="material-symbols-outlined"
+                            style={{
+                              color: settings.storeIconColor || "#FC7A00",
+                              fontSize: settings.storeIconSize ? `${settings.storeIconSize}px` : "16px",
+                            }}
+                          >
+                            add_shopping_cart
+                          </span>
                         </button>
 
                         {/* Buy Now Direct Button */}
@@ -773,9 +781,15 @@ export default function StorePage() {
                             handleAddToCart(item, 1);
                             setIsCartOpen(true);
                           }}
-                          className="flex-1 py-2 bg-gradient-to-r from-[#FC7A00] to-[#E06600] hover:from-[#E06600] hover:to-[#FC7A00] disabled:from-gray-300 disabled:to-gray-400 text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs border-0"
+                          style={{
+                            backgroundColor: settings.storeButtonColor || "#FC7A00",
+                            color: settings.storeButtonTextColor || "#FFFFFF",
+                          }}
+                          className="flex-1 py-2 hover:opacity-90 disabled:from-gray-300 disabled:to-gray-400 rounded-xl text-[9.5px] font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-2xs border-0"
                         >
-                          <span className="material-symbols-outlined text-[14px]">bolt</span>
+                          <span className="material-symbols-outlined text-[14px]">
+                            {settings.storeButtonIcon || "bolt"}
+                          </span>
                           <span>Buy Now</span>
                         </button>
                       </div>
