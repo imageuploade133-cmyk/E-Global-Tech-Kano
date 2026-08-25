@@ -137,7 +137,7 @@ export default function AdminDashboardPage() {
               onClick={handleRefreshFirebaseMetrics}
               className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap self-start sm:self-auto shadow-sm"
             >
-              {isSyncingFirebase ? <><ButtonSpinner /> Recalculating...</> : "Sync Firebase Data"}
+              {isSyncingFirebase ? <><ButtonSpinner /> Recalculating...</> : "Sync Database Data"}
             </button>
           </div>
 
