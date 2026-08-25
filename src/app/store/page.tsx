@@ -837,35 +837,30 @@ export default function StorePage() {
           </motion.button>
         )}
 
-        {/* Wishlist Smooth Bottom Drawer */}
+        {/* Wishlist Smooth Full Screen Modal */}
         <AnimatePresence>
           {isWishlistModalOpen && (
-            <div className="fixed inset-0 z-[100008] flex flex-col justify-end">
-              {/* Backdrop */}
+            <div className="fixed inset-0 z-[100008] bg-white flex flex-col justify-between overflow-hidden">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsWishlistModalOpen(false)}
-                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              />
-
-              {/* Drawer Box */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="relative bg-white rounded-t-[28px] max-h-[85vh] h-[80vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", damping: 32, stiffness: 350 }}
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
-                {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
-
-                {/* Header with single close icon */}
-                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                {/* Full Screen Header */}
+                <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsWishlistModalOpen(false)}
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                      title="Back"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    </button>
                     <span className="material-symbols-outlined text-red-500 text-[22px]">favorite</span>
-                    <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
                       My Saved Wishlist
                     </h2>
                   </div>
@@ -956,36 +951,31 @@ export default function StorePage() {
           )}
         </AnimatePresence>
 
-        {/* Shopping Cart Smooth Bottom Drawer */}
+        {/* Shopping Cart Smooth Full Screen Modal */}
         <AnimatePresence>
           {isCartOpen && (
-            <div className="fixed inset-0 z-[100002] flex flex-col justify-end">
-              {/* Backdrop */}
+            <div className="fixed inset-0 z-[100002] bg-white flex flex-col justify-between overflow-hidden">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsCartOpen(false)}
-                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              />
-
-              {/* Drawer Box */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="relative bg-white rounded-t-[28px] max-h-[90vh] h-[85vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", damping: 32, stiffness: 350 }}
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
-                {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
-
-                {/* Header with single close button */}
-                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                {/* Header */}
+                <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCartOpen(false)}
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                      title="Back"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    </button>
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">shopping_bag</span>
                     <div>
-                      <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                      <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
                         Shopping Cart
                       </h2>
                       <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
@@ -1193,35 +1183,30 @@ export default function StorePage() {
           )}
         </AnimatePresence>
 
-        {/* Customer Order History Smooth Bottom Drawer */}
+        {/* Customer Order History Smooth Full Screen Modal */}
         <AnimatePresence>
           {isMyOrdersOpen && (
-            <div className="fixed inset-0 z-[100003] flex flex-col justify-end">
-              {/* Backdrop */}
+            <div className="fixed inset-0 z-[100003] bg-white flex flex-col justify-between overflow-hidden">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsMyOrdersOpen(false)}
-                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              />
-
-              {/* Drawer Box */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="relative bg-white rounded-t-[28px] max-h-[85vh] h-[80vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", damping: 32, stiffness: 350 }}
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
-                {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
-
-                {/* Header with single close icon */}
-                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                {/* Header */}
+                <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsMyOrdersOpen(false)}
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                      title="Back"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    </button>
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
-                    <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
                       My Order History
                     </h2>
                   </div>
@@ -1282,35 +1267,30 @@ export default function StorePage() {
           )}
         </AnimatePresence>
 
-        {/* Dedicated Paginated "Recently Viewed" Smooth Bottom Drawer */}
+        {/* Dedicated Paginated "Recently Viewed" Smooth Full Screen Modal */}
         <AnimatePresence>
           {isAllRecentlyViewedOpen && (
-            <div className="fixed inset-0 z-[100007] flex flex-col justify-end">
-              {/* Backdrop */}
+            <div className="fixed inset-0 z-[100007] bg-white flex flex-col justify-between overflow-hidden">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsAllRecentlyViewedOpen(false)}
-                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              />
-
-              {/* Drawer Box */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="relative bg-white rounded-t-[28px] max-h-[85vh] h-[80vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", damping: 32, stiffness: 350 }}
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
-                {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
-
                 {/* Header */}
-                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAllRecentlyViewedOpen(false)}
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                      title="Back"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    </button>
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
-                    <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
+                    <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
                       Recently Viewed History
                     </h2>
                   </div>
@@ -1401,36 +1381,32 @@ export default function StorePage() {
           )}
         </AnimatePresence>
 
-        {/* Full-Screen Search Smooth Drawer */}
+        {/* Full-Screen Search Smooth Immersive Modal */}
         <AnimatePresence>
           {isSearchModalOpen && (
-            <div className="fixed inset-0 z-[100005] flex flex-col justify-end">
-              {/* Backdrop */}
+            <div className="fixed inset-0 z-[100005] bg-white flex flex-col justify-between overflow-hidden">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => {
-                  setSearchQuery(searchModalQuery);
-                  setActiveCategory(searchModalCategory);
-                  setIsSearchModalOpen(false);
-                }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              />
-
-              {/* Drawer Box */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="relative bg-white rounded-t-[28px] max-h-[92vh] h-[90vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", damping: 32, stiffness: 350 }}
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
-                {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
+                {/* Header with Search Input & Back Button */}
+                <div className="px-4 py-2.5 flex items-center justify-between gap-2.5 flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery(searchModalQuery);
+                      setActiveCategory(searchModalCategory);
+                      setIsSearchModalOpen(false);
+                    }}
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0 flex-shrink-0"
+                    title="Back"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                  </button>
 
-                {/* Header with Search Input & Close */}
-                <div className="px-5 pb-3 flex items-center justify-between gap-3 flex-shrink-0 border-b border-gray-100">
                   <div className="relative flex-1">
                     <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
                       search
