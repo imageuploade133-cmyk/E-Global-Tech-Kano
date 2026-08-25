@@ -320,6 +320,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     {
       title: "System Overview",
       items: [
+        { id: "profile", label: "My Admin Profile", icon: "account_circle", href: "/cpanel/profile" },
         { id: "dashboard", label: "Metrics & Operations", icon: "cell_tower", href: "/cpanel", exact: true, permission: "metrics.view" },
         { id: "admins", label: "Admin Management", icon: "admin_panel_settings", href: "/cpanel/admins", permission: "admins.view" },
       ]
