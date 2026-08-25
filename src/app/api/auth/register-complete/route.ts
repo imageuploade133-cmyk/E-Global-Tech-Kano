@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { ReferralService } from "@/services/referral-service";
+import { sendWelcomeEmail } from "@/lib/email-service";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -68,6 +69,13 @@ export async function POST(req: Request) {
 
     // Save user document securely
     await userRef.set(initialProfile, { merge: true });
+
+    // Send welcome email after successful account registration (safely caught so it never fails registration)
+    if (cleanEmail) {
+      sendWelcomeEmail(cleanEmail, fullName).catch((mailErr: any) => {
+        console.warn(`[Register Complete] Welcome email sending exception for ${cleanEmail}:`, mailErr.message);
+      });
+    }
 
     // Handle referral registration if code was provided
     if (referralCode) {
