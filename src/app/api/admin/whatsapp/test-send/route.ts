@@ -39,42 +39,20 @@ export async function POST(req: Request) {
     }
 
     const config = await getWhatsappServerConfig();
-    const instId = config.instanceId || "default";
+
+    if (!config.apiUrl || !config.apiKey || !config.instanceId) {
+      return NextResponse.json({
+        error: "WhatsApp API credentials (WHATSAPP_API_URL, WHATSAPP_API_KEY, WHATSAPP_INSTANCE_ID) are missing or incomplete."
+      }, { status: 500 });
+    }
 
     const payload = {
-      instanceId: instId,
       number: fullNum,
-      phoneNumber: fullNum,
-      recipient: fullNum,
-      phone: fullNum,
-      to: fullNum,
-      remoteJid: `${fullNum}@s.whatsapp.net`,
-      text: textToSend,
       message: textToSend,
-      body: textToSend,
-      caption: textToSend,
     };
 
-    // Candidates of WhatsAPI Multi-Device Gateway endpoints
-    const candidateEndpoints = [
-      `/send/text`,
-      `/sendText`,
-      `/message/sendText/${instId}`,
-      `/instances/${instId}/messages/send`,
-      `/instances/${instId}/messages`,
-      `/instances/${instId}/send-text`,
-      `/message/sendText`,
-      `/message/send`,
-    ];
-
-    let backendRes: any = { ok: false, status: 404, error: "No endpoint succeeded" };
-
-    for (const endpoint of candidateEndpoints) {
-      backendRes = await callWhatsappBackend(endpoint, "POST", payload, 3500);
-      if (backendRes.ok) {
-        break;
-      }
-    }
+    // Strictly send to POST /send/text using WhatsAPI contract (callWhatsappBackend automatically prepends /api)
+    const backendRes = await callWhatsappBackend("/send/text", "POST", payload, 10000);
 
     await logWhatsappAdminAudit(admin.uid, admin.email || "", "TEST_WHATSAPP_DISPATCH", {
       phoneNumber: fullNum,
@@ -94,8 +72,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
-      error: backendRes.error || "Failed to deliver WhatsApp message via VM gateway.",
-      details: backendRes.data || { note: "Tried standard Baileys/Evolution WhatsApp endpoints." },
+      error: backendRes.error || "WhatsApp API server returned an error.",
+      details: backendRes.data || { note: "Failed to dispatch message to POST /api/send/text." },
     }, { status: backendRes.status && backendRes.status >= 400 && backendRes.status < 500 ? backendRes.status : 502 });
 
   } catch (err: any) {

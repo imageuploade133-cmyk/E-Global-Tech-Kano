@@ -104,6 +104,25 @@ function CpanelStoreSettingsPageContent() {
 
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // Section Reset Confirmation Modal State
+  const [resetConfirmModal, setResetConfirmModal] = useState<{
+    isOpen: boolean;
+    sectionName: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    sectionName: "",
+    onConfirm: () => {},
+  });
+
+  const promptResetConfirmation = (sectionName: string, onConfirmAction: () => void) => {
+    setResetConfirmModal({
+      isOpen: true,
+      sectionName,
+      onConfirm: onConfirmAction,
+    });
+  };
+
 
   useEffect(() => {
     async function checkSession() {
@@ -385,12 +404,14 @@ function CpanelStoreSettingsPageContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      setHideClearCacheButton(false);
-                      setTopBarIconColor("#374151");
-                      setTopBarWishlistIconColor("#EF4444");
-                      setTopBarHistoryIconColor("#FC7A00");
-                      setTopBarCartIconColor("#1F2937");
-                      toast.info("Reset Top Bar section to defaults.");
+                      promptResetConfirmation("Top Bar Icons & Cache Toggle", () => {
+                        setHideClearCacheButton(false);
+                        setTopBarIconColor("#374151");
+                        setTopBarWishlistIconColor("#EF4444");
+                        setTopBarHistoryIconColor("#FC7A00");
+                        setTopBarCartIconColor("#1F2937");
+                        toast.info("Reset Top Bar section to defaults.");
+                      });
                     }}
                     className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                   >
@@ -531,7 +552,7 @@ function CpanelStoreSettingsPageContent() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setCardBorderRadius(16)}
+                      onClick={() => promptResetConfirmation("Card Border Radius", () => setCardBorderRadius(16))}
                       className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                     >
                       Reset Default
@@ -565,7 +586,7 @@ function CpanelStoreSettingsPageContent() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setBorderWidth(1)}
+                      onClick={() => promptResetConfirmation("Card Border Width", () => setBorderWidth(1))}
                       className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                     >
                       Reset Default
@@ -602,13 +623,15 @@ function CpanelStoreSettingsPageContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      setHideBorders(false);
-                      setEnableGradientBorder(false);
-                      setBorderColor("#FC7A00");
-                      setBorderOpacity(100);
-                      setGradientColorStart("#FC7A00");
-                      setGradientColorEnd("#0b513d");
-                      toast.info("Reset Card Borders section to defaults.");
+                      promptResetConfirmation("Product Card Borders & Gradient", () => {
+                        setHideBorders(false);
+                        setEnableGradientBorder(false);
+                        setBorderColor("#FC7A00");
+                        setBorderOpacity(100);
+                        setGradientColorStart("#FC7A00");
+                        setGradientColorEnd("#0b513d");
+                        toast.info("Reset Card Borders section to defaults.");
+                      });
                     }}
                     className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                   >
@@ -744,10 +767,12 @@ function CpanelStoreSettingsPageContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      setRecentlyViewedBorderEnabled(true);
-                      setRecentlyViewedBorderColor("#FC7A00");
-                      setRecentlyViewedBorderOpacity(20);
-                      toast.info("Reset Recently Viewed section to defaults.");
+                      promptResetConfirmation("Recently Viewed Border Styling", () => {
+                        setRecentlyViewedBorderEnabled(true);
+                        setRecentlyViewedBorderColor("#FC7A00");
+                        setRecentlyViewedBorderOpacity(20);
+                        toast.info("Reset Recently Viewed section to defaults.");
+                      });
                     }}
                     className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                   >
@@ -817,7 +842,7 @@ function CpanelStoreSettingsPageContent() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setSearchBarMarginTop(0)}
+                      onClick={() => promptResetConfirmation("Search Bar Top Space", () => setSearchBarMarginTop(0))}
                       className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                     >
                       Reset Default
@@ -849,11 +874,13 @@ function CpanelStoreSettingsPageContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      setStoreName("E-Tech Store");
-                      setStoreSubtitle("Hardware & Premium Gear");
-                      setStoreNameColor("#000000");
-                      setStoreSubtitleColor("#9CA3AF");
-                      toast.info("Reset Store Titles section to defaults.");
+                      promptResetConfirmation("Store Branding Titles", () => {
+                        setStoreName("E-Tech Store");
+                        setStoreSubtitle("Hardware & Premium Gear");
+                        setStoreNameColor("#000000");
+                        setStoreSubtitleColor("#9CA3AF");
+                        toast.info("Reset Store Titles section to defaults.");
+                      });
                     }}
                     className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                   >
@@ -943,9 +970,11 @@ function CpanelStoreSettingsPageContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      setStoreIconColor("#FC7A00");
-                      setStoreIconSize(20);
-                      toast.info("Reset Store Icons section to defaults.");
+                      promptResetConfirmation("Store Icon Colors & Sizes", () => {
+                        setStoreIconColor("#FC7A00");
+                        setStoreIconSize(20);
+                        toast.info("Reset Store Icons section to defaults.");
+                      });
                     }}
                     className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                   >
@@ -1025,10 +1054,12 @@ function CpanelStoreSettingsPageContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      setStoreButtonColor("#FC7A00");
-                      setStoreButtonTextColor("#FFFFFF");
-                      setStoreButtonIcon("bolt");
-                      toast.info("Reset Action Button section to defaults.");
+                      promptResetConfirmation("Store Action Button Customization", () => {
+                        setStoreButtonColor("#FC7A00");
+                        setStoreButtonTextColor("#FFFFFF");
+                        setStoreButtonIcon("bolt");
+                        toast.info("Reset Action Button section to defaults.");
+                      });
                     }}
                     className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
                   >
@@ -1164,6 +1195,44 @@ function CpanelStoreSettingsPageContent() {
         </div>
 
       </div>
+
+      {/* Confirmation Modal Overlay for Reset to Default */}
+      {resetConfirmModal.isOpen && (
+        <div className="fixed inset-0 z-[100001] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className={cn("w-[92vw] sm:w-full max-w-sm p-6 rounded-3xl border text-center shadow-2xl space-y-4", panelClass)}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto bg-amber-50 text-amber-500 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-900/50">
+              <span className="material-symbols-outlined text-[24px]">restart_alt</span>
+            </div>
+
+            <div>
+              <h4 className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">Reset Section to Default?</h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium leading-relaxed">
+                Are you sure you want to reset <strong className="text-[#FC7A00]">{resetConfirmModal.sectionName}</strong> to default settings? Any unsaved edits in this section will be replaced.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setResetConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+                className="py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-black uppercase cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetConfirmModal((prev) => ({ ...prev, isOpen: false }));
+                  resetConfirmModal.onConfirm();
+                }}
+                className="py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase cursor-pointer shadow-sm"
+              >
+                Confirm Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
