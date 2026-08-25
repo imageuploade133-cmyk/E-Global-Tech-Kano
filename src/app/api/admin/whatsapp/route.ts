@@ -63,10 +63,8 @@ export async function GET(req: Request) {
         qrCode: null,
         apiConfig: {
           whatsappApiUrl,
-          whatsappApiKey,
           whatsappInstanceId,
-          whatsappAdminUsername,
-          whatsappAdminPassword
+          hasApiKeyConfigured: Boolean(whatsappApiKey),
         }
       });
     }
@@ -139,10 +137,8 @@ export async function GET(req: Request) {
           isMock: false,
           apiConfig: {
             whatsappApiUrl,
-            whatsappApiKey,
             whatsappInstanceId,
-            whatsappAdminUsername,
-            whatsappAdminPassword
+            hasApiKeyConfigured: Boolean(whatsappApiKey),
           }
         });
       }
@@ -176,10 +172,8 @@ export async function GET(req: Request) {
       qrCode: liveQrCode,
       apiConfig: {
         whatsappApiUrl,
-        whatsappApiKey,
         whatsappInstanceId,
-        whatsappAdminUsername,
-        whatsappAdminPassword
+        hasApiKeyConfigured: Boolean(whatsappApiKey),
       }
     });
 
@@ -214,15 +208,24 @@ export async function POST(req: Request) {
         whatsappAdminPassword
       } = body;
 
+      const updateData: Record<string, any> = {
+        whatsappApiUrl: String(whatsappApiUrl || "").trim(),
+        whatsappInstanceId: String(whatsappInstanceId || "").trim(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (whatsappApiKey && String(whatsappApiKey).trim()) {
+        updateData.whatsappApiKey = String(whatsappApiKey).trim();
+      }
+      if (whatsappAdminUsername && String(whatsappAdminUsername).trim()) {
+        updateData.whatsappAdminUsername = String(whatsappAdminUsername).trim();
+      }
+      if (whatsappAdminPassword && String(whatsappAdminPassword).trim()) {
+        updateData.whatsappAdminPassword = String(whatsappAdminPassword).trim();
+      }
+
       try {
-        await adminDb.collection("config").doc("whatsapp_api").set({
-          whatsappApiUrl: whatsappApiUrl || "",
-          whatsappApiKey: whatsappApiKey || "",
-          whatsappInstanceId: whatsappInstanceId || "",
-          whatsappAdminUsername: whatsappAdminUsername || "",
-          whatsappAdminPassword: whatsappAdminPassword || "",
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
+        await adminDb.collection("config").doc("whatsapp_api").set(updateData, { merge: true });
 
         return NextResponse.json({
           success: true,
