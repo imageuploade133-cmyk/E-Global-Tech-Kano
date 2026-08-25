@@ -2,6 +2,7 @@ const CACHE_NAME = "e-tech-wallet-v1.2.0";
 
 const ASSETS_TO_CACHE = [
   "/",
+  "/cpanel",
   "/auth/login",
   "/auth/signup",
   "/file.svg",
@@ -88,8 +89,11 @@ self.addEventListener("fetch", (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Offline fallback: Serve index/dashboard on navigation failures
+          // Offline fallback: Never cross-serve main wallet '/' for CPanel routes
           if (event.request.mode === "navigate") {
+            if (url.pathname.startsWith("/cpanel")) {
+              return caches.match(event.request).then((cached) => cached || caches.match("/cpanel"));
+            }
             return caches.match("/");
           }
         });
