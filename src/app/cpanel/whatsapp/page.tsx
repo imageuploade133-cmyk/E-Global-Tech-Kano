@@ -7,6 +7,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
+import { useAppConfig } from "@/lib/ConfigContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
@@ -20,6 +21,7 @@ const ButtonSpinner = () => (
 
 function CpanelWhatsappPageContent() {
   const { user } = useAuth();
+  const { config } = useAppConfig();
   const router = useRouter();
 
   const { isDark, toggleTheme } = useCpanelTheme();
@@ -140,11 +142,16 @@ function CpanelWhatsappPageContent() {
 
   useEffect(() => {
     fetchWhatsappStatus();
+    const isPollingOn = config.whatsappPollingEnabled !== false;
+    const intervalMs = (config.whatsappPollingIntervalMinutes || 1) * 60 * 1000;
+
+    if (!isPollingOn) return;
+
     const interval = setInterval(() => {
       fetchWhatsappStatus(true);
-    }, 3000);
+    }, intervalMs);
     return () => clearInterval(interval);
-  }, []);
+  }, [config.whatsappPollingEnabled, config.whatsappPollingIntervalMinutes]);
 
   useEffect(() => {
     if (!whatsappQrCode || whatsappStatus === "LINKED" || whatsappQrCountdown <= 0) return;

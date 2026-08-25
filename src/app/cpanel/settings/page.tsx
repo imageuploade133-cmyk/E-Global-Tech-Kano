@@ -30,6 +30,8 @@ function CpanelSettingsPageContent() {
   const [emailInput, setEmailInput] = useState(config.supportEmail);
   const [apiKeyInput, setApiKeyInput] = useState(config.imgbbApiKey || "");
   const [uploadSizeInput, setUploadSizeInput] = useState(config.maxKycUploadSizeMb || 10);
+  const [whatsappPollingEnabled, setWhatsappPollingEnabled] = useState(config.whatsappPollingEnabled !== false);
+  const [whatsappPollingIntervalMinutes, setWhatsappPollingIntervalMinutes] = useState(config.whatsappPollingIntervalMinutes || 1);
 
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -45,6 +47,8 @@ function CpanelSettingsPageContent() {
     setEmailInput(config.supportEmail);
     setApiKeyInput(config.imgbbApiKey || "");
     setUploadSizeInput(config.maxKycUploadSizeMb || 10);
+    setWhatsappPollingEnabled(config.whatsappPollingEnabled !== false);
+    setWhatsappPollingIntervalMinutes(config.whatsappPollingIntervalMinutes || 1);
   }, [config]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -58,6 +62,8 @@ function CpanelSettingsPageContent() {
         supportEmail: emailInput,
         imgbbApiKey: apiKeyInput,
         maxKycUploadSizeMb: uploadSizeInput,
+        whatsappPollingEnabled,
+        whatsappPollingIntervalMinutes,
       });
       toast.success("Branding, Support and API configurations applied!");
     } catch (err: unknown) {
@@ -175,6 +181,52 @@ function CpanelSettingsPageContent() {
                   className={inputClass}
                 />
                 <p className="text-[9px] text-gray-400 mt-1">Configure the maximum permitted file size in MB for Identity document image uploads.</p>
+              </div>
+
+              {/* WhatsApp Automatic Connection Polling Controls */}
+              <div className={cn("p-4 rounded-xl border space-y-3 transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">sync</span>
+                      WhatsApp Session Polling Check
+                    </label>
+                    <p className="text-[9px] text-gray-400 mt-0.5">Automated background status verification with WhatsApp VM gateway to reduce Firestore writes.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWhatsappPollingEnabled(!whatsappPollingEnabled)}
+                    className={cn(
+                      "px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
+                      whatsappPollingEnabled
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                        : "bg-red-500/10 text-red-500 border-red-500/30"
+                    )}
+                  >
+                    {whatsappPollingEnabled ? "POLLING ON" : "POLLING OFF"}
+                  </button>
+                </div>
+
+                {whatsappPollingEnabled && (
+                  <div className="space-y-1.5 pt-2 border-t border-gray-200/30 dark:border-gray-800">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Polling Frequency ({whatsappPollingIntervalMinutes} Minute{whatsappPollingIntervalMinutes > 1 ? "s" : ""})</label>
+                      <span className="font-mono text-xs font-black text-[#FC7A00]">{whatsappPollingIntervalMinutes}m</span>
+                    </div>
+                    <select
+                      value={whatsappPollingIntervalMinutes}
+                      onChange={(e) => setWhatsappPollingIntervalMinutes(Number(e.target.value))}
+                      className={cn(inputClass, "font-bold cursor-pointer")}
+                    >
+                      <option value={1}>Every 1 Minute (High Precision)</option>
+                      <option value={2}>Every 2 Minutes</option>
+                      <option value={5}>Every 5 Minutes (Recommended - Saves Firestore Writes)</option>
+                      <option value={10}>Every 10 Minutes</option>
+                      <option value={15}>Every 15 Minutes</option>
+                      <option value={30}>Every 30 Minutes</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
