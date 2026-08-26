@@ -207,7 +207,7 @@ export default function PinPage() {
       if (!res.ok) {
         toast.error(data.error || `Failed to send ${resetOption === "email" ? "Email" : "WhatsApp"} OTP.`);
       } else {
-        toast.success(data.message || (resetOption === "email" ? "Verification code sent to registered Email!" : "Verification code sent to registered WhatsApp number!"));
+        toast.success(data.message || (resetOption === "email" ? "A 6-digit OTP has been sent to your registered email address." : "Verification code sent to registered WhatsApp number!"));
         setResetStage(2); // Transition to Stage 2: OTP Entry
         setOtpCooldown(60);
         if (data.devOtpCode) {
