@@ -67,19 +67,20 @@ export default function PinPage() {
     setIsVerifyingOtp(true);
     try {
       const idToken = await user?.getIdToken();
+      const channel = resetOption === "email" ? "email" : "whatsapp";
       const res = await fetch("/api/auth/pin-verify-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`
         },
-        body: JSON.stringify({ otpCode })
+        body: JSON.stringify({ otpCode, channel })
       });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || "Incorrect OTP code.");
       } else {
-        toast.success("WhatsApp number verified successfully!");
+        toast.success(data.message || (resetOption === "email" ? "Email verified successfully!" : "WhatsApp number verified successfully!"));
         setResetStage(3); // Go to Set New PIN stage
       }
     } catch (err) {
@@ -190,32 +191,23 @@ export default function PinPage() {
   };
 
   const handleRequestResetLink = async () => {
-    if (resetOption === "email") {
-      setIsRequestingReset(true);
-      setTimeout(() => {
-        setIsRequestingReset(false);
-        setShowForgotPin(false);
-        toast.success("A secure verification link has been dispatched to your email address.");
-      }, 1200);
-      return;
-    }
-
-    // Call serverless endpoint to dispatch OTP to registered WhatsApp number
     setIsRequestingReset(true);
     try {
       const idToken = await user?.getIdToken();
+      const channel = resetOption === "email" ? "email" : "whatsapp";
       const res = await fetch("/api/auth/pin-reset-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`
-        }
+        },
+        body: JSON.stringify({ channel })
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to send WhatsApp OTP.");
+        toast.error(data.error || `Failed to send ${resetOption === "email" ? "Email" : "WhatsApp"} OTP.`);
       } else {
-        toast.success("Verification code sent to WhatsApp registered number!");
+        toast.success(data.message || (resetOption === "email" ? "Verification code sent to registered Email!" : "Verification code sent to registered WhatsApp number!"));
         setResetStage(2); // Transition to Stage 2: OTP Entry
         setOtpCooldown(60);
         if (data.devOtpCode) {
@@ -529,8 +521,8 @@ export default function PinPage() {
                           <span className="material-symbols-outlined text-[20px]">mail</span>
                         </div>
                         <div className="flex-grow">
-                          <p className="font-hanken font-bold text-xs text-black">Email Verification</p>
-                          <p className="font-hanken text-[11px] text-gray-400">Send recovery link to registered email</p>
+                          <p className="font-hanken font-bold text-xs text-black">Email OTP Code</p>
+                          <p className="font-hanken text-[11px] text-gray-400">Send 6-digit secure code to registered email</p>
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                           resetOption === "email" ? "border-[#FC7A00]" : "border-gray-300"
@@ -571,12 +563,16 @@ export default function PinPage() {
                 {resetStage === 2 && (
                   <div className="w-full flex flex-col items-center space-y-5">
                     <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
-                      <span className="material-symbols-outlined text-[24px] font-bold">sms</span>
+                      <span className="material-symbols-outlined text-[24px] font-bold">
+                        {resetOption === "email" ? "mail" : "sms"}
+                      </span>
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-hanken font-bold text-base text-black">Enter WhatsApp OTP</h4>
+                      <h4 className="font-hanken font-bold text-base text-black">
+                        Enter {resetOption === "email" ? "Email" : "WhatsApp"} OTP
+                      </h4>
                       <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed">
-                        Please enter the secure 6-digit verification code sent to your registered WhatsApp number.
+                        Please enter the secure 6-digit verification code sent to your registered {resetOption === "email" ? "email address" : "WhatsApp number"}.
                       </p>
                     </div>
 
@@ -590,7 +586,7 @@ export default function PinPage() {
                     />
 
                     {otpCooldown > 0 ? (
-                      <p className="text-[11px] text-gray-400 font-bold">Resend code on WhatsApp in {otpCooldown}s</p>
+                      <p className="text-[11px] text-gray-400 font-bold">Resend code in {otpCooldown}s</p>
                     ) : (
                       <button
                         type="button"
@@ -619,7 +615,7 @@ export default function PinPage() {
                     <div className="space-y-1">
                       <h4 className="font-hanken font-bold text-base text-black">Setup New PIN</h4>
                       <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed">
-                        Your WhatsApp number is successfully verified. Create a new secure 4-digit Access PIN.
+                        Identity successfully verified. Create a new secure 4-digit Access PIN.
                       </p>
                     </div>
 
