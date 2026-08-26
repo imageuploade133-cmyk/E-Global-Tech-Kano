@@ -7,7 +7,9 @@ export async function POST(req: Request) {
     const authHeader = req.headers.get("Authorization") || "";
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
-    // Forward Bearer token and secure S2S Api Key to payment gateway
+    const body = await req.json().catch(() => ({}));
+
+    // Forward Bearer token, body payload, and secure S2S Api Key to payment gateway
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-reset-otp`, {
       method: "POST",
       headers: {
@@ -15,6 +17,7 @@ export async function POST(req: Request) {
         "Authorization": authHeader,
         "x-api-key": gatewayApiKey,
       },
+      body: JSON.stringify(body),
     });
 
     const result = await response.json();
