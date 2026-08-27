@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 50000); // 50-second timeout for server cold starts
 
     // Forward Bearer token, body payload, and secure S2S Api Key to payment gateway
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-verify-otp`, {
