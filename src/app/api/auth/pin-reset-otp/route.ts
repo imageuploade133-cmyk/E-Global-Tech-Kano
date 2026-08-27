@@ -9,6 +9,9 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
+
     // Forward Bearer token, body payload, and secure S2S Api Key to payment gateway
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-reset-otp`, {
       method: "POST",
@@ -18,15 +21,20 @@ export async function POST(req: Request) {
         "x-api-key": gatewayApiKey,
       },
       body: JSON.stringify(body),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
-    const responseText = await response.text();
+    const responseText = await response.text().catch(() => "");
     let result: Record<string, any> = {};
 
     try {
       result = responseText ? JSON.parse(responseText) : {};
     } catch {
-      result = { message: responseText || "Server returned non-JSON response." };
+      if (responseText.includes("504") || responseText.includes("Gateway Time-out")) {
+        result = { error: "Gateway timed out while connecting to server. Please try again in a few seconds." };
+      } else {
+        result = { error: responseText || "Server returned non-JSON response." };
+      }
     }
 
     if (!response.ok) {
@@ -45,6 +53,11 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[PIN Reset OTP Proxy] Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to dispatch PIN reset OTP." }, { status: 500 });
+    const isTimeout = error.name === "AbortError";
+    const errorMessage = isTimeout
+      ? "Server connection timed out. Please try again in a few seconds."
+      : (error.message || "Failed to dispatch PIN reset OTP.");
+
+    return NextResponse.json({ error: errorMessage }, { status: isTimeout ? 504 : 500 });
   }
 }

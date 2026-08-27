@@ -6,7 +6,11 @@ export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get("Authorization") || "";
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
-    const body = await req.json();
+
+    const body = await req.json().catch(() => ({}));
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
 
     // Forward Bearer token, body payload, and secure S2S Api Key to payment gateway
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-verify-otp`, {
@@ -17,22 +21,42 @@ export async function POST(req: Request) {
         "x-api-key": gatewayApiKey,
       },
       body: JSON.stringify(body),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
-    const result = await response.json();
+    const responseText = await response.text().catch(() => "");
+    let result: Record<string, any> = {};
+
+    try {
+      result = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      if (responseText.includes("504") || responseText.includes("Gateway Time-out")) {
+        result = { error: "Gateway timed out while connecting to server. Please try again in a few seconds." };
+      } else {
+        result = { error: responseText || "Server returned non-JSON response." };
+      }
+    }
 
     if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Failed to verify OTP." }, { status: response.status });
+      return NextResponse.json(
+        { error: result.error || result.message || "Failed to verify OTP." },
+        { status: response.status }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      message: result.message || "WhatsApp OTP verified successfully. Proceed to reset PIN."
+      message: result.message || "OTP verified successfully. Proceed to reset PIN."
     });
 
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[PIN Reset Verify OTP Proxy] Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to verify OTP." }, { status: 500 });
+    const isTimeout = error.name === "AbortError";
+    const errorMessage = isTimeout
+      ? "Server connection timed out. Please try again in a few seconds."
+      : (error.message || "Failed to verify OTP.");
+
+    return NextResponse.json({ error: errorMessage }, { status: isTimeout ? 504 : 500 });
   }
 }
