@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12-second timeout before Vercel gateway times out
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
 
     // Forward Bearer token, body payload, and secure S2S Api Key to payment gateway
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-reset-otp`, {
