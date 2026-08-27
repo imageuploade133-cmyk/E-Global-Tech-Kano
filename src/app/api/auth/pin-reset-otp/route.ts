@@ -20,15 +20,25 @@ export async function POST(req: Request) {
       body: JSON.stringify(body),
     });
 
-    const result = await response.json();
+    const responseText = await response.text();
+    let result: Record<string, any> = {};
+
+    try {
+      result = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      result = { message: responseText || "Server returned non-JSON response." };
+    }
 
     if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Failed to dispatch PIN reset OTP." }, { status: response.status });
+      return NextResponse.json(
+        { error: result.error || result.message || "Failed to dispatch PIN reset OTP." },
+        { status: response.status }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      message: result.message || "PIN reset OTP sent to registered WhatsApp number.",
+      message: result.message || "PIN reset OTP sent successfully.",
       ...(result.devOtpCode ? { devOtpCode: result.devOtpCode } : {}),
     });
 
