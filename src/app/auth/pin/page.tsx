@@ -7,9 +7,33 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 
-import { auth } from "@/lib/firebase";
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { handleAppSignOut } from "@/lib/logout-util";
+
+function maskEmail(email?: string | null): string {
+  if (!email || !email.includes("@")) return "t***t@gmail.com";
+  const parts = email.trim().split("@");
+  const local = parts[0];
+  const domain = parts.slice(1).join("@");
+  if (local.length <= 1) {
+    return `${local}***@${domain}`;
+  }
+  if (local.length === 2) {
+    return `${local[0]}*${local[1]}@${domain}`;
+  }
+  return `${local[0]}***${local[local.length - 1]}@${domain}`;
+}
+
+function maskPhone(phone?: string | null): string {
+  if (!phone) return "23480***34";
+  const cleaned = phone.trim().replace(/[^\d+]/g, "");
+  if (cleaned.length <= 5) {
+    return `${cleaned.slice(0, 2)}***${cleaned.slice(-1)}`;
+  }
+  const prefix = cleaned.slice(0, 5);
+  const suffix = cleaned.slice(-2);
+  return `${prefix}***${suffix}`;
+}
 
 export default function PinPage() {
   const [pin, setPin] = useState("");
@@ -32,12 +56,21 @@ export default function PinPage() {
 
   // PIN reset via WhatsApp flow states
   const [resetStage, setResetStage] = useState(1);
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [otpCode, setOtpCode] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmNewPin, setConfirmNewPin] = useState("");
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isSavingNewPin, setIsSavingNewPin] = useState(false);
+
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Masked contact info for UI display
+  const rawEmail = (userData?.email || user?.email || "") as string;
+  const rawPhone = (userData?.phoneNumber || userData?.phone || "") as string;
+  const displayEmail = maskEmail(rawEmail);
+  const displayPhone = maskPhone(rawPhone);
 
   // Cooldown countdown timer for OTP
   useEffect(() => {
@@ -48,10 +81,21 @@ export default function PinPage() {
     return () => clearInterval(timer);
   }, [otpCooldown]);
 
+  // Auto-focus first input box when entering Stage 2
+  useEffect(() => {
+    if (resetStage === 2) {
+      const timer = setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [resetStage]);
+
   // Reset stages when drawer is closed or opened
   useEffect(() => {
     if (!showForgotPin) {
       setResetStage(1);
+      setOtpDigits(["", "", "", "", "", ""]);
       setOtpCode("");
       setNewPin("");
       setConfirmNewPin("");
@@ -59,8 +103,48 @@ export default function PinPage() {
     }
   }, [showForgotPin]);
 
+  const handleOtpDigitChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const newDigits = [...otpDigits];
+    newDigits[index] = digit;
+    setOtpDigits(newDigits);
+    const combined = newDigits.join("");
+    setOtpCode(combined);
+
+    if (digit && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      if (!otpDigits[index] && index > 0) {
+        inputRefs.current[index - 1]?.focus();
+        const newDigits = [...otpDigits];
+        newDigits[index - 1] = "";
+        setOtpDigits(newDigits);
+        setOtpCode(newDigits.join(""));
+      }
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasteData) return;
+    const newDigits = ["", "", "", "", "", ""];
+    for (let i = 0; i < pasteData.length; i++) {
+      newDigits[i] = pasteData[i];
+    }
+    setOtpDigits(newDigits);
+    setOtpCode(newDigits.join(""));
+    const targetIndex = Math.min(pasteData.length, 5);
+    inputRefs.current[targetIndex]?.focus();
+  };
+
   const handleVerifyOtp = async () => {
-    if (otpCode.length !== 6) {
+    const code = otpDigits.join("");
+    if (code.length !== 6) {
       toast.error("Please enter a valid 6-digit OTP code.");
       return;
     }
@@ -74,7 +158,7 @@ export default function PinPage() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`
         },
-        body: JSON.stringify({ otpCode, channel })
+        body: JSON.stringify({ otpCode: code, channel })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -193,6 +277,14 @@ export default function PinPage() {
   const handleRequestResetLink = async () => {
     setIsRequestingReset(true);
     try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      if (isMock) {
+        toast.success(resetOption === "email" ? "A 6-digit OTP has been sent to your registered email address." : "Verification code sent to registered WhatsApp number!");
+        setResetStage(2);
+        setOtpCooldown(60);
+        return;
+      }
+
       const idToken = await user?.getIdToken();
       const channel = resetOption === "email" ? "email" : "whatsapp";
       const res = await fetch("/api/auth/pin-reset-otp", {
@@ -222,7 +314,7 @@ export default function PinPage() {
     }
   };
 
-  const handleForgotPinDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleForgotPinDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.y > 100 || info.velocity.y > 500) {
       setShowForgotPin(false);
     }
@@ -230,13 +322,13 @@ export default function PinPage() {
 
   const handleKeyPress = (num: string) => {
     if (pin.length < 4) {
-      const newPin = pin + num;
-      setPin(newPin);
+      const newPinVal = pin + num;
+      setPin(newPinVal);
       // Reshuffle after key press for maximum security
       shuffleKeypad();
 
-      if (newPin.length === 4) {
-        verifyPin(newPin);
+      if (newPinVal.length === 4) {
+        verifyPin(newPinVal);
       }
     }
   };
@@ -458,6 +550,7 @@ export default function PinPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               onClick={() => setShowForgotPin(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
             />
@@ -467,19 +560,20 @@ export default function PinPage() {
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+              transition={{ type: "spring", damping: 32, stiffness: 380, mass: 0.7 }}
               drag="y"
               dragDirectionLock
               dragConstraints={{ top: 0, bottom: 450 }}
-              dragElastic={{ top: 0, bottom: 0.2 }}
+              dragElastic={0.1}
               onDragEnd={handleForgotPinDragEnd}
+              style={{ willChange: "transform" }}
               className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] p-6 pb-8 z-[99999] flex flex-col items-center shadow-none"
             >
               {/* Grab handle */}
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-2 mb-4" />
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-2 mb-4 shrink-0" />
 
               {/* Header */}
-              <div className="w-full flex justify-between items-center border-b border-gray-100 pb-4 mb-6">
+              <div className="w-full flex justify-between items-center border-b border-gray-100 pb-4 mb-6 shrink-0">
                 <div className="w-8" />
                 <h3 className="font-hanken font-bold text-base text-black text-center">Reset Access PIN</h3>
                 <button
@@ -492,15 +586,15 @@ export default function PinPage() {
               </div>
 
               {/* Content body with dynamic reset stage rendering */}
-              <div className="flex-grow flex flex-col justify-start items-center px-4 text-center w-full overflow-y-auto">
+              <div className="flex-grow flex flex-col justify-start items-center px-2 text-center w-full overflow-y-auto no-scrollbar">
                 {resetStage === 1 && (
                   <>
-                    <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4">
+                    <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4 shrink-0">
                       <span className="material-symbols-outlined text-[24px] font-bold">lock_reset</span>
                     </div>
                     <h4 className="font-hanken font-bold text-base text-black mb-1">Verify Identity to Reset PIN</h4>
                     <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed mb-6">
-                      Select your preferred high-security verification method to recover your secure 4-digit Access PIN.
+                      Select your preferred high-security verification provider to recover your Access PIN.
                     </p>
 
                     {/* Reset options list */}
@@ -515,16 +609,21 @@ export default function PinPage() {
                             : "border-gray-200 bg-white hover:bg-gray-50"
                         }`}
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                           resetOption === "email" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
                         }`}>
                           <span className="material-symbols-outlined text-[20px]">mail</span>
                         </div>
-                        <div className="flex-grow">
-                          <p className="font-hanken font-bold text-xs text-black">Email OTP Code</p>
-                          <p className="font-hanken text-[11px] text-gray-400">Send 6-digit secure code to registered email</p>
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="font-hanken font-bold text-xs text-black truncate">Email OTP Code</p>
+                            <span className="font-mono font-bold text-[10px] text-[#FC7A00] bg-[#FC7A00]/10 px-2 py-0.5 rounded-full shrink-0">
+                              {displayEmail}
+                            </span>
+                          </div>
+                          <p className="font-hanken text-[11px] text-gray-400 mt-0.5">Send 6-digit secure code to registered email</p>
                         </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                           resetOption === "email" ? "border-[#FC7A00]" : "border-gray-300"
                         }`}>
                           {resetOption === "email" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
@@ -541,16 +640,21 @@ export default function PinPage() {
                             : "border-gray-200 bg-white hover:bg-gray-50"
                         }`}
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                           resetOption === "otp" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
                         }`}>
                           <span className="material-symbols-outlined text-[20px]">chat</span>
                         </div>
-                        <div className="flex-grow">
-                          <p className="font-hanken font-bold text-xs text-black">WhatsApp OTP Code</p>
-                          <p className="font-hanken text-[11px] text-gray-400">Send 6-digit secure code on WhatsApp</p>
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="font-hanken font-bold text-xs text-black truncate">WhatsApp OTP Code</p>
+                            <span className="font-mono font-bold text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
+                              {displayPhone}
+                            </span>
+                          </div>
+                          <p className="font-hanken text-[11px] text-gray-400 mt-0.5">Send 6-digit secure code on WhatsApp</p>
                         </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                           resetOption === "otp" ? "border-[#FC7A00]" : "border-gray-300"
                         }`}>
                           {resetOption === "otp" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
@@ -562,28 +666,45 @@ export default function PinPage() {
 
                 {resetStage === 2 && (
                   <div className="w-full flex flex-col items-center space-y-5">
-                    <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
+                    <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] shrink-0">
                       <span className="material-symbols-outlined text-[24px] font-bold">
-                        {resetOption === "email" ? "mail" : "sms"}
+                        {resetOption === "email" ? "mail" : "chat"}
                       </span>
                     </div>
                     <div className="space-y-1">
                       <h4 className="font-hanken font-bold text-base text-black">
                         Enter {resetOption === "email" ? "Email" : "WhatsApp"} OTP
                       </h4>
-                      <p className="font-hanken text-xs text-gray-500 max-w-[280px] leading-relaxed">
-                        Please enter the secure 6-digit verification code sent to your registered {resetOption === "email" ? "email address" : "WhatsApp number"}.
+                      <p className="font-hanken text-xs text-gray-500 max-w-[290px] leading-relaxed">
+                        Please enter the secure 6-digit verification code sent to{" "}
+                        <span className="font-mono font-bold text-black">
+                          {resetOption === "email" ? displayEmail : displayPhone}
+                        </span>.
                       </p>
                     </div>
 
-                    <input
-                      type="tel"
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                      className="w-full max-w-[240px] bg-white border border-black rounded-2xl px-4 py-3 text-sm font-bold tracking-widest text-black placeholder-gray-400 outline-none text-center font-mono shadow-sm"
-                      placeholder="••••••"
-                    />
+                    {/* 6 Individual OTP Digit Inputs */}
+                    <div className="flex gap-2 min-[360px]:gap-2.5 justify-center my-2 w-full max-w-[320px]">
+                      {[0, 1, 2, 3, 4, 5].map((idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => { inputRefs.current[idx] = el; }}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={otpDigits[idx]}
+                          onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                          onPaste={handleOtpPaste}
+                          className={`w-10 h-12 min-[360px]:w-11 min-[360px]:h-13 bg-white border-2 rounded-xl text-center font-mono font-bold text-lg min-[360px]:text-xl text-black transition-all outline-none ${
+                            otpDigits[idx]
+                              ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-2 ring-[#FC7A00]/20"
+                              : "border-gray-200 focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20"
+                          }`}
+                        />
+                      ))}
+                    </div>
 
                     {otpCooldown > 0 ? (
                       <p className="text-[11px] text-gray-400 font-bold">Resend code in {otpCooldown}s</p>
@@ -609,7 +730,7 @@ export default function PinPage() {
 
                 {resetStage === 3 && (
                   <div className="w-full flex flex-col items-center space-y-4">
-                    <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
                       <span className="material-symbols-outlined text-[24px] font-bold">security</span>
                     </div>
                     <div className="space-y-1">
@@ -655,7 +776,7 @@ export default function PinPage() {
               </div>
 
               {/* Bottom Buttons depending on resetStage */}
-              <div className="w-full flex flex-col gap-3 pt-4">
+              <div className="w-full flex flex-col gap-3 pt-4 shrink-0">
                 {resetStage === 1 && (
                   <button
                     type="button"
@@ -666,10 +787,10 @@ export default function PinPage() {
                     {isRequestingReset ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        {resetOption === "email" ? "Dispatching Reset..." : "Generating OTP..."}
+                        {resetOption === "email" ? "Requesting Secured OTP Code..." : "Generating Secure OTP Code..."}
                       </>
                     ) : (
-                      resetOption === "email" ? "Request Secure Reset Link" : "Generate Secure OTP Code"
+                      resetOption === "email" ? "Request Secured OTP Code" : "Generate Secure OTP Code"
                     )}
                   </button>
                 )}

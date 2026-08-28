@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dailyLimit: 500000,
         ...storedMock
       });
-      setIsPinVerified(true);
+      setIsPinVerified(window.location.pathname !== "/auth/pin");
       setLoading(false);
       return;
     }
