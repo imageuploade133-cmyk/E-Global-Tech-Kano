@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
@@ -8,6 +9,22 @@ export async function POST(req: Request) {
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
     const body = await req.json().catch(() => ({}));
+
+    // Attach active communication template branding settings from Firestore
+    let templateBranding: Record<string, any> = {};
+    try {
+      const docSnap = await adminDb.collection("config").doc("communication_branding").get();
+      if (docSnap.exists) {
+        templateBranding = docSnap.data() || {};
+      }
+    } catch {
+      // Ignore fallback
+    }
+
+    const payload = {
+      ...body,
+      templateBranding,
+    };
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 50000); // 50-second timeout for server cold starts
@@ -20,7 +37,7 @@ export async function POST(req: Request) {
         "Authorization": authHeader,
         "x-api-key": gatewayApiKey,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeoutId));
 
