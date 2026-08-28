@@ -36,8 +36,10 @@ export default function CommunicationBrandingPage() {
 
   // Modal States
   const [showTestEmailModal, setShowTestEmailModal] = useState(false);
+  const [testChannel, setTestChannel] = useState<"email" | "whatsapp">("email");
   const [testRecipientEmail, setTestRecipientEmail] = useState("");
-  const [testTemplateType, setTestTemplateType] = useState<"otp" | "welcome">("otp");
+  const [testRecipientPhone, setTestRecipientPhone] = useState("");
+  const [testTemplateType, setTestTemplateType] = useState<"otp" | "welcome" | "whatsapp_otp">("otp");
   const [isSendingTest, setIsSendingTest] = useState(false);
 
   const [showResetModal, setShowResetModal] = useState(false);
@@ -132,9 +134,18 @@ export default function CommunicationBrandingPage() {
 
   const handleSendTestEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!testRecipientEmail.trim() || !testRecipientEmail.includes("@")) {
-      toast.error("Please enter a valid recipient email address.");
-      return;
+
+    if (testChannel === "email") {
+      if (!testRecipientEmail.trim() || !testRecipientEmail.includes("@")) {
+        toast.error("Please enter a valid recipient email address.");
+        return;
+      }
+    } else {
+      const cleanPhone = testRecipientPhone.replace(/\D/g, "");
+      if (!cleanPhone || cleanPhone.length < 8) {
+        toast.error("Please enter a valid recipient phone number.");
+        return;
+      }
     }
 
     setIsSendingTest(true);
@@ -149,21 +160,23 @@ export default function CommunicationBrandingPage() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          action: "send_test_email",
+          action: "send_test",
+          channel: testChannel,
           recipientEmail: testRecipientEmail.trim(),
-          templateType: testTemplateType,
+          recipientPhone: testRecipientPhone.trim(),
+          templateType: testChannel === "whatsapp" ? "whatsapp_otp" : testTemplateType,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(data.message || `Test email dispatched to ${testRecipientEmail}!`);
+        toast.success(data.message || `Test message dispatched successfully!`);
         setShowTestEmailModal(false);
       } else {
-        toast.error(data.error || "Failed to dispatch test email.");
+        toast.error(data.error || "Failed to dispatch test communication.");
       }
     } catch {
-      toast.error("Network error dispatching test email.");
+      toast.error("Network error dispatching test communication.");
     } finally {
       setIsSendingTest(false);
     }
@@ -267,7 +280,7 @@ export default function CommunicationBrandingPage() {
             className="px-4 py-2.5 bg-gray-900 hover:bg-black dark:bg-gray-800 dark:hover:bg-gray-700 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
           >
             <span className="material-symbols-outlined text-sm">send</span>
-            Send Test Email
+            Send Test Message
           </button>
           <button
             type="button"
@@ -823,7 +836,7 @@ export default function CommunicationBrandingPage() {
         </motion.div>
       )}
 
-      {/* TEST EMAIL MODAL */}
+      {/* TEST COMMUNICATION DISPATCH MODAL */}
       <AnimatePresence>
         {showTestEmailModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -834,7 +847,7 @@ export default function CommunicationBrandingPage() {
               className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl"
             >
               <div className="flex items-center justify-between border-b pb-3 border-gray-100 dark:border-gray-800">
-                <h3 className="font-black text-sm uppercase tracking-wider">Send Test Email</h3>
+                <h3 className="font-black text-sm uppercase tracking-wider">Send Test Communication</h3>
                 <button
                   type="button"
                   onClick={() => setShowTestEmailModal(false)}
@@ -845,29 +858,73 @@ export default function CommunicationBrandingPage() {
               </div>
 
               <form onSubmit={handleSendTestEmail} className="space-y-4">
+                {/* Channel Switcher */}
                 <div>
-                  <label className={labelClass}>Target Recipient Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={testRecipientEmail}
-                    onChange={(e) => setTestRecipientEmail(e.target.value)}
-                    placeholder="Enter email to receive test template"
-                    className={inputClass}
-                  />
+                  <label className={labelClass}>Dispatch Channel</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTestChannel("email")}
+                      className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+                        testChannel === "email" ? "bg-[#FC7A00] text-white shadow-xs" : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">mail</span>
+                      Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTestChannel("whatsapp")}
+                      className={`py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+                        testChannel === "whatsapp" ? "bg-emerald-600 text-white shadow-xs" : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base">chat</span>
+                      WhatsApp
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className={labelClass}>Template Type</label>
-                  <select
-                    value={testTemplateType}
-                    onChange={(e) => setTestTemplateType(e.target.value as any)}
-                    className={inputClass}
-                  >
-                    <option value="otp">Email OTP Template</option>
-                    <option value="welcome">Welcome Email Template</option>
-                  </select>
-                </div>
+                {testChannel === "email" ? (
+                  <>
+                    <div>
+                      <label className={labelClass}>Target Recipient Email</label>
+                      <input
+                        type="email"
+                        required
+                        value={testRecipientEmail}
+                        onChange={(e) => setTestRecipientEmail(e.target.value)}
+                        placeholder="Enter recipient email..."
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Email Template Type</label>
+                      <select
+                        value={testTemplateType}
+                        onChange={(e) => setTestTemplateType(e.target.value as any)}
+                        className={inputClass}
+                      >
+                        <option value="otp">Email OTP Template</option>
+                        <option value="welcome">Welcome Email Template</option>
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className={labelClass}>Target WhatsApp Phone Number</label>
+                    <input
+                      type="tel"
+                      required
+                      value={testRecipientPhone}
+                      onChange={(e) => setTestRecipientPhone(e.target.value)}
+                      placeholder="e.g. +2348033123456 or 08033123456"
+                      className={inputClass}
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Dispatches configured WhatsApp OTP message template to WhatsApp API Gateway.</p>
+                  </div>
+                )}
 
                 <div className="flex gap-2 pt-2">
                   <button
@@ -880,9 +937,11 @@ export default function CommunicationBrandingPage() {
                   <button
                     type="submit"
                     disabled={isSendingTest}
-                    className="flex-1 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] disabled:opacity-50"
+                    className={`flex-1 py-3 ${
+                      testChannel === "whatsapp" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-[#FC7A00] hover:bg-[#e06600]"
+                    } text-white rounded-2xl text-xs font-black uppercase tracking-wider disabled:opacity-50 transition-all`}
                   >
-                    {isSendingTest ? <><ButtonSpinner /> Dispatching...</> : "Send Test Email"}
+                    {isSendingTest ? <><ButtonSpinner /> Dispatching...</> : `Dispatch Test ${testChannel === "whatsapp" ? "WhatsApp" : "Email"}`}
                   </button>
                 </div>
               </form>

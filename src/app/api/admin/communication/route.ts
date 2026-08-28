@@ -7,6 +7,7 @@ import {
   renderTemplateVariables,
 } from "@/lib/communication-defaults";
 import { sendEmail } from "@/lib/email-service";
+import { callWhatsappBackend } from "@/lib/whatsapp-service";
 
 function isValidEmail(email: string): boolean {
   if (!email || typeof email !== "string") return false;
@@ -87,11 +88,8 @@ export async function POST(req: Request) {
       });
     }
 
-    if (action === "send_test_email") {
-      const { recipientEmail, templateType } = body;
-      if (!isValidEmail(recipientEmail)) {
-        return NextResponse.json({ error: "Please enter a valid recipient email address." }, { status: 400 });
-      }
+    if (action === "send_test_email" || action === "send_test") {
+      const { recipientEmail, recipientPhone, templateType, channel = "email" } = body;
 
       let config = { ...DEFAULT_COMMUNICATION_BRANDING };
       const docSnap = await adminDb.collection("config").doc("communication_branding").get();
@@ -105,9 +103,58 @@ export async function POST(req: Request) {
         };
       }
 
-      const brandName = config.sender.senderName || "E-Global Pay";
-      const replyTo = config.sender.replyToEmail || config.sender.senderEmail;
+      const brandName = config.sender.senderName || config.whatsappOtp.brandName || "E-Global Pay";
 
+      // WHATSAPP TEST DISPATCH
+      if (channel === "whatsapp" || templateType === "whatsapp_otp" || templateType === "whatsapp_text") {
+        const targetPhone = (recipientPhone || recipientEmail || "").replace(/\D/g, "");
+        if (!targetPhone || targetPhone.length < 8) {
+          return NextResponse.json({ error: "Please enter a valid recipient phone number for WhatsApp test dispatch." }, { status: 400 });
+        }
+
+        const fullNum = targetPhone.length === 10 || targetPhone.startsWith("0")
+          ? `234${targetPhone.startsWith("0") ? targetPhone.slice(1) : targetPhone}`
+          : targetPhone;
+
+        const waText = renderTemplateVariables(config.whatsappOtp.messageTemplate, {
+          name: "Valued Administrator",
+          brandName,
+          otp: "987654",
+          expiryMinutes: 10,
+        });
+
+        const waRes = await callWhatsappBackend("/send/text", "POST", {
+          number: fullNum,
+          message: waText,
+        });
+
+        if (!waRes.ok) {
+          return NextResponse.json(
+            { error: waRes.error || "Failed to dispatch test WhatsApp message. Ensure WhatsAPI Hub gateway is connected." },
+            { status: waRes.status || 502 }
+          );
+        }
+
+        await adminDb.collection("admin_audit_logs").add({
+          action: "send_test_communication_whatsapp",
+          recipientPhone: fullNum,
+          templateType: templateType || "whatsapp_otp",
+          adminEmail,
+          createdAt: new Date().toISOString(),
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: `Test WhatsApp message successfully dispatched to +${fullNum}!`,
+        });
+      }
+
+      // EMAIL TEST DISPATCH
+      if (!isValidEmail(recipientEmail)) {
+        return NextResponse.json({ error: "Please enter a valid recipient email address." }, { status: 400 });
+      }
+
+      const replyTo = config.sender.replyToEmail || config.sender.senderEmail;
       let subject = "Test Email";
       let htmlBody = "";
 
