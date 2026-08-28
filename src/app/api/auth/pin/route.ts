@@ -164,48 +164,75 @@ export async function POST(req: Request) {
     if (action === "reset") {
       console.log(`[PIN API - Reset] Resetting PIN for user: ${uid}`);
 
-      // Retrieve registered phone number from Firestore user profile
-      const userSnap = await userRef.get();
-      if (!userSnap.exists) {
-        return NextResponse.json({ error: "User profile not found." }, { status: 404 });
+      let verifiedDocRef = null;
+      let verifiedChannel = "";
+      const now = new Date();
+
+      // 1. Check Email OTP verified session (`pin_reset_email_${uid}`)
+      const emailDocId = `pin_reset_email_${uid}`;
+      const emailDocRef = adminDb.collection("otp_sessions").doc(emailDocId);
+      const emailSnap = await emailDocRef.get();
+
+      if (emailSnap.exists) {
+        const emailData = emailSnap.data();
+        const expiresAt = emailData?.expiresAt ? new Date(emailData.expiresAt) : new Date(0);
+        if (
+          emailData?.channel === "email" &&
+          emailData?.type === "pin_reset" &&
+          emailData?.verified === true &&
+          now < expiresAt
+        ) {
+          verifiedDocRef = emailDocRef;
+          verifiedChannel = "email";
+        }
       }
 
-      const userData = userSnap.data();
-      const fullPhone = userData?.phoneNumber;
-      if (!fullPhone) {
-        return NextResponse.json({ error: "No registered phone number found on this profile." }, { status: 400 });
+      // 2. Fallback to WhatsApp OTP verified session if Email session is not valid
+      if (!verifiedDocRef) {
+        const userSnap = await userRef.get();
+        if (userSnap.exists) {
+          const userData = userSnap.data();
+          const fullPhone = userData?.phoneNumber;
+          if (fullPhone) {
+            const cleanPhoneDigits = fullPhone.trim().replace(/\D/g, "");
+            let cleanNumNoZero = cleanPhoneDigits;
+            if (cleanPhoneDigits.startsWith("234") && cleanPhoneDigits.length > 3) {
+              const sub = cleanPhoneDigits.slice(3);
+              cleanNumNoZero = "234" + (sub.startsWith("0") ? sub.slice(1) : sub);
+            } else if (cleanPhoneDigits.startsWith("227") && cleanPhoneDigits.length > 3) {
+              const sub = cleanPhoneDigits.slice(3);
+              cleanNumNoZero = "227" + (sub.startsWith("0") ? sub.slice(1) : sub);
+            }
+
+            const possiblePhones = Array.from(new Set([
+              fullPhone.trim(),
+              cleanPhoneDigits,
+              cleanNumNoZero,
+              `+${cleanPhoneDigits}`,
+              `+${cleanNumNoZero}`
+            ])).filter(Boolean);
+
+            const otpQuery = await adminDb.collection("otp_sessions")
+              .where("phoneNumber", "in", possiblePhones)
+              .where("type", "==", "pin_reset")
+              .where("verified", "==", true)
+              .get();
+
+            if (!otpQuery.empty) {
+              const waDoc = otpQuery.docs[0];
+              const waData = waDoc.data();
+              const expiresAt = waData?.expiresAt ? new Date(waData.expiresAt) : new Date(0);
+              if (now < expiresAt) {
+                verifiedDocRef = waDoc.ref;
+                verifiedChannel = "whatsapp";
+              }
+            }
+          }
+        }
       }
 
-      // Format potential phone number variations to search for the OTP reset session robustly
-      const cleanPhoneDigits = fullPhone.trim().replace(/\D/g, "");
-      let cleanNumNoZero = cleanPhoneDigits;
-      if (cleanPhoneDigits.startsWith("234") && cleanPhoneDigits.length > 3) {
-        const sub = cleanPhoneDigits.slice(3);
-        cleanNumNoZero = "234" + (sub.startsWith("0") ? sub.slice(1) : sub);
-      } else if (cleanPhoneDigits.startsWith("227") && cleanPhoneDigits.length > 3) {
-        const sub = cleanPhoneDigits.slice(3);
-        cleanNumNoZero = "227" + (sub.startsWith("0") ? sub.slice(1) : sub);
-      }
-
-      const possiblePhones = Array.from(new Set([
-        fullPhone.trim(),
-        cleanPhoneDigits,
-        cleanNumNoZero,
-        `+${cleanPhoneDigits}`,
-        `+${cleanNumNoZero}`
-      ])).filter(Boolean);
-
-      console.log("[PIN Reset API] Searching for verified OTP session with possible phone formats:", possiblePhones);
-
-      // Secure OTP validation check directly in Firestore
-      const otpQuery = await adminDb.collection("otp_sessions")
-        .where("phoneNumber", "in", possiblePhones)
-        .where("type", "==", "pin_reset")
-        .where("verified", "==", true)
-        .get();
-
-      if (otpQuery.empty) {
-        return NextResponse.json({ error: "WhatsApp verification required to reset PIN." }, { status: 400 });
+      if (!verifiedDocRef) {
+        return NextResponse.json({ error: "Verification required to reset PIN. Please complete Email or WhatsApp OTP verification." }, { status: 400 });
       }
 
       const salt = bcrypt.genSaltSync(10);
@@ -220,10 +247,10 @@ export async function POST(req: Request) {
         });
       });
 
-      // Clear the WhatsApp session on success
+      // Clear the verified OTP session on success to enforce single-use
       try {
-        const otpDocRef = otpQuery.docs[0].ref;
-        await otpDocRef.delete();
+        await verifiedDocRef.delete();
+        console.log(`[PIN Reset Cleanup] Successfully deleted verified ${verifiedChannel} OTP session.`);
       } catch (cleanupErr) {
         console.error("[PIN Reset Cleanup] Error clearing session:", cleanupErr);
       }
@@ -231,7 +258,7 @@ export async function POST(req: Request) {
       logPaymentEvent({
         category: "PIN Verification",
         userId: uid,
-        message: "PIN reset successful.",
+        message: `PIN reset successful via verified ${verifiedChannel} channel.`,
         processingTimeMs: Date.now() - startTime,
       });
 
