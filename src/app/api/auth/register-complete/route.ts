@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { ReferralService } from "@/services/referral-service";
+import { sendWelcomeEmail } from "@/lib/email-service";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -68,6 +69,11 @@ export async function POST(req: Request) {
 
     // Save user document securely
     await userRef.set(initialProfile, { merge: true });
+
+    // Non-blocking Welcome Email dispatch
+    sendWelcomeEmail(cleanEmail, fullName).catch((emailErr) => {
+      console.warn("[Register Complete] Non-blocking welcome email exception:", emailErr);
+    });
 
     // Handle referral registration if code was provided
     if (referralCode) {

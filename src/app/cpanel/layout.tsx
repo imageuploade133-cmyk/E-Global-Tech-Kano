@@ -344,6 +344,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       title: "Branding & Customization",
       items: [
         { id: "settings", label: "Branding & Support", icon: "diamond", href: "/cpanel/settings", permission: "branding.manage" },
+        { id: "communication", label: "Communication & Branding", icon: "mark_email_unread", href: "/cpanel/communication", permission: "communication.branding.manage" },
         { id: "banners", label: "Slide Banners", icon: "photo_library", href: "/cpanel/banners", permission: "banners.manage" },
         { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos", permission: "bank_logos.manage" },
         { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos", permission: "bill_logos.manage" },

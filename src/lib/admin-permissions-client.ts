@@ -21,6 +21,7 @@ export const CPANEL_PERMISSIONS_CATALOG: PermissionDefinition[] = [
 
   // Branding & Customization
   { key: "branding.manage", label: "Branding & App Config", category: "Branding", description: "Update platform titles, logos, and support details" },
+  { key: "communication.branding.manage", label: "Communication & Email Branding", category: "Branding", description: "Manage Email & WhatsApp OTP templates, sender settings, and Welcome email branding" },
   { key: "banners.manage", label: "Slide Banners Manager", category: "Branding", description: "Upload and manage promotional slides across app routes" },
   { key: "bank_logos.manage", label: "Bank Logos Manager", category: "Branding", description: "Manage and repair high-res financial institution logos" },
   { key: "bill_logos.manage", label: "Bill Logos Manager", category: "Branding", description: "Manage biller and network operator brand logos" },
@@ -44,7 +45,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   admin: [
     "metrics.view", "admins.view", "users.view", "users.manage",
     "kyc.view", "kyc.manage", "freeze.manage", "limits.manage",
-    "branding.manage", "banners.manage", "bank_logos.manage", "bill_logos.manage",
+    "branding.manage", "communication.branding.manage", "banners.manage", "bank_logos.manage", "bill_logos.manage",
     "whatsapp.manage", "vtu.manage", "investments.manage", "deposit.manage",
     "store.view", "store.manage", "user_history.view"
   ],
