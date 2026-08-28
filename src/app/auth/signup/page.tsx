@@ -63,12 +63,56 @@ export default function SignUpPage() {
 
   // WhatsApp OTP Verification States
   const [isOtpRequested, setIsOtpRequested] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const otpInputsRef = React.useRef<(HTMLInputElement | null)[]>([]);
+  const otpCode = otpDigits.join("");
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [otpError, setOtpError] = useState("");
+
+  const handleOtpDigitChange = (index: number, val: string) => {
+    const cleanVal = val.replace(/\D/g, "");
+    if (!cleanVal) {
+      const updated = [...otpDigits];
+      updated[index] = "";
+      setOtpDigits(updated);
+      setOtpError("");
+      return;
+    }
+    const lastChar = cleanVal.slice(-1);
+    const updated = [...otpDigits];
+    updated[index] = lastChar;
+    setOtpDigits(updated);
+    setOtpError("");
+
+    if (index < 5) {
+      otpInputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+      otpInputsRef.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+
+    const updated = ["", "", "", "", "", ""];
+    for (let i = 0; i < pasted.length; i++) {
+      updated[i] = pasted[i];
+    }
+    setOtpDigits(updated);
+    setOtpError("");
+
+    const nextFocusIndex = Math.min(pasted.length, 5);
+    otpInputsRef.current[nextFocusIndex]?.focus();
+  };
 
   // Cooldown countdown timer for OTP
   useEffect(() => {
@@ -83,11 +127,13 @@ export default function SignUpPage() {
   useEffect(() => {
     setIsOtpVerified(false);
     setIsOtpRequested(false);
-    setOtpCode("");
+    setOtpDigits(["", "", "", "", "", ""]);
     setOtpError("");
   }, [phonePrefix, phoneNumber]);
 
   const handleRequestOtp = async () => {
+    if (isSendingOtp || otpCooldown > 0) return;
+
     if (!phoneNumber || phoneNumber.trim().length === 0) {
       toast.error("Please enter your phone number first.");
       return;
@@ -619,23 +665,35 @@ export default function SignUpPage() {
                         </div>
 
                         <div className="space-y-2.5">
-                          <input
-                            type="tel"
-                            maxLength={6}
-                            value={otpCode}
-                            disabled={isVerifyingOtp}
-                            onChange={(e) => {
-                              setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
-                              setOtpError("");
-                            }}
-                            className="w-full bg-white border border-black rounded-2xl px-4 py-3 text-xs font-bold tracking-widest text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm font-mono text-center disabled:bg-gray-50 disabled:text-gray-400"
-                            placeholder="••••••"
-                          />
+                          {/* 6 Individual OTP Digit Inputs */}
+                          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                            {[0, 1, 2, 3, 4, 5].map((idx) => (
+                              <input
+                                key={idx}
+                                ref={(el) => {
+                                  otpInputsRef.current[idx] = el;
+                                }}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={1}
+                                value={otpDigits[idx]}
+                                disabled={isVerifyingOtp}
+                                onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                                onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                                onPaste={handleOtpPaste}
+                                className={`w-10 h-12 sm:w-11 sm:h-12 bg-white border ${
+                                  otpDigits[idx] ? "border-[#FC7A00] bg-orange-50/20" : "border-gray-300"
+                                } rounded-xl text-center font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-xs disabled:opacity-50`}
+                              />
+                            ))}
+                          </div>
+
                           <button
                             type="button"
                             disabled={isVerifyingOtp || otpCode.length !== 6}
                             onClick={handleVerifyOtp}
-                            className="w-full bg-[#FC7A00] text-white hover:brightness-105 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                            className="w-full bg-[#FC7A00] text-white hover:brightness-105 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                           >
                             {isVerifyingOtp ? (
                               <>
@@ -643,7 +701,7 @@ export default function SignUpPage() {
                                 <span>Verifying...</span>
                               </>
                             ) : (
-                              "Verify OTP"
+                              "Verify OTP Code"
                             )}
                           </button>
                         </div>
