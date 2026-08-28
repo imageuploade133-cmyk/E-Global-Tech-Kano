@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -50,12 +50,69 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
   const [isResetPasswordMode, setIsResetPasswordMode] = useState(false);
   const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
   const [resetPhone, setResetPhone] = useState("");
-  const [resetOtp, setResetOtp] = useState("");
+  const [resetOtpDigits, setResetOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const adminOtpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
+  const resetOtp = resetOtpDigits.join("");
+  const [adminOtpCooldown, setAdminOtpCooldown] = useState(0);
   const [isRequestingOtp, setIsRequestingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isDispatchingResetEmail, setIsDispatchingResetEmail] = useState(false);
   const [otpDevCode, setOtpDevCode] = useState<string | null>(null);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  // Admin Reset Password OTP Cooldown Countdown
+  useEffect(() => {
+    if (adminOtpCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setAdminOtpCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [adminOtpCooldown]);
+
+  const handleAdminOtpDigitChange = (index: number, val: string) => {
+    const cleanVal = val.replace(/\D/g, "");
+    if (!cleanVal) {
+      const updated = [...resetOtpDigits];
+      updated[index] = "";
+      setResetOtpDigits(updated);
+      return;
+    }
+    const lastChar = cleanVal.slice(-1);
+    const updated = [...resetOtpDigits];
+    updated[index] = lastChar;
+    setResetOtpDigits(updated);
+
+    if (index < 5) {
+      adminOtpInputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleAdminOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !resetOtpDigits[index] && index > 0) {
+      adminOtpInputsRef.current[index - 1]?.focus();
+    }
+  };
+
+  const handleAdminOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+
+    const updated = ["", "", "", "", "", ""];
+    for (let i = 0; i < pasted.length; i++) {
+      updated[i] = pasted[i];
+    }
+    setResetOtpDigits(updated);
+
+    const nextFocusIndex = Math.min(pasted.length, 5);
+    adminOtpInputsRef.current[nextFocusIndex]?.focus();
+  };
+
+  const maskPhoneForAdmin = (p: string) => {
+    const clean = p.replace(/\D/g, "");
+    if (clean.length < 8) return p;
+    return clean.slice(0, 4) + "***" + clean.slice(-2);
+  };
 
   // Session / Permission loading state for skeleton rendering
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -224,6 +281,8 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (isRequestingOtp || adminOtpCooldown > 0) return;
+
     setIsRequestingOtp(true);
     try {
       const res = await fetch("/api/admin/auth/reset-password", {
@@ -240,6 +299,8 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       if (res.ok && data.success) {
         toast.success(data.message || "Phone OTP sent successfully!");
         if (data.devOtp) setOtpDevCode(data.devOtp);
+        setAdminOtpCooldown(60);
+        setResetOtpDigits(["", "", "", "", "", ""]);
         setResetStep(2);
       } else {
         toast.error(data.error || "Failed to request password reset OTP.");
@@ -308,7 +369,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       setIsResetPasswordMode(false);
       setResetStep(1);
       setResetPhone("");
-      setResetOtp("");
+      setResetOtpDigits(["", "", "", "", "", ""]);
       setOtpDevCode(null);
     } catch (err: any) {
       toast.error(err.message || "Failed to send password recovery email.");
@@ -487,7 +548,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                 <form onSubmit={handleVerifyResetOtp} className="space-y-4">
                   <div className="p-3 bg-orange-50 border border-orange-100 rounded-2xl text-center space-y-1">
                     <p className="text-[11px] font-bold text-gray-700">OTP code dispatched via SMS/WhatsApp</p>
-                    <p className="text-[10px] text-gray-500">Sent to: <span className="font-mono font-black">{resetPhone}</span></p>
+                    <p className="text-[10px] text-gray-500">Sent to: <span className="font-mono font-black">{maskPhoneForAdmin(resetPhone)}</span></p>
                     {otpDevCode && (
                       <p className="text-[10px] font-mono font-bold text-[#FC7A00] bg-white p-1 rounded border border-orange-200 mt-1 select-all">
                         DEV OTP: {otpDevCode}
@@ -495,22 +556,37 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00]">Enter 6-Digit OTP Code</label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      required
-                      value={resetOtp}
-                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ""))}
-                      placeholder="e.g. 123456"
-                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-center font-mono text-lg tracking-widest text-gray-900 placeholder-gray-300 outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
-                    />
+                  <div className="space-y-2">
+                    <label className="font-hanken text-[11px] uppercase tracking-wider font-extrabold text-[#FC7A00] block text-center">Enter 6-Digit OTP Code</label>
+
+                    {/* 6 Individual Digit Inputs */}
+                    <div className="flex items-center justify-between gap-1.5">
+                      {[0, 1, 2, 3, 4, 5].map((idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => {
+                            adminOtpInputsRef.current[idx] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={resetOtpDigits[idx]}
+                          disabled={isVerifyingOtp}
+                          onChange={(e) => handleAdminOtpDigitChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleAdminOtpKeyDown(idx, e)}
+                          onPaste={handleAdminOtpPaste}
+                          className={`w-10 h-12 bg-white border ${
+                            resetOtpDigits[idx] ? "border-[#FC7A00] bg-orange-50/20" : "border-gray-300"
+                          } rounded-xl text-center font-mono font-black text-lg text-gray-900 outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-xs disabled:opacity-50`}
+                        />
+                      ))}
+                    </div>
                   </div>
 
                   <button
                     type="submit"
-                    disabled={isVerifyingOtp}
+                    disabled={isVerifyingOtp || resetOtp.length !== 6}
                     className="w-full py-4 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-[#e06600] active:scale-95 transition-all cursor-pointer disabled:opacity-50 shadow-md"
                   >
                     {isVerifyingOtp ? <><ButtonSpinner /> Verifying OTP Code...</> : "Confirm OTP Code"}
@@ -524,13 +600,19 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                     >
                       ← Re-enter Phone
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRequestResetOtp({ preventDefault: () => {} } as any)}
-                      className="text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer"
-                    >
-                      Resend OTP
-                    </button>
+
+                    {adminOtpCooldown > 0 ? (
+                      <span className="text-[10px] text-gray-400 font-bold">Resend in {adminOtpCooldown}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isRequestingOtp}
+                        onClick={() => handleRequestResetOtp({ preventDefault: () => {} } as any)}
+                        className="text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer disabled:opacity-50"
+                      >
+                        {isRequestingOtp ? "Sending..." : "Resend OTP"}
+                      </button>
+                    )}
                   </div>
                 </form>
               )}

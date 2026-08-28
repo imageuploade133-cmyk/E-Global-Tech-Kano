@@ -59,20 +59,36 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "The provided phone number does not match the administrator record." }, { status: 400 });
       }
 
+      const otpDocRef = adminDb.collection("admin_otp_requests").doc(cleanEmail);
+      const existingSnap = await otpDocRef.get();
+      const now = Date.now();
+
+      // Enforce 60-second cooldown lock to prevent duplicate OTP requests
+      if (existingSnap.exists) {
+        const existingData = existingSnap.data() || {};
+        const lastRequested = existingData.lastRequestedAt || 0;
+        if (now - lastRequested < 60000) {
+          const remaining = Math.ceil((60000 - (now - lastRequested)) / 1000);
+          return NextResponse.json(
+            { error: `Please wait ${remaining} seconds before requesting another OTP code.` },
+            { status: 429 }
+          );
+        }
+      }
+
       // Generate 6-digit OTP
       const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
       const hashedOtp = await bcrypt.hash(rawOtp, 10);
-      const now = Date.now();
       const expiresAt = now + 5 * 60 * 1000; // 5 minutes
 
       // Store OTP in admin_otp_requests/{cleanEmail}
-      const otpDocRef = adminDb.collection("admin_otp_requests").doc(cleanEmail);
       await otpDocRef.set({
         email: cleanEmail,
         phoneNumber: inputPhone,
         hashedOtp,
         attempts: 0,
         createdAt: new Date(now).toISOString(),
+        lastRequestedAt: now,
         expiresAt,
         verified: false
       });
