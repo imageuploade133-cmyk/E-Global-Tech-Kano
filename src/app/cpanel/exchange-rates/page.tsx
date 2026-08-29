@@ -795,16 +795,26 @@ function CpanelExchangeRatesContent() {
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 space-y-0.5">
+              <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 space-y-1">
                 <span className="text-[9px] font-black uppercase text-gray-400 block">Simulated User Receives</span>
                 <strong className="text-base font-black text-emerald-500 font-mono block">
                   {simToCurrency === "USD" ? "$" : simToCurrency === "XOF" ? "FCFA " : "₦"}
                   {simResult.output.toLocaleString(undefined, { maximumFractionDigits: 2 })} {simToCurrency}
                 </strong>
-                <span className="text-[9px] text-gray-400 font-bold block">
-                  Fee Deducted: {simResult.fee} {simFromCurrency}
-                  {simResult.appliedTier ? " (Custom Tier Applied)" : " (Default Fee)"}
-                </span>
+                <div className="text-[9.5px] text-gray-400 font-bold space-y-0.5 border-t border-gray-200 dark:border-gray-800 pt-1 mt-1">
+                  <div className="flex justify-between text-emerald-600 font-extrabold">
+                    <span>Active Rate:</span>
+                    <span>₦{effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD ($1.00)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Swap Fee Deducted:</span>
+                    <span>{simResult.fee} {simFromCurrency} {simResult.appliedTier ? "(Tier)" : "(Default)"}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Net Amount Converted:</span>
+                    <span>{Math.max(0, simAmount - simResult.fee).toLocaleString()} {simFromCurrency}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

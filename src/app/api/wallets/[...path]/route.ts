@@ -128,14 +128,12 @@ function calculateSwapFee(
 
 export async function GET(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const reqId = `req-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
-  const startTime = Date.now();
 
   let uid = "";
   try {
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
   } catch (err: any) {
-    console.error(`[GET /api/wallets/[...path]] [${reqId}] Auth failure: ${err.message}`);
     return NextResponse.json({ error: "Unauthorized: Invalid or missing authorization token." }, { status: 401 });
   }
 
@@ -249,7 +247,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
         to,
         amount,
         fee,
+        netAmount,
         rate,
+        effectiveDollarRate: activeConfig.effectiveDollarRate,
+        effectiveXofRate: activeConfig.effectiveXofRate,
+        rateFormatted: `₦${activeConfig.effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD ($1.00)`,
         targetAmount: Number(targetAmount.toFixed(2))
       });
     }
@@ -267,7 +269,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
 
 export async function POST(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const reqId = `req-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
-  const startTime = Date.now();
   let body: any = {};
 
   let uid = "";
@@ -396,7 +397,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           currency: fromCurrency,
           reference: txRef,
           type: "SWAP_DEBIT",
-          description: `Currency Exchange: Swapped ${fromCurrency} ${amount.toLocaleString()} to ${toCurrency}${fee > 0 ? ` (Deducted fee: ${fee})` : ""}`,
+          description: `Currency Exchange: Swapped ${fromCurrency} ${amount.toLocaleString()} to ${toCurrency}${fee > 0 ? ` (Includes fee: ${fee} ${fromCurrency})` : ""}`,
           recipientName: `${toCurrency} Wallet`,
           status: "SUCCESS",
           date: dateStr,
@@ -429,6 +430,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           toAmount: targetAmount,
           toCurrency,
           fee,
+          effectiveDollarRate: activeConfig.effectiveDollarRate,
+          effectiveXofRate: activeConfig.effectiveXofRate,
+          rateFormatted: `₦${activeConfig.effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD ($1.00)`,
           rate,
           txRef
         };
@@ -436,7 +440,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
 
       return NextResponse.json({
         success: true,
-        message: `Successfully exchanged ${result.fromCurrency} ${result.fromAmount.toLocaleString()} for ${result.toCurrency} ${result.toAmount.toLocaleString()}!`,
+        message: `Successfully exchanged ${result.fromCurrency} ${result.fromAmount.toLocaleString()} for ${result.toCurrency} ${result.toAmount.toLocaleString()} at ₦${result.effectiveDollarRate.toLocaleString()}/USD!`,
         data: result
       });
     }
