@@ -1,8 +1,6 @@
 "use client";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
-
-
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -57,6 +55,8 @@ function CpanelStoreOrdersPageContent() {
     "Delivered",
     "Refunded",
     "Canceled",
+    "Pending Payment",
+    "Payment Failed",
   ]);
   const [metrics, setMetrics] = useState({
     totalOrders: 0,
@@ -76,7 +76,7 @@ function CpanelStoreOrdersPageContent() {
   const [newStatus, setNewStatus] = useState("Pending");
   const [adminNotes, setAdminNotes] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-
+  const [isPurging, setIsPurging] = useState(false);
 
   // Check Admin Unlock Session via /api/admin/auth/session
   useEffect(() => {
@@ -167,6 +167,66 @@ function CpanelStoreOrdersPageContent() {
     setAdminNotes(order.adminNotes || "");
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm(`Are you sure you want to permanently delete order record ${orderId}?`)) {
+      return;
+    }
+
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+
+      const res = await fetch("/api/admin/store/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ action: "delete_order", orderId }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Order record deleted!");
+        if (activeOrder?.id === orderId) setActiveProductOrder(null);
+        fetchOrders();
+      } else {
+        toast.error(data.error || "Failed to delete order record.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error deleting order.");
+    }
+  };
+
+  const handlePurgeFailedOrders = async () => {
+    if (!confirm("Are you sure you want to bulk-purge all failed, abandoned, and canceled store order records from system storage?")) {
+      return;
+    }
+
+    setIsPurging(true);
+    toast.loading("Purging abandoned and canceled order records...", { id: "purge-orders" });
+
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+
+      const res = await fetch("/api/admin/store/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ action: "purge_failed_orders" }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Purged abandoned order records!", { id: "purge-orders" });
+        fetchOrders();
+      } else {
+        toast.error(data.error || "Failed to purge order records.", { id: "purge-orders" });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error purging order records.", { id: "purge-orders" });
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
   const handleUpdateOrderStatus = async (e?: React.FormEvent, quickStatus?: string) => {
     if (e) e.preventDefault();
     if (!activeOrder) return;
@@ -217,8 +277,11 @@ function CpanelStoreOrdersPageContent() {
     if (st === "processing" || st === "shipped") {
       return "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300";
     }
-    if (st === "refunded" || st === "canceled") {
+    if (st === "refunded" || st === "canceled" || st === "cancelled") {
       return "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300";
+    }
+    if (st === "payment failed" || st === "pending payment") {
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-300";
     }
     return "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300";
   };
@@ -269,7 +332,18 @@ function CpanelStoreOrdersPageContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              disabled={isPurging}
+              onClick={handlePurgeFailedOrders}
+              className="px-3.5 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Purge abandoned/failed payment orders from system storage"
+            >
+              <span className="material-symbols-outlined text-[17px]">cleaning_services</span>
+              <span>Purge Abandoned</span>
+            </button>
+
             <Link
               href="/cpanel/store"
               className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 font-bold text-xs uppercase tracking-wider text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all flex items-center gap-2"
@@ -281,7 +355,7 @@ function CpanelStoreOrdersPageContent() {
             <button
               type="button"
               onClick={fetchOrders}
-              className="px-4 py-2.5 rounded-xl bg-[#FC7A00] text-white font-black text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center gap-2 shadow-sm"
+              className="px-4 py-2.5 rounded-xl bg-[#FC7A00] text-white font-black text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center gap-2 shadow-sm cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">refresh</span>
               Refresh Orders
@@ -339,7 +413,7 @@ function CpanelStoreOrdersPageContent() {
               type="button"
               onClick={() => setSelectedStatusFilter("ALL")}
               className={cn(
-                "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all",
+                "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer",
                 selectedStatusFilter === "ALL"
                   ? "bg-[#FC7A00] text-white shadow-xs"
                   : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200"
@@ -354,7 +428,7 @@ function CpanelStoreOrdersPageContent() {
                 type="button"
                 onClick={() => setSelectedStatusFilter(st)}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all",
+                  "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer",
                   selectedStatusFilter === st
                     ? "bg-[#FC7A00] text-white shadow-xs"
                     : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200"
@@ -380,7 +454,7 @@ function CpanelStoreOrdersPageContent() {
             </div>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#FC7A00] text-white font-black text-xs uppercase tracking-wider hover:opacity-90"
+              className="px-5 py-2.5 rounded-xl bg-[#FC7A00] text-white font-black text-xs uppercase tracking-wider hover:opacity-90 cursor-pointer"
             >
               Search
             </button>
@@ -410,7 +484,7 @@ function CpanelStoreOrdersPageContent() {
                     <th className="p-4">Items Summary</th>
                     <th className="p-4">Total Amount</th>
                     <th className="p-4">Payment & Order Status</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80 font-medium">
@@ -455,8 +529,15 @@ function CpanelStoreOrdersPageContent() {
 
                       <td className="p-4 whitespace-nowrap space-y-1">
                         <div>
-                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 inline-flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[12px]">verified</span>
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border inline-flex items-center gap-1",
+                            order.paymentStatus === "PAID"
+                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                          )}>
+                            <span className="material-symbols-outlined text-[12px]">
+                              {order.paymentStatus === "PAID" ? "verified" : "pending"}
+                            </span>
                             <span>{order.paymentStatus || "PAID"}</span>
                           </span>
                         </div>
@@ -468,14 +549,25 @@ function CpanelStoreOrdersPageContent() {
                       </td>
 
                       <td className="p-4 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => openInspectModal(order)}
-                          className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white text-gray-700 dark:text-gray-200 font-bold text-[11px] transition-all flex items-center gap-1 ml-auto"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">visibility</span>
-                          Inspect & Manage
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openInspectModal(order)}
+                            className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white text-gray-700 dark:text-gray-200 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">visibility</span>
+                            Inspect
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="p-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-all cursor-pointer"
+                            title="Delete Order Record"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -507,7 +599,7 @@ function CpanelStoreOrdersPageContent() {
               <button
                 type="button"
                 onClick={() => setActiveProductOrder(null)}
-                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white"
+                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
@@ -628,7 +720,7 @@ function CpanelStoreOrdersPageContent() {
                     type="button"
                     disabled={isUpdatingStatus}
                     onClick={() => handleUpdateOrderStatus(undefined, "Delivered")}
-                    className="px-3 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5"
+                    className="px-3 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">check_circle</span>
                     Mark Delivered
@@ -642,21 +734,32 @@ function CpanelStoreOrdersPageContent() {
                         handleUpdateOrderStatus(undefined, "Refunded");
                       }
                     }}
-                    className="px-3 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5"
+                    className="px-3 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">undo</span>
                     Refund & Cancel
                   </button>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isUpdatingStatus}
-                  className="px-5 py-2.5 rounded-xl bg-[#FC7A00] text-white font-black text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isUpdatingStatus && <ButtonSpinner />}
-                  Save Status & Notes
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteOrder(activeOrder.id)}
+                    className="px-3 py-2 rounded-xl bg-red-500/10 text-red-500 font-bold text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Delete Order
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isUpdatingStatus}
+                    className="px-5 py-2.5 rounded-xl bg-[#FC7A00] text-white font-black text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isUpdatingStatus && <ButtonSpinner />}
+                    Save Status & Notes
+                  </button>
+                </div>
               </div>
             </form>
           </div>
