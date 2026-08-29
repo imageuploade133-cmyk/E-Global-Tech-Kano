@@ -322,11 +322,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success("Order placed successfully!", { id: "place-order" });
-        setConfirmedOrder(data.order);
-        updateCart([]);
-        setIsCheckoutStep(false);
-        setIsCartOpen(false);
+        if (data.requiresPaymentRedirect && data.paymentUrl) {
+          toast.success("Redirecting to secured card gateway...", { id: "place-order" });
+          updateCart([]);
+          setIsCheckoutStep(false);
+          setIsCartOpen(false);
+          window.location.href = data.paymentUrl;
+        } else {
+          toast.success("Order placed successfully!", { id: "place-order" });
+          setConfirmedOrder(data.order);
+          updateCart([]);
+          setIsCheckoutStep(false);
+          setIsCartOpen(false);
+        }
       } else {
         toast.error(data.error || "Failed to place store order.", { id: "place-order" });
       }

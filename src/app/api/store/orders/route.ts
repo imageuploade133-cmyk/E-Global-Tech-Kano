@@ -5,9 +5,11 @@ import { authenticateUserRequest } from "@/lib/auth-util";
 export async function POST(req: Request) {
   try {
     let uid = "";
+    let userEmail = "";
     try {
       const authUser = await authenticateUserRequest(req);
       uid = authUser.uid;
+      userEmail = authUser.email || "";
     } catch {
       return NextResponse.json({ error: "Unauthorized: Please sign in to place an order." }, { status: 401 });
     }
@@ -44,10 +46,11 @@ export async function POST(req: Request) {
 
     const orderId = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
     const now = new Date().toISOString();
-
     const isCardCheckout = paymentMethod === "CARD_CHECKOUT";
+
     const paymentChannel = isCardCheckout ? "Card / Direct Checkout Link" : "Main NGN Wallet";
-    const paymentStatus = isCardCheckout ? "PAID" : "PAID";
+    const initialPaymentStatus = isCardCheckout ? "PENDING_PAYMENT" : "PAID";
+    const initialOrderStatus = isCardCheckout ? "Pending Payment" : "Pending";
     const paymentVerificationRef = isCardCheckout
       ? `CARD-PAY-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
       : `WLT-PAY-${orderId}`;
@@ -56,26 +59,100 @@ export async function POST(req: Request) {
       id: orderId,
       userId: uid,
       customerName: String(customerName).trim(),
-      customerEmail: String(customerEmail || "").trim(),
+      customerEmail: String(customerEmail || userEmail).trim(),
       customerPhone: String(customerPhone).trim(),
       deliveryAddress: String(deliveryAddress).trim(),
       items: orderItems,
       totalAmount,
       currency: "NGN",
-      status: "Pending",
+      status: initialOrderStatus,
       adminNotes: "",
       paymentMethod: isCardCheckout ? "CARD_CHECKOUT" : "WALLET_NGN",
       paymentChannel,
-      paymentStatus,
+      paymentStatus: initialPaymentStatus,
       paymentVerificationRef,
       createdAt: now,
       updatedAt: now,
     };
 
     if (isCardCheckout) {
-      // Direct Card / Checkout Link Payment: Save order directly as PAID
+      // Resolve Flutterwave Secret Key from Env or AppConfig
+      let flutterwaveSecretKey = process.env.FLUTTERWAVE_SECRET_KEY || "";
+      try {
+        if (!flutterwaveSecretKey) {
+          const configDoc = await adminDb.collection("config").doc("app_config").get();
+          if (configDoc.exists) {
+            flutterwaveSecretKey = configDoc.data()?.flutterwaveSecretKey || "";
+          }
+        }
+      } catch (err: any) {
+        console.warn("[Store Order POST] Flutterwave config lookup warning:", err.message);
+      }
+
+      const txRef = `TX-STORE-${orderId}`;
+      const originUrl = req.headers.get("origin") || req.headers.get("referer") || "https://e-tech-store.com";
+      const redirectUrl = `${originUrl}/api/store/orders/verify?orderId=${orderId}&tx_ref=${txRef}`;
+
+      let paymentUrl = "";
+
+      if (flutterwaveSecretKey) {
+        try {
+          const flwRes = await fetch("https://api.flutterwave.com/v3/payments", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${flutterwaveSecretKey}`,
+            },
+            body: JSON.stringify({
+              tx_ref: txRef,
+              amount: totalAmount,
+              currency: "NGN",
+              redirect_url: redirectUrl,
+              meta: {
+                orderId,
+                userId: uid,
+                customerPhone,
+              },
+              customer: {
+                email: customerEmail || userEmail || "customer@e-tech-store.com",
+                phonenumber: customerPhone,
+                name: customerName,
+              },
+              customizations: {
+                title: "E-Tech Store Order Payment",
+                description: `Payment for Order ${orderId}`,
+                logo: "https://e-tech-store.com/logo.png",
+              },
+            }),
+          });
+
+          const flwData = await flwRes.json();
+          if (flwRes.ok && flwData.status === "success" && flwData.data?.link) {
+            paymentUrl = flwData.data.link;
+          } else {
+            console.error("[Store Order POST] Flutterwave payment creation failed:", flwData);
+          }
+        } catch (flwErr: any) {
+          console.error("[Store Order POST] Flutterwave API call exception:", flwErr.message);
+        }
+      }
+
+      // Save order record as Pending Payment
       const orderRef = adminDb.collection("store_orders").doc(orderId);
-      await orderRef.set(newOrder);
+      await orderRef.set({
+        ...newOrder,
+        txRef,
+        paymentUrl,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: paymentUrl ? "Card checkout link generated! Please complete payment." : "Order created. Please present payment reference.",
+        order: newOrder,
+        paymentUrl,
+        requiresPaymentRedirect: Boolean(paymentUrl),
+      });
+
     } else {
       // Wallet NGN Payment: Validate wallet & deduct balance atomically
       const walletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
@@ -132,13 +209,13 @@ export async function POST(req: Request) {
         const orderRef = adminDb.collection("store_orders").doc(orderId);
         transaction.set(orderRef, newOrder);
       });
-    }
 
-    return NextResponse.json({
-      success: true,
-      message: "Store order placed successfully!",
-      order: newOrder,
-    });
+      return NextResponse.json({
+        success: true,
+        message: "Store order placed successfully!",
+        order: newOrder,
+      });
+    }
   } catch (err: any) {
     console.error("[Store Order POST Exception]:", err.message);
     return NextResponse.json({ error: err.message || "Failed to place store order" }, { status: 500 });
