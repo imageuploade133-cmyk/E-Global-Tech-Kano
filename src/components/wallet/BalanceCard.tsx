@@ -439,13 +439,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [bulkRecipients, setBulkRecipients] = useState<Array<{
     accountNumber: string;
     bankId: string;
+    bankCode?: string;
     bankName: string;
     recipientName: string;
     amount: number;
+    logoUrl?: string | null;
+    logoBackupUrl?: string | null;
   }>>([]);
 
   // Bulk inputs state
-  const [bulkBank, setBulkBank] = useState<{ id: string; name: string; code?: string } | null>(null);
+  const [bulkBank, setBulkBank] = useState<{ id: string; name: string; code?: string; logoUrl?: string | null; logoBackupUrl?: string | null } | null>(null);
   const [bulkAccount, setBulkAccount] = useState("");
   const [bulkName, setBulkName] = useState("");
   const [bulkAmountVal, setBulkAmountVal] = useState("");
@@ -1331,9 +1334,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       {
         accountNumber: bulkAccount,
         bankId: bulkBank.id,
+        bankCode: bulkBank.code || bulkBank.id,
         bankName: bulkBank.name,
         recipientName: bulkName,
         amount: amt,
+        logoUrl: bulkBank.logoUrl,
+        logoBackupUrl: (bulkBank as any).logoBackupUrl,
       }
     ]);
 
@@ -3319,11 +3325,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             setBankSearchQuery("");
                             setShowTrfBankSelector(true);
                           }}
-                          className="w-full px-3 py-3 bg-white border border-gray-200 rounded-xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
+                          className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
                         >
-                          <span className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
-                            {bulkBank ? bulkBank.name : "Choose bank..."}
+                          <span className="flex items-center gap-2 min-w-0 truncate">
+                            {bulkBank ? (
+                              <>
+                                <BankLogo name={bulkBank.name} code={bulkBank.code || bulkBank.id} logoUrl={bulkBank.logoUrl} logoBackupUrl={(bulkBank as any).logoBackupUrl} />
+                                <span className="truncate">{bulkBank.name}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="material-symbols-outlined text-gray-400 text-[18px]">account_balance</span>
+                                <span>Choose bank...</span>
+                              </>
+                            )}
                           </span>
                           <span className="material-symbols-outlined text-gray-400 text-[16px]">expand_more</span>
                         </button>
@@ -3425,9 +3440,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               key={index}
                               className="px-4 py-3 hover:bg-[#FFF9F5] border-b border-gray-150 flex items-center justify-between font-hanken text-xs"
                             >
-                              <div>
-                                <p className="font-extrabold text-black uppercase leading-tight truncate max-w-[180px]">{rec.recipientName}</p>
-                                <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">{rec.bankName} - {rec.accountNumber}</p>
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <BankLogo name={rec.bankName} code={rec.bankCode || rec.bankId} logoUrl={rec.logoUrl} logoBackupUrl={rec.logoBackupUrl} />
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-black uppercase leading-tight truncate max-w-[180px]">{rec.recipientName}</p>
+                                  <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">{rec.bankName} - {rec.accountNumber}</p>
+                                </div>
                               </div>
                               <div className="flex items-center gap-3">
                                 <span className="font-mono font-black text-black">₦{rec.amount.toLocaleString()}</span>
