@@ -3,6 +3,129 @@ import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
+// Helper to resolve effective rates and swap fees from config/exchange_rates
+async function resolveActiveExchangeConfig() {
+  let useLiveWorldDollarRate = false;
+  let manualDollarRate = 1550;
+  let dollarCommissionFee = 15;
+  let useLiveWorldXofRate = false;
+  let manualXofRate = 2.5;
+  let xofCommissionFee = 0.1;
+
+  let swapFees = {
+    ngnToUsd: 50,
+    usdToNgn: 1.5,
+    ngnToXof: 30,
+    xofToNgn: 10,
+    usdToXof: 2.0,
+    xofToUsd: 15,
+  };
+
+  let swapRangeTiers: any[] = [];
+
+  try {
+    const docSnap = await adminDb.collection("config").doc("exchange_rates").get();
+    if (docSnap.exists) {
+      const stored = docSnap.data();
+      if (stored) {
+        useLiveWorldDollarRate = Boolean(stored.useLiveWorldDollarRate);
+        manualDollarRate = Math.max(1, Number(stored.manualDollarRate) || 1550);
+        dollarCommissionFee = Math.max(0, Number(stored.dollarCommissionFee) || 0);
+
+        useLiveWorldXofRate = Boolean(stored.useLiveWorldXofRate);
+        manualXofRate = Math.max(0.01, Number(stored.manualXofRate) || 2.5);
+        xofCommissionFee = Math.max(0, Number(stored.xofCommissionFee) || 0);
+
+        if (stored.swapFees) {
+          swapFees = {
+            ngnToUsd: Math.max(0, Number(stored.swapFees.ngnToUsd) || 0),
+            usdToNgn: Math.max(0, Number(stored.swapFees.usdToNgn) || 0),
+            ngnToXof: Math.max(0, Number(stored.swapFees.ngnToXof) || 0),
+            xofToNgn: Math.max(0, Number(stored.swapFees.xofToNgn) || 0),
+            usdToXof: Math.max(0, Number(stored.swapFees.usdToXof) || 0),
+            xofToUsd: Math.max(0, Number(stored.swapFees.xofToUsd) || 0),
+          };
+        }
+
+        if (Array.isArray(stored.swapRangeTiers)) {
+          swapRangeTiers = stored.swapRangeTiers;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[resolveActiveExchangeConfig] Firestore read warning:", err.message);
+  }
+
+  // Resolve USD Rate
+  let baseDollarRate = manualDollarRate;
+  if (useLiveWorldDollarRate) {
+    try {
+      const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/USD", { cache: "no-store" });
+      if (liveRes.ok) {
+        const liveData = await liveRes.json();
+        if (liveData?.rates?.NGN) {
+          baseDollarRate = Number(liveData.rates.NGN);
+        }
+      }
+    } catch {}
+  }
+  const effectiveDollarRate = baseDollarRate + dollarCommissionFee;
+
+  // Resolve XOF Rate
+  let baseXofRate = manualXofRate;
+  if (useLiveWorldXofRate) {
+    try {
+      const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/XOF", { cache: "no-store" });
+      if (liveRes.ok) {
+        const liveData = await liveRes.json();
+        if (liveData?.rates?.NGN) {
+          baseXofRate = Number(liveData.rates.NGN);
+        }
+      }
+    } catch {}
+  }
+  const effectiveXofRate = baseXofRate + xofCommissionFee;
+
+  return {
+    effectiveDollarRate,
+    effectiveXofRate,
+    swapFees,
+    swapRangeTiers,
+  };
+}
+
+// Calculate Swap Fee (checking custom range tiers first, then fallback to pair fee)
+function calculateSwapFee(
+  from: string,
+  to: string,
+  amount: number,
+  swapFees: Record<string, number>,
+  swapRangeTiers: any[]
+): number {
+  let pairKey = "";
+  if (from === "NGN" && to === "USD") pairKey = "ngnToUsd";
+  else if (from === "USD" && to === "NGN") pairKey = "usdToNgn";
+  else if (from === "NGN" && to === "XOF") pairKey = "ngnToXof";
+  else if (from === "XOF" && to === "NGN") pairKey = "xofToNgn";
+  else if (from === "USD" && to === "XOF") pairKey = "usdToXof";
+  else if (from === "XOF" && to === "USD") pairKey = "xofToUsd";
+
+  if (!pairKey) return 0;
+
+  // 1. Check custom range tier match
+  if (Array.isArray(swapRangeTiers)) {
+    const matchingTier = swapRangeTiers.find(
+      (t: any) => t.pair === pairKey && amount >= Number(t.minAmount) && amount <= Number(t.maxAmount)
+    );
+    if (matchingTier) {
+      return Number(matchingTier.markupFee) || 0;
+    }
+  }
+
+  // 2. Fallback to standard pair swap fee
+  return Number(swapFees[pairKey]) || 0;
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const reqId = `req-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
   const startTime = Date.now();
@@ -18,10 +141,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
 
   const { path } = await params;
   const pathStr = path.join("/");
-  console.log(`[GET /api/wallets/[...path]] [${reqId}] Path: "${pathStr}", uid: "${uid}"`);
 
   try {
-    console.log(`[GET /api/wallets/[...path]] Inside try-catch block. pathStr: "${pathStr}", isSandbox: ${req.headers.get("Authorization")?.includes("mock")}`);
     // 1. GET /api/wallets/accounts
     if (pathStr === "accounts") {
       const userRef = adminDb.collection("users").doc(uid);
@@ -43,7 +164,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       let ngnAccount = ngnAccSnap.exists ? ngnAccSnap.data() : null;
       let usdAccount = usdAccSnap.exists ? usdAccSnap.data() : null;
 
-      // Defensive fallbacks if missing
       if (!ngnAccount) {
         ngnAccount = {
           userId: uid,
@@ -76,7 +196,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
         await usdAccRef.set(usdAccount, { merge: true });
       }
 
-      console.log(`[GET /api/wallets/accounts] [${reqId}] Returned account details in ${Date.now() - startTime}ms`);
       return NextResponse.json({
         success: true,
         accounts: {
@@ -101,60 +220,35 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
         return NextResponse.json({ error: "Invalid amount specified. Amount must be a positive number." }, { status: 400 });
       }
 
-      // Sandbox environment check to bypass all database reads
-      const isSandbox = req.headers.get("Authorization") === "Bearer mock-token" || req.headers.get("Authorization") === "Bearer mock-admin-token";
+      const activeConfig = await resolveActiveExchangeConfig();
+      const fee = calculateSwapFee(from, to, amount, activeConfig.swapFees, activeConfig.swapRangeTiers);
+      const netAmount = Math.max(0, amount - fee);
 
-      let usdToNgn = 1500.00; // default exchange rate (1 USD = 1500 NGN)
-      let ngnToXof = 0.40;    // default exchange rate (1 NGN = 0.40 XOF)
-
-      if (!isSandbox) {
-        try {
-          const ratesRef = adminDb.collection("settings").doc("exchange_rates");
-          const ratesSnap = await ratesRef.get();
-          if (ratesSnap.exists) {
-            const ratesData = ratesSnap.data() || {};
-            usdToNgn = typeof ratesData.usd_to_ngn === "number" ? ratesData.usd_to_ngn : 1500.00;
-            ngnToXof = typeof ratesData.ngn_to_xof === "number" ? ratesData.ngn_to_xof : 0.40;
-          } else {
-            // Seed rates on-the-fly
-            await ratesRef.set({ usd_to_ngn: usdToNgn, ngn_to_xof: ngnToXof }, { merge: true });
-          }
-        } catch (err: any) {
-          console.warn("[Rates API] Firebase is offline or missing credentials. Using fallback defaults:", err.message);
-        }
-      } else {
-        console.log(`[Rates API] [${reqId}] Sandbox bypass active. Using local exchange rate matrix.`);
-      }
-
-      // Universal conversion engine converting input to NGN first
-      let valueInNgn = 0;
-      if (from === "NGN") {
-        valueInNgn = amount;
-      } else if (from === "USD") {
-        valueInNgn = amount * usdToNgn;
-      } else if (from === "XOF") {
-        valueInNgn = amount / ngnToXof;
-      }
-
-      // Then convert NGN value to target
       let targetAmount = 0;
-      if (to === "NGN") {
-        targetAmount = valueInNgn;
-      } else if (to === "USD") {
-        targetAmount = valueInNgn / usdToNgn;
-      } else if (to === "XOF") {
-        targetAmount = valueInNgn * ngnToXof;
+      if (from === "NGN" && to === "USD") {
+        targetAmount = netAmount / activeConfig.effectiveDollarRate;
+      } else if (from === "USD" && to === "NGN") {
+        targetAmount = netAmount * activeConfig.effectiveDollarRate;
+      } else if (from === "NGN" && to === "XOF") {
+        targetAmount = netAmount / activeConfig.effectiveXofRate;
+      } else if (from === "XOF" && to === "NGN") {
+        targetAmount = netAmount * activeConfig.effectiveXofRate;
+      } else if (from === "USD" && to === "XOF") {
+        const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
+        targetAmount = ngnEquiv / activeConfig.effectiveXofRate;
+      } else if (from === "XOF" && to === "USD") {
+        const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
+        targetAmount = ngnEquiv / activeConfig.effectiveDollarRate;
       }
 
-      // Compute exact rate
-      const rate = targetAmount / amount;
+      const rate = targetAmount / (amount || 1);
 
-      console.log(`[GET /api/wallets/rates] [${reqId}] Exchange computation: ${amount} ${from} @ ${rate.toFixed(6)} -> ${targetAmount.toFixed(2)} ${to}`);
       return NextResponse.json({
         success: true,
         from,
         to,
         amount,
+        fee,
         rate,
         targetAmount: Number(targetAmount.toFixed(2))
       });
@@ -166,8 +260,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
     console.error(`[GET /api/wallets/[...path]] [${reqId}] Unexpected error:`, error);
     return NextResponse.json({
       error: "Internal server error performing wallet path operation.",
-      message: error.message,
-      stack: error.stack
+      message: error.message
     }, { status: 500 });
   }
 }
@@ -182,13 +275,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
   } catch (err: any) {
-    console.error(`[POST /api/wallets/[...path]] [${reqId}] Auth failure: ${err.message}`);
     return NextResponse.json({ error: "Unauthorized: Invalid or missing authorization token." }, { status: 401 });
   }
 
   const { path } = await params;
   const pathStr = path.join("/");
-  console.log(`[POST /api/wallets/[...path]] [${reqId}] Path: "${pathStr}", uid: "${uid}"`);
 
   try {
     // 3. POST /api/wallets/swap
@@ -211,26 +302,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         return NextResponse.json({ error: "Amount must be a positive number." }, { status: 400 });
       }
 
+      const activeConfig = await resolveActiveExchangeConfig();
+      const fee = calculateSwapFee(fromCurrency, toCurrency, amount, activeConfig.swapFees, activeConfig.swapRangeTiers);
+
+      if (amount <= fee) {
+        return NextResponse.json({
+          error: `Swap input amount (${amount}) must be greater than the required swap fee (${fee}).`
+        }, { status: 400 });
+      }
+
       // Execute transaction
       const result = await adminDb.runTransaction(async (transaction) => {
         // 1. ALL READS FIRST
         const userRef = adminDb.collection("users").doc(uid);
         const fromWalletRef = adminDb.collection("wallets").doc(`${uid}_${fromCurrency}`);
         const toWalletRef = adminDb.collection("wallets").doc(`${uid}_${toCurrency}`);
-        const ratesRef = adminDb.collection("settings").doc("exchange_rates");
 
-        const [userSnap, fromSnap, toSnap, ratesSnap] = await Promise.all([
+        const [userSnap, fromSnap, toSnap] = await Promise.all([
           transaction.get(userRef),
           transaction.get(fromWalletRef),
           transaction.get(toWalletRef),
-          transaction.get(ratesRef)
         ]);
 
         if (!userSnap.exists) {
           throw new Error("User profile not found.");
         }
 
-        const userData = userSnap.data() || {};
         const fromWalletData = fromSnap.exists ? fromSnap.data() || {} : { balance: 0.00 };
         const toWalletData = toSnap.exists ? toSnap.data() || {} : { balance: 0.00 };
 
@@ -243,42 +340,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           throw new Error(`Insufficient wallet balance in ${fromCurrency} to complete this exchange. Available: ${currencySymbol}${sourceBalance.toLocaleString()}`);
         }
 
-        let usdToNgn = 1500.00;
-        let ngnToXof = 0.40;
-        if (ratesSnap.exists) {
-          const ratesData = ratesSnap.data() || {};
-          usdToNgn = typeof ratesData.usd_to_ngn === "number" ? ratesData.usd_to_ngn : 1500.00;
-          ngnToXof = typeof ratesData.ngn_to_xof === "number" ? ratesData.ngn_to_xof : 0.40;
-        }
-
-        // Universal conversion engine converting input to NGN first
-        let valueInNgn = 0;
-        if (fromCurrency === "NGN") {
-          valueInNgn = amount;
-        } else if (fromCurrency === "USD") {
-          valueInNgn = amount * usdToNgn;
-        } else if (fromCurrency === "XOF") {
-          valueInNgn = amount / ngnToXof;
-        }
-
-        // Then convert NGN value to target
+        const netAmount = Math.max(0, amount - fee);
         let targetAmountRaw = 0;
-        if (toCurrency === "NGN") {
-          targetAmountRaw = valueInNgn;
-        } else if (toCurrency === "USD") {
-          targetAmountRaw = valueInNgn / usdToNgn;
-        } else if (toCurrency === "XOF") {
-          targetAmountRaw = valueInNgn * ngnToXof;
+
+        if (fromCurrency === "NGN" && toCurrency === "USD") {
+          targetAmountRaw = netAmount / activeConfig.effectiveDollarRate;
+        } else if (fromCurrency === "USD" && toCurrency === "NGN") {
+          targetAmountRaw = netAmount * activeConfig.effectiveDollarRate;
+        } else if (fromCurrency === "NGN" && toCurrency === "XOF") {
+          targetAmountRaw = netAmount / activeConfig.effectiveXofRate;
+        } else if (fromCurrency === "XOF" && toCurrency === "NGN") {
+          targetAmountRaw = netAmount * activeConfig.effectiveXofRate;
+        } else if (fromCurrency === "USD" && toCurrency === "XOF") {
+          const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
+          targetAmountRaw = ngnEquiv / activeConfig.effectiveXofRate;
+        } else if (fromCurrency === "XOF" && toCurrency === "USD") {
+          const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
+          targetAmountRaw = ngnEquiv / activeConfig.effectiveDollarRate;
         }
 
-        const targetAmount = Number(targetAmountRaw.toFixed(2)); // Round to 2 decimal places
-        const rate = targetAmount / amount;
+        const targetAmount = Number(targetAmountRaw.toFixed(2));
+        const rate = targetAmount / (amount || 1);
 
         // 2. ALL WRITES AFTER READS
-        const newSourceBalance = sourceBalance - amount;
-        const newTargetBalance = targetBalance + targetAmount;
-
-        // Update Source Wallet
         transaction.set(fromWalletRef, {
           userId: uid,
           currency: fromCurrency,
@@ -286,7 +370,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           updatedAt: new Date().toISOString()
         }, { merge: true });
 
-        // Update Target Wallet
         transaction.set(toWalletRef, {
           userId: uid,
           currency: toCurrency,
@@ -294,18 +377,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           updatedAt: new Date().toISOString()
         }, { merge: true });
 
-        // Synchronize legacy user profile balance if NGN is affected
         if (fromCurrency === "NGN") {
-          transaction.update(userRef, {
-            balance: FieldValue.increment(-amount)
-          });
+          transaction.update(userRef, { balance: FieldValue.increment(-amount) });
         } else if (toCurrency === "NGN") {
-          transaction.update(userRef, {
-            balance: FieldValue.increment(targetAmount)
-          });
+          transaction.update(userRef, { balance: FieldValue.increment(targetAmount) });
         }
 
-        // Write Audit Ledger Transactions
         const txRef = `swap-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
         const debitTxRef = adminDb.collection("transactions").doc(`tx-debit-${txRef}`);
         const creditTxRef = adminDb.collection("transactions").doc(`tx-credit-${txRef}`);
@@ -319,12 +396,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           currency: fromCurrency,
           reference: txRef,
           type: "SWAP_DEBIT",
-          description: `Currency Exchange: Swapped ${fromCurrency} ${amount.toLocaleString()} to ${toCurrency}`,
+          description: `Currency Exchange: Swapped ${fromCurrency} ${amount.toLocaleString()} to ${toCurrency}${fee > 0 ? ` (Deducted fee: ${fee})` : ""}`,
           recipientName: `${toCurrency} Wallet`,
           status: "SUCCESS",
           date: dateStr,
           time: timeStr,
-          fee: 0,
+          fee,
           createdAt: new Date().toISOString()
         };
 
@@ -351,12 +428,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           fromCurrency,
           toAmount: targetAmount,
           toCurrency,
+          fee,
           rate,
           txRef
         };
       });
 
-      console.log(`[POST /api/wallets/swap] [${reqId}] Successfully completed swap inside transaction in ${Date.now() - startTime}ms. Ref: ${result.txRef}`);
       return NextResponse.json({
         success: true,
         message: `Successfully exchanged ${result.fromCurrency} ${result.fromAmount.toLocaleString()} for ${result.toCurrency} ${result.toAmount.toLocaleString()}!`,
@@ -368,57 +445,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
 
   } catch (error: any) {
     console.error(`[POST /api/wallets/[...path]] [${reqId}] Swap exception:`, error);
-
-    // Self-healing fallback for offline testing and mock sessions when DB credentials are absent
-    const isCredentialError = error.message?.includes("default credentials") || error.message?.includes("credentials");
-    if (isCredentialError) {
-      console.log(`[POST /api/wallets/[...path]] [${reqId}] Local Sandbox / Offline fallback mode activated.`);
-      const fromCurrency = (body.fromCurrency || "").toUpperCase();
-      const toCurrency = (body.toCurrency || "").toUpperCase();
-      const amount = parseFloat(body.amount);
-
-      const usdToNgn = 1500.00;
-      const ngnToXof = 0.40;
-
-      let valueInNgn = 0;
-      if (fromCurrency === "NGN") {
-        valueInNgn = amount;
-      } else if (fromCurrency === "USD") {
-        valueInNgn = amount * usdToNgn;
-      } else if (fromCurrency === "XOF") {
-        valueInNgn = amount / ngnToXof;
-      }
-
-      let targetAmountRaw = 0;
-      if (toCurrency === "NGN") {
-        targetAmountRaw = valueInNgn;
-      } else if (toCurrency === "USD") {
-        targetAmountRaw = valueInNgn / usdToNgn;
-      } else if (toCurrency === "XOF") {
-        targetAmountRaw = valueInNgn * ngnToXof;
-      }
-
-      const targetAmount = Number(targetAmountRaw.toFixed(2));
-      const rate = targetAmount / amount;
-
-      return NextResponse.json({
-        success: true,
-        message: `Successfully exchanged ${fromCurrency} ${amount.toLocaleString()} for ${toCurrency} ${targetAmount.toLocaleString()}! (Sandbox Safe-Fallback)`,
-        data: {
-          fromAmount: amount,
-          fromCurrency,
-          toAmount: targetAmount,
-          toCurrency,
-          rate,
-          txRef: `swap-mock-sandbox-${Date.now()}`
-        }
-      });
-    }
-
     return NextResponse.json({
       error: error.message || "Internal server error performing currency exchange swap.",
-      message: error.message,
-      stack: error.stack
+      message: error.message
     }, { status: 400 });
   }
 }

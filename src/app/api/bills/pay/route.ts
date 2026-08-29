@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       amount,
       customer_id,
       biller_name,
-      biller_type, // "airtime", "data", "cable", "utility", "internet"
+      biller_type, // "airtime", "data", "cable", "utility", "internet", "waec", "electricity"
       pin,
       walletType, // "MAIN" | "BONUS"
     } = body;
@@ -46,6 +46,32 @@ export async function POST(req: Request) {
     if (isNaN(numAmount) || numAmount <= 0) {
       return NextResponse.json({ error: "Invalid bill amount. Must be greater than zero." }, { status: 400 });
     }
+
+    // 1. Fetch Global Commission Markups from Firestore config/vtu_profit_margins
+    let appliedMarkupFee = 0;
+    try {
+      const marginSnap = await adminDb.collection("config").doc("vtu_profit_margins").get();
+      if (marginSnap.exists) {
+        const margins = marginSnap.data() || {};
+        const bType = (biller_type || "").toLowerCase();
+        if (bType === "airtime") {
+          appliedMarkupFee = Number(margins.airtimeProfitMargin) || 0;
+        } else if (bType === "data") {
+          appliedMarkupFee = Number(margins.dataProfitMargin) || 0;
+        } else if (bType === "cable") {
+          appliedMarkupFee = Number(margins.cableProfitMargin) || 0;
+        } else if (bType === "waec") {
+          appliedMarkupFee = Number(margins.waecProfitMargin) || 0;
+        } else if (bType === "electricity" || bType === "utility") {
+          appliedMarkupFee = Number(margins.electricityProfitMargin) || 0;
+        }
+      }
+    } catch (marginErr: any) {
+      console.warn("[Bills Pay] Failed to fetch vtu_profit_margins, proceeding without markup:", marginErr.message);
+    }
+
+    // Total charge = base bill amount + admin global commission markup fee
+    const totalChargeAmount = numAmount + appliedMarkupFee;
 
     // Dynamic Selected Biller and Item Validation before payment
     const isMock = uid === "mock-uid";
@@ -139,7 +165,7 @@ export async function POST(req: Request) {
       const checkBonus = await ReferralService.validateBonusPurchase(
         uid,
         biller_type || "utility",
-        numAmount,
+        totalChargeAmount,
         item_code,
         matchedItemName
       );
@@ -157,15 +183,9 @@ export async function POST(req: Request) {
     const transactionType = biller_type?.toUpperCase() === "AIRTIME" ? "AIRTIME" :
                             biller_type?.toUpperCase() === "DATA" ? "DATA" : "BILLS";
 
-    const description = `${biller_name || "Bill Payment"} (${item_code}) to ${customer_id}`;
+    const description = `${biller_name || "Bill Payment"} (${item_code}) to ${customer_id}${appliedMarkupFee > 0 ? ` (Includes ₦${appliedMarkupFee} service markup)` : ""}`;
 
     // Atomically verify PIN and debit wallet
-    // FIRESTORE TRANSACTION CONSTRAINTS:
-    // Firestore transactions strictly require all reads (transaction.get()) to be executed BEFORE any writes
-    // (transaction.set(), transaction.update(), transaction.delete()). Mixing reads after writes within the
-    // same transaction block breaks Firestore's optimistic concurrency control mechanisms and throws an immediate
-    // runtime exception. To guarantee strict serializability and avoid concurrency errors, we pre-load all
-    // required records up front first, and then execute all mutation writes sequentially at the end.
     const transactionResult = await adminDb.runTransaction(async (transaction) => {
       // 1. ALL READS: Execute all transaction.get() reads first to lock target documents
       const userDoc = await transaction.get(userRef);
@@ -188,9 +208,6 @@ export async function POST(req: Request) {
       const lockedUntil = userData.lockedUntil;
       let pinAttempts = Number(userData.pinAttempts) || 0;
 
-      // Construct a pre-loaded user profile payload to pass downstream to WalletService.debitWallet().
-      // This completely suppresses any subsequent internal transaction.get() reads inside WalletService,
-      // strictly ensuring zero reads-after-writes and preventing Firestore transaction state invalidation.
       const preLoadedUser = {
         ref: userRef,
         data: userData,
@@ -252,25 +269,24 @@ export async function POST(req: Request) {
       // PIN is correct, reset pinAttempts and check balance (WRITES start here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      // Check wallet balance using preloaded wallet doc
-      if (walletBalance < numAmount) {
+      // Check wallet balance using totalChargeAmount (numAmount + appliedMarkupFee)
+      if (walletBalance < totalChargeAmount) {
         return {
           success: false,
-          error: `Insufficient ${isBonus ? "bonus reward" : "wallet"} funds to pay this bill. Required: ₦${numAmount.toLocaleString()}, Available: ₦${walletBalance.toLocaleString()}`,
+          error: `Insufficient ${isBonus ? "bonus reward" : "wallet"} funds to pay this bill. Required: ₦${totalChargeAmount.toLocaleString()} (Bill: ₦${numAmount.toLocaleString()}${appliedMarkupFee > 0 ? ` + Markup Fee: ₦${appliedMarkupFee}` : ""}), Available: ₦${walletBalance.toLocaleString()}`,
         };
       }
 
-      // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end of the transaction block
-      // Safe debit using preLoadedUser and preLoadedWallet to completely avoid secondary reads-after-writes inside WalletService
+      // 2. ALL WRITES: Execute all updates sequentially
       await WalletService.debitWallet(transaction, {
         userId: uid,
-        amount: numAmount,
+        amount: totalChargeAmount,
         currency: "NGN",
         reference,
         type: transactionType,
         description,
         recipientName: customer_id,
-        fee: 0,
+        fee: appliedMarkupFee,
         walletType: walletType || "MAIN",
         preLoadedUser,
         preLoadedWallet,
@@ -379,7 +395,7 @@ export async function POST(req: Request) {
       const paymentRes = await gateway.payBills({
         biller_code,
         item_code,
-        amount: numAmount,
+        amount: numAmount, // Base bill amount sent to provider
         customer_id,
         biller_name,
         biller_type: biller_type || "utility",
@@ -418,7 +434,7 @@ export async function POST(req: Request) {
       const err = apiErr as Error;
       console.error(`[Bills Pay Error] Execution failed on provider [${gateway.name}]:`, err.message);
 
-      // Rollback debit atomically
+      // Rollback totalChargeAmount (base bill + markup) atomically
       await adminDb.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
         if (userDoc.exists) {
@@ -428,7 +444,7 @@ export async function POST(req: Request) {
 
           await WalletService.creditWallet(transaction, {
             userId: uid,
-            amount: numAmount,
+            amount: totalChargeAmount,
             currency: "NGN",
             reference: `REFUND-${reference}`,
             description: `Refund for failed bill payment: ${description}`,
