@@ -2,6 +2,48 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 
+// Helper function to auto-clean stale unpaid/abandoned orders older than 24 hours (100% server-side)
+async function autoCleanStaleAbandonedOrders() {
+  try {
+    const twentyFourHoursAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const staleOrdersSnap = await adminDb
+      .collection("store_orders")
+      .where("createdAt", "<", twentyFourHoursAgoIso)
+      .get();
+
+    if (!staleOrdersSnap.empty) {
+      const batch = adminDb.batch();
+      let deleteCount = 0;
+
+      staleOrdersSnap.forEach((doc) => {
+        const data = doc.data();
+        const st = String(data.status || "").toLowerCase();
+        const paySt = String(data.paymentStatus || "").toLowerCase();
+
+        // Delete if unpaid, abandoned, or failed after 24 hours
+        if (
+          st === "pending payment" ||
+          st === "payment failed" ||
+          st === "canceled" ||
+          st === "cancelled" ||
+          paySt === "pending_payment" ||
+          paySt === "failed"
+        ) {
+          batch.delete(doc.ref);
+          deleteCount++;
+        }
+      });
+
+      if (deleteCount > 0) {
+        await batch.commit();
+        console.log(`[Store Orders Auto-Clean] Auto-deleted ${deleteCount} stale abandoned store orders (>24h old).`);
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Store Orders Auto-Clean Warning]:", err.message);
+  }
+}
+
 export async function POST(req: Request) {
   try {
     let uid = "";
@@ -13,6 +55,10 @@ export async function POST(req: Request) {
     } catch {
       return NextResponse.json({ error: "Unauthorized: Please sign in to place an order." }, { status: 401 });
     }
+
+    // Trigger non-blocking 24h stale order cleanup routine
+    autoCleanStaleAbandonedOrders().catch(() => {});
+
     const body = await req.json();
     const { items, customerName, customerEmail, customerPhone, deliveryAddress, paymentMethod = "WALLET_NGN" } = body;
 
@@ -231,6 +277,10 @@ export async function GET(req: Request) {
     } catch {
       return NextResponse.json({ error: "Unauthorized access." }, { status: 401 });
     }
+
+    // Trigger non-blocking 24h stale order cleanup routine
+    autoCleanStaleAbandonedOrders().catch(() => {});
+
     const ordersSnap = await adminDb
       .collection("store_orders")
       .where("userId", "==", uid)
