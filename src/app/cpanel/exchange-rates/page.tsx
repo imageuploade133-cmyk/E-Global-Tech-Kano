@@ -53,6 +53,10 @@ function CpanelExchangeRatesContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Live World Dollar Rate State
+  const [liveWorldDollarRate, setLiveWorldDollarRate] = useState<number | null>(null);
+  const [isFetchingLiveRate, setIsFetchingLiveRate] = useState(false);
+
   // Simulator States
   const [simFromCurrency, setSimFromCurrency] = useState<"NGN" | "USD" | "XOF">("NGN");
   const [simToCurrency, setSimToCurrency] = useState<"NGN" | "USD" | "XOF">("USD");
@@ -75,9 +79,33 @@ function CpanelExchangeRatesContent() {
     }
   };
 
+  const fetchLiveDollarRate = async () => {
+    setIsFetchingLiveRate(true);
+    try {
+      const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.rates?.NGN) {
+          setLiveWorldDollarRate(Number(data.rates.NGN));
+          toast.success(`Fetched live world market USD rate: ₦${Number(data.rates.NGN).toLocaleString()}`);
+        }
+      }
+    } catch (err: any) {
+      console.warn("Failed to fetch live USD market rate:", err.message);
+    } finally {
+      setIsFetchingLiveRate(false);
+    }
+  };
+
   useEffect(() => {
     fetchConfig();
   }, []);
+
+  useEffect(() => {
+    if (config.useLiveWorldDollarRate && !liveWorldDollarRate) {
+      fetchLiveDollarRate();
+    }
+  }, [config.useLiveWorldDollarRate]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +145,11 @@ function CpanelExchangeRatesContent() {
     ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
     : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
 
-  const effectiveDollarRate = config.manualDollarRate + config.dollarCommissionFee;
+  const activeBaseDollarRate = config.useLiveWorldDollarRate
+    ? (liveWorldDollarRate || config.manualDollarRate)
+    : config.manualDollarRate;
+
+  const effectiveDollarRate = activeBaseDollarRate + config.dollarCommissionFee;
 
   // Simulator calculation
   const calculateSimSwap = () => {
@@ -245,18 +277,35 @@ function CpanelExchangeRatesContent() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Manual Dollar Rate Override</span>
+            {/* Manual Dollar Rate Input / Deactivated Box */}
+            <div className={cn("p-4 rounded-xl border transition-all space-y-1", config.useLiveWorldDollarRate ? "bg-slate-950/60 border-slate-800 opacity-80" : "bg-slate-900/80 border-slate-800")}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Manual Dollar Rate Override</span>
+                {config.useLiveWorldDollarRate && (
+                  <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    {isFetchingLiveRate ? "Fetching Live..." : "Deactivated (Live Mode Active)"}
+                  </span>
+                )}
+              </div>
+
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₦</span>
                 <input
                   type="number"
-                  value={config.manualDollarRate}
+                  disabled={config.useLiveWorldDollarRate}
+                  value={config.useLiveWorldDollarRate ? (liveWorldDollarRate || config.manualDollarRate) : config.manualDollarRate}
                   onChange={(e) => setConfig({ ...config, manualDollarRate: Math.max(1, parseFloat(e.target.value) || 0) })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold text-white outline-none focus:border-[#FC7A00]"
+                  className={cn(
+                    "w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold outline-none focus:border-[#FC7A00] transition-all",
+                    config.useLiveWorldDollarRate && "opacity-60 cursor-not-allowed text-emerald-400 border-slate-800 bg-slate-900"
+                  )}
                 />
               </div>
-              <span className="text-[9px] text-slate-400 block mt-1">Base rate per 1 USD when Live Mode is OFF.</span>
+              <span className="text-[9px] text-slate-400 block mt-1">
+                {config.useLiveWorldDollarRate
+                  ? `Live world market USD rate auto-fetched: ₦${(liveWorldDollarRate || config.manualDollarRate).toLocaleString()}`
+                  : "Manual base rate per 1 USD when Live Mode is OFF."}
+              </span>
             </div>
 
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-1">
@@ -276,10 +325,12 @@ function CpanelExchangeRatesContent() {
             <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-1">
               <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Effective Customer Sell Rate</span>
               <strong className="text-xl font-black text-emerald-400 block font-mono mt-2">
-                ₦{effectiveDollarRate.toLocaleString()} / USD
+                ₦{effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD
               </strong>
               <span className="text-[9px] text-slate-400 block">
-                {config.useLiveWorldDollarRate ? "Live Market Rate + Admin Commission" : "Manual Rate + Admin Commission"}
+                {config.useLiveWorldDollarRate
+                  ? `Live World Rate (₦${(liveWorldDollarRate || config.manualDollarRate).toLocaleString()}) + Commission Fee (₦${config.dollarCommissionFee})`
+                  : `Manual Rate (₦${config.manualDollarRate.toLocaleString()}) + Commission Fee (₦${config.dollarCommissionFee})`}
               </span>
             </div>
           </div>
