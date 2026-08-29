@@ -36,6 +36,9 @@ export interface StoreOrder {
   status: string;
   adminNotes?: string;
   paymentMethod?: string;
+  paymentChannel?: string;
+  paymentStatus?: string;
+  paymentVerificationRef?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -403,9 +406,10 @@ function CpanelStoreOrdersPageContent() {
                   <tr>
                     <th className="p-4">Order ID & Date</th>
                     <th className="p-4">Customer Details</th>
+                    <th className="p-4">Payment Channel</th>
                     <th className="p-4">Items Summary</th>
                     <th className="p-4">Total Amount</th>
-                    <th className="p-4">Status</th>
+                    <th className="p-4">Payment & Order Status</th>
                     <th className="p-4 text-right">Action</th>
                   </tr>
                 </thead>
@@ -425,6 +429,15 @@ function CpanelStoreOrdersPageContent() {
                         <div className="text-[10px] text-gray-500 truncate max-w-xs">{order.deliveryAddress}</div>
                       </td>
 
+                      <td className="p-4 whitespace-nowrap">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/10 text-purple-600 border border-purple-500/20 inline-flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px]">
+                            {order.paymentMethod === "CARD_CHECKOUT" ? "credit_card" : "account_balance_wallet"}
+                          </span>
+                          <span>{order.paymentChannel || (order.paymentMethod === "CARD_CHECKOUT" ? "Card / Direct Link" : "Main Wallet")}</span>
+                        </span>
+                      </td>
+
                       <td className="p-4">
                         <span className="font-bold text-gray-700 dark:text-gray-300">
                           {order.items?.length || 0} Item(s)
@@ -440,10 +453,18 @@ function CpanelStoreOrdersPageContent() {
                         </span>
                       </td>
 
-                      <td className="p-4 whitespace-nowrap">
-                        <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border", getStatusBadge(order.status))}>
-                          {order.status}
-                        </span>
+                      <td className="p-4 whitespace-nowrap space-y-1">
+                        <div>
+                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 inline-flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px]">verified</span>
+                            <span>{order.paymentStatus || "PAID"}</span>
+                          </span>
+                        </div>
+                        <div>
+                          <span className={cn("px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border", getStatusBadge(order.status))}>
+                            {order.status}
+                          </span>
+                        </div>
                       </td>
 
                       <td className="p-4 text-right whitespace-nowrap">
@@ -514,8 +535,19 @@ function CpanelStoreOrdersPageContent() {
                 )}
 
                 <div>
-                  <span className="text-gray-400 block text-[10px]">Payment Method:</span>
-                  <strong className="text-emerald-600 font-black">{activeOrder.paymentMethod || "WALLET_NGN"}</strong>
+                  <span className="text-gray-400 block text-[10px]">Payment Channel & Verification:</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="px-2 py-0.5 rounded text-[9.5px] font-black uppercase bg-purple-500/10 text-purple-600 border border-purple-500/20">
+                      {activeOrder.paymentChannel || (activeOrder.paymentMethod === "CARD_CHECKOUT" ? "Card / Direct Checkout Link" : "Main NGN Wallet")}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[9.5px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px]">verified</span>
+                      <span>{activeOrder.paymentStatus || "PAID"}</span>
+                    </span>
+                  </div>
+                  {activeOrder.paymentVerificationRef && (
+                    <span className="text-[9px] font-mono text-gray-400 block mt-1">Ref: {activeOrder.paymentVerificationRef}</span>
+                  )}
                 </div>
 
                 <div className="col-span-1 md:col-span-2 border-t border-gray-200 dark:border-gray-800 pt-2">
