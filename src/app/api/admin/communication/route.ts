@@ -116,17 +116,43 @@ export async function POST(req: Request) {
           ? `234${targetPhone.startsWith("0") ? targetPhone.slice(1) : targetPhone}`
           : targetPhone;
 
+        const isBoldOtp = config.whatsappOtp.boldOtp !== false;
+        const formattedOtp = isBoldOtp ? "*987654*" : "987654";
+
         const waText = renderTemplateVariables(config.whatsappOtp.messageTemplate, {
           name: "Valued Administrator",
           brandName,
-          otp: "987654",
+          otp: formattedOtp,
           expiryMinutes: 10,
         });
 
-        const waRes = await callWhatsappBackend("/send/text", "POST", {
-          number: fullNum,
-          message: waText,
-        });
+        let waRes: any;
+        const bannerUrl = (config.whatsappOtp.bannerUrl || "").trim();
+
+        if (bannerUrl) {
+          // Attempt sending media with banner image via WhatsApp gateway
+          waRes = await callWhatsappBackend("/send/media", "POST", {
+            number: fullNum,
+            mediaUrl: bannerUrl,
+            image: bannerUrl,
+            url: bannerUrl,
+            caption: waText,
+            message: waText,
+          });
+
+          if (!waRes.ok) {
+            // Fallback to text message with banner link
+            waRes = await callWhatsappBackend("/send/text", "POST", {
+              number: fullNum,
+              message: `${waText}\n\n${bannerUrl}`,
+            });
+          }
+        } else {
+          waRes = await callWhatsappBackend("/send/text", "POST", {
+            number: fullNum,
+            message: waText,
+          });
+        }
 
         if (!waRes.ok) {
           return NextResponse.json(
@@ -285,6 +311,8 @@ export async function POST(req: Request) {
         mainMessage: sanitizeText(whatsappOtp?.mainMessage || DEFAULT_COMMUNICATION_BRANDING.whatsappOtp.mainMessage),
         expiryMessage: sanitizeText(whatsappOtp?.expiryMessage || DEFAULT_COMMUNICATION_BRANDING.whatsappOtp.expiryMessage),
         securityWarning: sanitizeText(whatsappOtp?.securityWarning || DEFAULT_COMMUNICATION_BRANDING.whatsappOtp.securityWarning),
+        boldOtp: whatsappOtp?.boldOtp !== undefined ? Boolean(whatsappOtp.boldOtp) : true,
+        bannerUrl: (whatsappOtp?.bannerUrl || "").trim(),
       },
       welcomeEmail: {
         subject: sanitizeText(welcomeEmail?.subject || DEFAULT_COMMUNICATION_BRANDING.welcomeEmail.subject),

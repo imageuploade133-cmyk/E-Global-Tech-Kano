@@ -32,6 +32,7 @@ export default function CommunicationBrandingPage() {
   // Image Uploading States
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingOtpBanner, setIsUploadingOtpBanner] = useState(false);
+  const [isUploadingWaBanner, setIsUploadingWaBanner] = useState(false);
   const [isUploadingWelcomeBanner, setIsUploadingWelcomeBanner] = useState(false);
 
   // Modal States
@@ -47,6 +48,7 @@ export default function CommunicationBrandingPage() {
 
   const logoFileRef = useRef<HTMLInputElement>(null);
   const otpBannerFileRef = useRef<HTMLInputElement>(null);
+  const waBannerFileRef = useRef<HTMLInputElement>(null);
   const welcomeBannerFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -184,7 +186,7 @@ export default function CommunicationBrandingPage() {
 
   const handleImageUpload = async (
     file: File,
-    target: "sender_logo" | "email_otp_banner" | "welcome_banner",
+    target: "sender_logo" | "email_otp_banner" | "whatsapp_banner" | "welcome_banner",
     setLoadingState: (val: boolean) => void
   ) => {
     // Validate file type
@@ -213,6 +215,11 @@ export default function CommunicationBrandingPage() {
           setConfig((prev) => ({
             ...prev,
             emailOtp: { ...prev.emailOtp, bannerUrl: result.url },
+          }));
+        } else if (target === "whatsapp_banner") {
+          setConfig((prev) => ({
+            ...prev,
+            whatsappOtp: { ...prev.whatsappOtp, bannerUrl: result.url },
           }));
         } else if (target === "welcome_banner") {
           setConfig((prev) => ({
@@ -630,6 +637,68 @@ export default function CommunicationBrandingPage() {
                 />
               </div>
 
+              {/* Bold OTP Toggle Checkbox */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-emerald-600 text-[20px]">format_bold</span>
+                  <div>
+                    <span className="font-extrabold text-xs text-gray-900 dark:text-white block">Bold OTP Code Number (*123456*)</span>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400 block font-medium">Formats the 6-digit verification PIN in bold asterisks for high visibility on WhatsApp.</span>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.whatsappOtp.boldOtp !== false}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      whatsappOtp: { ...config.whatsappOtp, boldOtp: e.target.checked }
+                    })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* WhatsApp Banner Image Upload */}
+              <div>
+                <label className={labelClass}>WhatsApp OTP Header Banner Image</label>
+                <div className="flex items-center gap-3">
+                  {config.whatsappOtp.bannerUrl && (
+                    <img src={config.whatsappOtp.bannerUrl} alt="WhatsApp Banner" className="w-16 h-10 object-cover rounded-lg border border-gray-200 dark:border-gray-800" />
+                  )}
+                  <input
+                    type="file"
+                    ref={waBannerFileRef}
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, "whatsapp_banner", setIsUploadingWaBanner);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={isUploadingWaBanner}
+                    onClick={() => waBannerFileRef.current?.click()}
+                    className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isUploadingWaBanner ? "Uploading..." : config.whatsappOtp.bannerUrl ? "Replace Banner" : "Upload Banner Image"}
+                  </button>
+                  {config.whatsappOtp.bannerUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, whatsappOtp: { ...config.whatsappOtp, bannerUrl: "" } })}
+                      className="px-3 py-2 text-red-500 hover:underline text-xs font-bold cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">When set, WhatsApp dispatches include this banner image alongside your OTP message.</p>
+              </div>
+
               <div>
                 <label className={labelClass}>Full WhatsApp Message Template</label>
                 <textarea
@@ -657,14 +726,25 @@ export default function CommunicationBrandingPage() {
             <div className="space-y-4">
               <h3 className="font-extrabold text-sm uppercase tracking-wider text-gray-500">WhatsApp Live Chat Preview</h3>
               <div className="bg-[#efeae2] dark:bg-gray-950 p-6 rounded-3xl border border-gray-300 dark:border-gray-800 min-h-[300px] flex items-center justify-center">
-                <div className="bg-white dark:bg-gray-900 text-black dark:text-white p-4 rounded-2xl rounded-tl-none shadow-md max-w-[320px] font-sans text-xs whitespace-pre-wrap leading-relaxed border-l-4 border-emerald-500">
-                  {renderTemplateVariables(config.whatsappOtp.messageTemplate, {
-                    name: "Valued Customer",
-                    brandName: config.whatsappOtp.brandName || "E-Global Pay",
-                    otp: "123456",
-                    expiryMinutes: 10,
-                  })}
-                  <div className="text-[9px] text-gray-400 text-right mt-2">Just now • WhatsApp Verification</div>
+                <div className="bg-white dark:bg-gray-900 text-black dark:text-white p-3.5 rounded-2xl rounded-tl-none shadow-md max-w-[320px] font-sans text-xs whitespace-pre-wrap leading-relaxed border-l-4 border-emerald-500 space-y-2">
+                  {/* Render Banner Image if configured */}
+                  {config.whatsappOtp.bannerUrl && (
+                    <div className="rounded-xl overflow-hidden mb-2 border border-gray-100 dark:border-gray-800">
+                      <img src={config.whatsappOtp.bannerUrl} alt="WhatsApp OTP Banner" className="w-full h-32 object-cover" />
+                    </div>
+                  )}
+
+                  <div>
+                    {renderTemplateVariables(config.whatsappOtp.messageTemplate, {
+                      name: "Valued Customer",
+                      brandName: config.whatsappOtp.brandName || "E-Global Pay",
+                      otp: config.whatsappOtp.boldOtp !== false ? "*123456*" : "123456",
+                      expiryMinutes: 10,
+                    })}
+                  </div>
+                  <div className="text-[9px] text-gray-400 text-right pt-1 border-t border-gray-100 dark:border-gray-800">
+                    Just now • WhatsApp Verification
+                  </div>
                 </div>
               </div>
             </div>
