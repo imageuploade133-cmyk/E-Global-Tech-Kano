@@ -130,28 +130,33 @@ export async function GET(req: Request) {
       });
     }
 
-    const sanitizedUsers = await Promise.all(users.map(async u => {
+    if (users.length === 0) {
+      return NextResponse.json({ success: true, users: [] });
+    }
+
+    // High-performance batch read for user wallets using adminDb.getAll()
+    const walletRefs: FirebaseFirestore.DocumentReference[] = [];
+    users.forEach(u => {
+      const userUid = u.uid || u.id;
+      walletRefs.push(adminDb.collection("wallets").doc(`${userUid}_USD`));
+      walletRefs.push(adminDb.collection("wallets").doc(`${userUid}_XOF`));
+    });
+
+    const walletDocSnaps = await adminDb.getAll(...walletRefs);
+    const walletBalancesMap: Record<string, number> = {};
+
+    walletDocSnaps.forEach(doc => {
+      if (doc.exists) {
+        walletBalancesMap[doc.id] = Number(doc.data()?.balance) || 0;
+      }
+    });
+
+    const sanitizedUsers = users.map(u => {
       const userUid = u.uid || u.id;
 
-      let usdBalance = 0;
-      let xofBalance = 0;
+      const usdBalance = walletBalancesMap[`${userUid}_USD`] || 0;
+      const xofBalance = walletBalancesMap[`${userUid}_XOF`] || 0;
       const bonusBalance = u.bonusBalance || 0;
-
-      try {
-        const [usdDoc, xofDoc] = await Promise.all([
-          adminDb.collection("wallets").doc(`${userUid}_USD`).get(),
-          adminDb.collection("wallets").doc(`${userUid}_XOF`).get()
-        ]);
-
-        if (usdDoc.exists) {
-          usdBalance = Number(usdDoc.data()?.balance) || 0;
-        }
-        if (xofDoc.exists) {
-          xofBalance = Number(xofDoc.data()?.balance) || 0;
-        }
-      } catch (walletErr: any) {
-        console.warn(`[Admin Users GET] Failed to fetch wallets for user=${userUid}:`, walletErr.message);
-      }
 
       return {
         uid: userUid,
@@ -166,7 +171,7 @@ export async function GET(req: Request) {
         bonusBalance,
         createdAt: u.createdAt || new Date().toISOString()
       };
-    }));
+    });
 
     return NextResponse.json({ success: true, users: sanitizedUsers });
   } catch (err: unknown) {
