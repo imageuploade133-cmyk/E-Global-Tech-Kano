@@ -26,6 +26,8 @@ export interface WhatsappOtpTemplateSettings {
   mainMessage: string;
   expiryMessage: string;
   securityWarning: string;
+  boldOtp?: boolean;
+  bannerUrl?: string;
 }
 
 export interface WelcomeEmailTemplateSettings {
@@ -71,12 +73,14 @@ export const DEFAULT_COMMUNICATION_BRANDING: CommunicationBrandingConfig = {
     bannerUrl: "",
   },
   whatsappOtp: {
-    messageTemplate: "Hello {{name}},\n\nYour {{brandName}} verification code is {{otp}}.\n\nThis code expires in {{expiryMinutes}} minutes.\n\nDo NOT share this code with anyone for security.",
+    messageTemplate: "Hello {{name}},\n\nYour {{brandName}} verification code is *{{otp}}*.\n\nThis code expires in {{expiryMinutes}} minutes.\n\nDo NOT share this code with anyone for security.",
     brandName: "E-Global Pay",
     greeting: "Hello {{name}},",
-    mainMessage: "Your verification code is {{otp}}.",
+    mainMessage: "Your verification code is *{{otp}}*.",
     expiryMessage: "This code expires in {{expiryMinutes}} minutes.",
     securityWarning: "Do NOT share this code with anyone for security reasons.",
+    boldOtp: true,
+    bannerUrl: "",
   },
   welcomeEmail: {
     subject: "Welcome to {{brandName}} - Your Account is Active!",
