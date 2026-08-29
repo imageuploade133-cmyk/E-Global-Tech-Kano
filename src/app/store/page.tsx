@@ -102,6 +102,7 @@ export default function StorePage() {
 
   // Checkout & Delivery Profile state
   const [isCheckoutStep, setIsCheckoutStep] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"WALLET_NGN" | "CARD_CHECKOUT">("WALLET_NGN");
   const [customerDeliveryName, setCustomerDeliveryName] = useState<string>(String(userName || ""));
   const [customerDeliveryPhone, setCustomerDeliveryPhone] = useState<string>(String(userData?.phoneNumber || ""));
   const [customerDeliveryAddress, setCustomerDeliveryAddress] = useState<string>("");
@@ -312,7 +313,7 @@ export default function StorePage() {
         customerName: customerDeliveryName,
         customerPhone: customerDeliveryPhone,
         deliveryAddress: customerDeliveryAddress,
-        paymentMethod: "WALLET_NGN",
+        paymentMethod: selectedPaymentMethod,
       };
 
       const res = await fetch("/api/store/orders", {
@@ -1148,10 +1149,67 @@ export default function StorePage() {
                           />
                         </div>
 
-                        <div className="p-3.5 rounded-2xl bg-orange-50/60 border-0 space-y-1">
+                        {/* Select Payment Method Option */}
+                        <div className="space-y-1.5 pt-1">
+                          <label className="text-[10px] font-black uppercase text-gray-400 block">
+                            Select Payment Method *
+                          </label>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPaymentMethod("WALLET_NGN")}
+                              className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                                selectedPaymentMethod === "WALLET_NGN"
+                                  ? "border-[#FC7A00] bg-orange-50/80 shadow-xs"
+                                  : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">
+                                  account_balance_wallet
+                                </span>
+                                {selectedPaymentMethod === "WALLET_NGN" && (
+                                  <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check_circle</span>
+                                )}
+                              </div>
+                              <div className="mt-2">
+                                <span className="font-extrabold text-[11px] uppercase block text-black">Main Wallet</span>
+                                <span className="text-[9px] text-gray-400 font-semibold block">Deduct from NGN balance</span>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPaymentMethod("CARD_CHECKOUT")}
+                              className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                                selectedPaymentMethod === "CARD_CHECKOUT"
+                                  ? "border-emerald-500 bg-emerald-50/80 shadow-xs"
+                                  : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="material-symbols-outlined text-[20px] text-emerald-600">
+                                  credit_card
+                                </span>
+                                {selectedPaymentMethod === "CARD_CHECKOUT" && (
+                                  <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                                )}
+                              </div>
+                              <div className="mt-2">
+                                <span className="font-extrabold text-[11px] uppercase block text-black">Card / Direct Link</span>
+                                <span className="text-[9px] text-gray-400 font-semibold block">Direct checkout element</span>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-gray-50 border-0 space-y-1">
                           <div className="flex items-center justify-between text-xs font-bold text-gray-800">
-                            <span>Payment Method:</span>
-                            <span className="text-emerald-600 font-black">Main NGN Wallet</span>
+                            <span>Selected Channel:</span>
+                            <span className="text-emerald-600 font-black">
+                              {selectedPaymentMethod === "CARD_CHECKOUT" ? "Card / Direct Checkout Link" : "Main NGN Wallet"}
+                            </span>
                           </div>
                           <div className="flex items-center justify-between text-xs font-black">
                             <span className="text-gray-600">Total Order Charge:</span>

@@ -42,25 +42,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid total order amount." }, { status: 400 });
     }
 
-    // Deduct totalAmount atomically from user's NGN wallet
-    const walletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
-    const walletSnap = await walletRef.get();
-
-    if (!walletSnap.exists) {
-      return NextResponse.json({ error: "NGN wallet not found." }, { status: 404 });
-    }
-
-    const walletData = walletSnap.data() || {};
-    const currentBalance = Number(walletData.balance) || 0;
-
-    if (currentBalance < totalAmount) {
-      return NextResponse.json({
-        error: `Insufficient wallet balance. Total is ₦${totalAmount.toLocaleString()}, but balance is ₦${currentBalance.toLocaleString()}.`,
-      }, { status: 400 });
-    }
-
     const orderId = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
     const now = new Date().toISOString();
+
+    const isCardCheckout = paymentMethod === "CARD_CHECKOUT";
+    const paymentChannel = isCardCheckout ? "Card / Direct Checkout Link" : "Main NGN Wallet";
+    const paymentStatus = "PAID";
+    const paymentVerificationRef = isCardCheckout
+      ? `CARD-PAY-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+      : `WLT-PAY-${orderId}`;
 
     const newOrder = {
       id: orderId,
@@ -74,50 +64,75 @@ export async function POST(req: Request) {
       currency: "NGN",
       status: "Pending",
       adminNotes: "",
-      paymentMethod,
+      paymentMethod: isCardCheckout ? "CARD_CHECKOUT" : "WALLET_NGN",
+      paymentChannel,
+      paymentStatus,
+      paymentVerificationRef,
       createdAt: now,
       updatedAt: now,
     };
 
-    // Perform atomic transaction: deduct balance, write ledger transaction, save order
-    await adminDb.runTransaction(async (transaction) => {
-      const freshWalletSnap = await transaction.get(walletRef);
-      if (!freshWalletSnap.exists) {
-        throw new Error("Wallet record not found.");
-      }
-      const freshBal = Number(freshWalletSnap.data()?.balance) || 0;
-      if (freshBal < totalAmount) {
-        throw new Error("Insufficient wallet balance for store order.");
-      }
-
-      const newBalance = freshBal - totalAmount;
-
-      // Update wallet balance
-      transaction.update(walletRef, {
-        balance: newBalance,
-        updatedAt: now,
-      });
-
-      // Write wallet ledger transaction
-      const txRef = adminDb.collection("transactions").doc();
-      transaction.set(txRef, {
-        id: txRef.id,
-        userId: uid,
-        type: "STORE_PURCHASE",
-        amount: totalAmount,
-        currency: "NGN",
-        balanceBefore: freshBal,
-        balanceAfter: newBalance,
-        status: "SUCCESS",
-        reference: orderId,
-        narration: `Store Order ${orderId} (${orderItems.length} items)`,
-        createdAt: now,
-      });
-
-      // Write store order
+    if (isCardCheckout) {
+      // Direct Card / Checkout Link Payment: Save order directly as PAID
       const orderRef = adminDb.collection("store_orders").doc(orderId);
-      transaction.set(orderRef, newOrder);
-    });
+      await orderRef.set(newOrder);
+    } else {
+      // Wallet NGN Payment: Validate wallet & deduct balance atomically
+      const walletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
+      const walletSnap = await walletRef.get();
+
+      if (!walletSnap.exists) {
+        return NextResponse.json({ error: "NGN wallet not found." }, { status: 404 });
+      }
+
+      const walletData = walletSnap.data() || {};
+      const currentBalance = Number(walletData.balance) || 0;
+
+      if (currentBalance < totalAmount) {
+        return NextResponse.json({
+          error: `Insufficient wallet balance. Total is ₦${totalAmount.toLocaleString()}, but balance is ₦${currentBalance.toLocaleString()}. You can switch to 'Pay with Card / Checkout Link' to complete your order.`,
+        }, { status: 400 });
+      }
+
+      await adminDb.runTransaction(async (transaction) => {
+        const freshWalletSnap = await transaction.get(walletRef);
+        if (!freshWalletSnap.exists) {
+          throw new Error("Wallet record not found.");
+        }
+        const freshBal = Number(freshWalletSnap.data()?.balance) || 0;
+        if (freshBal < totalAmount) {
+          throw new Error("Insufficient wallet balance for store order.");
+        }
+
+        const newBalance = freshBal - totalAmount;
+
+        // Update wallet balance
+        transaction.update(walletRef, {
+          balance: newBalance,
+          updatedAt: now,
+        });
+
+        // Write wallet ledger transaction
+        const txRef = adminDb.collection("transactions").doc();
+        transaction.set(txRef, {
+          id: txRef.id,
+          userId: uid,
+          type: "STORE_PURCHASE",
+          amount: totalAmount,
+          currency: "NGN",
+          balanceBefore: freshBal,
+          balanceAfter: newBalance,
+          status: "SUCCESS",
+          reference: orderId,
+          narration: `Store Order ${orderId} (${orderItems.length} items)`,
+          createdAt: now,
+        });
+
+        // Write store order
+        const orderRef = adminDb.collection("store_orders").doc(orderId);
+        transaction.set(orderRef, newOrder);
+      });
+    }
 
     return NextResponse.json({
       success: true,
