@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
-export interface ExchangeRatesConfig {
+interface ExchangeRatesConfig {
   useLiveWorldDollarRate: boolean;
   manualDollarRate: number;
   dollarCommissionFee: number;
@@ -20,7 +20,7 @@ export interface ExchangeRatesConfig {
   updatedBy?: string;
 }
 
-export const DEFAULT_EXCHANGE_RATES_CONFIG: ExchangeRatesConfig = {
+const DEFAULT_EXCHANGE_RATES_CONFIG: ExchangeRatesConfig = {
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
