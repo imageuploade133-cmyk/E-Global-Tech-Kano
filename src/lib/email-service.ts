@@ -13,9 +13,38 @@ export interface SendEmailParams {
  * Server-side Email Service calling the WhatsAPI Email API Gateway.
  */
 export async function sendEmail(params: SendEmailParams): Promise<boolean> {
-  const emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
-  const apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
-  const instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
+  let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
+  let apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
+  let instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
+  let senderName = "E-Global Pay";
+  let senderEmail = "no-reply@eglobalpay.com";
+
+  // 1. Fetch dynamic Email Gateway credentials from Firestore config/email_connect or config/whatsapp_api
+  try {
+    const emailConnectDoc = await adminDb.collection("config").doc("email_connect").get();
+    if (emailConnectDoc.exists) {
+      const data = emailConnectDoc.data();
+      if (data?.emailApiUrl) emailApiUrl = data.emailApiUrl;
+      if (data?.emailApiKey) apiKey = data.emailApiKey;
+      if (data?.emailInstanceId) instanceId = data.emailInstanceId;
+      if (data?.senderName) senderName = data.senderName;
+      if (data?.senderEmail) senderEmail = data.senderEmail;
+    } else {
+      const whatsappApiDoc = await adminDb.collection("config").doc("whatsapp_api").get();
+      if (whatsappApiDoc.exists) {
+        const waData = whatsappApiDoc.data();
+        if (waData?.whatsappApiUrl) {
+          emailApiUrl = waData.whatsappApiUrl.includes("/api/email")
+            ? waData.whatsappApiUrl
+            : `${waData.whatsappApiUrl.replace(/\/$/, "")}/api/email/send`;
+        }
+        if (waData?.whatsappApiKey) apiKey = waData.whatsappApiKey;
+        if (waData?.whatsappInstanceId) instanceId = waData.whatsappInstanceId;
+      }
+    }
+  } catch (dbErr: any) {
+    console.warn("[sendEmail] Firestore config lookup warning, using defaults:", dbErr.message);
+  }
 
   try {
     const controller = new AbortController();
@@ -35,6 +64,8 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
         html: params.html,
         text: params.text || "",
         replyTo: params.replyTo || "",
+        fromName: senderName,
+        fromEmail: senderEmail,
       }),
       signal: controller.signal,
     });

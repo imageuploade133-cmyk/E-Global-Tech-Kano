@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
     const isCardCheckout = paymentMethod === "CARD_CHECKOUT";
     const paymentChannel = isCardCheckout ? "Card / Direct Checkout Link" : "Main NGN Wallet";
-    const paymentStatus = "PAID";
+    const paymentStatus = isCardCheckout ? "PAID" : "PAID";
     const paymentVerificationRef = isCardCheckout
       ? `CARD-PAY-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
       : `WLT-PAY-${orderId}`;

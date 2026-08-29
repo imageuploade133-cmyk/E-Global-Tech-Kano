@@ -303,21 +303,18 @@ export async function POST(req: Request) {
       } catch (gateErr: any) {
         console.error("[Email Connect Test Dispatch Exception]:", gateErr.message);
 
-        // Record last activity timestamp even on fallback/test mode
         try {
           await adminDb.collection("config").doc("email_connect").set(
-            { lastActivity: new Date().toISOString() },
+            { status: "DISCONNECTED", lastActivity: new Date().toISOString() },
             { merge: true }
           );
         } catch {}
 
         return NextResponse.json({
-          success: true,
-          message: `Test email request recorded for ${recipient} (Gateway mock/simulation response).`,
-          recipient,
-          simulated: true,
+          success: false,
+          error: `Email Gateway connection failed: ${gateErr.message}. Please verify endpoint URL and API Key.`,
           details: gateErr.message,
-        });
+        }, { status: 502 });
       }
     }
 
