@@ -141,7 +141,7 @@ export async function POST(req: Request) {
       xofToUsd: Math.max(0, Number(body.swapFees?.xofToUsd) || 0),
     };
 
-    let swapRangeTiers: SwapRangeTier[] = [];
+    const swapRangeTiers: SwapRangeTier[] = [];
     if (Array.isArray(body.swapRangeTiers)) {
       for (const t of body.swapRangeTiers) {
         const minAmount = Math.max(0, Number(t.minAmount) || 0);
