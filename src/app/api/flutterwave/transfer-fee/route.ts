@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
+import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
 
 export async function GET(req: Request) {
   const reqId = `fee-req-${Date.now()}-${Math.random().toString(36).slice(-4)}`;
@@ -36,26 +37,48 @@ export async function GET(req: Request) {
     }
 
     // 3. Fetch custom global markup configurations securely from Firestore config collection
-    let transferProfitMargin = 0;
-    let bulkTransferProfitMargin = 0;
+    let defaultTransferProfitMargin = 0;
+    let defaultBulkTransferProfitMargin = 0;
+    let transferTieredMargins: TransferTieredMarkup[] = [];
+    let bulkTransferTieredMargins: TransferTieredMarkup[] = [];
 
     const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
     const marginSnap = await marginRef.get();
     if (marginSnap.exists) {
       const marginData = marginSnap.data() || {};
-      transferProfitMargin = Number(marginData.transferProfitMargin) || 0;
-      bulkTransferProfitMargin = Number(marginData.bulkTransferProfitMargin) || 0;
+      defaultTransferProfitMargin = Number(marginData.transferProfitMargin) || 0;
+      defaultBulkTransferProfitMargin = Number(marginData.bulkTransferProfitMargin) || 0;
+      if (Array.isArray(marginData.transferTieredMargins)) {
+        transferTieredMargins = marginData.transferTieredMargins;
+      }
+      if (Array.isArray(marginData.bulkTransferTieredMargins)) {
+        bulkTransferTieredMargins = marginData.bulkTransferTieredMargins;
+      }
     }
 
     let finalFee = 10.00;
 
     if (isBulk) {
-      // Bulk transfer fee calculation: (base flat fee + bulk margin) * count of recipients
+      // Bulk transfer fee calculation: evaluate tiered markup for each recipient amount or count
+      const amountsParam = searchParams.get("amounts");
       const baseFlatFee = 10.00;
-      const finalFlatFee = baseFlatFee + bulkTransferProfitMargin;
-      finalFee = count * finalFlatFee;
+      if (amountsParam) {
+        const itemAmounts = amountsParam.split(",").map((a) => Number(a) || 0);
+        let accumulatedFees = 0;
+        for (const itemAmt of itemAmounts) {
+          const markup = calculateTransferMarkupFee(itemAmt, defaultBulkTransferProfitMargin, bulkTransferTieredMargins);
+          accumulatedFees += baseFlatFee + markup;
+        }
+        finalFee = accumulatedFees;
+      } else {
+        // Evaluate based on average amount per recipient if total amount is passed
+        const avgAmtPerRec = count > 0 ? amount / count : amount;
+        const bulkMarkup = calculateTransferMarkupFee(avgAmtPerRec, defaultBulkTransferProfitMargin, bulkTransferTieredMargins);
+        const finalFlatFee = baseFlatFee + bulkMarkup;
+        finalFee = count * finalFlatFee;
+      }
     } else {
-      // Single transfer fee calculation: fetch base fee from remote payment gateway S2S and apply single markup
+      // Single transfer fee calculation: fetch base fee from remote payment gateway S2S and apply single tiered markup
       let baseFee = 10.00;
       const authHeader = req.headers.get("Authorization") || "";
       const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
@@ -78,6 +101,7 @@ export async function GET(req: Request) {
         }
       }
 
+      const transferProfitMargin = calculateTransferMarkupFee(amount, defaultTransferProfitMargin, transferTieredMargins);
       finalFee = baseFee + transferProfitMargin;
     }
 

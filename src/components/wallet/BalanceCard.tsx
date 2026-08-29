@@ -904,8 +904,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           idToken = await user.getIdToken();
         }
 
+        const amountsParam = isBulkMode ? bulkRecipients.map((r) => r.amount).join(",") : "";
         const url = isBulkMode
-          ? `/api/flutterwave/transfer-fee?amount=${amt}&bulk=true&count=${bulkRecipients.length}`
+          ? `/api/flutterwave/transfer-fee?amount=${amt}&bulk=true&count=${bulkRecipients.length}&amounts=${amountsParam}`
           : `/api/flutterwave/transfer-fee?amount=${amt}`;
 
         const res = await fetch(url, {
