@@ -123,7 +123,6 @@ function CpanelExchangeRatesContent() {
   const calculateSimSwap = () => {
     if (simFromCurrency === simToCurrency) return { output: simAmount, fee: 0 };
 
-    let feeKey = "ngnToUsd";
     let fee = 0;
     let converted = 0;
 
