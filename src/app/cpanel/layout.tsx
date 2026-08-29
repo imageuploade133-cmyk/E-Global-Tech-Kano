@@ -410,6 +410,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         { id: "bank_logos", label: "Bank Logos", icon: "account_balance", href: "/cpanel/bank-logos", permission: "bank_logos.manage" },
         { id: "bill_logos", label: "Bills Logos", icon: "receipt_long", href: "/cpanel/bill-logos", permission: "bill_logos.manage" },
         { id: "whatsapp", label: "WhatsApp Link", icon: "hub", href: "/cpanel/whatsapp", permission: "whatsapp.manage" },
+        { id: "email_connect", label: "Email Connect", icon: "alternate_email", href: "/cpanel/email-connect", permission: "email_connect.manage" },
       ]
     },
     {

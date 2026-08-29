@@ -26,6 +26,7 @@ export const CPANEL_PERMISSIONS_CATALOG: PermissionDefinition[] = [
   { key: "bank_logos.manage", label: "Bank Logos Manager", category: "Branding", description: "Manage and repair high-res financial institution logos" },
   { key: "bill_logos.manage", label: "Bill Logos Manager", category: "Branding", description: "Manage biller and network operator brand logos" },
   { key: "whatsapp.manage", label: "WhatsApp Link & Device", category: "Branding", description: "Connect and monitor Baileys WhatsApp integration" },
+  { key: "email_connect.manage", label: "Email Connect Gateway", category: "Branding", description: "Configure and test Email API keys & external gateway integration" },
 
   // Finance & Operations
   { key: "vtu.manage", label: "VTU Markups & Pricing", category: "Finance", description: "Set network airtime/data pricing markups" },
@@ -46,7 +47,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     "metrics.view", "admins.view", "users.view", "users.manage",
     "kyc.view", "kyc.manage", "freeze.manage", "limits.manage",
     "branding.manage", "communication.branding.manage", "banners.manage", "bank_logos.manage", "bill_logos.manage",
-    "whatsapp.manage", "vtu.manage", "investments.manage", "deposit.manage",
+    "whatsapp.manage", "email_connect.manage", "vtu.manage", "investments.manage", "deposit.manage",
     "store.view", "store.manage", "user_history.view"
   ],
   support: ["metrics.view", "users.view", "kyc.view", "store.view", "user_history.view"],
