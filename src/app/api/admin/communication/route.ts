@@ -214,15 +214,24 @@ export async function POST(req: Request) {
         `;
       }
 
-      const emailSent = await sendEmail({
-        to: recipientEmail,
-        subject,
-        html: htmlBody,
-        replyTo,
-      });
+      let emailSent = false;
+      let emailErrDetails = "";
+      try {
+        emailSent = await sendEmail({
+          to: recipientEmail,
+          subject,
+          html: htmlBody,
+          replyTo,
+        });
+      } catch (e: any) {
+        emailErrDetails = e.message || "Email gateway connection error";
+      }
 
       if (!emailSent) {
-        return NextResponse.json({ error: "Failed to dispatch test email via Email API. Check server logs." }, { status: 500 });
+        return NextResponse.json({
+          error: "Failed to dispatch test email via Email API Gateway. Please verify API Key & URL in 'Email Connect' page.",
+          details: emailErrDetails || "Remote Email Gateway unreachable or rejected credentials.",
+        }, { status: 502 });
       }
 
       await adminDb.collection("admin_audit_logs").add({
