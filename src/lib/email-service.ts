@@ -9,6 +9,56 @@ export interface SendEmailParams {
   replyTo?: string;
 }
 
+// 5-Minute In-Memory Server Cache for System Configs to minimize Firestore Reads
+let cachedEmailConfig: { data: any; expiresAt: number } | null = null;
+let cachedBrandingConfig: { data: any; expiresAt: number } | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 Minutes
+
+async function getCachedEmailGatewayConfig() {
+  const now = Date.now();
+  if (cachedEmailConfig && cachedEmailConfig.expiresAt > now) {
+    return cachedEmailConfig.data;
+  }
+
+  let configData: any = null;
+  try {
+    const emailConnectDoc = await adminDb.collection("config").doc("email_connect").get();
+    if (emailConnectDoc.exists) {
+      configData = emailConnectDoc.data();
+    } else {
+      const whatsappApiDoc = await adminDb.collection("config").doc("whatsapp_api").get();
+      if (whatsappApiDoc.exists) {
+        configData = whatsappApiDoc.data();
+      }
+    }
+  } catch (err: any) {
+    console.warn("[getCachedEmailGatewayConfig] Firestore lookup warning:", err.message);
+  }
+
+  cachedEmailConfig = { data: configData, expiresAt: now + CACHE_TTL_MS };
+  return configData;
+}
+
+async function getCachedBrandingConfig() {
+  const now = Date.now();
+  if (cachedBrandingConfig && cachedBrandingConfig.expiresAt > now) {
+    return cachedBrandingConfig.data;
+  }
+
+  let brandingData: any = null;
+  try {
+    const docSnap = await adminDb.collection("config").doc("communication_branding").get();
+    if (docSnap.exists) {
+      brandingData = docSnap.data();
+    }
+  } catch (err: any) {
+    console.warn("[getCachedBrandingConfig] Firestore lookup warning:", err.message);
+  }
+
+  cachedBrandingConfig = { data: brandingData, expiresAt: now + CACHE_TTL_MS };
+  return brandingData;
+}
+
 /**
  * Server-side Email Service calling the WhatsAPI Email API Gateway.
  */
@@ -19,31 +69,23 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   let senderName = "E-Global Pay";
   let senderEmail = "no-reply@eglobalpay.com";
 
-  // 1. Fetch dynamic Email Gateway credentials from Firestore config/email_connect or config/whatsapp_api
-  try {
-    const emailConnectDoc = await adminDb.collection("config").doc("email_connect").get();
-    if (emailConnectDoc.exists) {
-      const data = emailConnectDoc.data();
-      if (data?.emailApiUrl) emailApiUrl = data.emailApiUrl;
-      if (data?.emailApiKey) apiKey = data.emailApiKey;
-      if (data?.emailInstanceId) instanceId = data.emailInstanceId;
-      if (data?.senderName) senderName = data.senderName;
-      if (data?.senderEmail) senderEmail = data.senderEmail;
-    } else {
-      const whatsappApiDoc = await adminDb.collection("config").doc("whatsapp_api").get();
-      if (whatsappApiDoc.exists) {
-        const waData = whatsappApiDoc.data();
-        if (waData?.whatsappApiUrl) {
-          emailApiUrl = waData.whatsappApiUrl.includes("/api/email")
-            ? waData.whatsappApiUrl
-            : `${waData.whatsappApiUrl.replace(/\/$/, "")}/api/email/send`;
-        }
-        if (waData?.whatsappApiKey) apiKey = waData.whatsappApiKey;
-        if (waData?.whatsappInstanceId) instanceId = waData.whatsappInstanceId;
-      }
+  // Fetch dynamic Email Gateway credentials using 5-minute in-memory cache
+  const data = await getCachedEmailGatewayConfig();
+  if (data) {
+    if (data.emailApiUrl) emailApiUrl = data.emailApiUrl;
+    if (data.whatsappApiUrl && !data.emailApiUrl) {
+      emailApiUrl = data.whatsappApiUrl.includes("/api/email")
+        ? data.whatsappApiUrl
+        : `${data.whatsappApiUrl.replace(/\/$/, "")}/api/email/send`;
     }
-  } catch (dbErr: any) {
-    console.warn("[sendEmail] Firestore config lookup warning, using defaults:", dbErr.message);
+    if (data.emailApiKey) apiKey = data.emailApiKey;
+    else if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
+
+    if (data.emailInstanceId) instanceId = data.emailInstanceId;
+    else if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
+
+    if (data.senderName) senderName = data.senderName;
+    if (data.senderEmail) senderEmail = data.senderEmail;
   }
 
   try {
@@ -90,19 +132,14 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
 export async function sendWelcomeEmail(toEmail: string, userName?: string): Promise<boolean> {
   try {
     let config = { ...DEFAULT_COMMUNICATION_BRANDING };
-    try {
-      const docSnap = await adminDb.collection("config").doc("communication_branding").get();
-      if (docSnap.exists) {
-        const stored = docSnap.data() as Partial<CommunicationBrandingConfig>;
-        config = {
-          sender: { ...DEFAULT_COMMUNICATION_BRANDING.sender, ...(stored.sender || {}) },
-          emailOtp: { ...DEFAULT_COMMUNICATION_BRANDING.emailOtp, ...(stored.emailOtp || {}) },
-          whatsappOtp: { ...DEFAULT_COMMUNICATION_BRANDING.whatsappOtp, ...(stored.whatsappOtp || {}) },
-          welcomeEmail: { ...DEFAULT_COMMUNICATION_BRANDING.welcomeEmail, ...(stored.welcomeEmail || {}) },
-        };
-      }
-    } catch {
-      // Fallback to default
+    const stored = await getCachedBrandingConfig();
+    if (stored) {
+      config = {
+        sender: { ...DEFAULT_COMMUNICATION_BRANDING.sender, ...(stored.sender || {}) },
+        emailOtp: { ...DEFAULT_COMMUNICATION_BRANDING.emailOtp, ...(stored.emailOtp || {}) },
+        whatsappOtp: { ...DEFAULT_COMMUNICATION_BRANDING.whatsappOtp, ...(stored.whatsappOtp || {}) },
+        welcomeEmail: { ...DEFAULT_COMMUNICATION_BRANDING.welcomeEmail, ...(stored.welcomeEmail || {}) },
+      };
     }
 
     const tpl = config.welcomeEmail;

@@ -124,7 +124,7 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] total bonus sum failed:", err.message);
     }
 
-    // H. Read VTU margins and compute total Transfer Profit and total Data Profit
+    // H. Low-Cost Aggregations for Transfer Profit and Data Profit (Uses count() aggregation: 1 read per 1,000 txs)
     let totalTransferProfit = 0;
     let totalDataProfit = 0;
     try {
@@ -138,21 +138,25 @@ export async function GET(req: Request) {
         transferProfitMargin = Number(marginData?.transferProfitMargin) || 0;
       }
 
-      // Calculate transfer profit based on successful TRANSFER transactions count
-      const transferTxSnap = await adminDb.collection("transactions")
+      // Calculate transfer profit based on count() aggregation query (1 read per 1,000 txs)
+      const transferCountSnap = await adminDb.collection("transactions")
         .where("type", "==", "TRANSFER")
         .where("status", "==", "SUCCESS")
+        .count()
         .get();
-      totalTransferProfit = transferTxSnap.size * transferProfitMargin;
+      const transferCount = transferCountSnap.data().count || 0;
+      totalTransferProfit = transferCount * transferProfitMargin;
 
-      // Calculate data profit based on successful DATA transactions count
-      const dataTxSnap = await adminDb.collection("transactions")
+      // Calculate data profit based on count() aggregation query (1 read per 1,000 txs)
+      const dataCountSnap = await adminDb.collection("transactions")
         .where("type", "==", "DATA")
         .where("status", "==", "SUCCESS")
+        .count()
         .get();
-      totalDataProfit = dataTxSnap.size * dataProfitMargin;
+      const dataCount = dataCountSnap.data().count || 0;
+      totalDataProfit = dataCount * dataProfitMargin;
     } catch (err: any) {
-      console.warn("[Admin Config GET API] profit computation failed:", err.message);
+      console.warn("[Admin Config GET API] profit aggregation failed:", err.message);
     }
 
     // 3. Compile and merge aggregated values into config object

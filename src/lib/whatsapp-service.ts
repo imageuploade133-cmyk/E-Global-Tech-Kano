@@ -13,6 +13,10 @@ let isActionInFlight = false;
 let lastActionTime = 0;
 let vmSessionCookie = "";
 
+// 5-Minute In-Memory Server Cache for WhatsApp Config to minimize Firestore Reads
+let cachedWhatsappConfig: { data: WhatsappConfig; expiresAt: number } | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 Minutes
+
 /**
  * Ensures an active session cookie with the WhatsApp API VM.
  */
@@ -47,9 +51,14 @@ async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
 
 /**
  * Resolves server-side WhatsApp environment configuration.
- * Prioritizes process.env, falling back to Firestore config/whatsapp_api if process.env is missing.
+ * Uses 5-minute in-memory cache to prevent repetitive Firestore reads on every message/OTP dispatch.
  */
 export async function getWhatsappServerConfig(): Promise<WhatsappConfig> {
+  const now = Date.now();
+  if (cachedWhatsappConfig && cachedWhatsappConfig.expiresAt > now) {
+    return cachedWhatsappConfig.data;
+  }
+
   let apiUrl = (process.env.WHATSAPP_API_URL || "https://whatsapp-5fda.onrender.com").replace(/\/+$/, "");
   let apiKey = process.env.WHATSAPP_API_KEY || "";
   let instanceId = process.env.WHATSAPP_INSTANCE_ID || "default";
@@ -70,7 +79,9 @@ export async function getWhatsappServerConfig(): Promise<WhatsappConfig> {
     console.warn("[getWhatsappServerConfig] Firestore config lookup warning:", err.message);
   }
 
-  return { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
+  const resolvedConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
+  cachedWhatsappConfig = { data: resolvedConfig, expiresAt: now + CACHE_TTL_MS };
+  return resolvedConfig;
 }
 
 /**
