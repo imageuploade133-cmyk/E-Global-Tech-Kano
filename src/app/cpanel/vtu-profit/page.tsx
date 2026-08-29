@@ -13,6 +13,13 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 
+export interface TransferTieredMarkup {
+  id: string;
+  minAmount: number;
+  maxAmount: number;
+  fee: number;
+}
+
 interface ProfitMargins {
   dataProfitMargin: number;
   airtimeProfitMargin: number;
@@ -21,6 +28,8 @@ interface ProfitMargins {
   electricityProfitMargin: number;
   transferProfitMargin: number;
   bulkTransferProfitMargin: number;
+  transferTieredMargins: TransferTieredMarkup[];
+  bulkTransferTieredMargins: TransferTieredMarkup[];
 }
 
 const ButtonSpinner = () => (
@@ -99,6 +108,8 @@ function AdminVtuProfitPageContent() {
     electricityProfitMargin: 0,
     transferProfitMargin: 0,
     bulkTransferProfitMargin: 0,
+    transferTieredMargins: [],
+    bulkTransferTieredMargins: [],
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -128,6 +139,8 @@ function AdminVtuProfitPageContent() {
           electricityProfitMargin: Number(data.electricityProfitMargin) || 0,
           transferProfitMargin: Number(data.transferProfitMargin) || 0,
           bulkTransferProfitMargin: Number(data.bulkTransferProfitMargin) || 0,
+          transferTieredMargins: Array.isArray(data.transferTieredMargins) ? data.transferTieredMargins : [],
+          bulkTransferTieredMargins: Array.isArray(data.bulkTransferTieredMargins) ? data.bulkTransferTieredMargins : [],
         });
       } else {
         toast.error(data.error || "Failed to load profit margins.");
@@ -231,6 +244,68 @@ function AdminVtuProfitPageContent() {
     setMargins((prev) => ({
       ...prev,
       [key]: num,
+    }));
+  };
+
+  // Tiered Markup Handlers for Single Transfers
+  const addSingleTier = () => {
+    const newTier: TransferTieredMarkup = {
+      id: `tier_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      minAmount: 100,
+      maxAmount: 600,
+      fee: 10,
+    };
+    setMargins((prev) => ({
+      ...prev,
+      transferTieredMargins: [...prev.transferTieredMargins, newTier],
+    }));
+  };
+
+  const updateSingleTier = (id: string, field: "minAmount" | "maxAmount" | "fee", value: string) => {
+    const num = Math.max(0, parseFloat(value) || 0);
+    setMargins((prev) => ({
+      ...prev,
+      transferTieredMargins: prev.transferTieredMargins.map((t) =>
+        t.id === id ? { ...t, [field]: num } : t
+      ),
+    }));
+  };
+
+  const removeSingleTier = (id: string) => {
+    setMargins((prev) => ({
+      ...prev,
+      transferTieredMargins: prev.transferTieredMargins.filter((t) => t.id !== id),
+    }));
+  };
+
+  // Tiered Markup Handlers for Bulk Transfers
+  const addBulkTier = () => {
+    const newTier: TransferTieredMarkup = {
+      id: `tier_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      minAmount: 100,
+      maxAmount: 600,
+      fee: 10,
+    };
+    setMargins((prev) => ({
+      ...prev,
+      bulkTransferTieredMargins: [...prev.bulkTransferTieredMargins, newTier],
+    }));
+  };
+
+  const updateBulkTier = (id: string, field: "minAmount" | "maxAmount" | "fee", value: string) => {
+    const num = Math.max(0, parseFloat(value) || 0);
+    setMargins((prev) => ({
+      ...prev,
+      bulkTransferTieredMargins: prev.bulkTransferTieredMargins.map((t) =>
+        t.id === id ? { ...t, [field]: num } : t
+      ),
+    }));
+  };
+
+  const removeBulkTier = (id: string) => {
+    setMargins((prev) => ({
+      ...prev,
+      bulkTransferTieredMargins: prev.bulkTransferTieredMargins.filter((t) => t.id !== id),
     }));
   };
 
@@ -438,6 +513,181 @@ function AdminVtuProfitPageContent() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Outward Transfer Tiered Markups Dedicated Section */}
+            <div className={cn("p-6 rounded-2xl border space-y-6", panelClass)}>
+              <div className="border-b pb-3.5 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-[#FC7A00] flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[20px]">currency_exchange</span>
+                    <span>Outward Transfer Amount Tiered Markups</span>
+                  </h3>
+                  <p className="text-[10.5px] text-gray-400 font-bold uppercase mt-1">
+                    Configure custom range fees based on transfer amounts. If a transfer amount is not in any range, it falls back to the default <span className="text-emerald-500">SINGLE / BULK TRANSFER MARKUP</span> fee.
+                  </p>
+                </div>
+              </div>
+
+              {/* 1. Single Transfer Range Tiers */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-blue-500 text-[18px]">payments</span>
+                    <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white">Single Transfer Tiered Ranges</h4>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addSingleTier}
+                    className="px-3 py-1.5 bg-[#FC7A00]/10 border border-[#FC7A00]/30 text-[#FC7A00] hover:bg-[#FC7A00] hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">add</span>
+                    <span>Add Single Transfer Tier</span>
+                  </button>
+                </div>
+
+                {margins.transferTieredMargins.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-800 text-center text-xs text-gray-400 font-semibold">
+                    No custom amount range tiers added for Single Transfer. All single transfers will use default markup of <strong className="text-gray-700 dark:text-gray-200">₦{margins.transferProfitMargin}</strong>.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {margins.transferTieredMargins.map((tier, idx) => (
+                      <div
+                        key={tier.id}
+                        className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex flex-col sm:flex-row items-center gap-3"
+                      >
+                        <span className="text-[10px] font-mono font-black text-gray-400 shrink-0">#{idx + 1}</span>
+
+                        <div className="grid grid-cols-3 gap-2 flex-1 w-full">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-400 block">Min Amount (₦)</label>
+                            <input
+                              type="number"
+                              value={tier.minAmount || ""}
+                              onChange={(e) => updateSingleTier(tier.id, "minAmount", e.target.value)}
+                              placeholder="e.g. 100"
+                              className={cn(inputClass, "font-mono font-bold")}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-400 block">Max Amount (₦)</label>
+                            <input
+                              type="number"
+                              value={tier.maxAmount || ""}
+                              onChange={(e) => updateSingleTier(tier.id, "maxAmount", e.target.value)}
+                              placeholder="e.g. 600"
+                              className={cn(inputClass, "font-mono font-bold")}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-400 block">Markup Fee (₦)</label>
+                            <input
+                              type="number"
+                              value={tier.fee || ""}
+                              onChange={(e) => updateSingleTier(tier.id, "fee", e.target.value)}
+                              placeholder="e.g. 10"
+                              className={cn(inputClass, "font-mono font-bold text-emerald-500")}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeSingleTier(tier.id)}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all shrink-0 cursor-pointer"
+                          title="Delete Tier"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Bulk Transfer Range Tiers */}
+              <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-purple-500 text-[18px]">account_balance_wallet</span>
+                    <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white">Bulk Transfer Tiered Ranges</h4>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addBulkTier}
+                    className="px-3 py-1.5 bg-[#FC7A00]/10 border border-[#FC7A00]/30 text-[#FC7A00] hover:bg-[#FC7A00] hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">add</span>
+                    <span>Add Bulk Transfer Tier</span>
+                  </button>
+                </div>
+
+                {margins.bulkTransferTieredMargins.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-800 text-center text-xs text-gray-400 font-semibold">
+                    No custom amount range tiers added for Bulk Transfer. All bulk recipients will use default markup of <strong className="text-gray-700 dark:text-gray-200">₦{margins.bulkTransferProfitMargin}</strong>.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {margins.bulkTransferTieredMargins.map((tier, idx) => (
+                      <div
+                        key={tier.id}
+                        className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex flex-col sm:flex-row items-center gap-3"
+                      >
+                        <span className="text-[10px] font-mono font-black text-gray-400 shrink-0">#{idx + 1}</span>
+
+                        <div className="grid grid-cols-3 gap-2 flex-1 w-full">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-400 block">Min Amount (₦)</label>
+                            <input
+                              type="number"
+                              value={tier.minAmount || ""}
+                              onChange={(e) => updateBulkTier(tier.id, "minAmount", e.target.value)}
+                              placeholder="e.g. 5000"
+                              className={cn(inputClass, "font-mono font-bold")}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-400 block">Max Amount (₦)</label>
+                            <input
+                              type="number"
+                              value={tier.maxAmount || ""}
+                              onChange={(e) => updateBulkTier(tier.id, "maxAmount", e.target.value)}
+                              placeholder="e.g. 7000"
+                              className={cn(inputClass, "font-mono font-bold")}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black uppercase text-gray-400 block">Markup Fee (₦)</label>
+                            <input
+                              type="number"
+                              value={tier.fee || ""}
+                              onChange={(e) => updateBulkTier(tier.id, "fee", e.target.value)}
+                              placeholder="e.g. 1"
+                              className={cn(inputClass, "font-mono font-bold text-emerald-500")}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeBulkTier(tier.id)}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all shrink-0 cursor-pointer"
+                          title="Delete Tier"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <button

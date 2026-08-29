@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { NotificationService } from "@/services/notification-service";
+import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
@@ -124,12 +125,18 @@ export async function POST(req: Request) {
       const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
 
       // Fetch margins document (All reads must be done before any writes!)
-      let transferProfitMargin = 0;
+      let defaultTransferProfitMargin = 0;
+      let transferTieredMargins: TransferTieredMarkup[] = [];
       const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
       const marginSnap = await transaction.get(marginRef);
       if (marginSnap.exists) {
-        transferProfitMargin = Number(marginSnap.data()?.transferProfitMargin) || 0;
+        const marginData = marginSnap.data() || {};
+        defaultTransferProfitMargin = Number(marginData.transferProfitMargin) || 0;
+        if (Array.isArray(marginData.transferTieredMargins)) {
+          transferTieredMargins = marginData.transferTieredMargins;
+        }
       }
+      const transferProfitMargin = calculateTransferMarkupFee(trfAmount, defaultTransferProfitMargin, transferTieredMargins);
 
       const userData = userDoc.data() || {};
 
@@ -368,12 +375,18 @@ export async function POST(req: Request) {
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
-          let transferProfitMargin = 0;
+          let defaultTransferProfitMargin = 0;
+          let transferTieredMargins: TransferTieredMarkup[] = [];
           const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
           const marginSnap = await rollbackTx.get(marginRef);
           if (marginSnap.exists) {
-            transferProfitMargin = Number(marginSnap.data()?.transferProfitMargin) || 0;
+            const marginData = marginSnap.data() || {};
+            defaultTransferProfitMargin = Number(marginData.transferProfitMargin) || 0;
+            if (Array.isArray(marginData.transferTieredMargins)) {
+              transferTieredMargins = marginData.transferTieredMargins;
+            }
           }
+          const transferProfitMargin = calculateTransferMarkupFee(trfAmount, defaultTransferProfitMargin, transferTieredMargins);
           const finalFee = fee + transferProfitMargin;
           const finalTotalDeduction = trfAmount + finalFee;
 
