@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       const st = String(data.status || "Pending").toLowerCase();
       if (st === "pending") pendingCount++;
       else if (st === "delivered") deliveredCount++;
-      else if (st === "refunded" || st === "canceled") refundedCount++;
+      else if (st === "refunded" || st === "canceled" || st === "cancelled") refundedCount++;
 
       // Apply search query filter across customer fields
       if (searchQuery) {
@@ -89,6 +89,59 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { action, orderId, newStatus, adminNotes } = body;
+
+    // Single order deletion
+    if (action === "delete_order") {
+      if (!orderId) {
+        return NextResponse.json({ error: "Missing orderId parameter." }, { status: 400 });
+      }
+      const orderRef = adminDb.collection("store_orders").doc(orderId);
+      const orderSnap = await orderRef.get();
+      if (!orderSnap.exists) {
+        return NextResponse.json({ error: "Order not found." }, { status: 404 });
+      }
+
+      await orderRef.delete();
+      return NextResponse.json({
+        success: true,
+        message: `Order ${orderId} has been deleted successfully!`,
+      });
+    }
+
+    // Bulk purge abandoned, failed, or canceled orders
+    if (action === "purge_failed_orders") {
+      const ordersSnap = await adminDb.collection("store_orders").get();
+      let purgedCount = 0;
+      const batch = adminDb.batch();
+
+      ordersSnap.forEach((doc) => {
+        const data = doc.data();
+        const st = String(data.status || "").toLowerCase();
+        const paySt = String(data.paymentStatus || "").toLowerCase();
+
+        if (
+          st === "payment failed" ||
+          st === "pending payment" ||
+          st === "canceled" ||
+          st === "cancelled" ||
+          paySt === "failed" ||
+          paySt === "pending_payment"
+        ) {
+          batch.delete(doc.ref);
+          purgedCount++;
+        }
+      });
+
+      if (purgedCount > 0) {
+        await batch.commit();
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Purged ${purgedCount} failed, abandoned, and canceled store order records from system storage!`,
+        purgedCount,
+      });
+    }
 
     if (action !== "update_status" || !orderId || !newStatus) {
       return NextResponse.json({ error: "Missing required parameters (action, orderId, newStatus)." }, { status: 400 });
