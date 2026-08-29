@@ -201,8 +201,31 @@ function AdminVtuProfitPageContent() {
     }
   };
 
+  const validateTieredRanges = (): boolean => {
+    // Validate Single Transfer Tiers
+    for (const [idx, t] of margins.transferTieredMargins.entries()) {
+      if (t.maxAmount <= t.minAmount) {
+        toast.error(`Single Transfer Tier #${idx + 1} Invalid: Max Amount (₦${t.maxAmount}) must be strictly greater than Min Amount (₦${t.minAmount}).`);
+        return false;
+      }
+    }
+    // Validate Bulk Transfer Tiers
+    for (const [idx, t] of margins.bulkTransferTieredMargins.entries()) {
+      if (t.maxAmount <= t.minAmount) {
+        toast.error(`Bulk Transfer Tier #${idx + 1} Invalid: Max Amount (₦${t.maxAmount}) must be strictly greater than Min Amount (₦${t.minAmount}).`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateTieredRanges()) {
+      return;
+    }
+
     setIsSaving(true);
     toast.loading("Applying and securing global markup configurations...");
 
@@ -263,6 +286,16 @@ function AdminVtuProfitPageContent() {
 
   const updateSingleTier = (id: string, field: "minAmount" | "maxAmount" | "fee", value: string) => {
     const num = Math.max(0, parseFloat(value) || 0);
+    const targetTier = margins.transferTieredMargins.find((t) => t.id === id);
+
+    if (targetTier) {
+      if (field === "maxAmount" && num > 0 && num <= targetTier.minAmount) {
+        toast.error(`Not Allowed: Max Amount (₦${num}) cannot be lower than or equal to Min Amount (₦${targetTier.minAmount}).`);
+      } else if (field === "minAmount" && targetTier.maxAmount > 0 && num >= targetTier.maxAmount) {
+        toast.error(`Not Allowed: Min Amount (₦${num}) cannot be greater than or equal to Max Amount (₦${targetTier.maxAmount}).`);
+      }
+    }
+
     setMargins((prev) => ({
       ...prev,
       transferTieredMargins: prev.transferTieredMargins.map((t) =>
@@ -294,6 +327,16 @@ function AdminVtuProfitPageContent() {
 
   const updateBulkTier = (id: string, field: "minAmount" | "maxAmount" | "fee", value: string) => {
     const num = Math.max(0, parseFloat(value) || 0);
+    const targetTier = margins.bulkTransferTieredMargins.find((t) => t.id === id);
+
+    if (targetTier) {
+      if (field === "maxAmount" && num > 0 && num <= targetTier.minAmount) {
+        toast.error(`Not Allowed: Max Amount (₦${num}) cannot be lower than or equal to Min Amount (₦${targetTier.minAmount}).`);
+      } else if (field === "minAmount" && targetTier.maxAmount > 0 && num >= targetTier.maxAmount) {
+        toast.error(`Not Allowed: Min Amount (₦${num}) cannot be greater than or equal to Max Amount (₦${targetTier.maxAmount}).`);
+      }
+    }
+
     setMargins((prev) => ({
       ...prev,
       bulkTransferTieredMargins: prev.bulkTransferTieredMargins.map((t) =>
