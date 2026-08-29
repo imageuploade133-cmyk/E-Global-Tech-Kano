@@ -93,21 +93,41 @@ export async function POST(req: Request) {
     if (bulkTransferProfitMargin !== undefined) updates.bulkTransferProfitMargin = Math.max(0, Number(bulkTransferProfitMargin) || 0);
 
     if (Array.isArray(transferTieredMargins)) {
-      updates.transferTieredMargins = transferTieredMargins.map((t: any) => ({
+      const sanitizedSingle = transferTieredMargins.map((t: any) => ({
         id: String(t.id || `tier_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
         minAmount: Math.max(0, Number(t.minAmount) || 0),
         maxAmount: Math.max(0, Number(t.maxAmount) || 0),
         fee: Math.max(0, Number(t.fee) || 0),
       }));
+
+      for (const [idx, t] of sanitizedSingle.entries()) {
+        if (t.maxAmount <= t.minAmount) {
+          return NextResponse.json({
+            error: `Invalid Single Transfer Tier #${idx + 1}: Max Amount (₦${t.maxAmount}) must be strictly greater than Min Amount (₦${t.minAmount}).`
+          }, { status: 400 });
+        }
+      }
+
+      updates.transferTieredMargins = sanitizedSingle;
     }
 
     if (Array.isArray(bulkTransferTieredMargins)) {
-      updates.bulkTransferTieredMargins = bulkTransferTieredMargins.map((t: any) => ({
+      const sanitizedBulk = bulkTransferTieredMargins.map((t: any) => ({
         id: String(t.id || `tier_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
         minAmount: Math.max(0, Number(t.minAmount) || 0),
         maxAmount: Math.max(0, Number(t.maxAmount) || 0),
         fee: Math.max(0, Number(t.fee) || 0),
       }));
+
+      for (const [idx, t] of sanitizedBulk.entries()) {
+        if (t.maxAmount <= t.minAmount) {
+          return NextResponse.json({
+            error: `Invalid Bulk Transfer Tier #${idx + 1}: Max Amount (₦${t.maxAmount}) must be strictly greater than Min Amount (₦${t.minAmount}).`
+          }, { status: 400 });
+        }
+      }
+
+      updates.bulkTransferTieredMargins = sanitizedBulk;
     }
 
     updates.updatedAt = new Date().toISOString();
