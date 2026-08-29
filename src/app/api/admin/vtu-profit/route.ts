@@ -17,6 +17,8 @@ export async function GET(req: Request) {
     let electricityProfitMargin = 0;
     let transferProfitMargin = 0;
     let bulkTransferProfitMargin = 0;
+    let transferTieredMargins: any[] = [];
+    let bulkTransferTieredMargins: any[] = [];
 
     // Load from Firestore global admin configuration document or use default margins
     try {
@@ -31,6 +33,12 @@ export async function GET(req: Request) {
         electricityProfitMargin = Number(data?.electricityProfitMargin) || 0;
         transferProfitMargin = Number(data?.transferProfitMargin) || 0;
         bulkTransferProfitMargin = Number(data?.bulkTransferProfitMargin) || 0;
+        if (Array.isArray(data?.transferTieredMargins)) {
+          transferTieredMargins = data.transferTieredMargins;
+        }
+        if (Array.isArray(data?.bulkTransferTieredMargins)) {
+          bulkTransferTieredMargins = data.bulkTransferTieredMargins;
+        }
       }
     } catch (dbErr: any) {
       console.warn("[Admin VTU Profit GET] Failed to fetch margin settings, returning defaults:", dbErr.message);
@@ -45,6 +53,8 @@ export async function GET(req: Request) {
       electricityProfitMargin,
       transferProfitMargin,
       bulkTransferProfitMargin,
+      transferTieredMargins,
+      bulkTransferTieredMargins,
     });
   } catch (err: any) {
     console.error("[Admin VTU Profit GET Exception]:", err.message);
@@ -67,10 +77,12 @@ export async function POST(req: Request) {
       waecProfitMargin,
       electricityProfitMargin,
       transferProfitMargin,
-      bulkTransferProfitMargin
+      bulkTransferProfitMargin,
+      transferTieredMargins,
+      bulkTransferTieredMargins,
     } = body;
 
-    const updates: Record<string, number> = {};
+    const updates: Record<string, any> = {};
 
     if (dataProfitMargin !== undefined) updates.dataProfitMargin = Math.max(0, Number(dataProfitMargin) || 0);
     if (airtimeProfitMargin !== undefined) updates.airtimeProfitMargin = Math.max(0, Number(airtimeProfitMargin) || 0);
@@ -80,7 +92,25 @@ export async function POST(req: Request) {
     if (transferProfitMargin !== undefined) updates.transferProfitMargin = Math.max(0, Number(transferProfitMargin) || 0);
     if (bulkTransferProfitMargin !== undefined) updates.bulkTransferProfitMargin = Math.max(0, Number(bulkTransferProfitMargin) || 0);
 
-    updates.updatedAt = new Date().toISOString() as any;
+    if (Array.isArray(transferTieredMargins)) {
+      updates.transferTieredMargins = transferTieredMargins.map((t: any) => ({
+        id: String(t.id || `tier_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
+        minAmount: Math.max(0, Number(t.minAmount) || 0),
+        maxAmount: Math.max(0, Number(t.maxAmount) || 0),
+        fee: Math.max(0, Number(t.fee) || 0),
+      }));
+    }
+
+    if (Array.isArray(bulkTransferTieredMargins)) {
+      updates.bulkTransferTieredMargins = bulkTransferTieredMargins.map((t: any) => ({
+        id: String(t.id || `tier_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
+        minAmount: Math.max(0, Number(t.minAmount) || 0),
+        maxAmount: Math.max(0, Number(t.maxAmount) || 0),
+        fee: Math.max(0, Number(t.fee) || 0),
+      }));
+    }
+
+    updates.updatedAt = new Date().toISOString();
 
     try {
       await adminDb.collection("config").doc("vtu_profit_margins").set(updates, { merge: true });

@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { NotificationService } from "@/services/notification-service";
+import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
 import bcrypt from "bcryptjs";
 
 interface BulkRecipient {
@@ -153,14 +154,25 @@ export async function POST(req: Request) {
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
       // Apply Bulk Transfer Fee Profit Markup securely on server-side from global admin config
-      let bulkTransferProfitMargin = 0;
+      let defaultBulkTransferProfitMargin = 0;
+      let bulkTransferTieredMargins: TransferTieredMarkup[] = [];
       const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
       const marginSnap = await transaction.get(marginRef);
       if (marginSnap.exists) {
-        bulkTransferProfitMargin = Number(marginSnap.data()?.bulkTransferProfitMargin) || 0;
+        const marginData = marginSnap.data() || {};
+        defaultBulkTransferProfitMargin = Number(marginData.bulkTransferProfitMargin) || 0;
+        if (Array.isArray(marginData.bulkTransferTieredMargins)) {
+          bulkTransferTieredMargins = marginData.bulkTransferTieredMargins;
+        }
       }
-      const finalFlatFee = 10.00 + bulkTransferProfitMargin;
-      const finalTotalFees = trfRecipients.length * finalFlatFee;
+
+      // Calculate total fee by evaluating each recipient amount against tiered rules (or falling back to default bulk markup)
+      let finalTotalFees = 0;
+      for (const rec of trfRecipients) {
+        const recAmt = Number(rec.amount) || 0;
+        const recMarkup = calculateTransferMarkupFee(recAmt, defaultBulkTransferProfitMargin, bulkTransferTieredMargins);
+        finalTotalFees += (10.00 + recMarkup);
+      }
       const finalTotalDeduction = totalAmt + finalTotalFees;
 
       // Check balance using preloaded wallet
@@ -321,14 +333,23 @@ export async function POST(req: Request) {
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
-          let bulkTransferProfitMargin = 0;
+          let defaultBulkTransferProfitMargin = 0;
+          let bulkTransferTieredMargins: TransferTieredMarkup[] = [];
           const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
           const marginSnap = await rollbackTx.get(marginRef);
           if (marginSnap.exists) {
-            bulkTransferProfitMargin = Number(marginSnap.data()?.bulkTransferProfitMargin) || 0;
+            const marginData = marginSnap.data() || {};
+            defaultBulkTransferProfitMargin = Number(marginData.bulkTransferProfitMargin) || 0;
+            if (Array.isArray(marginData.bulkTransferTieredMargins)) {
+              bulkTransferTieredMargins = marginData.bulkTransferTieredMargins;
+            }
           }
-          const finalFlatFee = 10.00 + bulkTransferProfitMargin;
-          const finalTotalFees = trfRecipients.length * finalFlatFee;
+          let finalTotalFees = 0;
+          for (const rec of trfRecipients) {
+            const recAmt = Number(rec.amount) || 0;
+            const recMarkup = calculateTransferMarkupFee(recAmt, defaultBulkTransferProfitMargin, bulkTransferTieredMargins);
+            finalTotalFees += (10.00 + recMarkup);
+          }
           const finalTotalDeduction = totalAmt + finalTotalFees;
 
           const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
