@@ -6,6 +6,11 @@ export async function GET() {
     let useLiveWorldDollarRate = false;
     let manualDollarRate = 1550;
     let dollarCommissionFee = 15;
+
+    let useLiveWorldXofRate = false;
+    let manualXofRate = 2.5;
+    let xofCommissionFee = 0.1;
+
     let xofToNgnRate = 2.5;
     let swapFees = {
       ngnToUsd: 50,
@@ -15,6 +20,7 @@ export async function GET() {
       usdToXof: 2.0,
       xofToUsd: 15,
     };
+    let swapRangeTiers = [];
 
     try {
       const docSnap = await adminDb.collection("config").doc("exchange_rates").get();
@@ -24,7 +30,13 @@ export async function GET() {
           useLiveWorldDollarRate = Boolean(stored.useLiveWorldDollarRate);
           manualDollarRate = Math.max(1, Number(stored.manualDollarRate) || 1550);
           dollarCommissionFee = Math.max(0, Number(stored.dollarCommissionFee) || 0);
-          xofToNgnRate = Math.max(0.01, Number(stored.xofToNgnRate) || 2.5);
+
+          useLiveWorldXofRate = Boolean(stored.useLiveWorldXofRate);
+          manualXofRate = Math.max(0.01, Number(stored.manualXofRate) || 2.5);
+          xofCommissionFee = Math.max(0, Number(stored.xofCommissionFee) || 0);
+
+          xofToNgnRate = Math.max(0.01, Number(stored.xofToNgnRate) || manualXofRate);
+
           if (stored.swapFees) {
             swapFees = {
               ngnToUsd: Math.max(0, Number(stored.swapFees.ngnToUsd) || 0),
@@ -35,6 +47,9 @@ export async function GET() {
               xofToUsd: Math.max(0, Number(stored.swapFees.xofToUsd) || 0),
             };
           }
+          if (Array.isArray(stored.swapRangeTiers)) {
+            swapRangeTiers = stored.swapRangeTiers;
+          }
         }
       }
     } catch (err: any) {
@@ -42,7 +57,7 @@ export async function GET() {
     }
 
     let baseDollarRate = manualDollarRate;
-    let liveMarketRateFetched = false;
+    let liveDollarRateFetched = false;
 
     // Fetch live market USD rate if live mode is enabled
     if (useLiveWorldDollarRate) {
@@ -52,28 +67,54 @@ export async function GET() {
           const liveData = await liveRes.json();
           if (liveData?.rates?.NGN) {
             baseDollarRate = Number(liveData.rates.NGN);
-            liveMarketRateFetched = true;
+            liveDollarRateFetched = true;
           }
         }
       } catch (liveErr: any) {
-        console.warn("[Public Exchange Rates GET] Live rate fetch fallback:", liveErr.message);
+        console.warn("[Public Exchange Rates GET] Live USD rate fetch fallback:", liveErr.message);
       }
     }
 
-    // Add administrator's configured commission fee onto base dollar rate
+    let baseXofRate = manualXofRate;
+    let liveXofRateFetched = false;
+
+    // Fetch live market XOF rate if live mode is enabled (1 XOF to NGN rate via USD or XOF)
+    if (useLiveWorldXofRate) {
+      try {
+        const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/XOF", { cache: "no-store" });
+        if (liveRes.ok) {
+          const liveData = await liveRes.json();
+          if (liveData?.rates?.NGN) {
+            baseXofRate = Number(liveData.rates.NGN);
+            liveXofRateFetched = true;
+          }
+        }
+      } catch (liveErr: any) {
+        console.warn("[Public Exchange Rates GET] Live XOF rate fetch fallback:", liveErr.message);
+      }
+    }
+
+    // Add administrator's configured commission fees onto base rates
     const effectiveDollarSellRate = baseDollarRate + dollarCommissionFee;
+    const effectiveXofSellRate = baseXofRate + xofCommissionFee;
 
     return NextResponse.json({
       success: true,
       rates: {
-        mode: useLiveWorldDollarRate ? "LIVE_WORLD" : "MANUAL",
+        dollarMode: useLiveWorldDollarRate ? "LIVE_WORLD" : "MANUAL",
         baseDollarRate,
         dollarCommissionFee,
         effectiveDollarSellRate,
-        xofToNgnRate,
-        liveMarketRateFetched,
+        liveDollarRateFetched,
+        xofMode: useLiveWorldXofRate ? "LIVE_WORLD" : "MANUAL",
+        baseXofRate,
+        xofCommissionFee,
+        effectiveXofSellRate,
+        liveXofRateFetched,
+        xofToNgnRate: effectiveXofSellRate,
       },
       swapFees,
+      swapRangeTiers,
     });
   } catch (err: any) {
     console.error("[Public Exchange Rates GET Exception]:", err.message);

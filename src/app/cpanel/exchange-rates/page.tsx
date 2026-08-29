@@ -15,10 +15,21 @@ const ButtonSpinner = () => (
   </svg>
 );
 
+export interface SwapRangeTier {
+  id: string;
+  pair: "ngnToUsd" | "usdToNgn" | "ngnToXof" | "xofToNgn" | "usdToXof" | "xofToUsd";
+  minAmount: number;
+  maxAmount: number;
+  markupFee: number;
+}
+
 interface ExchangeConfig {
   useLiveWorldDollarRate: boolean;
   manualDollarRate: number;
   dollarCommissionFee: number;
+  useLiveWorldXofRate: boolean;
+  manualXofRate: number;
+  xofCommissionFee: number;
   xofToNgnRate: number;
   swapFees: {
     ngnToUsd: number;
@@ -28,12 +39,16 @@ interface ExchangeConfig {
     usdToXof: number;
     xofToUsd: number;
   };
+  swapRangeTiers: SwapRangeTier[];
 }
 
 const DEFAULT_CONFIG: ExchangeConfig = {
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
+  useLiveWorldXofRate: false,
+  manualXofRate: 2.5,
+  xofCommissionFee: 0.1,
   xofToNgnRate: 2.5,
   swapFees: {
     ngnToUsd: 50,
@@ -43,6 +58,15 @@ const DEFAULT_CONFIG: ExchangeConfig = {
     usdToXof: 2.0,
     xofToUsd: 15,
   },
+  swapRangeTiers: [
+    {
+      id: "tier-1",
+      pair: "ngnToUsd",
+      minAmount: 1000,
+      maxAmount: 5000,
+      markupFee: 1,
+    },
+  ],
 };
 
 function CpanelExchangeRatesContent() {
@@ -53,14 +77,23 @@ function CpanelExchangeRatesContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Live World Dollar Rate State
+  // Live World Rates State
   const [liveWorldDollarRate, setLiveWorldDollarRate] = useState<number | null>(null);
-  const [isFetchingLiveRate, setIsFetchingLiveRate] = useState(false);
+  const [isFetchingLiveDollar, setIsFetchingLiveDollar] = useState(false);
+
+  const [liveWorldXofRate, setLiveWorldXofRate] = useState<number | null>(null);
+  const [isFetchingLiveXof, setIsFetchingLiveXof] = useState(false);
+
+  // Range Tier Creator Modal/Form State
+  const [newPair, setNewPair] = useState<SwapRangeTier["pair"]>("ngnToUsd");
+  const [newMin, setNewMin] = useState<number>(1000);
+  const [newMax, setNewMax] = useState<number>(5000);
+  const [newFee, setNewFee] = useState<number>(1);
 
   // Simulator States
   const [simFromCurrency, setSimFromCurrency] = useState<"NGN" | "USD" | "XOF">("NGN");
   const [simToCurrency, setSimToCurrency] = useState<"NGN" | "USD" | "XOF">("USD");
-  const [simAmount, setSimAmount] = useState<number>(10000);
+  const [simAmount, setSimAmount] = useState<number>(3000);
 
   const fetchConfig = async () => {
     setIsLoading(true);
@@ -80,7 +113,7 @@ function CpanelExchangeRatesContent() {
   };
 
   const fetchLiveDollarRate = async () => {
-    setIsFetchingLiveRate(true);
+    setIsFetchingLiveDollar(true);
     try {
       const res = await fetch("https://api.exchangerate-api.com/v4/latest/USD");
       if (res.ok) {
@@ -93,7 +126,25 @@ function CpanelExchangeRatesContent() {
     } catch (err: any) {
       console.warn("Failed to fetch live USD market rate:", err.message);
     } finally {
-      setIsFetchingLiveRate(false);
+      setIsFetchingLiveDollar(false);
+    }
+  };
+
+  const fetchLiveXofRate = async () => {
+    setIsFetchingLiveXof(true);
+    try {
+      const res = await fetch("https://api.exchangerate-api.com/v4/latest/XOF");
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.rates?.NGN) {
+          setLiveWorldXofRate(Number(data.rates.NGN));
+          toast.success(`Fetched live world market XOF rate: ₦${Number(data.rates.NGN).toLocaleString()}`);
+        }
+      }
+    } catch (err: any) {
+      console.warn("Failed to fetch live XOF market rate:", err.message);
+    } finally {
+      setIsFetchingLiveXof(false);
     }
   };
 
@@ -107,8 +158,57 @@ function CpanelExchangeRatesContent() {
     }
   }, [config.useLiveWorldDollarRate]);
 
+  useEffect(() => {
+    if (config.useLiveWorldXofRate && !liveWorldXofRate) {
+      fetchLiveXofRate();
+    }
+  }, [config.useLiveWorldXofRate]);
+
+  const handleAddTier = () => {
+    if (newMax <= newMin) {
+      toast.error(`Invalid range! Max amount (${newMax}) must be strictly greater than Min amount (${newMin}).`);
+      return;
+    }
+    if (newFee < 0) {
+      toast.error("Markup fee cannot be negative.");
+      return;
+    }
+
+    const newTier: SwapRangeTier = {
+      id: `tier-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      pair: newPair,
+      minAmount: newMin,
+      maxAmount: newMax,
+      markupFee: newFee,
+    };
+
+    setConfig((prev) => ({
+      ...prev,
+      swapRangeTiers: [...(prev.swapRangeTiers || []), newTier],
+    }));
+
+    toast.success(`Added range markup tier for ${newPair.toUpperCase()} (${newMin} - ${newMax})!`);
+  };
+
+  const handleDeleteTier = (id: string) => {
+    setConfig((prev) => ({
+      ...prev,
+      swapRangeTiers: prev.swapRangeTiers.filter((t) => t.id !== id),
+    }));
+    toast.success("Removed custom range markup tier.");
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate all range tiers before save
+    for (const t of config.swapRangeTiers || []) {
+      if (t.maxAmount <= t.minAmount) {
+        toast.error(`Tier error (${t.pair}): Max amount (${t.maxAmount}) must be greater than Min amount (${t.minAmount}).`);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
@@ -125,7 +225,7 @@ function CpanelExchangeRatesContent() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(data.message || "Exchange rates and swap fees saved successfully!");
+        toast.success(data.message || "Exchange rates, XOF mode, and custom range tiers saved successfully!");
         if (data.config) setConfig(data.config);
       } else {
         toast.error(data.error || "Failed to save exchange rates.");
@@ -148,45 +248,70 @@ function CpanelExchangeRatesContent() {
   const activeBaseDollarRate = config.useLiveWorldDollarRate
     ? (liveWorldDollarRate || config.manualDollarRate)
     : config.manualDollarRate;
-
   const effectiveDollarRate = activeBaseDollarRate + config.dollarCommissionFee;
 
-  // Simulator calculation
+  const activeBaseXofRate = config.useLiveWorldXofRate
+    ? (liveWorldXofRate || config.manualXofRate)
+    : config.manualXofRate;
+  const effectiveXofRate = activeBaseXofRate + config.xofCommissionFee;
+
+  // Pair key helper
+  const getPairKey = (from: string, to: string): SwapRangeTier["pair"] | null => {
+    if (from === "NGN" && to === "USD") return "ngnToUsd";
+    if (from === "USD" && to === "NGN") return "usdToNgn";
+    if (from === "NGN" && to === "XOF") return "ngnToXof";
+    if (from === "XOF" && to === "NGN") return "xofToNgn";
+    if (from === "USD" && to === "XOF") return "usdToXof";
+    if (from === "XOF" && to === "USD") return "xofToUsd";
+    return null;
+  };
+
+  // Simulator calculation with Custom Range Tier Fee checking
   const calculateSimSwap = () => {
-    if (simFromCurrency === simToCurrency) return { output: simAmount, fee: 0 };
+    if (simFromCurrency === simToCurrency) return { output: simAmount, fee: 0, appliedTier: null };
 
+    const pairKey = getPairKey(simFromCurrency, simToCurrency);
     let fee = 0;
-    let converted = 0;
+    let appliedTier: SwapRangeTier | null = null;
 
+    if (pairKey) {
+      // Check for matching range tier
+      const matchingTier = (config.swapRangeTiers || []).find(
+        (t) => t.pair === pairKey && simAmount >= t.minAmount && simAmount <= t.maxAmount
+      );
+
+      if (matchingTier) {
+        fee = matchingTier.markupFee;
+        appliedTier = matchingTier;
+      } else {
+        fee = config.swapFees[pairKey] || 0;
+      }
+    }
+
+    let converted = 0;
     if (simFromCurrency === "NGN" && simToCurrency === "USD") {
-      fee = config.swapFees.ngnToUsd;
       const net = Math.max(0, simAmount - fee);
       converted = net / effectiveDollarRate;
     } else if (simFromCurrency === "USD" && simToCurrency === "NGN") {
-      fee = config.swapFees.usdToNgn;
       const net = Math.max(0, simAmount - fee);
       converted = net * effectiveDollarRate;
     } else if (simFromCurrency === "NGN" && simToCurrency === "XOF") {
-      fee = config.swapFees.ngnToXof;
       const net = Math.max(0, simAmount - fee);
-      converted = net / config.xofToNgnRate;
+      converted = net / effectiveXofRate;
     } else if (simFromCurrency === "XOF" && simToCurrency === "NGN") {
-      fee = config.swapFees.xofToNgn;
       const net = Math.max(0, simAmount - fee);
-      converted = net * config.xofToNgnRate;
+      converted = net * effectiveXofRate;
     } else if (simFromCurrency === "USD" && simToCurrency === "XOF") {
-      fee = config.swapFees.usdToXof;
       const net = Math.max(0, simAmount - fee);
       const ngnEquivalent = net * effectiveDollarRate;
-      converted = ngnEquivalent / config.xofToNgnRate;
+      converted = ngnEquivalent / effectiveXofRate;
     } else if (simFromCurrency === "XOF" && simToCurrency === "USD") {
-      fee = config.swapFees.xofToUsd;
       const net = Math.max(0, simAmount - fee);
-      const ngnEquivalent = net * config.xofToNgnRate;
+      const ngnEquivalent = net * effectiveXofRate;
       converted = ngnEquivalent / effectiveDollarRate;
     }
 
-    return { output: Math.max(0, converted), fee };
+    return { output: Math.max(0, converted), fee, appliedTier };
   };
 
   const simResult = calculateSimSwap();
@@ -221,7 +346,7 @@ function CpanelExchangeRatesContent() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Exchange Rates & Swap Fees Manager</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Configure USD sell rates, admin commission fees, live world market rate mode, and multi-currency swap fees.
+                Configure USD & XOF live market modes, custom range markup fees, commission margins, and multi-currency swap rules.
               </p>
             </div>
           </div>
@@ -246,107 +371,307 @@ function CpanelExchangeRatesContent() {
           </div>
         </div>
 
-        {/* Live World Rate vs Manual Dollar Rate Toggle Card */}
-        <div className="bg-[#0b1329] text-white rounded-2xl p-6 border border-slate-800 space-y-6 shadow-xl">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-            <div>
-              <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 tracking-wider">
-                CURRENCY RATE ENGINE
-              </span>
-              <h2 className="text-lg md:text-xl font-extrabold tracking-tight mt-2">World Live Dollar Rate Mode (ON / OFF)</h2>
-              <p className="text-xs text-slate-400 mt-1 font-medium">
-                When Live Rate is ON, rates fetch dynamically from live FX market APIs + your configured commission fee.
-              </p>
+        {/* Live World Rate Modes Grid (USD & XOF) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* USD Live Rate Mode Card */}
+          <div className="bg-[#0b1329] text-white rounded-2xl p-6 border border-slate-800 space-y-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 tracking-wider">
+                  USD RATE ENGINE
+                </span>
+                <h2 className="text-base font-extrabold tracking-tight mt-1.5">World Live Dollar Rate Mode</h2>
+                <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                  Auto-fetches USD FX rates dynamically + your commission fee.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 bg-slate-900 p-2.5 rounded-2xl border border-slate-800">
+                <span className="text-xs font-bold text-slate-300">
+                  {config.useLiveWorldDollarRate ? "Live: ON" : "Manual: ON"}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.useLiveWorldDollarRate}
+                    onChange={(e) => setConfig({ ...config, useLiveWorldDollarRate: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
             </div>
 
-            {/* Toggle Switch */}
-            <div className="flex items-center gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800">
-              <span className="text-xs font-bold text-slate-300">
-                {config.useLiveWorldDollarRate ? "Live World Rate: ON" : "Manual Rate Mode: ON"}
-              </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.useLiveWorldDollarRate}
-                  onChange={(e) => setConfig({ ...config, useLiveWorldDollarRate: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-12 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-              </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={cn("p-4 rounded-xl border transition-all space-y-1", config.useLiveWorldDollarRate ? "bg-slate-950/60 border-slate-800 opacity-80" : "bg-slate-900/80 border-slate-800")}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Manual Dollar Rate</span>
+                  {config.useLiveWorldDollarRate && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-emerald-500/20 text-emerald-400">
+                      {isFetchingLiveDollar ? "Fetching..." : "Live Active"}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₦</span>
+                  <input
+                    type="number"
+                    disabled={config.useLiveWorldDollarRate}
+                    value={config.useLiveWorldDollarRate ? (liveWorldDollarRate || config.manualDollarRate) : config.manualDollarRate}
+                    onChange={(e) => setConfig({ ...config, manualDollarRate: Math.max(1, parseFloat(e.target.value) || 0) })}
+                    className={cn(
+                      "w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold outline-none focus:border-[#FC7A00] transition-all",
+                      config.useLiveWorldDollarRate && "opacity-60 cursor-not-allowed text-emerald-400 border-slate-800 bg-slate-900"
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-slate-400 block">USD Commission Fee</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₦</span>
+                  <input
+                    type="number"
+                    value={config.dollarCommissionFee}
+                    onChange={(e) => setConfig({ ...config, dollarCommissionFee: Math.max(0, parseFloat(e.target.value) || 0) })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold text-emerald-400 outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-slate-400">Effective Customer USD Sell Rate:</span>
+              <strong className="text-base font-black text-emerald-400 font-mono">
+                ₦{effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD
+              </strong>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Manual Dollar Rate Input / Deactivated Box */}
-            <div className={cn("p-4 rounded-xl border transition-all space-y-1", config.useLiveWorldDollarRate ? "bg-slate-950/60 border-slate-800 opacity-80" : "bg-slate-900/80 border-slate-800")}>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Manual Dollar Rate Override</span>
-                {config.useLiveWorldDollarRate && (
-                  <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    {isFetchingLiveRate ? "Fetching Live..." : "Deactivated (Live Mode Active)"}
-                  </span>
-                )}
+          {/* XOF Live Rate Mode Card */}
+          <div className="bg-[#0b1329] text-white rounded-2xl p-6 border border-slate-800 space-y-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 tracking-wider">
+                  XOF (FCFA) RATE ENGINE
+                </span>
+                <h2 className="text-base font-extrabold tracking-tight mt-1.5">World Live XOF Rate Mode</h2>
+                <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                  Auto-fetches XOF (FCFA) live market rate + your commission fee.
+                </p>
               </div>
 
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₦</span>
-                <input
-                  type="number"
-                  disabled={config.useLiveWorldDollarRate}
-                  value={config.useLiveWorldDollarRate ? (liveWorldDollarRate || config.manualDollarRate) : config.manualDollarRate}
-                  onChange={(e) => setConfig({ ...config, manualDollarRate: Math.max(1, parseFloat(e.target.value) || 0) })}
-                  className={cn(
-                    "w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold outline-none focus:border-[#FC7A00] transition-all",
-                    config.useLiveWorldDollarRate && "opacity-60 cursor-not-allowed text-emerald-400 border-slate-800 bg-slate-900"
+              <div className="flex items-center gap-3 bg-slate-900 p-2.5 rounded-2xl border border-slate-800">
+                <span className="text-xs font-bold text-slate-300">
+                  {config.useLiveWorldXofRate ? "Live: ON" : "Manual: ON"}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.useLiveWorldXofRate}
+                    onChange={(e) => setConfig({ ...config, useLiveWorldXofRate: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={cn("p-4 rounded-xl border transition-all space-y-1", config.useLiveWorldXofRate ? "bg-slate-950/60 border-slate-800 opacity-80" : "bg-slate-900/80 border-slate-800")}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Manual XOF Rate (₦)</span>
+                  {config.useLiveWorldXofRate && (
+                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-blue-500/20 text-blue-400">
+                      {isFetchingLiveXof ? "Fetching..." : "Live Active"}
+                    </span>
                   )}
-                />
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₦</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    disabled={config.useLiveWorldXofRate}
+                    value={config.useLiveWorldXofRate ? (liveWorldXofRate || config.manualXofRate) : config.manualXofRate}
+                    onChange={(e) => {
+                      const val = Math.max(0.01, parseFloat(e.target.value) || 0);
+                      setConfig({ ...config, manualXofRate: val, xofToNgnRate: val });
+                    }}
+                    className={cn(
+                      "w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold outline-none focus:border-[#FC7A00] transition-all",
+                      config.useLiveWorldXofRate && "opacity-60 cursor-not-allowed text-blue-400 border-slate-800 bg-slate-900"
+                    )}
+                  />
+                </div>
               </div>
-              <span className="text-[9px] text-slate-400 block mt-1">
-                {config.useLiveWorldDollarRate
-                  ? `Live world market USD rate auto-fetched: ₦${(liveWorldDollarRate || config.manualDollarRate).toLocaleString()}`
-                  : "Manual base rate per 1 USD when Live Mode is OFF."}
-              </span>
+
+              <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-slate-400 block">XOF Commission Fee</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₦</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={config.xofCommissionFee}
+                    onChange={(e) => setConfig({ ...config, xofCommissionFee: Math.max(0, parseFloat(e.target.value) || 0) })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold text-blue-400 outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Administrator Commission Fee</span>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₦</span>
+            <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-slate-400">Effective Customer XOF Sell Rate:</span>
+              <strong className="text-base font-black text-blue-400 font-mono">
+                ₦{effectiveXofRate.toLocaleString(undefined, { maximumFractionDigits: 3 })} / FCFA
+              </strong>
+            </div>
+          </div>
+
+        </div>
+
+        {/* CONFIGURE CUSTOM RANGE MARKUP FEES */}
+        <div className={cn("p-6 rounded-2xl border space-y-6", panelClass)}>
+          <div className="border-b pb-3.5 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-purple-500 text-[24px]">price_change</span>
+                <h3 className="font-extrabold text-sm uppercase tracking-wider text-purple-500">
+                  Configure Custom Range Markup Fees
+                </h3>
+              </div>
+              <p className="text-[11px] text-gray-400 font-bold uppercase mt-0.5">
+                Set custom swap fees based on user swap amount ranges (e.g. NGN 1,000 to 5,000 ➔ 1 NGN fee).
+              </p>
+            </div>
+            <span className="px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              Tiered Fee Engine
+            </span>
+          </div>
+
+          {/* Form to Add New Range Tier */}
+          <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/5 space-y-3">
+            <span className="text-[10px] font-black uppercase tracking-wider text-purple-400 block">
+              Add New Custom Range Tier
+            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-gray-400 block">Currency Pair</label>
+                <select
+                  value={newPair}
+                  onChange={(e) => setNewPair(e.target.value as any)}
+                  className={cn(inputClass, "cursor-pointer font-bold")}
+                >
+                  <option value="ngnToUsd">NGN ➔ USD</option>
+                  <option value="usdToNgn">USD ➔ NGN</option>
+                  <option value="ngnToXof">NGN ➔ XOF</option>
+                  <option value="xofToNgn">XOF ➔ NGN</option>
+                  <option value="usdToXof">USD ➔ XOF</option>
+                  <option value="xofToUsd">XOF ➔ USD</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-gray-400 block">Min Amount</label>
                 <input
                   type="number"
-                  value={config.dollarCommissionFee}
-                  onChange={(e) => setConfig({ ...config, dollarCommissionFee: Math.max(0, parseFloat(e.target.value) || 0) })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold text-emerald-400 outline-none focus:border-emerald-500"
+                  value={newMin}
+                  onChange={(e) => setNewMin(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className={inputClass}
                 />
               </div>
-              <span className="text-[9px] text-slate-400 block mt-1">Added directly onto dollar sell rate for profit margin.</span>
-            </div>
 
-            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Effective Customer Sell Rate</span>
-              <strong className="text-xl font-black text-emerald-400 block font-mono mt-2">
-                ₦{effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD
-              </strong>
-              <span className="text-[9px] text-slate-400 block">
-                {config.useLiveWorldDollarRate
-                  ? `Live World Rate (₦${(liveWorldDollarRate || config.manualDollarRate).toLocaleString()}) + Commission Fee (₦${config.dollarCommissionFee})`
-                  : `Manual Rate (₦${config.manualDollarRate.toLocaleString()}) + Commission Fee (₦${config.dollarCommissionFee})`}
-              </span>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-gray-400 block">Max Amount</label>
+                <input
+                  type="number"
+                  value={newMax}
+                  onChange={(e) => setNewMax(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase text-gray-400 block">Markup Fee</label>
+                <input
+                  type="number"
+                  value={newFee}
+                  onChange={(e) => setNewFee(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={handleAddTier}
+                  className="w-full h-10 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add_circle</span> Add Tier
+                </button>
+              </div>
             </div>
+          </div>
+
+          {/* Configured Range Tiers List */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+              Active Custom Range Tiers ({config.swapRangeTiers?.length || 0})
+            </span>
+
+            {(!config.swapRangeTiers || config.swapRangeTiers.length === 0) ? (
+              <div className="p-4 rounded-xl border border-dashed text-center text-xs text-gray-400 font-medium">
+                No custom range tiers configured. Standard default swap fees will apply.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {config.swapRangeTiers.map((tier) => (
+                  <div
+                    key={tier.id}
+                    className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex items-center justify-between gap-2 shadow-3xs"
+                  >
+                    <div className="space-y-0.5">
+                      <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                        {tier.pair.toUpperCase()}
+                      </span>
+                      <p className="text-xs font-bold text-gray-900 dark:text-white font-mono mt-1">
+                        {tier.minAmount.toLocaleString()} ➔ {tier.maxAmount.toLocaleString()}
+                      </p>
+                      <p className="text-[10px] font-bold text-emerald-500">
+                        Custom Fee: {tier.markupFee} {tier.pair.startsWith("usd") ? "$" : tier.pair.startsWith("xof") ? "FCFA" : "₦"}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTier(tier.id)}
+                      className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-all cursor-pointer"
+                      title="Delete Tier"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Multi-Currency Swap Fees Grid */}
+        {/* Multi-Currency Standard Default Swap Fees Grid */}
         <form onSubmit={handleSave} className="space-y-6">
           <div className={cn("p-6 rounded-2xl border space-y-4", panelClass)}>
             <div className="border-b pb-3.5 flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h3 className="font-extrabold text-sm uppercase tracking-wider text-[#FC7A00] flex items-center gap-2">
                   <span className="material-symbols-outlined text-[20px]">swap_horiz</span>
-                  <span>Multi-Pair Currency Swap Fees</span>
+                  <span>Default Fallback Swap Fees</span>
                 </h3>
                 <p className="text-[10.5px] text-gray-400 font-bold uppercase mt-0.5">
-                  Set fixed transaction swap fees charged when users convert balances between NGN, USD, and XOF.
+                  Fallback transaction swap fees applied when user amount does not fall into a custom range tier.
                 </p>
               </div>
             </div>
@@ -424,7 +749,7 @@ function CpanelExchangeRatesContent() {
                     Real-Time Currency Swap Simulator & Diagnostic Tool
                   </h4>
                   <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">
-                    Test exact user conversions, effective rates, and deducted swap fees in real-time
+                    Test exact user conversions, effective rates, range tier matching, and deducted swap fees in real-time
                   </p>
                 </div>
               </div>
@@ -478,6 +803,7 @@ function CpanelExchangeRatesContent() {
                 </strong>
                 <span className="text-[9px] text-gray-400 font-bold block">
                   Fee Deducted: {simResult.fee} {simFromCurrency}
+                  {simResult.appliedTier ? " (Custom Tier Applied)" : " (Default Fee)"}
                 </span>
               </div>
             </div>
@@ -488,7 +814,7 @@ function CpanelExchangeRatesContent() {
             disabled={isSaving}
             className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
           >
-            {isSaving ? <><ButtonSpinner /> Saving Configurations...</> : "Save Exchange Rates & Swap Fees"}
+            {isSaving ? <><ButtonSpinner /> Saving Configurations...</> : "Save Exchange Rates, XOF Mode & Range Tiers"}
           </button>
         </form>
 

@@ -2,12 +2,24 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
-interface ExchangeRatesConfig {
+export interface SwapRangeTier {
+  id: string;
+  pair: "ngnToUsd" | "usdToNgn" | "ngnToXof" | "xofToNgn" | "usdToXof" | "xofToUsd";
+  minAmount: number;
+  maxAmount: number;
+  markupFee: number;
+}
+
+export interface ExchangeRatesConfig {
   useLiveWorldDollarRate: boolean;
   manualDollarRate: number;
   dollarCommissionFee: number;
+
+  useLiveWorldXofRate: boolean;
+  manualXofRate: number;
+  xofCommissionFee: number;
+
   xofToNgnRate: number;
-  // Multi-Pair Swap Fees (Flat ₦ or USD or XOF or Percentage)
   swapFees: {
     ngnToUsd: number;
     usdToNgn: number;
@@ -16,6 +28,7 @@ interface ExchangeRatesConfig {
     usdToXof: number;
     xofToUsd: number;
   };
+  swapRangeTiers: SwapRangeTier[];
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -24,6 +37,9 @@ const DEFAULT_EXCHANGE_RATES_CONFIG: ExchangeRatesConfig = {
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
+  useLiveWorldXofRate: false,
+  manualXofRate: 2.5,
+  xofCommissionFee: 0.1,
   xofToNgnRate: 2.5,
   swapFees: {
     ngnToUsd: 50,
@@ -33,6 +49,15 @@ const DEFAULT_EXCHANGE_RATES_CONFIG: ExchangeRatesConfig = {
     usdToXof: 2.0,
     xofToUsd: 15,
   },
+  swapRangeTiers: [
+    {
+      id: "tier-demo-1",
+      pair: "ngnToUsd",
+      minAmount: 1000,
+      maxAmount: 5000,
+      markupFee: 1,
+    },
+  ],
 };
 
 export async function GET(req: Request) {
@@ -52,6 +77,9 @@ export async function GET(req: Request) {
           useLiveWorldDollarRate: Boolean(stored?.useLiveWorldDollarRate),
           manualDollarRate: Math.max(1, Number(stored?.manualDollarRate) || 1550),
           dollarCommissionFee: Math.max(0, Number(stored?.dollarCommissionFee) || 0),
+          useLiveWorldXofRate: Boolean(stored?.useLiveWorldXofRate),
+          manualXofRate: Math.max(0.01, Number(stored?.manualXofRate) || 2.5),
+          xofCommissionFee: Math.max(0, Number(stored?.xofCommissionFee) || 0),
           xofToNgnRate: Math.max(0.1, Number(stored?.xofToNgnRate) || 2.5),
           swapFees: {
             ngnToUsd: Math.max(0, Number(stored?.swapFees?.ngnToUsd) || 0),
@@ -61,6 +89,15 @@ export async function GET(req: Request) {
             usdToXof: Math.max(0, Number(stored?.swapFees?.usdToXof) || 0),
             xofToUsd: Math.max(0, Number(stored?.swapFees?.xofToUsd) || 0),
           },
+          swapRangeTiers: Array.isArray(stored?.swapRangeTiers)
+            ? stored.swapRangeTiers.map((t: any) => ({
+                id: String(t.id || `tier-${Math.random().toString(36).substring(2, 9)}`),
+                pair: t.pair || "ngnToUsd",
+                minAmount: Math.max(0, Number(t.minAmount) || 0),
+                maxAmount: Math.max(0, Number(t.maxAmount) || 0),
+                markupFee: Math.max(0, Number(t.markupFee) || 0),
+              }))
+            : DEFAULT_EXCHANGE_RATES_CONFIG.swapRangeTiers,
           updatedAt: stored?.updatedAt,
           updatedBy: stored?.updatedBy,
         };
@@ -89,7 +126,11 @@ export async function POST(req: Request) {
     const useLiveWorldDollarRate = Boolean(body.useLiveWorldDollarRate);
     const manualDollarRate = Math.max(1, Number(body.manualDollarRate) || 1550);
     const dollarCommissionFee = Math.max(0, Number(body.dollarCommissionFee) || 0);
-    const xofToNgnRate = Math.max(0.01, Number(body.xofToNgnRate) || 2.5);
+
+    const useLiveWorldXofRate = Boolean(body.useLiveWorldXofRate);
+    const manualXofRate = Math.max(0.01, Number(body.manualXofRate) || 2.5);
+    const xofCommissionFee = Math.max(0, Number(body.xofCommissionFee) || 0);
+    const xofToNgnRate = Math.max(0.01, Number(body.xofToNgnRate) || manualXofRate);
 
     const swapFees = {
       ngnToUsd: Math.max(0, Number(body.swapFees?.ngnToUsd) || 0),
@@ -100,12 +141,40 @@ export async function POST(req: Request) {
       xofToUsd: Math.max(0, Number(body.swapFees?.xofToUsd) || 0),
     };
 
+    const swapRangeTiers: SwapRangeTier[] = [];
+    if (Array.isArray(body.swapRangeTiers)) {
+      for (const t of body.swapRangeTiers) {
+        const minAmount = Math.max(0, Number(t.minAmount) || 0);
+        const maxAmount = Math.max(0, Number(t.maxAmount) || 0);
+        const markupFee = Math.max(0, Number(t.markupFee) || 0);
+
+        if (maxAmount <= minAmount) {
+          return NextResponse.json(
+            { error: `Invalid custom range tier: Max amount (${maxAmount}) must be strictly greater than Min amount (${minAmount})` },
+            { status: 400 }
+          );
+        }
+
+        swapRangeTiers.push({
+          id: String(t.id || `tier-${Math.random().toString(36).substring(2, 9)}`),
+          pair: t.pair,
+          minAmount,
+          maxAmount,
+          markupFee,
+        });
+      }
+    }
+
     const updatedConfig: ExchangeRatesConfig = {
       useLiveWorldDollarRate,
       manualDollarRate,
       dollarCommissionFee,
+      useLiveWorldXofRate,
+      manualXofRate,
+      xofCommissionFee,
       xofToNgnRate,
       swapFees,
+      swapRangeTiers,
       updatedAt: new Date().toISOString(),
       updatedBy: adminEmail,
     };
@@ -118,6 +187,9 @@ export async function POST(req: Request) {
       useLiveWorldDollarRate,
       manualDollarRate,
       dollarCommissionFee,
+      useLiveWorldXofRate,
+      manualXofRate,
+      xofCommissionFee,
       createdAt: new Date().toISOString(),
     });
 
