@@ -27,7 +27,7 @@ export async function fetchFlutterwaveTransferRate(
     return cached.rate;
   }
 
-  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+  const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
   const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
   if (!apiKey) {
