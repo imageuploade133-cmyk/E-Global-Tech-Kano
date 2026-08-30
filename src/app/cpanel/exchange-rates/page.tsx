@@ -45,11 +45,11 @@ interface ExchangeConfig {
 }
 
 const DEFAULT_CONFIG: ExchangeConfig = {
-  useFlutterwaveRate: false,
+  useFlutterwaveRate: true,
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
-  useFlutterwaveXofRate: false,
+  useFlutterwaveXofRate: true,
   useLiveWorldXofRate: false,
   manualXofRate: 2.5,
   xofCommissionFee: 0.1,
