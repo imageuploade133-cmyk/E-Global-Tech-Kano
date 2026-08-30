@@ -1,68 +1,11 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-
-export interface SwapRangeTier {
-  id: string;
-  pair: "ngnToUsd" | "usdToNgn" | "ngnToXof" | "xofToNgn" | "usdToXof" | "xofToUsd";
-  minAmount: number;
-  maxAmount: number;
-  markupFee: number;
-}
-
-export interface ExchangeRatesConfig {
-  useFlutterwaveRate: boolean;
-  useLiveWorldDollarRate: boolean;
-  manualDollarRate: number;
-  dollarCommissionFee: number;
-
-  useFlutterwaveXofRate: boolean;
-  useLiveWorldXofRate: boolean;
-  manualXofRate: number;
-  xofCommissionFee: number;
-
-  xofToNgnRate: number;
-  swapFees: {
-    ngnToUsd: number;
-    usdToNgn: number;
-    ngnToXof: number;
-    xofToNgn: number;
-    usdToXof: number;
-    xofToUsd: number;
-  };
-  swapRangeTiers: SwapRangeTier[];
-  updatedAt?: string;
-  updatedBy?: string;
-}
-
-const DEFAULT_EXCHANGE_RATES_CONFIG: ExchangeRatesConfig = {
-  useFlutterwaveRate: true,
-  useLiveWorldDollarRate: false,
-  manualDollarRate: 1550,
-  dollarCommissionFee: 15,
-  useFlutterwaveXofRate: true,
-  useLiveWorldXofRate: false,
-  manualXofRate: 2.5,
-  xofCommissionFee: 0.1,
-  xofToNgnRate: 2.5,
-  swapFees: {
-    ngnToUsd: 50,
-    usdToNgn: 1.5,
-    ngnToXof: 30,
-    xofToNgn: 10,
-    usdToXof: 2.0,
-    xofToUsd: 15,
-  },
-  swapRangeTiers: [
-    {
-      id: "tier-demo-1",
-      pair: "ngnToUsd",
-      minAmount: 1000,
-      maxAmount: 5000,
-      markupFee: 1,
-    },
-  ],
-};
+import {
+  DEFAULT_FULL_EXCHANGE_RATES_CONFIG,
+  FullExchangeRatesConfig,
+  parsePositiveNumber,
+} from "@/lib/exchange-pricing";
 
 export async function GET(req: Request) {
   try {
@@ -71,42 +14,59 @@ export async function GET(req: Request) {
       return perm.response!;
     }
 
-    let config = { ...DEFAULT_EXCHANGE_RATES_CONFIG };
+    let config: FullExchangeRatesConfig = { ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG };
 
     try {
       const docSnap = await adminDb.collection("config").doc("exchange_rates").get();
       if (docSnap.exists) {
         const stored = docSnap.data();
-        config = {
-          useFlutterwaveRate: stored?.useFlutterwaveRate !== undefined ? Boolean(stored.useFlutterwaveRate) : true,
-          useLiveWorldDollarRate: Boolean(stored?.useLiveWorldDollarRate),
-          manualDollarRate: Math.max(1, Number(stored?.manualDollarRate) || 1550),
-          dollarCommissionFee: Math.max(0, Number(stored?.dollarCommissionFee) || 0),
-          useFlutterwaveXofRate: stored?.useFlutterwaveXofRate !== undefined ? Boolean(stored.useFlutterwaveXofRate) : true,
-          useLiveWorldXofRate: Boolean(stored?.useLiveWorldXofRate),
-          manualXofRate: Math.max(0.01, Number(stored?.manualXofRate) || 2.5),
-          xofCommissionFee: Math.max(0, Number(stored?.xofCommissionFee) || 0),
-          xofToNgnRate: Math.max(0.1, Number(stored?.xofToNgnRate) || 2.5),
-          swapFees: {
-            ngnToUsd: Math.max(0, Number(stored?.swapFees?.ngnToUsd) || 0),
-            usdToNgn: Math.max(0, Number(stored?.swapFees?.usdToNgn) || 0),
-            ngnToXof: Math.max(0, Number(stored?.swapFees?.ngnToXof) || 0),
-            xofToNgn: Math.max(0, Number(stored?.swapFees?.xofToNgn) || 0),
-            usdToXof: Math.max(0, Number(stored?.swapFees?.usdToXof) || 0),
-            xofToUsd: Math.max(0, Number(stored?.swapFees?.xofToUsd) || 0),
-          },
-          swapRangeTiers: Array.isArray(stored?.swapRangeTiers)
-            ? stored.swapRangeTiers.map((t: any) => ({
-                id: String(t.id || `tier-${Math.random().toString(36).substring(2, 9)}`),
-                pair: t.pair || "ngnToUsd",
-                minAmount: Math.max(0, Number(t.minAmount) || 0),
-                maxAmount: Math.max(0, Number(t.maxAmount) || 0),
-                markupFee: Math.max(0, Number(t.markupFee) || 0),
-              }))
-            : DEFAULT_EXCHANGE_RATES_CONFIG.swapRangeTiers,
-          updatedAt: stored?.updatedAt,
-          updatedBy: stored?.updatedBy,
-        };
+        if (stored) {
+          config = {
+            ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG,
+            useFlutterwaveRate: stored.useFlutterwaveRate !== undefined ? Boolean(stored.useFlutterwaveRate) : true,
+            useLiveWorldDollarRate: Boolean(stored.useLiveWorldDollarRate),
+            manualDollarRate: parsePositiveNumber(stored.manualDollarRate, 1550),
+            dollarCommissionFee: parsePositiveNumber(stored.dollarCommissionFee, 180),
+
+            usdSellMarkup: parsePositiveNumber(stored.usdSellMarkup, 180),
+            usdBuyMarkup: parsePositiveNumber(stored.usdBuyMarkup, 100),
+            eurSellMarkup: parsePositiveNumber(stored.eurSellMarkup, 200),
+            eurBuyMarkup: parsePositiveNumber(stored.eurBuyMarkup, 110),
+            gbpSellMarkup: parsePositiveNumber(stored.gbpSellMarkup, 220),
+            gbpBuyMarkup: parsePositiveNumber(stored.gbpBuyMarkup, 120),
+            ghsSellMarkup: parsePositiveNumber(stored.ghsSellMarkup, 10),
+            ghsBuyMarkup: parsePositiveNumber(stored.ghsBuyMarkup, 5),
+            kesSellMarkup: parsePositiveNumber(stored.kesSellMarkup, 1),
+            kesBuyMarkup: parsePositiveNumber(stored.kesBuyMarkup, 0.5),
+            xofSellMarkup: parsePositiveNumber(stored.xofSellMarkup, 0.1),
+            xofBuyMarkup: parsePositiveNumber(stored.xofBuyMarkup, 0.1),
+            xafSellMarkup: parsePositiveNumber(stored.xafSellMarkup, 0.1),
+            xafBuyMarkup: parsePositiveNumber(stored.xafBuyMarkup, 0.1),
+            cadSellMarkup: parsePositiveNumber(stored.cadSellMarkup, 100),
+            cadBuyMarkup: parsePositiveNumber(stored.cadBuyMarkup, 50),
+            zarSellMarkup: parsePositiveNumber(stored.zarSellMarkup, 10),
+            zarBuyMarkup: parsePositiveNumber(stored.zarBuyMarkup, 5),
+            tzsSellMarkup: parsePositiveNumber(stored.tzsSellMarkup, 0.1),
+            tzsBuyMarkup: parsePositiveNumber(stored.tzsBuyMarkup, 0.05),
+            ugxSellMarkup: parsePositiveNumber(stored.ugxSellMarkup, 0.1),
+            ugxBuyMarkup: parsePositiveNumber(stored.ugxBuyMarkup, 0.05),
+            rwfSellMarkup: parsePositiveNumber(stored.rwfSellMarkup, 0.2),
+            rwfBuyMarkup: parsePositiveNumber(stored.rwfBuyMarkup, 0.1),
+            zmwSellMarkup: parsePositiveNumber(stored.zmwSellMarkup, 5),
+            zmwBuyMarkup: parsePositiveNumber(stored.zmwBuyMarkup, 2.5),
+
+            useFlutterwaveXofRate: stored.useFlutterwaveXofRate !== undefined ? Boolean(stored.useFlutterwaveXofRate) : true,
+            useLiveWorldXofRate: Boolean(stored.useLiveWorldXofRate),
+            manualXofRate: parsePositiveNumber(stored.manualXofRate, 2.5),
+            xofCommissionFee: parsePositiveNumber(stored.xofCommissionFee, 0.1),
+            xofToNgnRate: parsePositiveNumber(stored.xofToNgnRate, 2.5),
+
+            swapFees: stored.swapFees ? { ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG.swapFees, ...stored.swapFees } : DEFAULT_FULL_EXCHANGE_RATES_CONFIG.swapFees,
+            swapRangeTiers: Array.isArray(stored.swapRangeTiers) ? stored.swapRangeTiers : [],
+            updatedAt: stored.updatedAt,
+            updatedBy: stored.updatedBy,
+          };
+        }
       }
     } catch (err: any) {
       console.warn("[Admin Exchange Rates GET] Firestore fetch warning:", err.message);
@@ -129,28 +89,62 @@ export async function POST(req: Request) {
     const adminEmail = perm.auth?.email || "admin";
     const body = await req.json();
 
-    const useFlutterwaveRate = Boolean(body.useFlutterwaveRate);
-    const useLiveWorldDollarRate = Boolean(body.useLiveWorldDollarRate);
-    const manualDollarRate = Math.max(1, Number(body.manualDollarRate) || 1550);
-    const dollarCommissionFee = Math.max(0, Number(body.dollarCommissionFee) || 0);
+    const updatedConfig: Partial<FullExchangeRatesConfig> = {
+      useFlutterwaveRate: Boolean(body.useFlutterwaveRate),
+      useLiveWorldDollarRate: Boolean(body.useLiveWorldDollarRate),
+      manualDollarRate: parsePositiveNumber(body.manualDollarRate, 1550),
+      dollarCommissionFee: parsePositiveNumber(body.dollarCommissionFee, 180),
 
-    const useFlutterwaveXofRate = Boolean(body.useFlutterwaveXofRate);
-    const useLiveWorldXofRate = Boolean(body.useLiveWorldXofRate);
-    const manualXofRate = Math.max(0.01, Number(body.manualXofRate) || 2.5);
-    const xofCommissionFee = Math.max(0, Number(body.xofCommissionFee) || 0);
-    const xofToNgnRate = Math.max(0.01, Number(body.xofToNgnRate) || manualXofRate);
+      useFlutterwaveXofRate: Boolean(body.useFlutterwaveXofRate),
+      useLiveWorldXofRate: Boolean(body.useLiveWorldXofRate),
+      manualXofRate: parsePositiveNumber(body.manualXofRate, 2.5),
+      xofCommissionFee: parsePositiveNumber(body.xofCommissionFee, 0.1),
+      xofToNgnRate: parsePositiveNumber(body.xofToNgnRate, 2.5),
 
-    const swapFees = {
-      ngnToUsd: Math.max(0, Number(body.swapFees?.ngnToUsd) || 0),
-      usdToNgn: Math.max(0, Number(body.swapFees?.usdToNgn) || 0),
-      ngnToXof: Math.max(0, Number(body.swapFees?.ngnToXof) || 0),
-      xofToNgn: Math.max(0, Number(body.swapFees?.xofToNgn) || 0),
-      usdToXof: Math.max(0, Number(body.swapFees?.usdToXof) || 0),
-      xofToUsd: Math.max(0, Number(body.swapFees?.xofToUsd) || 0),
+      updatedAt: new Date().toISOString(),
+      updatedBy: adminEmail,
     };
 
-    const swapRangeTiers: SwapRangeTier[] = [];
+    const adjustmentKeys = [
+      "usdSellMarkup", "usdBuyMarkup",
+      "eurSellMarkup", "eurBuyMarkup",
+      "gbpSellMarkup", "gbpBuyMarkup",
+      "ghsSellMarkup", "ghsBuyMarkup",
+      "kesSellMarkup", "kesBuyMarkup",
+      "xofSellMarkup", "xofBuyMarkup",
+      "xafSellMarkup", "xafBuyMarkup",
+      "cadSellMarkup", "cadBuyMarkup",
+      "zarSellMarkup", "zarBuyMarkup",
+      "tzsSellMarkup", "tzsBuyMarkup",
+      "ugxSellMarkup", "ugxBuyMarkup",
+      "rwfSellMarkup", "rwfBuyMarkup",
+      "zmwSellMarkup", "zmwBuyMarkup",
+    ] as const;
+
+    for (const key of adjustmentKeys) {
+      const val = Number(body[key]);
+      if (isNaN(val) || !isFinite(val) || val < 0) {
+        return NextResponse.json(
+          { error: `Adjustment '${key}' must be a non-negative finite number.` },
+          { status: 400 }
+        );
+      }
+      (updatedConfig as any)[key] = val;
+    }
+
+    if (body.swapFees && typeof body.swapFees === "object") {
+      updatedConfig.swapFees = {
+        ngnToUsd: Math.max(0, Number(body.swapFees.ngnToUsd) || 0),
+        usdToNgn: Math.max(0, Number(body.swapFees.usdToNgn) || 0),
+        ngnToXof: Math.max(0, Number(body.swapFees.ngnToXof) || 0),
+        xofToNgn: Math.max(0, Number(body.swapFees.xofToNgn) || 0),
+        usdToXof: Math.max(0, Number(body.swapFees.usdToXof) || 0),
+        xofToUsd: Math.max(0, Number(body.swapFees.xofToUsd) || 0),
+      };
+    }
+
     if (Array.isArray(body.swapRangeTiers)) {
+      const tiers = [];
       for (const t of body.swapRangeTiers) {
         const minAmount = Math.max(0, Number(t.minAmount) || 0);
         const maxAmount = Math.max(0, Number(t.maxAmount) || 0);
@@ -163,49 +157,28 @@ export async function POST(req: Request) {
           );
         }
 
-        swapRangeTiers.push({
+        tiers.push({
           id: String(t.id || `tier-${Math.random().toString(36).substring(2, 9)}`),
-          pair: t.pair,
+          pair: String(t.pair || "ngnToUsd"),
           minAmount,
           maxAmount,
           markupFee,
         });
       }
+      updatedConfig.swapRangeTiers = tiers;
     }
-
-    const updatedConfig: ExchangeRatesConfig = {
-      useFlutterwaveRate,
-      useLiveWorldDollarRate,
-      manualDollarRate,
-      dollarCommissionFee,
-      useFlutterwaveXofRate,
-      useLiveWorldXofRate,
-      manualXofRate,
-      xofCommissionFee,
-      xofToNgnRate,
-      swapFees,
-      swapRangeTiers,
-      updatedAt: new Date().toISOString(),
-      updatedBy: adminEmail,
-    };
 
     await adminDb.collection("config").doc("exchange_rates").set(updatedConfig, { merge: true });
 
     await adminDb.collection("admin_audit_logs").add({
       action: "update_exchange_rates_config",
       adminEmail,
-      useLiveWorldDollarRate,
-      manualDollarRate,
-      dollarCommissionFee,
-      useLiveWorldXofRate,
-      manualXofRate,
-      xofCommissionFee,
       createdAt: new Date().toISOString(),
     });
 
     return NextResponse.json({
       success: true,
-      message: "Exchange rates and swap fees updated successfully!",
+      message: "Exchange rates, Bid/Ask spread markups, and swap fees updated successfully!",
       config: updatedConfig,
     });
   } catch (err: any) {
