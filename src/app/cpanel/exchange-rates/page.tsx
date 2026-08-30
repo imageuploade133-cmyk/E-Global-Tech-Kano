@@ -39,11 +39,8 @@ function CpanelExchangeRatesContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Live Provider Rates State
-  const [flwDollarRate, setFlwDollarRate] = useState<number | null>(null);
-  const [flwXofRate, setFlwXofRate] = useState<number | null>(null);
-  const [liveWorldDollarRate, setLiveWorldDollarRate] = useState<number | null>(null);
-  const [liveWorldXofRate, setLiveWorldXofRate] = useState<number | null>(null);
+  // Live Provider Base Rates State for all currencies
+  const [baseRatesMap, setBaseRatesMap] = useState<Record<string, number | null>>({});
 
   // Range Tier Creator Modal/Form State
   const [newPair, setNewPair] = useState<string>("ngnToUsd");
@@ -66,36 +63,12 @@ function CpanelExchangeRatesContent() {
       if (res.ok && data.success && data.config) {
         setConfig(data.config);
 
-        // Fetch live active rates to auto-fill inputs
+        // Fetch live active base rates map to fill provider base rates
         try {
           const publicRes = await fetch("/api/exchange-rates");
           const publicData = await publicRes.json();
-          if (publicRes.ok && publicData.success && publicData.rates) {
-            const usdPair = publicData.rates.usdToNgn;
-            const xofPair = publicData.rates.xofToNgn;
-
-            if (usdPair?.available && typeof usdPair.baseRate === "number") {
-              setFlwDollarRate(usdPair.baseRate);
-            }
-            if (xofPair?.available && typeof xofPair.baseRate === "number") {
-              setFlwXofRate(xofPair.baseRate);
-            }
-
-            const fetchedDollar = Number(publicData.rates.baseDollarRate);
-            const fetchedXof = Number(publicData.rates.baseXofRate);
-
-            if (!isNaN(fetchedDollar) && fetchedDollar > 0) {
-              setLiveWorldDollarRate(fetchedDollar);
-              if (data.config.useFlutterwaveRate || data.config.useLiveWorldDollarRate) {
-                setConfig((prev) => ({ ...prev, manualDollarRate: fetchedDollar }));
-              }
-            }
-            if (!isNaN(fetchedXof) && fetchedXof > 0) {
-              setLiveWorldXofRate(fetchedXof);
-              if (data.config.useFlutterwaveXofRate || data.config.useLiveWorldXofRate) {
-                setConfig((prev) => ({ ...prev, manualXofRate: fetchedXof }));
-              }
-            }
+          if (publicRes.ok && publicData.success && publicData.baseRates) {
+            setBaseRatesMap(publicData.baseRates);
           }
         } catch {
           // ignore background fetch error
@@ -202,14 +175,6 @@ function CpanelExchangeRatesContent() {
     ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
     : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
 
-  const activeBaseDollarRate = config.useFlutterwaveRate
-    ? (flwDollarRate || liveWorldDollarRate || config.manualDollarRate)
-    : (config.useLiveWorldDollarRate ? (liveWorldDollarRate || config.manualDollarRate) : config.manualDollarRate);
-
-  const activeBaseXofRate = config.useFlutterwaveXofRate
-    ? (flwXofRate || liveWorldXofRate || config.manualXofRate)
-    : (config.useLiveWorldXofRate ? (liveWorldXofRate || config.manualXofRate) : config.manualXofRate);
-
   const getPairKey = (from: string, to: string): string | null => {
     if (from === "NGN" && to === "USD") return "ngnToUsd";
     if (from === "USD" && to === "NGN") return "usdToNgn";
@@ -243,17 +208,16 @@ function CpanelExchangeRatesContent() {
     const net = Math.max(0, simAmount - fee);
     let converted = 0;
 
+    const fromBaseRate = baseRatesMap[simFromCurrency] || (simFromCurrency === "USD" ? config.manualDollarRate : (simFromCurrency === "XOF" ? config.manualXofRate : 1000));
+    const toBaseRate = baseRatesMap[simToCurrency] || (simToCurrency === "USD" ? config.manualDollarRate : (simToCurrency === "XOF" ? config.manualXofRate : 1000));
+
     if (simFromCurrency === "NGN" && simToCurrency !== "NGN") {
-      const baseRate = simToCurrency === "USD" ? activeBaseDollarRate : (simToCurrency === "XOF" ? activeBaseXofRate : 1000);
-      const calc = calculateDirectionalCustomerRate({ sourceCurrency: simFromCurrency, destinationCurrency: simToCurrency, baseRate, config });
+      const calc = calculateDirectionalCustomerRate({ sourceCurrency: simFromCurrency, destinationCurrency: simToCurrency, baseRate: toBaseRate, config });
       converted = net * calc.unitExchangeRate;
     } else if (simFromCurrency !== "NGN" && simToCurrency === "NGN") {
-      const baseRate = simFromCurrency === "USD" ? activeBaseDollarRate : (simFromCurrency === "XOF" ? activeBaseXofRate : 1000);
-      const calc = calculateDirectionalCustomerRate({ sourceCurrency: simFromCurrency, destinationCurrency: simToCurrency, baseRate, config });
+      const calc = calculateDirectionalCustomerRate({ sourceCurrency: simFromCurrency, destinationCurrency: simToCurrency, baseRate: fromBaseRate, config });
       converted = net * calc.unitExchangeRate;
     } else {
-      const fromBaseRate = simFromCurrency === "USD" ? activeBaseDollarRate : activeBaseXofRate;
-      const toBaseRate = simToCurrency === "USD" ? activeBaseDollarRate : activeBaseXofRate;
       const fromCalc = calculateDirectionalCustomerRate({ sourceCurrency: simFromCurrency, destinationCurrency: "NGN", baseRate: fromBaseRate, config });
       const toCalc = calculateDirectionalCustomerRate({ sourceCurrency: "NGN", destinationCurrency: simToCurrency, baseRate: toBaseRate, config });
       converted = (net * fromCalc.unitExchangeRate) * toCalc.unitExchangeRate;
@@ -419,6 +383,11 @@ function CpanelExchangeRatesContent() {
               const buyVal = Number(config[buyKey] ?? 0);
               const sellVal = Number(config[sellKey] ?? 0);
 
+              // Base provider rate resolution
+              const basePrice = baseRatesMap[curr] || (curr === "USD" ? config.manualDollarRate : (curr === "XOF" ? config.manualXofRate : 1000));
+              const totalCustomerBuyRate = basePrice + buyVal;
+              const totalCustomerSellRate = Math.max(0.0001, basePrice - sellVal);
+
               return (
                 <div
                   key={curr}
@@ -453,11 +422,22 @@ function CpanelExchangeRatesContent() {
                     </button>
                   </div>
 
+                  {/* Display Currency Price / Base Rate */}
+                  <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Currency Price (Base Rate):</span>
+                    <strong className="text-amber-400 font-mono font-bold">
+                      ₦{basePrice.toLocaleString(undefined, { maximumFractionDigits: 3 })} / {curr}
+                    </strong>
+                  </div>
+
                   <div className="space-y-3">
-                    <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1">
-                      <span className="text-[9.5px] font-black uppercase text-slate-400 block">
-                        Customer Buy {curr} Adjustment (NGN ➔ {curr})
-                      </span>
+                    {/* Customer Buy Section */}
+                    <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9.5px] font-black uppercase text-slate-400 block">
+                          Customer Buy {curr} Adjustment (NGN ➔ {curr})
+                        </span>
+                      </div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">+₦</span>
                         <input
@@ -468,12 +448,19 @@ function CpanelExchangeRatesContent() {
                           className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none focus:border-amber-500"
                         />
                       </div>
+                      <div className="flex justify-between items-center text-[10px] text-slate-300 font-mono pt-1 border-t border-slate-800/60">
+                        <span>Total Customer Buy Rate:</span>
+                        <strong className="text-amber-400 font-bold">₦{totalCustomerBuyRate.toLocaleString(undefined, { maximumFractionDigits: 3 })} / {curr}</strong>
+                      </div>
                     </div>
 
-                    <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1">
-                      <span className="text-[9.5px] font-black uppercase text-slate-400 block">
-                        Customer Sell {curr} Adjustment ({curr} ➔ NGN)
-                      </span>
+                    {/* Customer Sell Section */}
+                    <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9.5px] font-black uppercase text-slate-400 block">
+                          Customer Sell {curr} Adjustment ({curr} ➔ NGN)
+                        </span>
+                      </div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">-₦</span>
                         <input
@@ -483,6 +470,10 @@ function CpanelExchangeRatesContent() {
                           onChange={(e) => setConfig({ ...config, [sellKey]: Math.max(0, parseFloat(e.target.value) || 0) })}
                           className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs font-mono font-bold text-emerald-400 outline-none focus:border-emerald-500"
                         />
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] text-slate-300 font-mono pt-1 border-t border-slate-800/60">
+                        <span>Total Customer Sell Rate:</span>
+                        <strong className="text-emerald-400 font-bold">₦{totalCustomerSellRate.toLocaleString(undefined, { maximumFractionDigits: 3 })} / {curr}</strong>
                       </div>
                     </div>
                   </div>
