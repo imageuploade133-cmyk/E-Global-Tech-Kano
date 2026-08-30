@@ -299,17 +299,17 @@ function CpanelExchangeRatesContent() {
       converted = net * effectiveDollarRate;
     } else if (simFromCurrency === "NGN" && simToCurrency === "XOF") {
       const net = Math.max(0, simAmount - fee);
-      converted = net / effectiveXofRate;
+      converted = net * effectiveXofRate;
     } else if (simFromCurrency === "XOF" && simToCurrency === "NGN") {
       const net = Math.max(0, simAmount - fee);
-      converted = net * effectiveXofRate;
+      converted = net / effectiveXofRate;
     } else if (simFromCurrency === "USD" && simToCurrency === "XOF") {
       const net = Math.max(0, simAmount - fee);
       const ngnEquivalent = net * effectiveDollarRate;
-      converted = ngnEquivalent / effectiveXofRate;
+      converted = ngnEquivalent * effectiveXofRate;
     } else if (simFromCurrency === "XOF" && simToCurrency === "USD") {
       const net = Math.max(0, simAmount - fee);
-      const ngnEquivalent = net * effectiveXofRate;
+      const ngnEquivalent = net / effectiveXofRate;
       converted = ngnEquivalent / effectiveDollarRate;
     }
 
@@ -835,7 +835,13 @@ function CpanelExchangeRatesContent() {
                 <div className="text-[9.5px] text-gray-400 font-bold space-y-0.5 border-t border-gray-200 dark:border-gray-800 pt-1 mt-1">
                   <div className="flex justify-between text-emerald-600 font-extrabold">
                     <span>Active Rate:</span>
-                    <span>₦{effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD ($1.00)</span>
+                    <span>
+                      {simFromCurrency === "NGN" && simToCurrency === "USD" && `1 USD = ₦${effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} (1 NGN = $${(1 / effectiveDollarRate).toFixed(6)})`}
+                      {simFromCurrency === "USD" && simToCurrency === "NGN" && `1 USD = ₦${effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                      {simFromCurrency === "NGN" && simToCurrency === "XOF" && `1 NGN = ${effectiveXofRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} XOF (1 XOF = ₦${(1 / effectiveXofRate).toFixed(4)})`}
+                      {simFromCurrency === "XOF" && simToCurrency === "NGN" && `1 NGN = ${effectiveXofRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} XOF (1 XOF = ₦${(1 / effectiveXofRate).toFixed(4)})`}
+                      {(simFromCurrency === "USD" && simToCurrency === "XOF" || (simFromCurrency === "XOF" && simToCurrency === "USD")) && `1 USD = ${(effectiveDollarRate * effectiveXofRate).toLocaleString(undefined, { maximumFractionDigits: 2 })} XOF`}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Swap Fee Deducted:</span>
