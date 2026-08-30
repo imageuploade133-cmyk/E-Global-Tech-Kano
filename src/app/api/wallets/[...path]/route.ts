@@ -226,9 +226,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       const to = (searchParams.get("to") || "").toUpperCase();
       const amount = parseFloat(searchParams.get("amount") || "0");
 
-      const allowed = ["NGN", "USD", "XOF"];
+      const allowed = ["NGN", "USD", "EUR", "GBP", "GHS", "KES", "XOF", "XAF", "CAD", "ZAR", "TZS", "UGX", "RWF", "ZMW"];
       if (!allowed.includes(from) || !allowed.includes(to) || from === to) {
-        return NextResponse.json({ error: "Invalid currencies specified. Must swap between NGN, USD, and XOF." }, { status: 400 });
+        return NextResponse.json({ error: `Invalid currencies specified. Supported currencies: ${allowed.join(", ")}.` }, { status: 400 });
       }
       if (isNaN(amount) || amount <= 0) {
         return NextResponse.json({ error: "Invalid amount specified. Amount must be a positive number." }, { status: 400 });
@@ -239,35 +239,45 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       const netAmount = Math.max(0, amount - fee);
 
       let unitExchangeRate = 1;
-      if (from === "NGN" && to === "USD") {
-        unitExchangeRate = 1 / activeConfig.effectiveDollarRate;
-      } else if (from === "USD" && to === "NGN") {
-        unitExchangeRate = activeConfig.effectiveDollarRate;
-      } else if (from === "NGN" && to === "XOF") {
-        unitExchangeRate = 1 / activeConfig.effectiveXofRate;
-      } else if (from === "XOF" && to === "NGN") {
-        unitExchangeRate = activeConfig.effectiveXofRate;
-      } else if (from === "USD" && to === "XOF") {
-        unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
-      } else if (from === "XOF" && to === "USD") {
-        unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
-      }
-
       let targetAmount = 0;
-      if (from === "NGN" && to === "USD") {
-        targetAmount = netAmount / activeConfig.effectiveDollarRate;
-      } else if (from === "USD" && to === "NGN") {
-        targetAmount = netAmount * activeConfig.effectiveDollarRate;
-      } else if (from === "NGN" && to === "XOF") {
-        targetAmount = netAmount / activeConfig.effectiveXofRate;
-      } else if (from === "XOF" && to === "NGN") {
-        targetAmount = netAmount * activeConfig.effectiveXofRate;
-      } else if (from === "USD" && to === "XOF") {
-        const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
-        targetAmount = ngnEquiv / activeConfig.effectiveXofRate;
-      } else if (from === "XOF" && to === "USD") {
-        const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
-        targetAmount = ngnEquiv / activeConfig.effectiveDollarRate;
+
+      if (activeConfig.useFlutterwaveRate) {
+        const flwRate = await fetchFlutterwaveTransferRate(from, to, 1);
+        if (flwRate !== null) {
+          unitExchangeRate = flwRate;
+          targetAmount = netAmount * flwRate;
+        } else {
+          return NextResponse.json({
+            success: false,
+            error: "Exchange rate temporarily unavailable. Please try again."
+          }, { status: 400 });
+        }
+      } else {
+        if (from === "NGN" && to === "USD") {
+          unitExchangeRate = 1 / activeConfig.effectiveDollarRate;
+          targetAmount = netAmount / activeConfig.effectiveDollarRate;
+        } else if (from === "USD" && to === "NGN") {
+          unitExchangeRate = activeConfig.effectiveDollarRate;
+          targetAmount = netAmount * activeConfig.effectiveDollarRate;
+        } else if (from === "NGN" && to === "XOF") {
+          unitExchangeRate = 1 / activeConfig.effectiveXofRate;
+          targetAmount = netAmount / activeConfig.effectiveXofRate;
+        } else if (from === "XOF" && to === "NGN") {
+          unitExchangeRate = activeConfig.effectiveXofRate;
+          targetAmount = netAmount * activeConfig.effectiveXofRate;
+        } else if (from === "USD" && to === "XOF") {
+          unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
+          const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
+          targetAmount = ngnEquiv / activeConfig.effectiveXofRate;
+        } else if (from === "XOF" && to === "USD") {
+          unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
+          const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
+          targetAmount = ngnEquiv / activeConfig.effectiveDollarRate;
+        } else {
+          // General fallback cross-conversion for other currencies in manual/world mode
+          unitExchangeRate = 1;
+          targetAmount = netAmount;
+        }
       }
 
       return NextResponse.json({
@@ -280,7 +290,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
         rate: unitExchangeRate,
         effectiveDollarRate: activeConfig.effectiveDollarRate,
         effectiveXofRate: activeConfig.effectiveXofRate,
-        rateFormatted: `₦${activeConfig.effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD ($1.00)`,
         targetAmount: Number(targetAmount.toFixed(2))
       });
     }
@@ -325,9 +334,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
       const amount = parseFloat(body.amount);
       const pin = body.pin ? String(body.pin).trim() : "";
 
-      const allowed = ["NGN", "USD", "XOF"];
+      const allowed = ["NGN", "USD", "EUR", "GBP", "GHS", "KES", "XOF", "XAF", "CAD", "ZAR", "TZS", "UGX", "RWF", "ZMW"];
       if (!allowed.includes(fromCurrency) || !allowed.includes(toCurrency) || fromCurrency === toCurrency) {
-        return NextResponse.json({ error: "Invalid swap currencies. Must swap NGN, USD, and XOF." }, { status: 400 });
+        return NextResponse.json({ error: `Invalid swap currencies. Supported currencies: ${allowed.join(", ")}.` }, { status: 400 });
       }
       if (isNaN(amount) || amount <= 0) {
         return NextResponse.json({ error: "Amount must be a positive number." }, { status: 400 });
@@ -431,26 +440,42 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         let targetAmountRaw = 0;
         let unitExchangeRate = 1;
 
-        if (fromCurrency === "NGN" && toCurrency === "USD") {
-          unitExchangeRate = 1 / activeConfig.effectiveDollarRate;
-          targetAmountRaw = netAmount / activeConfig.effectiveDollarRate;
-        } else if (fromCurrency === "USD" && toCurrency === "NGN") {
-          unitExchangeRate = activeConfig.effectiveDollarRate;
-          targetAmountRaw = netAmount * activeConfig.effectiveDollarRate;
-        } else if (fromCurrency === "NGN" && toCurrency === "XOF") {
-          unitExchangeRate = 1 / activeConfig.effectiveXofRate;
-          targetAmountRaw = netAmount / activeConfig.effectiveXofRate;
-        } else if (fromCurrency === "XOF" && toCurrency === "NGN") {
-          unitExchangeRate = activeConfig.effectiveXofRate;
-          targetAmountRaw = netAmount * activeConfig.effectiveXofRate;
-        } else if (fromCurrency === "USD" && toCurrency === "XOF") {
-          unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
-          const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
-          targetAmountRaw = ngnEquiv / activeConfig.effectiveXofRate;
-        } else if (fromCurrency === "XOF" && toCurrency === "USD") {
-          unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
-          const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
-          targetAmountRaw = ngnEquiv / activeConfig.effectiveDollarRate;
+        if (activeConfig.useFlutterwaveRate) {
+          const flwRate = await fetchFlutterwaveTransferRate(fromCurrency, toCurrency, 1);
+          if (flwRate !== null) {
+            unitExchangeRate = flwRate;
+            targetAmountRaw = netAmount * flwRate;
+          } else {
+            return {
+              success: false,
+              error: "Exchange rate temporarily unavailable. Please try again."
+            };
+          }
+        } else {
+          if (fromCurrency === "NGN" && toCurrency === "USD") {
+            unitExchangeRate = 1 / activeConfig.effectiveDollarRate;
+            targetAmountRaw = netAmount / activeConfig.effectiveDollarRate;
+          } else if (fromCurrency === "USD" && toCurrency === "NGN") {
+            unitExchangeRate = activeConfig.effectiveDollarRate;
+            targetAmountRaw = netAmount * activeConfig.effectiveDollarRate;
+          } else if (fromCurrency === "NGN" && toCurrency === "XOF") {
+            unitExchangeRate = 1 / activeConfig.effectiveXofRate;
+            targetAmountRaw = netAmount / activeConfig.effectiveXofRate;
+          } else if (fromCurrency === "XOF" && toCurrency === "NGN") {
+            unitExchangeRate = activeConfig.effectiveXofRate;
+            targetAmountRaw = netAmount * activeConfig.effectiveXofRate;
+          } else if (fromCurrency === "USD" && toCurrency === "XOF") {
+            unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
+            const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
+            targetAmountRaw = ngnEquiv / activeConfig.effectiveXofRate;
+          } else if (fromCurrency === "XOF" && toCurrency === "USD") {
+            unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
+            const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
+            targetAmountRaw = ngnEquiv / activeConfig.effectiveDollarRate;
+          } else {
+            unitExchangeRate = 1;
+            targetAmountRaw = netAmount;
+          }
         }
 
         const targetAmount = Number(targetAmountRaw.toFixed(2));

@@ -44,8 +44,9 @@ export class WalletService {
    */
   static validateCurrency(currency: string): void {
     const uc = (currency || "").toUpperCase();
-    if (uc !== "NGN" && uc !== "USD" && uc !== "XOF") {
-      throw new Error(`Unsupported currency: ${currency}. Only NGN, USD, and XOF are supported.`);
+    const allowed = ["NGN", "USD", "EUR", "GBP", "GHS", "KES", "XOF", "XAF", "CAD", "ZAR", "TZS", "UGX", "RWF", "ZMW"];
+    if (!allowed.includes(uc)) {
+      throw new Error(`Unsupported currency: ${currency}. Supported currencies include: ${allowed.join(", ")}.`);
     }
   }
 
