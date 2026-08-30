@@ -498,12 +498,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
       });
 
       if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 400 });
+        return NextResponse.json({ error: result.error || "Swap failed" }, { status: 400 });
       }
+
+      const fromCurrency = result.fromCurrency || "";
+      const fromAmount = result.fromAmount || 0;
+      const toCurrency = result.toCurrency || "";
+      const toAmount = result.toAmount || 0;
 
       return NextResponse.json({
         success: true,
-        message: `Successfully exchanged ${result.fromCurrency} ${result.fromAmount.toLocaleString()} for ${result.toCurrency} ${result.toAmount.toLocaleString()}!`,
+        message: `Successfully exchanged ${fromCurrency} ${fromAmount.toLocaleString()} for ${toCurrency} ${toAmount.toLocaleString()}!`,
         data: result
       });
     }
