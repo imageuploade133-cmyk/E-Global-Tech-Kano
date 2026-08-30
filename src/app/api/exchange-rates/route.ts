@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 
 export async function GET() {
   try {
+    let useFlutterwaveRate = false;
     let useLiveWorldDollarRate = false;
     let manualDollarRate = 1550;
     let dollarCommissionFee = 15;
@@ -27,6 +28,7 @@ export async function GET() {
       if (docSnap.exists) {
         const stored = docSnap.data();
         if (stored) {
+          useFlutterwaveRate = Boolean(stored.useFlutterwaveRate);
           useLiveWorldDollarRate = Boolean(stored.useLiveWorldDollarRate);
           manualDollarRate = Math.max(1, Number(stored.manualDollarRate) || 1550);
           dollarCommissionFee = Math.max(0, Number(stored.dollarCommissionFee) || 0);
@@ -59,8 +61,27 @@ export async function GET() {
     let baseDollarRate = manualDollarRate;
     let liveDollarRateFetched = false;
 
-    // Fetch live market USD rate if live mode is enabled
-    if (useLiveWorldDollarRate) {
+    // Fetch live market USD rate if Flutterwave or Live World mode is enabled
+    if (useFlutterwaveRate) {
+      try {
+        const flwKey = process.env.FLUTTERWAVE_SECRET_KEY;
+        if (flwKey) {
+          const flwRes = await fetch("https://api.flutterwave.com/v3/rates?from=USD&to=NGN&amount=1", {
+            headers: { Authorization: `Bearer ${flwKey}` },
+            cache: "no-store"
+          });
+          if (flwRes.ok) {
+            const flwData = await flwRes.json();
+            if (flwData?.data?.rate) {
+              baseDollarRate = Number(flwData.data.rate);
+              liveDollarRateFetched = true;
+            }
+          }
+        }
+      } catch (flwErr: any) {
+        console.warn("[Public Exchange Rates GET] Flutterwave rate fetch fallback:", flwErr.message);
+      }
+    } else if (useLiveWorldDollarRate) {
       try {
         const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/USD", { cache: "no-store" });
         if (liveRes.ok) {
@@ -101,7 +122,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       rates: {
-        dollarMode: useLiveWorldDollarRate ? "LIVE_WORLD" : "MANUAL",
+        dollarMode: useFlutterwaveRate ? "FLUTTERWAVE" : (useLiveWorldDollarRate ? "LIVE_WORLD" : "MANUAL"),
         baseDollarRate,
         dollarCommissionFee,
         effectiveDollarSellRate,

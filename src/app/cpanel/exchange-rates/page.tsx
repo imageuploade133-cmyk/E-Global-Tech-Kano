@@ -24,6 +24,7 @@ export interface SwapRangeTier {
 }
 
 interface ExchangeConfig {
+  useFlutterwaveRate: boolean;
   useLiveWorldDollarRate: boolean;
   manualDollarRate: number;
   dollarCommissionFee: number;
@@ -43,6 +44,7 @@ interface ExchangeConfig {
 }
 
 const DEFAULT_CONFIG: ExchangeConfig = {
+  useFlutterwaveRate: false,
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
@@ -381,25 +383,54 @@ function CpanelExchangeRatesContent() {
                 <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 tracking-wider">
                   USD RATE ENGINE
                 </span>
-                <h2 className="text-base font-extrabold tracking-tight mt-1.5">World Live Dollar Rate Mode</h2>
+                <h2 className="text-base font-extrabold tracking-tight mt-1.5">Live FX Rate Modes</h2>
                 <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-                  Auto-fetches USD FX rates dynamically + your commission fee.
+                  Auto-fetches real-time USD exchange rates + your commission fee.
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-900 p-2.5 rounded-2xl border border-slate-800">
-                <span className="text-xs font-bold text-slate-300">
-                  {config.useLiveWorldDollarRate ? "Live: ON" : "Manual: ON"}
-                </span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.useLiveWorldDollarRate}
-                    onChange={(e) => setConfig({ ...config, useLiveWorldDollarRate: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                </label>
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                {/* Flutterwave Rate Toggle */}
+                <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                  <span className="text-[11px] font-extrabold text-amber-400">Flutterwave Rate</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.useFlutterwaveRate}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setConfig({
+                          ...config,
+                          useFlutterwaveRate: checked,
+                          useLiveWorldDollarRate: checked ? false : config.useLiveWorldDollarRate
+                        });
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                {/* World Live Rate Toggle */}
+                <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                  <span className="text-[11px] font-extrabold text-slate-300">World Rate</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.useLiveWorldDollarRate}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setConfig({
+                          ...config,
+                          useLiveWorldDollarRate: checked,
+                          useFlutterwaveRate: checked ? false : config.useFlutterwaveRate
+                        });
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
               </div>
             </div>
 
