@@ -152,7 +152,7 @@ export const matchBankLogo = (text: string, bankList?: BankLogoItem[] | null): s
 
   // Known bank keyword static fallbacks
   if (t.includes("providus")) return "/bank-logos/101.png";
-  if (t.includes("wema")) return "/bank-logos-[#035]" ? "/bank-logos/035.png" : "/bank-logos/035.png";
+  if (t.includes("wema")) return "/bank-logos/035.png";
   if (t.includes("fcmb")) return "/bank-logos/214.png";
   if (t.includes("opay") || t.includes("owealth")) return "/bank-logos/999992.png";
   if (t.includes("access")) return "/bank-logos/044.png";
