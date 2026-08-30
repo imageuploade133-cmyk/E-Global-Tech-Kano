@@ -224,61 +224,25 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         const fromCurrency = swapFromCurrency;
         const toCurrency = swapToCurrency;
 
-        if (sessionStorage.getItem("mock") === "true") {
-          let valInNgn = 0;
-          if (fromCurrency === "NGN") {
-            valInNgn = amtToQuery;
-          } else if (fromCurrency === "USD") {
-            valInNgn = amtToQuery * 1550;
-          } else if (fromCurrency === "XOF") {
-            valInNgn = amtToQuery / 2.5;
-          }
-
-          let targetAmt = 0;
-          if (toCurrency === "NGN") {
-            targetAmt = valInNgn;
-          } else if (toCurrency === "USD") {
-            targetAmt = valInNgn / 1550;
-          } else if (toCurrency === "XOF") {
-            targetAmt = valInNgn * 2.5;
-          }
-
-          const calculatedRate = targetAmt / amtToQuery;
-          setSwapRate(calculatedRate);
-          setSwapFee(0);
-          setSwapTargetAmount(!isNaN(inputAmt) && inputAmt > 0 ? targetAmt : 0);
-          setIsRatesLoading(false);
-          return;
-        }
-
         let idToken = "";
         if (user) {
-          idToken = await user.getIdToken();
+          try {
+            idToken = await user.getIdToken();
+          } catch {}
         }
 
-        const res = await fetch(`/api/wallets/rates?from=${fromCurrency}&to=${toCurrency}&amount=${amtToQuery}`, {
-          headers: {
-            "Authorization": `Bearer ${idToken}`
-          }
-        });
+        const headers: Record<string, string> = idToken ? { Authorization: `Bearer ${idToken}` } : {};
+        const res = await fetch(`/api/wallets/rates?from=${fromCurrency}&to=${toCurrency}&amount=${amtToQuery}`, { headers });
         const data = await res.json();
         if (res.ok && data.success) {
           setSwapRate(data.rate);
           setSwapFee(!isNaN(inputAmt) && inputAmt > 0 ? (data.fee || 0) : 0);
           setSwapTargetAmount(!isNaN(inputAmt) && inputAmt > 0 ? data.targetAmount : 0);
         } else {
-          // Fallback static rate calculation
-          let defaultRate = 1;
-          if (fromCurrency === "NGN" && toCurrency === "USD") defaultRate = 1 / 1550;
-          else if (fromCurrency === "USD" && toCurrency === "NGN") defaultRate = 1550;
-          else if (fromCurrency === "NGN" && toCurrency === "XOF") defaultRate = 2.5;
-          else if (fromCurrency === "XOF" && toCurrency === "NGN") defaultRate = 1 / 2.5;
-          else if (fromCurrency === "USD" && toCurrency === "XOF") defaultRate = 1550 * 2.5;
-          else if (fromCurrency === "XOF" && toCurrency === "USD") defaultRate = 1 / (1550 * 2.5);
-
-          setSwapRate(defaultRate);
+          console.warn("Could not fetch realtime exchange rates:", data?.error);
+          setSwapRate(null);
           setSwapFee(0);
-          setSwapTargetAmount(!isNaN(inputAmt) && inputAmt > 0 ? inputAmt * defaultRate : 0);
+          setSwapTargetAmount(0);
         }
       } catch (err) {
         console.error("Error fetching swap rate:", err);

@@ -4,12 +4,12 @@ import { fetchFlutterwaveTransferRate } from "@/lib/flutterwave-rates";
 
 export async function GET() {
   try {
-    let useFlutterwaveRate = false;
+    let useFlutterwaveRate = true;
     let useLiveWorldDollarRate = false;
     let manualDollarRate = 1550;
     let dollarCommissionFee = 15;
 
-    let useFlutterwaveXofRate = false;
+    let useFlutterwaveXofRate = true;
     let useLiveWorldXofRate = false;
     let manualXofRate = 2.5;
     let xofCommissionFee = 0.1;
@@ -30,12 +30,12 @@ export async function GET() {
       if (docSnap.exists) {
         const stored = docSnap.data();
         if (stored) {
-          useFlutterwaveRate = Boolean(stored.useFlutterwaveRate);
+          useFlutterwaveRate = stored.useFlutterwaveRate !== undefined ? Boolean(stored.useFlutterwaveRate) : true;
           useLiveWorldDollarRate = Boolean(stored.useLiveWorldDollarRate);
           manualDollarRate = Math.max(1, Number(stored.manualDollarRate) || 1550);
           dollarCommissionFee = Math.max(0, Number(stored.dollarCommissionFee) || 0);
 
-          useFlutterwaveXofRate = Boolean(stored.useFlutterwaveXofRate);
+          useFlutterwaveXofRate = stored.useFlutterwaveXofRate !== undefined ? Boolean(stored.useFlutterwaveXofRate) : true;
           useLiveWorldXofRate = Boolean(stored.useLiveWorldXofRate);
           manualXofRate = Math.max(0.01, Number(stored.manualXofRate) || 2.5);
           xofCommissionFee = Math.max(0, Number(stored.xofCommissionFee) || 0);
