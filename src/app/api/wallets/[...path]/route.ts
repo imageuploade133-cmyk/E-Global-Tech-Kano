@@ -103,6 +103,7 @@ async function resolveActiveExchangeConfig() {
   const effectiveXofRate = baseXofRate + xofCommissionFee;
 
   return {
+    useFlutterwaveRate,
     effectiveDollarRate,
     effectiveXofRate,
     swapFees,
