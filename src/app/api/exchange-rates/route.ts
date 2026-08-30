@@ -125,7 +125,7 @@ export async function GET() {
 
     const effectiveXofSellRate = (baseXofRate !== null) ? baseXofRate + xofCommissionFee : null;
 
-    // 3. Resolve Direct Cross Pairs
+    // 3. Resolve Direct Cross Pairs (Without Fallbacks When Flutterwave Mode Is Active)
     // NGN -> USD
     let ngnToUsdRate: number | null = null;
     let ngnToUsdAvailable = false;
@@ -133,9 +133,6 @@ export async function GET() {
       const flwNgnToUsd = await fetchFlutterwaveTransferRate("NGN", "USD", 1);
       if (flwNgnToUsd !== null) {
         ngnToUsdRate = flwNgnToUsd;
-        ngnToUsdAvailable = true;
-      } else if (effectiveDollarSellRate !== null && effectiveDollarSellRate > 0) {
-        ngnToUsdRate = 1 / effectiveDollarSellRate;
         ngnToUsdAvailable = true;
       }
     } else if (effectiveDollarSellRate !== null && effectiveDollarSellRate > 0) {
@@ -151,9 +148,6 @@ export async function GET() {
       if (flwNgnToXof !== null) {
         ngnToXofRate = flwNgnToXof;
         ngnToXofAvailable = true;
-      } else if (effectiveXofSellRate !== null && effectiveXofSellRate > 0) {
-        ngnToXofRate = 1 / effectiveXofSellRate;
-        ngnToXofAvailable = true;
       }
     } else if (effectiveXofSellRate !== null && effectiveXofSellRate > 0) {
       ngnToXofRate = 1 / effectiveXofSellRate;
@@ -168,9 +162,6 @@ export async function GET() {
       if (flwUsdToXof !== null) {
         usdToXofRate = flwUsdToXof;
         usdToXofAvailable = true;
-      } else if (effectiveDollarSellRate !== null && ngnToXofRate !== null) {
-        usdToXofRate = effectiveDollarSellRate * ngnToXofRate;
-        usdToXofAvailable = true;
       }
     } else if (effectiveDollarSellRate !== null && effectiveXofSellRate !== null && effectiveXofSellRate > 0) {
       usdToXofRate = effectiveDollarSellRate / effectiveXofSellRate;
@@ -184,9 +175,6 @@ export async function GET() {
       const flwXofToUsd = await fetchFlutterwaveTransferRate("XOF", "USD", 1);
       if (flwXofToUsd !== null) {
         xofToUsdRate = flwXofToUsd;
-        xofToUsdAvailable = true;
-      } else if (usdToXofRate !== null && usdToXofRate > 0) {
-        xofToUsdRate = 1 / usdToXofRate;
         xofToUsdAvailable = true;
       }
     } else if (usdToXofRate !== null && usdToXofRate > 0) {
