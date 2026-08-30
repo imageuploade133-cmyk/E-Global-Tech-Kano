@@ -28,6 +28,7 @@ interface ExchangeConfig {
   useLiveWorldDollarRate: boolean;
   manualDollarRate: number;
   dollarCommissionFee: number;
+  useFlutterwaveXofRate: boolean;
   useLiveWorldXofRate: boolean;
   manualXofRate: number;
   xofCommissionFee: number;
@@ -48,6 +49,7 @@ const DEFAULT_CONFIG: ExchangeConfig = {
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
+  useFlutterwaveXofRate: false,
   useLiveWorldXofRate: false,
   manualXofRate: 2.5,
   xofCommissionFee: 0.1,
