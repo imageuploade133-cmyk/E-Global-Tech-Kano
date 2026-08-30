@@ -4227,7 +4227,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           </span>
                           {swapRate > 0 && (
                             <span className="font-mono text-[10px] text-gray-400 font-extrabold block mt-0.5">
-                              (1 {swapToCurrency} = {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}{(1 / swapRate).toLocaleString(undefined, { maximumFractionDigits: 2 })})
+                              (1 {swapToCurrency} = {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}
+                              {(1 / swapRate) < 0.01
+                                ? (1 / swapRate).toFixed(6)
+                                : (1 / swapRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                              )
                             </span>
                           )}
                         </div>

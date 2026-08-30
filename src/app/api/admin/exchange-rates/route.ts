@@ -11,6 +11,7 @@ export interface SwapRangeTier {
 }
 
 export interface ExchangeRatesConfig {
+  useFlutterwaveRate: boolean;
   useLiveWorldDollarRate: boolean;
   manualDollarRate: number;
   dollarCommissionFee: number;
@@ -34,6 +35,7 @@ export interface ExchangeRatesConfig {
 }
 
 const DEFAULT_EXCHANGE_RATES_CONFIG: ExchangeRatesConfig = {
+  useFlutterwaveRate: false,
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
@@ -74,6 +76,7 @@ export async function GET(req: Request) {
       if (docSnap.exists) {
         const stored = docSnap.data();
         config = {
+          useFlutterwaveRate: Boolean(stored?.useFlutterwaveRate),
           useLiveWorldDollarRate: Boolean(stored?.useLiveWorldDollarRate),
           manualDollarRate: Math.max(1, Number(stored?.manualDollarRate) || 1550),
           dollarCommissionFee: Math.max(0, Number(stored?.dollarCommissionFee) || 0),
@@ -123,6 +126,7 @@ export async function POST(req: Request) {
     const adminEmail = perm.auth?.email || "admin";
     const body = await req.json();
 
+    const useFlutterwaveRate = Boolean(body.useFlutterwaveRate);
     const useLiveWorldDollarRate = Boolean(body.useLiveWorldDollarRate);
     const manualDollarRate = Math.max(1, Number(body.manualDollarRate) || 1550);
     const dollarCommissionFee = Math.max(0, Number(body.dollarCommissionFee) || 0);
@@ -166,6 +170,7 @@ export async function POST(req: Request) {
     }
 
     const updatedConfig: ExchangeRatesConfig = {
+      useFlutterwaveRate,
       useLiveWorldDollarRate,
       manualDollarRate,
       dollarCommissionFee,
