@@ -116,18 +116,31 @@ function CpanelExchangeRatesContent() {
           const publicRes = await fetch("/api/exchange-rates");
           const publicData = await publicRes.json();
           if (publicRes.ok && publicData.success && publicData.rates) {
+            const usdPair = publicData.rates.usdToNgn;
+            const xofPair = publicData.rates.xofToNgn;
+
+            if (usdPair?.available && typeof usdPair.baseRate === "number") {
+              setFlwDollarRate(usdPair.baseRate);
+            } else {
+              setFlwDollarRate(null);
+            }
+
+            if (xofPair?.available && typeof xofPair.baseRate === "number") {
+              setFlwXofRate(xofPair.baseRate);
+            } else {
+              setFlwXofRate(null);
+            }
+
             const fetchedDollar = Number(publicData.rates.baseDollarRate);
             const fetchedXof = Number(publicData.rates.baseXofRate);
 
             if (!isNaN(fetchedDollar) && fetchedDollar > 0) {
-              setFlwDollarRate(fetchedDollar);
               setLiveWorldDollarRate(fetchedDollar);
               if (data.config.useFlutterwaveRate || data.config.useLiveWorldDollarRate) {
                 setConfig((prev) => ({ ...prev, manualDollarRate: fetchedDollar }));
               }
             }
             if (!isNaN(fetchedXof) && fetchedXof > 0) {
-              setFlwXofRate(fetchedXof);
               setLiveWorldXofRate(fetchedXof);
               if (data.config.useFlutterwaveXofRate || data.config.useLiveWorldXofRate) {
                 setConfig((prev) => ({ ...prev, manualXofRate: fetchedXof }));
@@ -330,17 +343,17 @@ function CpanelExchangeRatesContent() {
       converted = net * effectiveDollarRate;
     } else if (simFromCurrency === "NGN" && simToCurrency === "XOF") {
       const net = Math.max(0, simAmount - fee);
-      converted = net * effectiveXofRate;
+      converted = net / effectiveXofRate;
     } else if (simFromCurrency === "XOF" && simToCurrency === "NGN") {
       const net = Math.max(0, simAmount - fee);
-      converted = net / effectiveXofRate;
+      converted = net * effectiveXofRate;
     } else if (simFromCurrency === "USD" && simToCurrency === "XOF") {
       const net = Math.max(0, simAmount - fee);
       const ngnEquivalent = net * effectiveDollarRate;
-      converted = ngnEquivalent * effectiveXofRate;
+      converted = ngnEquivalent / effectiveXofRate;
     } else if (simFromCurrency === "XOF" && simToCurrency === "USD") {
       const net = Math.max(0, simAmount - fee);
-      const ngnEquivalent = net / effectiveXofRate;
+      const ngnEquivalent = net * effectiveXofRate;
       converted = ngnEquivalent / effectiveDollarRate;
     }
 
@@ -411,9 +424,30 @@ function CpanelExchangeRatesContent() {
           <div className="bg-[#0b1329] text-white rounded-2xl p-6 border border-slate-800 space-y-5 shadow-xl">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
               <div>
-                <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 tracking-wider">
-                  USD RATE ENGINE
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 tracking-wider">
+                    USD RATE ENGINE
+                  </span>
+                  {config.useFlutterwaveRate ? (
+                    flwDollarRate !== null ? (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        FLUTTERWAVE: CONNECTED
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
+                        FLUTTERWAVE: UNAVAILABLE
+                      </span>
+                    )
+                  ) : config.useLiveWorldDollarRate ? (
+                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      WORLD RATE: LIVE
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-slate-700 text-slate-300 border border-slate-600">
+                      MANUAL RATE
+                    </span>
+                  )}
+                </div>
                 <h2 className="text-base font-extrabold tracking-tight mt-1.5">Live FX Rate Modes</h2>
                 <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
                   Auto-fetches real-time USD exchange rates + your commission fee.
@@ -516,9 +550,30 @@ function CpanelExchangeRatesContent() {
           <div className="bg-[#0b1329] text-white rounded-2xl p-6 border border-slate-800 space-y-5 shadow-xl">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
               <div>
-                <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 tracking-wider">
-                  XOF (FCFA) RATE ENGINE
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 tracking-wider">
+                    XOF (FCFA) RATE ENGINE
+                  </span>
+                  {config.useFlutterwaveXofRate ? (
+                    flwXofRate !== null ? (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        FLUTTERWAVE: CONNECTED
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
+                        FLUTTERWAVE: UNAVAILABLE
+                      </span>
+                    )
+                  ) : config.useLiveWorldXofRate ? (
+                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      WORLD RATE: LIVE
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-slate-700 text-slate-300 border border-slate-600">
+                      MANUAL RATE
+                    </span>
+                  )}
+                </div>
                 <h2 className="text-base font-extrabold tracking-tight mt-1.5">Live XOF Rate Modes</h2>
                 <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
                   Auto-fetches XOF (FCFA) live exchange rate + your commission fee.

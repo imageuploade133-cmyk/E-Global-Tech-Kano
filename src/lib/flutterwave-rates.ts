@@ -1,7 +1,7 @@
 /**
- * Helper to fetch live FX conversion rates via payment-gateway VM or direct Flutterwave Transfers Rates V3 API.
- * Endpoint: GET https://api.flutterwave.com/v3/transfers/rates?amount={amount}&destination_currency={dest}&source_currency={src}
- * Doc reference: https://developer.flutterwave.com/docs/real-time-fx-conversion
+ * Helper to fetch live FX conversion rates exclusively via payment-gateway VM server-to-server endpoint.
+ * Endpoint on VM: GET /api/flutterwave/rates?sourceCurrency={from}&destinationCurrency={to}&amount={amount}
+ * The Flutterwave Secret Key remains strictly on the payment-gateway VM.
  */
 
 const rateCache: Map<string, { rate: number; expiresAt: number }> = new Map();
@@ -28,21 +28,23 @@ export async function fetchFlutterwaveTransferRate(
   }
 
   const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
-  const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+  const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
-  // 1. Try VM server-to-server gateway first (keeps secret key on VM)
+  if (!apiKey) {
+    console.warn("[fetchFlutterwaveTransferRate] PAYMENT_GATEWAY_API_KEY is not defined in environment variables.");
+    return null;
+  }
+
   try {
-    const vmRes = await fetch(
-      `${gatewayUrl}/api/flutterwave/rates?sourceCurrency=${from}&destinationCurrency=${to}&amount=${amount}`,
-      {
-        method: "GET",
-        headers: {
-          "x-api-key": apiKey,
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        cache: "no-store",
-      }
-    );
+    const url = `${gatewayUrl}/api/flutterwave/rates?sourceCurrency=${from}&destinationCurrency=${to}&amount=${amount}`;
+    const vmRes = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      cache: "no-store",
+    });
 
     if (vmRes.ok) {
       const vmData = await vmRes.json();
@@ -52,41 +54,11 @@ export async function fetchFlutterwaveTransferRate(
         console.log(`[fetchFlutterwaveTransferRate] VM S2S rate fetched (${from} -> ${to}): ${rate}`);
         return rate;
       }
+    } else {
+      console.warn(`[fetchFlutterwaveTransferRate] VM S2S error response status=${vmRes.status} (${from} -> ${to})`);
     }
   } catch (vmErr: any) {
-    console.warn(`[fetchFlutterwaveTransferRate] VM S2S request warning (${from} -> ${to}):`, vmErr.message);
-  }
-
-  // 2. Fallback: Direct Flutterwave V3 GET request (Server-side only if FLUTTERWAVE_SECRET_KEY set)
-  const flwKey = process.env.FLUTTERWAVE_SECRET_KEY;
-  if (!flwKey) {
-    return null;
-  }
-
-  try {
-    const url = `https://api.flutterwave.com/v3/transfers/rates?amount=${amount}&destination_currency=${to}&source_currency=${from}`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${flwKey}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-    });
-
-    const data = await res.json();
-    if (res.ok && data?.status === "success" && data?.data?.rate) {
-      const rateNum = parseFloat(String(data.data.rate));
-      if (!isNaN(rateNum) && rateNum > 0) {
-        rateCache.set(cacheKey, { rate: rateNum, expiresAt: now + RATE_CACHE_TTL_MS });
-        console.log(`[fetchFlutterwaveTransferRate] Direct Flutterwave V3 GET rate fetched (${from} -> ${to}): ${rateNum}`);
-        return rateNum;
-      }
-    } else {
-      console.warn(`[fetchFlutterwaveTransferRate] Direct Flutterwave V3 GET returned error (${from} -> ${to}):`, data?.message);
-    }
-  } catch (err: any) {
-    console.warn(`[fetchFlutterwaveTransferRate] Direct V3 GET exception (${from} -> ${to}):`, err.message);
+    console.warn(`[fetchFlutterwaveTransferRate] VM S2S request exception (${from} -> ${to}):`, vmErr.message);
   }
 
   return null;
