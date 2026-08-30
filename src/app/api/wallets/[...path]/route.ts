@@ -82,10 +82,10 @@ async function resolveActiveExchangeConfig() {
   }
   const effectiveDollarRate = baseDollarRate + dollarCommissionFee;
 
-  // Resolve XOF Rate
+  // Resolve XOF Rate (querying source=XOF, destination=NGN)
   let baseXofRate = manualXofRate;
   if (useFlutterwaveXofRate) {
-    const flwXofRate = await fetchFlutterwaveTransferRate("NGN", "XOF", 1);
+    const flwXofRate = await fetchFlutterwaveTransferRate("XOF", "NGN", 1);
     if (flwXofRate !== null) {
       baseXofRate = flwXofRate;
     }
@@ -244,13 +244,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       } else if (from === "USD" && to === "NGN") {
         unitExchangeRate = activeConfig.effectiveDollarRate;
       } else if (from === "NGN" && to === "XOF") {
-        unitExchangeRate = activeConfig.effectiveXofRate;
-      } else if (from === "XOF" && to === "NGN") {
         unitExchangeRate = 1 / activeConfig.effectiveXofRate;
+      } else if (from === "XOF" && to === "NGN") {
+        unitExchangeRate = activeConfig.effectiveXofRate;
       } else if (from === "USD" && to === "XOF") {
-        unitExchangeRate = activeConfig.effectiveDollarRate * activeConfig.effectiveXofRate;
+        unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
       } else if (from === "XOF" && to === "USD") {
-        unitExchangeRate = 1 / (activeConfig.effectiveDollarRate * activeConfig.effectiveXofRate);
+        unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
       }
 
       let targetAmount = 0;
@@ -259,14 +259,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       } else if (from === "USD" && to === "NGN") {
         targetAmount = netAmount * activeConfig.effectiveDollarRate;
       } else if (from === "NGN" && to === "XOF") {
-        targetAmount = netAmount * activeConfig.effectiveXofRate;
-      } else if (from === "XOF" && to === "NGN") {
         targetAmount = netAmount / activeConfig.effectiveXofRate;
+      } else if (from === "XOF" && to === "NGN") {
+        targetAmount = netAmount * activeConfig.effectiveXofRate;
       } else if (from === "USD" && to === "XOF") {
         const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
-        targetAmount = ngnEquiv * activeConfig.effectiveXofRate;
+        targetAmount = ngnEquiv / activeConfig.effectiveXofRate;
       } else if (from === "XOF" && to === "USD") {
-        const ngnEquiv = netAmount / activeConfig.effectiveXofRate;
+        const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
         targetAmount = ngnEquiv / activeConfig.effectiveDollarRate;
       }
 
@@ -438,18 +438,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           unitExchangeRate = activeConfig.effectiveDollarRate;
           targetAmountRaw = netAmount * activeConfig.effectiveDollarRate;
         } else if (fromCurrency === "NGN" && toCurrency === "XOF") {
-          unitExchangeRate = activeConfig.effectiveXofRate;
-          targetAmountRaw = netAmount * activeConfig.effectiveXofRate;
-        } else if (fromCurrency === "XOF" && toCurrency === "NGN") {
           unitExchangeRate = 1 / activeConfig.effectiveXofRate;
           targetAmountRaw = netAmount / activeConfig.effectiveXofRate;
+        } else if (fromCurrency === "XOF" && toCurrency === "NGN") {
+          unitExchangeRate = activeConfig.effectiveXofRate;
+          targetAmountRaw = netAmount * activeConfig.effectiveXofRate;
         } else if (fromCurrency === "USD" && toCurrency === "XOF") {
-          unitExchangeRate = activeConfig.effectiveDollarRate * activeConfig.effectiveXofRate;
+          unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
           const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
-          targetAmountRaw = ngnEquiv * activeConfig.effectiveXofRate;
+          targetAmountRaw = ngnEquiv / activeConfig.effectiveXofRate;
         } else if (fromCurrency === "XOF" && toCurrency === "USD") {
-          unitExchangeRate = 1 / (activeConfig.effectiveDollarRate * activeConfig.effectiveXofRate);
-          const ngnEquiv = netAmount / activeConfig.effectiveXofRate;
+          unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
+          const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
           targetAmountRaw = ngnEquiv / activeConfig.effectiveDollarRate;
         }
 

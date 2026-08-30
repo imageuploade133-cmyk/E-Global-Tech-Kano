@@ -310,24 +310,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
         setTimeout(() => {
           toast.dismiss();
-
-          let valInNgn = 0;
-          if (fromCurrency === "NGN") {
-            valInNgn = amt;
-          } else if (fromCurrency === "USD") {
-            valInNgn = amt * 1550;
-          } else if (fromCurrency === "XOF") {
-            valInNgn = amt / 2.5;
-          }
-
-          let targetAmt = 0;
-          if (toCurrency === "NGN") {
-            targetAmt = valInNgn;
-          } else if (toCurrency === "USD") {
-            targetAmt = valInNgn / 1550;
-          } else if (toCurrency === "XOF") {
-            targetAmt = valInNgn * 2.5;
-          }
+          const targetAmt = swapTargetAmount > 0 ? swapTargetAmount : amt * (swapRate || 1);
 
           setWalletBalances(prev => {
             const next = { ...prev };
