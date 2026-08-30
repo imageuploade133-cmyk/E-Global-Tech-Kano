@@ -4,111 +4,36 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { fetchFlutterwaveTransferRate } from "@/lib/flutterwave-rates";
 import bcrypt from "bcryptjs";
+import {
+  DEFAULT_FULL_EXCHANGE_RATES_CONFIG,
+  FullExchangeRatesConfig,
+  SUPPORTED_CURRENCIES,
+  calculateDirectionalCustomerRate,
+  getCurrencyAdjustments,
+} from "@/lib/exchange-pricing";
 
 // Helper to resolve effective rates and swap fees from config/exchange_rates
-async function resolveActiveExchangeConfig() {
-  let useFlutterwaveRate = true;
-  let useLiveWorldDollarRate = false;
-  let manualDollarRate = 1550;
-  let dollarCommissionFee = 15;
-  let useFlutterwaveXofRate = true;
-  let useLiveWorldXofRate = false;
-  let manualXofRate = 2.5;
-  let xofCommissionFee = 0.1;
-
-  let swapFees = {
-    ngnToUsd: 50,
-    usdToNgn: 1.5,
-    ngnToXof: 30,
-    xofToNgn: 10,
-    usdToXof: 2.0,
-    xofToUsd: 15,
-  };
-
-  let swapRangeTiers: any[] = [];
+async function resolveActiveExchangeConfig(): Promise<FullExchangeRatesConfig> {
+  let config: FullExchangeRatesConfig = { ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG };
 
   try {
     const docSnap = await adminDb.collection("config").doc("exchange_rates").get();
     if (docSnap.exists) {
       const stored = docSnap.data();
       if (stored) {
-        useFlutterwaveRate = stored.useFlutterwaveRate !== undefined ? Boolean(stored.useFlutterwaveRate) : true;
-        useLiveWorldDollarRate = Boolean(stored.useLiveWorldDollarRate);
-        manualDollarRate = Math.max(1, Number(stored.manualDollarRate) || 1550);
-        dollarCommissionFee = Math.max(0, Number(stored.dollarCommissionFee) || 0);
-
-        useFlutterwaveXofRate = stored.useFlutterwaveXofRate !== undefined ? Boolean(stored.useFlutterwaveXofRate) : true;
-        useLiveWorldXofRate = Boolean(stored.useLiveWorldXofRate);
-        manualXofRate = Math.max(0.01, Number(stored.manualXofRate) || 2.5);
-        xofCommissionFee = Math.max(0, Number(stored.xofCommissionFee) || 0);
-
-        if (stored.swapFees) {
-          swapFees = {
-            ngnToUsd: Math.max(0, Number(stored.swapFees.ngnToUsd) || 0),
-            usdToNgn: Math.max(0, Number(stored.swapFees.usdToNgn) || 0),
-            ngnToXof: Math.max(0, Number(stored.swapFees.ngnToXof) || 0),
-            xofToNgn: Math.max(0, Number(stored.swapFees.xofToNgn) || 0),
-            usdToXof: Math.max(0, Number(stored.swapFees.usdToXof) || 0),
-            xofToUsd: Math.max(0, Number(stored.swapFees.xofToUsd) || 0),
-          };
-        }
-
-        if (Array.isArray(stored.swapRangeTiers)) {
-          swapRangeTiers = stored.swapRangeTiers;
-        }
+        config = {
+          ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG,
+          ...stored,
+          swapFees: stored.swapFees ? { ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG.swapFees, ...stored.swapFees } : DEFAULT_FULL_EXCHANGE_RATES_CONFIG.swapFees,
+          swapRangeTiers: Array.isArray(stored.swapRangeTiers) ? stored.swapRangeTiers : [],
+        };
       }
     }
   } catch (err: any) {
     console.warn("[resolveActiveExchangeConfig] Firestore read warning:", err.message);
   }
 
-  // Resolve USD Rate
-  let baseDollarRate = manualDollarRate;
-  if (useFlutterwaveRate) {
-    const flwRate = await fetchFlutterwaveTransferRate("USD", "NGN", 1);
-    if (flwRate !== null) {
-      baseDollarRate = flwRate;
-    }
-  } else if (useLiveWorldDollarRate) {
-    try {
-      const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/USD", { cache: "no-store" });
-      if (liveRes.ok) {
-        const liveData = await liveRes.json();
-        if (liveData?.rates?.NGN) {
-          baseDollarRate = Number(liveData.rates.NGN);
-        }
-      }
-    } catch {}
-  }
-  const effectiveDollarRate = baseDollarRate + dollarCommissionFee;
-
-  // Resolve XOF Rate (querying source=XOF, destination=NGN)
-  let baseXofRate = manualXofRate;
-  if (useFlutterwaveXofRate) {
-    const flwXofRate = await fetchFlutterwaveTransferRate("XOF", "NGN", 1);
-    if (flwXofRate !== null) {
-      baseXofRate = flwXofRate;
-    }
-  } else if (useLiveWorldXofRate) {
-    try {
-      const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/XOF", { cache: "no-store" });
-      if (liveRes.ok) {
-        const liveData = await liveRes.json();
-        if (liveData?.rates?.NGN) {
-          baseXofRate = Number(liveData.rates.NGN);
-        }
-      }
-    } catch {}
-  }
-  const effectiveXofRate = baseXofRate + xofCommissionFee;
-
-  return {
-    useFlutterwaveRate,
-    effectiveDollarRate,
-    effectiveXofRate,
-    swapFees,
-    swapRangeTiers,
-  };
+  return config;
 }
 
 // Calculate Swap Fee (checking custom range tiers first, then fallback to pair fee)
@@ -141,6 +66,58 @@ function calculateSwapFee(
 
   // 2. Fallback to standard pair swap fee
   return Number(swapFees[pairKey]) || 0;
+}
+
+// Dynamically resolves provider base rate for a currency relative to NGN
+async function getProviderBaseRate(currency: string, config: FullExchangeRatesConfig): Promise<number | null> {
+  const code = currency.toUpperCase();
+  if (code === "NGN") return 1;
+
+  if (code === "USD") {
+    if (config.useFlutterwaveRate) {
+      return await fetchFlutterwaveTransferRate("USD", "NGN", 1);
+    } else if (config.useLiveWorldDollarRate) {
+      try {
+        const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/USD", { cache: "no-store" });
+        if (liveRes.ok) {
+          const liveData = await liveRes.json();
+          if (liveData?.rates?.NGN) return Number(liveData.rates.NGN);
+        }
+      } catch {}
+    }
+    return config.manualDollarRate;
+  }
+
+  if (code === "XOF") {
+    if (config.useFlutterwaveXofRate) {
+      return await fetchFlutterwaveTransferRate("XOF", "NGN", 1);
+    } else if (config.useLiveWorldXofRate) {
+      try {
+        const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/XOF", { cache: "no-store" });
+        if (liveRes.ok) {
+          const liveData = await liveRes.json();
+          if (liveData?.rates?.NGN) return Number(liveData.rates.NGN);
+        }
+      } catch {}
+    }
+    return config.manualXofRate;
+  }
+
+  // For other currencies (EUR, GBP, GHS, KES, XAF, CAD, ZAR, TZS, UGX, RWF, ZMW)
+  if (config.useFlutterwaveRate) {
+    return await fetchFlutterwaveTransferRate(code, "NGN", 1);
+  }
+
+  // Fallback to Live World API for other currencies if Manual/World Rate is active
+  try {
+    const liveRes = await fetch(`https://api.exchangerate-api.com/v4/latest/${code}`, { cache: "no-store" });
+    if (liveRes.ok) {
+      const liveData = await liveRes.json();
+      if (liveData?.rates?.NGN) return Number(liveData.rates.NGN);
+    }
+  } catch {}
+
+  return null;
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ path: string[] }> }) {
@@ -227,9 +204,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       const to = (searchParams.get("to") || "").toUpperCase();
       const amount = parseFloat(searchParams.get("amount") || "0");
 
-      const allowed = ["NGN", "USD", "EUR", "GBP", "GHS", "KES", "XOF", "XAF", "CAD", "ZAR", "TZS", "UGX", "RWF", "ZMW"];
-      if (!allowed.includes(from) || !allowed.includes(to) || from === to) {
-        return NextResponse.json({ error: `Invalid currencies specified. Supported currencies: ${allowed.join(", ")}.` }, { status: 400 });
+      if (!SUPPORTED_CURRENCIES.includes(from as any) || !SUPPORTED_CURRENCIES.includes(to as any) || from === to) {
+        return NextResponse.json({ error: `Invalid currencies specified. Supported currencies: ${SUPPORTED_CURRENCIES.join(", ")}.` }, { status: 400 });
       }
       if (isNaN(amount) || amount <= 0) {
         return NextResponse.json({ error: "Invalid amount specified. Amount must be a positive number." }, { status: 400 });
@@ -242,44 +218,38 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       let unitExchangeRate = 1;
       let targetAmount = 0;
 
-      if (activeConfig.useFlutterwaveRate) {
-        const flwRate = await fetchFlutterwaveTransferRate(from, to, 1);
-        if (flwRate !== null) {
-          unitExchangeRate = flwRate;
-          targetAmount = netAmount * flwRate;
-        } else {
-          return NextResponse.json({
-            success: false,
-            error: "Exchange rate temporarily unavailable. Please try again."
-          }, { status: 400 });
+      if (from === "NGN" && to !== "NGN") {
+        const baseRate = await getProviderBaseRate(to, activeConfig);
+        if (baseRate === null) {
+          return NextResponse.json({ success: false, error: "Exchange rate temporarily unavailable. Please try again." }, { status: 400 });
         }
+        const calc = calculateDirectionalCustomerRate({ sourceCurrency: from, destinationCurrency: to, baseRate, config: activeConfig });
+        unitExchangeRate = calc.unitExchangeRate;
+        targetAmount = netAmount * unitExchangeRate;
+      } else if (from !== "NGN" && to === "NGN") {
+        const baseRate = await getProviderBaseRate(from, activeConfig);
+        if (baseRate === null) {
+          return NextResponse.json({ success: false, error: "Exchange rate temporarily unavailable. Please try again." }, { status: 400 });
+        }
+        const calc = calculateDirectionalCustomerRate({ sourceCurrency: from, destinationCurrency: to, baseRate, config: activeConfig });
+        unitExchangeRate = calc.unitExchangeRate;
+        targetAmount = netAmount * unitExchangeRate;
       } else {
-        if (from === "NGN" && to === "USD") {
-          unitExchangeRate = 1 / activeConfig.effectiveDollarRate;
-          targetAmount = netAmount / activeConfig.effectiveDollarRate;
-        } else if (from === "USD" && to === "NGN") {
-          unitExchangeRate = activeConfig.effectiveDollarRate;
-          targetAmount = netAmount * activeConfig.effectiveDollarRate;
-        } else if (from === "NGN" && to === "XOF") {
-          unitExchangeRate = 1 / activeConfig.effectiveXofRate;
-          targetAmount = netAmount / activeConfig.effectiveXofRate;
-        } else if (from === "XOF" && to === "NGN") {
-          unitExchangeRate = activeConfig.effectiveXofRate;
-          targetAmount = netAmount * activeConfig.effectiveXofRate;
-        } else if (from === "USD" && to === "XOF") {
-          unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
-          const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
-          targetAmount = ngnEquiv / activeConfig.effectiveXofRate;
-        } else if (from === "XOF" && to === "USD") {
-          unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
-          const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
-          targetAmount = ngnEquiv / activeConfig.effectiveDollarRate;
-        } else {
-          // General fallback cross-conversion for other currencies in manual/world mode
-          unitExchangeRate = 1;
-          targetAmount = netAmount;
+        // Cross pairs (e.g. USD -> XOF)
+        const fromBaseRate = await getProviderBaseRate(from, activeConfig);
+        const toBaseRate = await getProviderBaseRate(to, activeConfig);
+        if (fromBaseRate === null || toBaseRate === null) {
+          return NextResponse.json({ success: false, error: "Exchange rate temporarily unavailable. Please try again." }, { status: 400 });
         }
+        const fromCalc = calculateDirectionalCustomerRate({ sourceCurrency: from, destinationCurrency: "NGN", baseRate: fromBaseRate, config: activeConfig });
+        const toCalc = calculateDirectionalCustomerRate({ sourceCurrency: "NGN", destinationCurrency: to, baseRate: toBaseRate, config: activeConfig });
+        const ngnEquiv = netAmount * fromCalc.unitExchangeRate;
+        targetAmount = ngnEquiv * toCalc.unitExchangeRate;
+        unitExchangeRate = netAmount > 0 ? targetAmount / netAmount : 1;
       }
+
+      const usdAdj = getCurrencyAdjustments(activeConfig, "USD");
+      const baseDollarRate = await getProviderBaseRate("USD", activeConfig) || activeConfig.manualDollarRate;
 
       return NextResponse.json({
         success: true,
@@ -289,8 +259,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
         fee,
         netAmount,
         rate: unitExchangeRate,
-        effectiveDollarRate: activeConfig.effectiveDollarRate,
-        effectiveXofRate: activeConfig.effectiveXofRate,
+        effectiveDollarRate: baseDollarRate + usdAdj.buyAdjustment,
+        usdSellRate: baseDollarRate + usdAdj.buyAdjustment,
+        usdBuyRate: Math.max(0.01, baseDollarRate - usdAdj.sellAdjustment),
         targetAmount: Number(targetAmount.toFixed(2))
       });
     }
@@ -335,9 +306,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
       const amount = parseFloat(body.amount);
       const pin = body.pin ? String(body.pin).trim() : "";
 
-      const allowed = ["NGN", "USD", "EUR", "GBP", "GHS", "KES", "XOF", "XAF", "CAD", "ZAR", "TZS", "UGX", "RWF", "ZMW"];
-      if (!allowed.includes(fromCurrency) || !allowed.includes(toCurrency) || fromCurrency === toCurrency) {
-        return NextResponse.json({ error: `Invalid swap currencies. Supported currencies: ${allowed.join(", ")}.` }, { status: 400 });
+      if (!SUPPORTED_CURRENCIES.includes(fromCurrency as any) || !SUPPORTED_CURRENCIES.includes(toCurrency as any) || fromCurrency === toCurrency) {
+        return NextResponse.json({ error: `Invalid swap currencies. Supported currencies: ${SUPPORTED_CURRENCIES.join(", ")}.` }, { status: 400 });
       }
       if (isNaN(amount) || amount <= 0) {
         return NextResponse.json({ error: "Amount must be a positive number." }, { status: 400 });
@@ -441,42 +411,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         let targetAmountRaw = 0;
         let unitExchangeRate = 1;
 
-        if (activeConfig.useFlutterwaveRate) {
-          const flwRate = await fetchFlutterwaveTransferRate(fromCurrency, toCurrency, 1);
-          if (flwRate !== null) {
-            unitExchangeRate = flwRate;
-            targetAmountRaw = netAmount * flwRate;
-          } else {
-            return {
-              success: false,
-              error: "Exchange rate temporarily unavailable. Please try again."
-            };
+        if (fromCurrency === "NGN" && toCurrency !== "NGN") {
+          const baseRate = await getProviderBaseRate(toCurrency, activeConfig);
+          if (baseRate === null) {
+            return { success: false, error: "Exchange rate temporarily unavailable. Please try again." };
           }
+          const calc = calculateDirectionalCustomerRate({ sourceCurrency: fromCurrency, destinationCurrency: toCurrency, baseRate, config: activeConfig });
+          unitExchangeRate = calc.unitExchangeRate;
+          targetAmountRaw = netAmount * unitExchangeRate;
+        } else if (fromCurrency !== "NGN" && toCurrency === "NGN") {
+          const baseRate = await getProviderBaseRate(fromCurrency, activeConfig);
+          if (baseRate === null) {
+            return { success: false, error: "Exchange rate temporarily unavailable. Please try again." };
+          }
+          const calc = calculateDirectionalCustomerRate({ sourceCurrency: fromCurrency, destinationCurrency: toCurrency, baseRate, config: activeConfig });
+          unitExchangeRate = calc.unitExchangeRate;
+          targetAmountRaw = netAmount * unitExchangeRate;
         } else {
-          if (fromCurrency === "NGN" && toCurrency === "USD") {
-            unitExchangeRate = 1 / activeConfig.effectiveDollarRate;
-            targetAmountRaw = netAmount / activeConfig.effectiveDollarRate;
-          } else if (fromCurrency === "USD" && toCurrency === "NGN") {
-            unitExchangeRate = activeConfig.effectiveDollarRate;
-            targetAmountRaw = netAmount * activeConfig.effectiveDollarRate;
-          } else if (fromCurrency === "NGN" && toCurrency === "XOF") {
-            unitExchangeRate = 1 / activeConfig.effectiveXofRate;
-            targetAmountRaw = netAmount / activeConfig.effectiveXofRate;
-          } else if (fromCurrency === "XOF" && toCurrency === "NGN") {
-            unitExchangeRate = activeConfig.effectiveXofRate;
-            targetAmountRaw = netAmount * activeConfig.effectiveXofRate;
-          } else if (fromCurrency === "USD" && toCurrency === "XOF") {
-            unitExchangeRate = activeConfig.effectiveDollarRate / activeConfig.effectiveXofRate;
-            const ngnEquiv = netAmount * activeConfig.effectiveDollarRate;
-            targetAmountRaw = ngnEquiv / activeConfig.effectiveXofRate;
-          } else if (fromCurrency === "XOF" && toCurrency === "USD") {
-            unitExchangeRate = activeConfig.effectiveXofRate / activeConfig.effectiveDollarRate;
-            const ngnEquiv = netAmount * activeConfig.effectiveXofRate;
-            targetAmountRaw = ngnEquiv / activeConfig.effectiveDollarRate;
-          } else {
-            unitExchangeRate = 1;
-            targetAmountRaw = netAmount;
+          // Cross pairs
+          const fromBaseRate = await getProviderBaseRate(fromCurrency, activeConfig);
+          const toBaseRate = await getProviderBaseRate(toCurrency, activeConfig);
+          if (fromBaseRate === null || toBaseRate === null) {
+            return { success: false, error: "Exchange rate temporarily unavailable. Please try again." };
           }
+          const fromCalc = calculateDirectionalCustomerRate({ sourceCurrency: fromCurrency, destinationCurrency: "NGN", baseRate: fromBaseRate, config: activeConfig });
+          const toCalc = calculateDirectionalCustomerRate({ sourceCurrency: "NGN", destinationCurrency: toCurrency, baseRate: toBaseRate, config: activeConfig });
+          const ngnEquiv = netAmount * fromCalc.unitExchangeRate;
+          targetAmountRaw = ngnEquiv * toCalc.unitExchangeRate;
+          unitExchangeRate = netAmount > 0 ? targetAmountRaw / netAmount : 1;
         }
 
         const targetAmount = Number(targetAmountRaw.toFixed(2));
@@ -550,9 +512,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           toAmount: targetAmount,
           toCurrency,
           fee,
-          effectiveDollarRate: activeConfig.effectiveDollarRate,
-          effectiveXofRate: activeConfig.effectiveXofRate,
-          rateFormatted: `₦${activeConfig.effectiveDollarRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} / USD ($1.00)`,
           rate,
           txRef
         };
