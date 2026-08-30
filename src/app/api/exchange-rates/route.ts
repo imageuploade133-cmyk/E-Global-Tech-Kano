@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { fetchFlutterwaveTransferRate } from "@/lib/flutterwave-rates";
 
 export async function GET() {
   try {
@@ -8,6 +9,7 @@ export async function GET() {
     let manualDollarRate = 1550;
     let dollarCommissionFee = 15;
 
+    let useFlutterwaveXofRate = false;
     let useLiveWorldXofRate = false;
     let manualXofRate = 2.5;
     let xofCommissionFee = 0.1;
@@ -33,6 +35,7 @@ export async function GET() {
           manualDollarRate = Math.max(1, Number(stored.manualDollarRate) || 1550);
           dollarCommissionFee = Math.max(0, Number(stored.dollarCommissionFee) || 0);
 
+          useFlutterwaveXofRate = Boolean(stored.useFlutterwaveXofRate);
           useLiveWorldXofRate = Boolean(stored.useLiveWorldXofRate);
           manualXofRate = Math.max(0.01, Number(stored.manualXofRate) || 2.5);
           xofCommissionFee = Math.max(0, Number(stored.xofCommissionFee) || 0);
@@ -63,23 +66,10 @@ export async function GET() {
 
     // Fetch live market USD rate if Flutterwave or Live World mode is enabled
     if (useFlutterwaveRate) {
-      try {
-        const flwKey = process.env.FLUTTERWAVE_SECRET_KEY;
-        if (flwKey) {
-          const flwRes = await fetch("https://api.flutterwave.com/v3/rates?from=USD&to=NGN&amount=1", {
-            headers: { Authorization: `Bearer ${flwKey}` },
-            cache: "no-store"
-          });
-          if (flwRes.ok) {
-            const flwData = await flwRes.json();
-            if (flwData?.data?.rate) {
-              baseDollarRate = Number(flwData.data.rate);
-              liveDollarRateFetched = true;
-            }
-          }
-        }
-      } catch (flwErr: any) {
-        console.warn("[Public Exchange Rates GET] Flutterwave rate fetch fallback:", flwErr.message);
+      const flwRate = await fetchFlutterwaveTransferRate("USD", "NGN", 1);
+      if (flwRate !== null) {
+        baseDollarRate = flwRate;
+        liveDollarRateFetched = true;
       }
     } else if (useLiveWorldDollarRate) {
       try {
@@ -99,8 +89,14 @@ export async function GET() {
     let baseXofRate = manualXofRate;
     let liveXofRateFetched = false;
 
-    // Fetch live market XOF rate if live mode is enabled (1 XOF to NGN rate via USD or XOF)
-    if (useLiveWorldXofRate) {
+    // Fetch live market XOF rate if Flutterwave or Live World mode is enabled
+    if (useFlutterwaveXofRate) {
+      const flwXofRate = await fetchFlutterwaveTransferRate("NGN", "XOF", 1);
+      if (flwXofRate !== null) {
+        baseXofRate = flwXofRate;
+        liveXofRateFetched = true;
+      }
+    } else if (useLiveWorldXofRate) {
       try {
         const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/XOF", { cache: "no-store" });
         if (liveRes.ok) {
@@ -127,7 +123,7 @@ export async function GET() {
         dollarCommissionFee,
         effectiveDollarSellRate,
         liveDollarRateFetched,
-        xofMode: useLiveWorldXofRate ? "LIVE_WORLD" : "MANUAL",
+        xofMode: useFlutterwaveXofRate ? "FLUTTERWAVE" : (useLiveWorldXofRate ? "LIVE_WORLD" : "MANUAL"),
         baseXofRate,
         xofCommissionFee,
         effectiveXofSellRate,

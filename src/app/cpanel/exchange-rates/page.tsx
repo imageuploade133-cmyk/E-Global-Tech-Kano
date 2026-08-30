@@ -28,6 +28,7 @@ interface ExchangeConfig {
   useLiveWorldDollarRate: boolean;
   manualDollarRate: number;
   dollarCommissionFee: number;
+  useFlutterwaveXofRate: boolean;
   useLiveWorldXofRate: boolean;
   manualXofRate: number;
   xofCommissionFee: number;
@@ -48,6 +49,7 @@ const DEFAULT_CONFIG: ExchangeConfig = {
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
+  useFlutterwaveXofRate: false,
   useLiveWorldXofRate: false,
   manualXofRate: 2.5,
   xofCommissionFee: 0.1,
@@ -106,6 +108,31 @@ function CpanelExchangeRatesContent() {
       const data = await res.json();
       if (res.ok && data.success && data.config) {
         setConfig(data.config);
+
+        // Fetch live active rates to auto-fill inputs
+        try {
+          const publicRes = await fetch("/api/exchange-rates");
+          const publicData = await publicRes.json();
+          if (publicRes.ok && publicData.success && publicData.rates) {
+            const fetchedDollar = Number(publicData.rates.baseDollarRate);
+            const fetchedXof = Number(publicData.rates.baseXofRate);
+
+            if (!isNaN(fetchedDollar) && fetchedDollar > 0) {
+              setLiveWorldDollarRate(fetchedDollar);
+              if (data.config.useFlutterwaveRate || data.config.useLiveWorldDollarRate) {
+                setConfig((prev) => ({ ...prev, manualDollarRate: fetchedDollar }));
+              }
+            }
+            if (!isNaN(fetchedXof) && fetchedXof > 0) {
+              setLiveWorldXofRate(fetchedXof);
+              if (data.config.useFlutterwaveXofRate || data.config.useLiveWorldXofRate) {
+                setConfig((prev) => ({ ...prev, manualXofRate: fetchedXof }));
+              }
+            }
+          }
+        } catch {
+          // ignore background fetch error
+        }
       }
     } catch {
       toast.error("Failed to load exchange rates configuration.");
@@ -488,25 +515,54 @@ function CpanelExchangeRatesContent() {
                 <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 tracking-wider">
                   XOF (FCFA) RATE ENGINE
                 </span>
-                <h2 className="text-base font-extrabold tracking-tight mt-1.5">World Live XOF Rate Mode</h2>
+                <h2 className="text-base font-extrabold tracking-tight mt-1.5">Live XOF Rate Modes</h2>
                 <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-                  Auto-fetches XOF (FCFA) live market rate + your commission fee.
+                  Auto-fetches XOF (FCFA) live exchange rate + your commission fee.
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-900 p-2.5 rounded-2xl border border-slate-800">
-                <span className="text-xs font-bold text-slate-300">
-                  {config.useLiveWorldXofRate ? "Live: ON" : "Manual: ON"}
-                </span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.useLiveWorldXofRate}
-                    onChange={(e) => setConfig({ ...config, useLiveWorldXofRate: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                </label>
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                {/* Flutterwave XOF Toggle */}
+                <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                  <span className="text-[11px] font-extrabold text-amber-400">Flutterwave Rate</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.useFlutterwaveXofRate}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setConfig({
+                          ...config,
+                          useFlutterwaveXofRate: checked,
+                          useLiveWorldXofRate: checked ? false : config.useLiveWorldXofRate
+                        });
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                {/* World XOF Toggle */}
+                <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                  <span className="text-[11px] font-extrabold text-slate-300">World Rate</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.useLiveWorldXofRate}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setConfig({
+                          ...config,
+                          useLiveWorldXofRate: checked,
+                          useFlutterwaveXofRate: checked ? false : config.useFlutterwaveXofRate
+                        });
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                  </label>
+                </div>
               </div>
             </div>
 

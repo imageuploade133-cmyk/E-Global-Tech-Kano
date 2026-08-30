@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { fetchFlutterwaveTransferRate } from "@/lib/flutterwave-rates";
 import bcrypt from "bcryptjs";
 
 // Helper to resolve effective rates and swap fees from config/exchange_rates
@@ -10,6 +11,7 @@ async function resolveActiveExchangeConfig() {
   let useLiveWorldDollarRate = false;
   let manualDollarRate = 1550;
   let dollarCommissionFee = 15;
+  let useFlutterwaveXofRate = false;
   let useLiveWorldXofRate = false;
   let manualXofRate = 2.5;
   let xofCommissionFee = 0.1;
@@ -35,6 +37,7 @@ async function resolveActiveExchangeConfig() {
         manualDollarRate = Math.max(1, Number(stored.manualDollarRate) || 1550);
         dollarCommissionFee = Math.max(0, Number(stored.dollarCommissionFee) || 0);
 
+        useFlutterwaveXofRate = Boolean(stored.useFlutterwaveXofRate);
         useLiveWorldXofRate = Boolean(stored.useLiveWorldXofRate);
         manualXofRate = Math.max(0.01, Number(stored.manualXofRate) || 2.5);
         xofCommissionFee = Math.max(0, Number(stored.xofCommissionFee) || 0);
@@ -62,22 +65,9 @@ async function resolveActiveExchangeConfig() {
   // Resolve USD Rate
   let baseDollarRate = manualDollarRate;
   if (useFlutterwaveRate) {
-    try {
-      const flwKey = process.env.FLUTTERWAVE_SECRET_KEY;
-      if (flwKey) {
-        const flwRes = await fetch("https://api.flutterwave.com/v3/rates?from=USD&to=NGN&amount=1", {
-          headers: { Authorization: `Bearer ${flwKey}` },
-          cache: "no-store"
-        });
-        if (flwRes.ok) {
-          const flwData = await flwRes.json();
-          if (flwData?.data?.rate) {
-            baseDollarRate = Number(flwData.data.rate);
-          }
-        }
-      }
-    } catch (err: any) {
-      console.warn("[resolveActiveExchangeConfig] Flutterwave rate fetch fallback:", err.message);
+    const flwRate = await fetchFlutterwaveTransferRate("USD", "NGN", 1);
+    if (flwRate !== null) {
+      baseDollarRate = flwRate;
     }
   } else if (useLiveWorldDollarRate) {
     try {
@@ -94,7 +84,12 @@ async function resolveActiveExchangeConfig() {
 
   // Resolve XOF Rate
   let baseXofRate = manualXofRate;
-  if (useLiveWorldXofRate) {
+  if (useFlutterwaveXofRate) {
+    const flwXofRate = await fetchFlutterwaveTransferRate("NGN", "XOF", 1);
+    if (flwXofRate !== null) {
+      baseXofRate = flwXofRate;
+    }
+  } else if (useLiveWorldXofRate) {
     try {
       const liveRes = await fetch("https://api.exchangerate-api.com/v4/latest/XOF", { cache: "no-store" });
       if (liveRes.ok) {

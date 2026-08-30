@@ -16,6 +16,7 @@ export interface ExchangeRatesConfig {
   manualDollarRate: number;
   dollarCommissionFee: number;
 
+  useFlutterwaveXofRate: boolean;
   useLiveWorldXofRate: boolean;
   manualXofRate: number;
   xofCommissionFee: number;
@@ -39,6 +40,7 @@ const DEFAULT_EXCHANGE_RATES_CONFIG: ExchangeRatesConfig = {
   useLiveWorldDollarRate: false,
   manualDollarRate: 1550,
   dollarCommissionFee: 15,
+  useFlutterwaveXofRate: false,
   useLiveWorldXofRate: false,
   manualXofRate: 2.5,
   xofCommissionFee: 0.1,
@@ -80,6 +82,7 @@ export async function GET(req: Request) {
           useLiveWorldDollarRate: Boolean(stored?.useLiveWorldDollarRate),
           manualDollarRate: Math.max(1, Number(stored?.manualDollarRate) || 1550),
           dollarCommissionFee: Math.max(0, Number(stored?.dollarCommissionFee) || 0),
+          useFlutterwaveXofRate: Boolean(stored?.useFlutterwaveXofRate),
           useLiveWorldXofRate: Boolean(stored?.useLiveWorldXofRate),
           manualXofRate: Math.max(0.01, Number(stored?.manualXofRate) || 2.5),
           xofCommissionFee: Math.max(0, Number(stored?.xofCommissionFee) || 0),
@@ -131,6 +134,7 @@ export async function POST(req: Request) {
     const manualDollarRate = Math.max(1, Number(body.manualDollarRate) || 1550);
     const dollarCommissionFee = Math.max(0, Number(body.dollarCommissionFee) || 0);
 
+    const useFlutterwaveXofRate = Boolean(body.useFlutterwaveXofRate);
     const useLiveWorldXofRate = Boolean(body.useLiveWorldXofRate);
     const manualXofRate = Math.max(0.01, Number(body.manualXofRate) || 2.5);
     const xofCommissionFee = Math.max(0, Number(body.xofCommissionFee) || 0);
@@ -174,6 +178,7 @@ export async function POST(req: Request) {
       useLiveWorldDollarRate,
       manualDollarRate,
       dollarCommissionFee,
+      useFlutterwaveXofRate,
       useLiveWorldXofRate,
       manualXofRate,
       xofCommissionFee,
