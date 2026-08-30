@@ -112,6 +112,23 @@ function CpanelExchangeRatesContent() {
     fetchConfig();
   }, []);
 
+  const handleToggleCurrencyVisibility = (curr: string) => {
+    if (curr.toUpperCase() === "NGN") return; // NGN is strictly non-hideable
+    setConfig((prev) => {
+      const currentVis = prev.currencyVisibility?.[curr] !== false;
+      return {
+        ...prev,
+        currencyVisibility: {
+          ...prev.currencyVisibility,
+          [curr]: !currentVis,
+          NGN: true,
+        },
+      };
+    });
+    const nowVisible = !(config.currencyVisibility?.[curr] !== false);
+    toast.success(`${curr} visibility updated to: ${nowVisible ? "VISIBLE" : "HIDDEN"}`);
+  };
+
   const handleAddTier = () => {
     if (newMax <= newMin) {
       toast.error(`Invalid range! Max amount (${newMax}) must be strictly greater than Min amount (${newMin}).`);
@@ -165,7 +182,7 @@ function CpanelExchangeRatesContent() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(data.message || "Exchange rates, Bid/Ask spreads, and swap fees saved successfully!");
+        toast.success(data.message || "Exchange rates, provider toggles, currency visibility, and swap fees saved successfully!");
         if (data.config) setConfig(data.config);
       } else {
         toast.error(data.error || "Failed to save exchange rates.");
@@ -277,7 +294,7 @@ function CpanelExchangeRatesContent() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Exchange Rates & Swap Fees Manager</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Configure Customer Buy & Customer Sell directional adjustments for all 13 supported currencies.
+                Configure Global Provider ON/OFF controls, per-currency visibility toggles, and directional pricing adjustments.
               </p>
             </div>
           </div>
@@ -302,29 +319,138 @@ function CpanelExchangeRatesContent() {
           </div>
         </div>
 
-        {/* Currency Directional Adjustments Grid */}
+        {/* Global Rate Provider ON/OFF Controls Card */}
+        <div className={cn("p-6 rounded-2xl border space-y-4", panelClass)}>
+          <div className="border-b pb-3 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-500 text-[22px]">toggle_on</span>
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-gray-900 dark:text-white">
+                Global Exchange Rate Provider Toggles
+              </h2>
+            </div>
+            <span className="px-2.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              Provider Engine
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Flutterwave Toggle */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 flex items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-black uppercase text-amber-500 block">Flutterwave Live Rate</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  Fetch live rates securely via Payment Gateway VM.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.useFlutterwaveRate}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setConfig({
+                      ...config,
+                      useFlutterwaveRate: checked,
+                      useLiveWorldDollarRate: checked ? false : config.useLiveWorldDollarRate,
+                    });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FC7A00]"></div>
+              </label>
+            </div>
+
+            {/* World Rate Toggle */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 flex items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-black uppercase text-blue-500 block">World Live Rate</span>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  Fetch live market rates from World FX provider.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.useLiveWorldDollarRate}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setConfig({
+                      ...config,
+                      useLiveWorldDollarRate: checked,
+                      useFlutterwaveRate: checked ? false : config.useFlutterwaveRate,
+                    });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Currency Directional Adjustments & Visibility Grid */}
         <div className="space-y-4">
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-orange-500 flex items-center gap-2">
             <span className="material-symbols-outlined text-[20px]">tune</span>
-            Supported Currencies Directional Pricing Adjustments
+            Supported Currencies Directional Pricing & Visibility Controls
           </h2>
+
+          {/* NGN Card - Non-hideable Base Currency */}
+          <div className="bg-[#0b1329] text-white rounded-2xl p-5 border border-emerald-500/40 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1 rounded-xl text-xs font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 tracking-wider">
+                NGN
+              </span>
+              <div>
+                <h3 className="text-sm font-extrabold tracking-tight">Nigerian Naira (NGN)</h3>
+                <p className="text-xs text-emerald-400 font-bold mt-0.5">Base Wallet Currency — Always Visible</p>
+              </div>
+            </div>
+            <span className="px-3 py-1.5 rounded-xl text-xs font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 self-start md:self-auto">
+              <span className="material-symbols-outlined text-[16px]">lock</span> Always Visible
+            </span>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {NON_NGN_CURRENCIES.map((curr) => {
+              const isVisible = config.currencyVisibility?.[curr] !== false;
               const buyKey = `${curr.toLowerCase()}SellMarkup` as keyof FullExchangeRatesConfig;
               const sellKey = `${curr.toLowerCase()}BuyMarkup` as keyof FullExchangeRatesConfig;
               const buyVal = Number(config[buyKey] ?? 0);
               const sellVal = Number(config[sellKey] ?? 0);
 
               return (
-                <div key={curr} className="bg-[#0b1329] text-white rounded-2xl p-5 border border-slate-800 space-y-4 shadow-lg">
+                <div
+                  key={curr}
+                  className={cn(
+                    "rounded-2xl p-5 border space-y-4 transition-all shadow-lg",
+                    isVisible ? "bg-[#0b1329] text-white border-slate-800" : "bg-[#0a0d18] text-slate-400 border-red-500/30 opacity-80"
+                  )}
+                >
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 tracking-wider">
+                      <span className={cn("px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider", isVisible ? "bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30" : "bg-red-500/20 text-red-400 border border-red-500/30")}>
                         {curr}
                       </span>
-                      <h3 className="text-xs font-extrabold tracking-tight">{curr} Directional Pricing</h3>
+                      <h3 className="text-xs font-extrabold tracking-tight">{curr} Pricing</h3>
                     </div>
+
+                    {/* Visibility Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCurrencyVisibility(curr)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-1",
+                        isVisible
+                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30"
+                          : "bg-red-500/20 text-red-400 border-red-500/40 hover:bg-red-500/30"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {isVisible ? "visibility" : "visibility_off"}
+                      </span>
+                      {isVisible ? "Visible" : "Hidden"}
+                    </button>
                   </div>
 
                   <div className="space-y-3">
@@ -638,7 +764,7 @@ function CpanelExchangeRatesContent() {
             disabled={isSaving}
             className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
           >
-            {isSaving ? <><ButtonSpinner /> Saving Configurations...</> : "Save All Currency Exchange Rates & Spread Markups"}
+            {isSaving ? <><ButtonSpinner /> Saving Configurations...</> : "Save All Currency Exchange Rates, Visibility & Spread Markups"}
           </button>
         </form>
 

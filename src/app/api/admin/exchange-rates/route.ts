@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import {
+  DEFAULT_CURRENCY_VISIBILITY,
   DEFAULT_FULL_EXCHANGE_RATES_CONFIG,
   FullExchangeRatesConfig,
+  NON_NGN_CURRENCIES,
   parsePositiveNumber,
 } from "@/lib/exchange-pricing";
 
@@ -21,6 +23,14 @@ export async function GET(req: Request) {
       if (docSnap.exists) {
         const stored = docSnap.data();
         if (stored) {
+          const loadedVisibility: Record<string, boolean> = { ...DEFAULT_CURRENCY_VISIBILITY };
+          if (stored.currencyVisibility && typeof stored.currencyVisibility === "object") {
+            for (const key of Object.keys(stored.currencyVisibility)) {
+              loadedVisibility[key.toUpperCase()] = Boolean(stored.currencyVisibility[key]);
+            }
+          }
+          loadedVisibility.NGN = true; // NGN is strictly non-hideable
+
           config = {
             ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG,
             useFlutterwaveRate: stored.useFlutterwaveRate !== undefined ? Boolean(stored.useFlutterwaveRate) : true,
@@ -61,6 +71,8 @@ export async function GET(req: Request) {
             xofCommissionFee: parsePositiveNumber(stored.xofCommissionFee, 0.1),
             xofToNgnRate: parsePositiveNumber(stored.xofToNgnRate, 2.5),
 
+            currencyVisibility: loadedVisibility,
+
             swapFees: stored.swapFees ? { ...DEFAULT_FULL_EXCHANGE_RATES_CONFIG.swapFees, ...stored.swapFees } : DEFAULT_FULL_EXCHANGE_RATES_CONFIG.swapFees,
             swapRangeTiers: Array.isArray(stored.swapRangeTiers) ? stored.swapRangeTiers : [],
             updatedAt: stored.updatedAt,
@@ -89,6 +101,14 @@ export async function POST(req: Request) {
     const adminEmail = perm.auth?.email || "admin";
     const body = await req.json();
 
+    const currencyVisibility: Record<string, boolean> = { ...DEFAULT_CURRENCY_VISIBILITY };
+    if (body.currencyVisibility && typeof body.currencyVisibility === "object") {
+      for (const key of Object.keys(body.currencyVisibility)) {
+        currencyVisibility[key.toUpperCase()] = Boolean(body.currencyVisibility[key]);
+      }
+    }
+    currencyVisibility.NGN = true; // NGN cannot be hidden
+
     const updatedConfig: Partial<FullExchangeRatesConfig> = {
       useFlutterwaveRate: Boolean(body.useFlutterwaveRate),
       useLiveWorldDollarRate: Boolean(body.useLiveWorldDollarRate),
@@ -100,6 +120,8 @@ export async function POST(req: Request) {
       manualXofRate: parsePositiveNumber(body.manualXofRate, 2.5),
       xofCommissionFee: parsePositiveNumber(body.xofCommissionFee, 0.1),
       xofToNgnRate: parsePositiveNumber(body.xofToNgnRate, 2.5),
+
+      currencyVisibility,
 
       updatedAt: new Date().toISOString(),
       updatedBy: adminEmail,
@@ -178,7 +200,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Exchange rates, Bid/Ask spread markups, and swap fees updated successfully!",
+      message: "Exchange rates, provider toggles, currency visibility, and swap fees updated successfully!",
       config: updatedConfig,
     });
   } catch (err: any) {
