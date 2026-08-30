@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Deposit amount must be a valid positive number." }, { status: 400 });
     }
 
-    const allowedCurrencies = ["NGN", "USD", "XOF"];
+    const allowedCurrencies = ["NGN", "USD", "EUR", "GBP", "GHS", "KES", "XOF", "XAF", "CAD", "ZAR", "TZS", "UGX", "RWF", "ZMW"];
     if (!currency || !allowedCurrencies.includes(currency)) {
       return NextResponse.json({ error: `Invalid currency. Allowed: ${allowedCurrencies.join(", ")}` }, { status: 400 });
     }
