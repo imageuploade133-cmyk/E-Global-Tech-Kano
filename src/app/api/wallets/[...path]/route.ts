@@ -501,14 +501,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         return NextResponse.json({ error: result.error || "Swap failed" }, { status: 400 });
       }
 
-      const fromCurrency = result.fromCurrency || "";
-      const fromAmount = result.fromAmount || 0;
-      const toCurrency = result.toCurrency || "";
-      const toAmount = result.toAmount || 0;
+      const resFromCurrency = result.fromCurrency || fromCurrency;
+      const resFromAmount = result.fromAmount || amount;
+      const resToCurrency = result.toCurrency || toCurrency;
+      const resToAmount = result.toAmount || 0;
 
       return NextResponse.json({
         success: true,
-        message: `Successfully exchanged ${fromCurrency} ${fromAmount.toLocaleString()} for ${toCurrency} ${toAmount.toLocaleString()}!`,
+        message: `Successfully exchanged ${resFromCurrency} ${resFromAmount.toLocaleString()} for ${resToCurrency} ${resToAmount.toLocaleString()}!`,
         data: result
       });
     }
