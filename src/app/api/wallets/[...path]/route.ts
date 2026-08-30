@@ -10,6 +10,7 @@ import {
   SUPPORTED_CURRENCIES,
   calculateDirectionalCustomerRate,
   getCurrencyAdjustments,
+  isCurrencyVisible,
 } from "@/lib/exchange-pricing";
 
 // Helper to resolve effective rates and swap fees from config/exchange_rates
@@ -212,6 +213,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
       }
 
       const activeConfig = await resolveActiveExchangeConfig();
+
+      // Check backend currency visibility enforcement for new operations
+      if (!isCurrencyVisible(activeConfig, from) || !isCurrencyVisible(activeConfig, to)) {
+        return NextResponse.json({
+          success: false,
+          error: "Exchange rate temporarily unavailable. Please try again."
+        }, { status: 400 });
+      }
+
       const fee = calculateSwapFee(from, to, amount, activeConfig.swapFees, activeConfig.swapRangeTiers);
       const netAmount = Math.max(0, amount - fee);
 
@@ -314,6 +324,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
       }
 
       const activeConfig = await resolveActiveExchangeConfig();
+
+      // Check backend currency visibility enforcement for new swap operations
+      if (!isCurrencyVisible(activeConfig, fromCurrency) || !isCurrencyVisible(activeConfig, toCurrency)) {
+        return NextResponse.json({
+          error: "Selected currency swap pair is currently unavailable. Please try another currency."
+        }, { status: 400 });
+      }
+
       const fee = calculateSwapFee(fromCurrency, toCurrency, amount, activeConfig.swapFees, activeConfig.swapRangeTiers);
 
       if (amount <= fee) {

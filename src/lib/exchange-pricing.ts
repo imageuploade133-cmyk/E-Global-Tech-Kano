@@ -81,6 +81,9 @@ export interface FullExchangeRatesConfig {
   xofCommissionFee: number;
   xofToNgnRate: number;
 
+  // Currency visibility map: string -> boolean (true = visible, false = hidden)
+  currencyVisibility: Record<string, boolean>;
+
   swapFees: Record<string, number>;
   swapRangeTiers: Array<{
     id: string;
@@ -92,6 +95,23 @@ export interface FullExchangeRatesConfig {
   updatedAt?: string;
   updatedBy?: string;
 }
+
+export const DEFAULT_CURRENCY_VISIBILITY: Record<string, boolean> = {
+  NGN: true,
+  USD: true,
+  EUR: true,
+  GBP: true,
+  GHS: true,
+  KES: true,
+  XOF: true,
+  XAF: true,
+  CAD: true,
+  ZAR: true,
+  TZS: true,
+  UGX: true,
+  RWF: true,
+  ZMW: true,
+};
 
 export const DEFAULT_FULL_EXCHANGE_RATES_CONFIG: FullExchangeRatesConfig = {
   useFlutterwaveRate: true,
@@ -132,6 +152,8 @@ export const DEFAULT_FULL_EXCHANGE_RATES_CONFIG: FullExchangeRatesConfig = {
   xofCommissionFee: 0.1,
   xofToNgnRate: 2.5,
 
+  currencyVisibility: { ...DEFAULT_CURRENCY_VISIBILITY },
+
   swapFees: {
     ngnToUsd: 50,
     usdToNgn: 1.5,
@@ -147,6 +169,24 @@ export function parsePositiveNumber(val: any, fallback: number): number {
   if (val === undefined || val === null || val === "") return fallback;
   const num = Number(val);
   return isNaN(num) || !isFinite(num) ? fallback : Math.max(0, num);
+}
+
+/**
+ * Checks if a given currency is customer-visible according to config.
+ * NGN is the base currency and is ALWAYS visible.
+ */
+export function isCurrencyVisible(
+  config: Partial<FullExchangeRatesConfig>,
+  currency: string
+): boolean {
+  const code = currency.toUpperCase();
+  if (code === "NGN") return true;
+
+  if (config.currencyVisibility && typeof config.currencyVisibility[code] === "boolean") {
+    return config.currencyVisibility[code];
+  }
+
+  return true; // Default legacy currencies to visible
 }
 
 /**

@@ -99,8 +99,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
 
   // Multi-currency States
-  const [selectedCurrency, setSelectedCurrency] = useState<"NGN" | "USD" | "XOF">("NGN");
-  const [walletBalances, setWalletBalances] = useState({ NGN: balance, USD: 0, XOF: 0 });
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("NGN");
+  const [currencyVisibility, setCurrencyVisibility] = useState<Record<string, boolean>>({});
+  const [walletBalances, setWalletBalances] = useState<Record<string, number>>({ NGN: balance, USD: 0, XOF: 0 });
   const [usdAccountData, setUsdAccountData] = useState<{
     accountNumber: string;
     bankName: string;
@@ -167,7 +168,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           const ngnBal = data.wallets.NGN?.balance ?? balance;
           const usdBal = data.wallets.USD?.balance ?? 0;
           const xofBal = data.wallets.XOF?.balance ?? 0;
-          setWalletBalances({ NGN: ngnBal, USD: usdBal, XOF: xofBal });
+          setWalletBalances((prev) => ({ ...prev, NGN: ngnBal, USD: usdBal, XOF: xofBal }));
+        }
+      }
+
+      // Fetch public rates to obtain currencyVisibility map
+      const ratesRes = await fetch("/api/exchange-rates");
+      if (ratesRes.ok) {
+        const ratesData = await ratesRes.json();
+        if (ratesData.success && ratesData.currencyVisibility) {
+          setCurrencyVisibility(ratesData.currencyVisibility);
         }
       }
 
@@ -1964,30 +1974,32 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     <>
     <div className="relative p-[1px] rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#E06600] w-full max-w-[280px] mx-auto mb-5 shadow-sm select-none">
       <div className="bg-white rounded-[15px] p-1 flex w-full relative overflow-hidden">
-        {["NGN", "USD", "XOF"].map((curr) => {
-          const isActive = selectedCurrency === curr;
-          return (
-            <button
-              key={curr}
-              onClick={() => {
-                setSelectedCurrency(curr as "NGN" | "USD" | "XOF");
-                toast.info(`Switched to ${curr} Wallet`);
-              }}
-              className={`relative flex-1 py-2 text-xs font-extrabold uppercase tracking-widest rounded-xl transition-colors duration-300 focus:outline-none z-10 cursor-pointer ${
-                isActive ? "text-white" : "text-gray-400 hover:text-black"
-              }`}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="activeCurrencyTab"
-                  className="absolute inset-0 bg-gradient-to-r from-[#FC7A00] to-[#E06600] rounded-xl -z-10 shadow-sm"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-              {curr}
-            </button>
-          );
-        })}
+        {["NGN", "USD", "XOF"]
+          .filter((curr) => curr === "NGN" || currencyVisibility[curr] !== false)
+          .map((curr) => {
+            const isActive = selectedCurrency === curr;
+            return (
+              <button
+                key={curr}
+                onClick={() => {
+                  setSelectedCurrency(curr);
+                  toast.info(`Switched to ${curr} Wallet`);
+                }}
+                className={`relative flex-1 py-2 text-xs font-extrabold uppercase tracking-widest rounded-xl transition-colors duration-300 focus:outline-none z-10 cursor-pointer ${
+                  isActive ? "text-white" : "text-gray-400 hover:text-black"
+                }`}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="activeCurrencyTab"
+                    className="absolute inset-0 bg-gradient-to-r from-[#FC7A00] to-[#E06600] rounded-xl -z-10 shadow-sm"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                {curr}
+              </button>
+            );
+          })}
       </div>
     </div>
 
