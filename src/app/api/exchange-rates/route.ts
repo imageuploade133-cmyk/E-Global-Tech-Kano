@@ -64,7 +64,7 @@ export async function GET() {
     let baseDollarRate = manualDollarRate;
     let liveDollarRateFetched = false;
 
-    // Fetch live market USD rate if Flutterwave or Live World mode is enabled
+    // Resolve USD -> NGN Rate
     if (useFlutterwaveRate) {
       const flwRate = await fetchFlutterwaveTransferRate("USD", "NGN", 1);
       if (flwRate !== null) {
@@ -89,9 +89,9 @@ export async function GET() {
     let baseXofRate = manualXofRate;
     let liveXofRateFetched = false;
 
-    // Fetch live market XOF rate if Flutterwave or Live World mode is enabled
+    // Resolve XOF -> NGN Rate (queries source=XOF, destination=NGN)
     if (useFlutterwaveXofRate) {
-      const flwXofRate = await fetchFlutterwaveTransferRate("NGN", "XOF", 1);
+      const flwXofRate = await fetchFlutterwaveTransferRate("XOF", "NGN", 1);
       if (flwXofRate !== null) {
         baseXofRate = flwXofRate;
         liveXofRateFetched = true;
@@ -115,8 +115,46 @@ export async function GET() {
     const effectiveDollarSellRate = baseDollarRate + dollarCommissionFee;
     const effectiveXofSellRate = baseXofRate + xofCommissionFee;
 
+    // Direct queries for reverse / cross-currency pairs
+    let ngnToUsdRate = 1 / effectiveDollarSellRate;
+    if (useFlutterwaveRate) {
+      const directNgnToUsd = await fetchFlutterwaveTransferRate("NGN", "USD", 1);
+      if (directNgnToUsd !== null) {
+        ngnToUsdRate = directNgnToUsd;
+      }
+    }
+
+    let ngnToXofRate = effectiveXofSellRate > 0 ? 1 / effectiveXofSellRate : manualXofRate;
+    if (useFlutterwaveXofRate) {
+      const directNgnToXof = await fetchFlutterwaveTransferRate("NGN", "XOF", 1);
+      if (directNgnToXof !== null) {
+        ngnToXofRate = directNgnToXof;
+      }
+    }
+
+    let usdToXofRate = effectiveDollarSellRate * (ngnToXofRate || baseXofRate);
+    if (useFlutterwaveRate && useFlutterwaveXofRate) {
+      const directUsdToXof = await fetchFlutterwaveTransferRate("USD", "XOF", 1);
+      if (directUsdToXof !== null) {
+        usdToXofRate = directUsdToXof;
+      }
+    }
+
+    let xofToUsdRate = usdToXofRate > 0 ? 1 / usdToXofRate : 1 / (effectiveDollarSellRate * effectiveXofSellRate);
+    if (useFlutterwaveRate && useFlutterwaveXofRate) {
+      const directXofToUsd = await fetchFlutterwaveTransferRate("XOF", "USD", 1);
+      if (directXofToUsd !== null) {
+        xofToUsdRate = directXofToUsd;
+      }
+    }
+
+    const primaryMode = (useFlutterwaveRate || useFlutterwaveXofRate)
+      ? "FLUTTERWAVE"
+      : ((useLiveWorldDollarRate || useLiveWorldXofRate) ? "LIVE_WORLD" : "MANUAL");
+
     return NextResponse.json({
       success: true,
+      provider: primaryMode,
       rates: {
         dollarMode: useFlutterwaveRate ? "FLUTTERWAVE" : (useLiveWorldDollarRate ? "LIVE_WORLD" : "MANUAL"),
         baseDollarRate,
@@ -129,9 +167,16 @@ export async function GET() {
         effectiveXofSellRate,
         liveXofRateFetched,
         xofToNgnRate: effectiveXofSellRate,
+        usdToNgn: { rate: effectiveDollarSellRate, baseRate: baseDollarRate, commission: dollarCommissionFee },
+        ngnToUsd: { rate: ngnToUsdRate },
+        xofToNgn: { rate: effectiveXofSellRate, baseRate: baseXofRate, commission: xofCommissionFee },
+        ngnToXof: { rate: ngnToXofRate },
+        usdToXof: { rate: usdToXofRate },
+        xofToUsd: { rate: xofToUsdRate },
       },
       swapFees,
       swapRangeTiers,
+      fetchedAt: new Date().toISOString(),
     });
   } catch (err: any) {
     console.error("[Public Exchange Rates GET Exception]:", err.message);
