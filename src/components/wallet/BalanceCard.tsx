@@ -270,6 +270,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       return;
     }
 
+    if (swapRate === null || swapTargetAmount <= 0) {
+      toast.error("Exchange rate temporarily unavailable. Please try again.");
+      return;
+    }
+
     setSwapStep("pin");
   };
 
