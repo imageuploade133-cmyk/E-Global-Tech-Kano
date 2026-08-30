@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import bcrypt from "bcryptjs";
 
 // Helper to resolve effective rates and swap fees from config/exchange_rates
 async function resolveActiveExchangeConfig() {
@@ -294,6 +295,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
       const fromCurrency = (body.fromCurrency || "").toUpperCase();
       const toCurrency = (body.toCurrency || "").toUpperCase();
       const amount = parseFloat(body.amount);
+      const pin = body.pin ? String(body.pin).trim() : "";
 
       const allowed = ["NGN", "USD", "XOF"];
       if (!allowed.includes(fromCurrency) || !allowed.includes(toCurrency) || fromCurrency === toCurrency) {
@@ -329,16 +331,72 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           throw new Error("User profile not found.");
         }
 
+        const userData = userSnap.data() || {};
+        const isMock = uid === "mock-uid";
+
+        // Transaction PIN Verification
+        if (!pin) {
+          throw new Error("Transaction PIN is required to authorize currency swap.");
+        }
+
+        const pinHash = userData.pinHash;
+        const currentPlainPin = userData.pin;
+        const lockedUntil = userData.lockedUntil;
+        let pinAttempts = Number(userData.pinAttempts) || 0;
+
+        if (lockedUntil) {
+          const lockTime = new Date(lockedUntil).getTime();
+          if (Date.now() < lockTime) {
+            const minutesLeft = Math.ceil((lockTime - Date.now()) / (60 * 1000));
+            throw new Error(`Too many incorrect PIN attempts. Account locked for ${minutesLeft} minutes.`);
+          }
+        }
+
+        let isPinMatch = false;
+        if (isMock) {
+          isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
+        } else if (pinHash) {
+          isPinMatch = bcrypt.compareSync(pin, pinHash);
+        } else if (currentPlainPin) {
+          isPinMatch = (pin === currentPlainPin);
+        } else {
+          throw new Error("No transaction PIN has been set up on this account.");
+        }
+
+        if (!isPinMatch) {
+          pinAttempts += 1;
+          let lockTimestamp = null;
+          if (pinAttempts >= 5) {
+            lockTimestamp = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+          }
+          transaction.update(userRef, {
+            pinAttempts,
+            lockedUntil: lockTimestamp,
+          });
+
+          const remaining = Math.max(0, 5 - pinAttempts);
+          return {
+            success: false,
+            error: pinAttempts >= 5
+              ? "Too many incorrect PIN attempts. Account locked for 15 minutes."
+              : `Incorrect transaction PIN. ${remaining} attempts remaining.`
+          };
+        }
+
+        transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
+
         const fromWalletData = fromSnap.exists ? fromSnap.data() || {} : { balance: 0.00 };
         const toWalletData = toSnap.exists ? toSnap.data() || {} : { balance: 0.00 };
 
         const sourceBalance = typeof fromWalletData.balance === "number" ? fromWalletData.balance : 0.00;
-        const targetBalance = typeof toWalletData.balance === "number" ? toWalletData.balance : 0.00;
 
         const currencySymbol = fromCurrency === "NGN" ? "₦" : (fromCurrency === "USD" ? "$" : "CFA");
 
         if (sourceBalance < amount) {
-          throw new Error(`Insufficient wallet balance in ${fromCurrency} to complete this exchange. Available: ${currencySymbol}${sourceBalance.toLocaleString()}`);
+          return {
+            success: false,
+            error: `Insufficient wallet balance in ${fromCurrency} to complete this exchange. Available: ${currencySymbol}${sourceBalance.toLocaleString()}`
+          };
         }
 
         const netAmount = Math.max(0, amount - fee);
@@ -425,6 +483,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         transaction.set(creditTxRef, creditRecord);
 
         return {
+          success: true,
           fromAmount: amount,
           fromCurrency,
           toAmount: targetAmount,
@@ -438,9 +497,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         };
       });
 
+      if (!result.success) {
+        return NextResponse.json({ error: result.error || "Swap failed" }, { status: 400 });
+      }
+
+      const resFromCurrency = result.fromCurrency || fromCurrency;
+      const resFromAmount = result.fromAmount || amount;
+      const resToCurrency = result.toCurrency || toCurrency;
+      const resToAmount = result.toAmount || 0;
+
       return NextResponse.json({
         success: true,
-        message: `Successfully exchanged ${result.fromCurrency} ${result.fromAmount.toLocaleString()} for ${result.toCurrency} ${result.toAmount.toLocaleString()} at ₦${result.effectiveDollarRate.toLocaleString()}/USD!`,
+        message: `Successfully exchanged ${resFromCurrency} ${resFromAmount.toLocaleString()} for ${resToCurrency} ${resToAmount.toLocaleString()}!`,
         data: result
       });
     }

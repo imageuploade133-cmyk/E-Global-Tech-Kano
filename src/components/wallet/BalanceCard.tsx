@@ -112,12 +112,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [isSwapOpen, setIsSwapOpen] = useState(false);
 
   // Swap states
+  const [swapStep, setSwapStep] = useState<"form" | "pin">("form");
   const [swapAmount, setSwapAmount] = useState("");
+  const [swapFromCurrency, setSwapFromCurrency] = useState<"NGN" | "USD" | "XOF">("NGN");
   const [swapToCurrency, setSwapToCurrency] = useState<"NGN" | "USD" | "XOF">("USD");
   const [swapRate, setSwapRate] = useState<number | null>(null);
+  const [swapFee, setSwapFee] = useState<number>(0);
   const [swapTargetAmount, setSwapTargetAmount] = useState<number>(0);
   const [isRatesLoading, setIsRatesLoading] = useState(false);
   const [isSwapping, setIsSwapping] = useState(false);
+  const [swapPin, setSwapPin] = useState("");
 
   useEffect(() => {
     setWalletBalances(prev => ({ ...prev, NGN: balance }));
@@ -125,11 +129,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   useEffect(() => {
     if (isSwapOpen) {
-      if (selectedCurrency === "NGN") {
-        setSwapToCurrency("USD");
-      } else {
-        setSwapToCurrency("NGN");
-      }
+      setSwapFromCurrency(selectedCurrency);
+      setSwapToCurrency(selectedCurrency === "USD" ? "NGN" : (selectedCurrency === "XOF" ? "NGN" : "USD"));
+      setSwapAmount("");
+      setSwapStep("form");
+      setSwapPin("");
     }
   }, [selectedCurrency, isSwapOpen]);
 
@@ -206,48 +210,44 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     if (!isSwapOpen) {
       setSwapAmount("");
       setSwapRate(null);
+      setSwapFee(0);
       setSwapTargetAmount(0);
       return;
     }
 
-    const amt = parseFloat(swapAmount);
-    if (isNaN(amt) || amt <= 0) {
-      setSwapRate(null);
-      setSwapTargetAmount(0);
-      return;
-    }
+    const inputAmt = parseFloat(swapAmount);
+    const amtToQuery = !isNaN(inputAmt) && inputAmt > 0 ? inputAmt : 1;
 
     const fetchRate = async () => {
       setIsRatesLoading(true);
       try {
-        const fromCurrency = selectedCurrency;
+        const fromCurrency = swapFromCurrency;
         const toCurrency = swapToCurrency;
 
         if (sessionStorage.getItem("mock") === "true") {
-          setTimeout(() => {
-            let valInNgn = 0;
-            if (fromCurrency === "NGN") {
-              valInNgn = amt;
-            } else if (fromCurrency === "USD") {
-              valInNgn = amt * 1500;
-            } else if (fromCurrency === "XOF") {
-              valInNgn = amt / 0.40;
-            }
+          let valInNgn = 0;
+          if (fromCurrency === "NGN") {
+            valInNgn = amtToQuery;
+          } else if (fromCurrency === "USD") {
+            valInNgn = amtToQuery * 1550;
+          } else if (fromCurrency === "XOF") {
+            valInNgn = amtToQuery / 2.5;
+          }
 
-            let targetAmt = 0;
-            if (toCurrency === "NGN") {
-              targetAmt = valInNgn;
-            } else if (toCurrency === "USD") {
-              targetAmt = valInNgn / 1500;
-            } else if (toCurrency === "XOF") {
-              targetAmt = valInNgn * 0.40;
-            }
+          let targetAmt = 0;
+          if (toCurrency === "NGN") {
+            targetAmt = valInNgn;
+          } else if (toCurrency === "USD") {
+            targetAmt = valInNgn / 1550;
+          } else if (toCurrency === "XOF") {
+            targetAmt = valInNgn * 2.5;
+          }
 
-            const rate = targetAmt / amt;
-            setSwapRate(rate);
-            setSwapTargetAmount(targetAmt);
-            setIsRatesLoading(false);
-          }, 300);
+          const calculatedRate = targetAmt / amtToQuery;
+          setSwapRate(calculatedRate);
+          setSwapFee(0);
+          setSwapTargetAmount(!isNaN(inputAmt) && inputAmt > 0 ? targetAmt : 0);
+          setIsRatesLoading(false);
           return;
         }
 
@@ -256,7 +256,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           idToken = await user.getIdToken();
         }
 
-        const res = await fetch(`/api/wallets/rates?from=${fromCurrency}&to=${toCurrency}&amount=${amt}`, {
+        const res = await fetch(`/api/wallets/rates?from=${fromCurrency}&to=${toCurrency}&amount=${amtToQuery}`, {
           headers: {
             "Authorization": `Bearer ${idToken}`
           }
@@ -264,37 +264,60 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         const data = await res.json();
         if (res.ok && data.success) {
           setSwapRate(data.rate);
-          setSwapTargetAmount(data.targetAmount);
+          setSwapFee(!isNaN(inputAmt) && inputAmt > 0 ? (data.fee || 0) : 0);
+          setSwapTargetAmount(!isNaN(inputAmt) && inputAmt > 0 ? data.targetAmount : 0);
         } else {
-          // fallback
-          const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
-          setSwapRate(rate);
-          setSwapTargetAmount(amt * rate);
+          // Fallback static rate calculation
+          let defaultRate = 1;
+          if (fromCurrency === "NGN" && toCurrency === "USD") defaultRate = 1 / 1550;
+          else if (fromCurrency === "USD" && toCurrency === "NGN") defaultRate = 1550;
+          else if (fromCurrency === "NGN" && toCurrency === "XOF") defaultRate = 2.5;
+          else if (fromCurrency === "XOF" && toCurrency === "NGN") defaultRate = 1 / 2.5;
+          else if (fromCurrency === "USD" && toCurrency === "XOF") defaultRate = 1550 * 2.5;
+          else if (fromCurrency === "XOF" && toCurrency === "USD") defaultRate = 1 / (1550 * 2.5);
+
+          setSwapRate(defaultRate);
+          setSwapFee(0);
+          setSwapTargetAmount(!isNaN(inputAmt) && inputAmt > 0 ? inputAmt * defaultRate : 0);
         }
       } catch (err) {
-        console.error("Error fetching rate:", err);
-        const fromCurrency = selectedCurrency;
-        const rate = fromCurrency === "NGN" ? 1 / 1500 : 1500;
-        setSwapRate(rate);
-        setSwapTargetAmount(amt * rate);
+        console.error("Error fetching swap rate:", err);
       } finally {
         setIsRatesLoading(false);
       }
     };
 
-    const delay = setTimeout(fetchRate, 400);
+    const delay = setTimeout(fetchRate, 300);
     return () => clearTimeout(delay);
-  }, [swapAmount, isSwapOpen, selectedCurrency, swapToCurrency, user]);
+  }, [swapAmount, isSwapOpen, swapFromCurrency, swapToCurrency, user]);
 
-  const handleSwapExecute = async (e: React.FormEvent) => {
+  const handleSwapFormContinue = (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(swapAmount);
-    const fromCurrency = selectedCurrency;
+    const available = swapFromCurrency === "NGN" ? walletBalances.NGN : (swapFromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
+
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid swap amount.");
+      return;
+    }
+
+    if (amt > available) {
+      toast.error(`Insufficient balance in your ${swapFromCurrency} wallet.`);
+      return;
+    }
+
+    setSwapStep("pin");
+  };
+
+  const handleSwapExecute = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const amt = parseFloat(swapAmount);
+    const fromCurrency = swapFromCurrency;
     const toCurrency = swapToCurrency;
     const available = fromCurrency === "NGN" ? walletBalances.NGN : (fromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
 
     if (isNaN(amt) || amt <= 0) {
-      toast.error("Please enter a valid swap amount");
+      toast.error("Please enter a valid swap amount.");
       return;
     }
 
@@ -303,11 +326,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       return;
     }
 
+    if (!swapPin || swapPin.length < 4) {
+      toast.error("Please enter your 4-digit transaction PIN.");
+      return;
+    }
+
     setIsSwapping(true);
-    toast.loading("Processing your currency exchange...");
+    toast.loading("Authorizing currency exchange...");
 
     try {
       if (sessionStorage.getItem("mock") === "true") {
+        if (swapPin !== "1234") {
+          toast.dismiss();
+          toast.error("Incorrect transaction PIN. Mock PIN is 1234.");
+          setSwapPin("");
+          setIsSwapping(false);
+          return;
+        }
+
         setTimeout(() => {
           toast.dismiss();
 
@@ -315,21 +351,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           if (fromCurrency === "NGN") {
             valInNgn = amt;
           } else if (fromCurrency === "USD") {
-            valInNgn = amt * 1500;
+            valInNgn = amt * 1550;
           } else if (fromCurrency === "XOF") {
-            valInNgn = amt / 0.40;
+            valInNgn = amt / 2.5;
           }
 
           let targetAmt = 0;
           if (toCurrency === "NGN") {
             targetAmt = valInNgn;
           } else if (toCurrency === "USD") {
-            targetAmt = valInNgn / 1500;
+            targetAmt = valInNgn / 1550;
           } else if (toCurrency === "XOF") {
-            targetAmt = valInNgn * 0.40;
+            targetAmt = valInNgn * 2.5;
           }
 
-          // Deduct from source and credit target
           setWalletBalances(prev => {
             const next = { ...prev };
             next[fromCurrency] -= amt;
@@ -337,7 +372,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             return next;
           });
 
-          toast.success("Currency swapped successfully (MOCK)!");
+          toast.success("Currency swapped successfully!");
           setIsSwapping(false);
           setIsSwapOpen(false);
         }, 1000);
@@ -358,7 +393,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         body: JSON.stringify({
           fromCurrency,
           toCurrency,
-          amount: amt
+          amount: amt,
+          pin: swapPin
         })
       });
 
@@ -366,16 +402,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       toast.dismiss();
 
       if (res.ok && data.success) {
-        toast.success(data.message || "Swap transaction completed!");
+        toast.success(data.message || "Currency swapped successfully!");
         fetchWalletBalances();
         setIsSwapOpen(false);
       } else {
         toast.error(data.error || data.message || "Failed to execute swap.");
+        setSwapPin("");
       }
     } catch (err) {
       console.error("Swap Error:", err);
       toast.dismiss();
       toast.error("Network communication error during swap.");
+      setSwapPin("");
     } finally {
       setIsSwapping(false);
     }
@@ -4066,9 +4104,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
 
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
-              <h3 className="font-hanken font-bold text-base text-black">
-                Swap {selectedCurrency} → {swapToCurrency}
-              </h3>
+              <div className="flex items-center gap-2">
+                {swapStep === "pin" && (
+                  <button
+                    type="button"
+                    onClick={() => setSwapStep("form")}
+                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:text-black cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] font-bold">arrow_back</span>
+                  </button>
+                )}
+                <h3 className="font-hanken font-bold text-base text-black">
+                  {swapStep === "pin" ? "Authorize Swap PIN" : `Swap ${swapFromCurrency} → ${swapToCurrency}`}
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsSwapOpen(false)}
@@ -4078,93 +4127,255 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </button>
             </div>
 
-            <form onSubmit={handleSwapExecute} className="space-y-4 text-left">
-              {/* Dynamic Swap To Currency pill selector */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap To Currency</label>
-                <div className="flex gap-2">
-                  {(["NGN", "USD", "XOF"] as const)
-                    .filter((c) => c !== selectedCurrency)
-                    .map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setSwapToCurrency(c)}
-                        className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer border ${
-                          swapToCurrency === c
-                            ? "bg-[#FC7A00]/10 border-[#FC7A00] text-[#FC7A00]"
-                            : "bg-gray-50 border-gray-250 text-gray-500 hover:text-black"
+            {swapStep === "form" ? (
+              <form onSubmit={handleSwapFormContinue} className="space-y-4 text-left">
+                {/* Dynamic Swap Direction & Currency pill selector */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap To Currency</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const prevFrom = swapFromCurrency;
+                        const prevTo = swapToCurrency;
+                        setSwapFromCurrency(prevTo);
+                        setSwapToCurrency(prevFrom);
+                      }}
+                      className="text-[10px] font-bold text-[#FC7A00] flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
+                      Switch Direction
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    {(["NGN", "USD", "XOF"] as const)
+                      .filter((c) => c !== swapFromCurrency)
+                      .map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSwapToCurrency(c)}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer border ${
+                            swapToCurrency === c
+                              ? "bg-[#FC7A00]/10 border-[#FC7A00] text-[#FC7A00]"
+                              : "bg-gray-50 border-gray-250 text-gray-500 hover:text-black"
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Available Balance in swapFromCurrency */}
+                {(() => {
+                  const avail = swapFromCurrency === "NGN" ? walletBalances.NGN : (swapFromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
+                  const symbol = swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ");
+                  return (
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 flex items-center justify-between">
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Available Balance</p>
+                        <p className="font-mono font-black text-black text-sm mt-0.5">
+                          {symbol}{avail.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <span className="text-[10px] bg-[#FC7A00]/10 text-[#FC7A00] font-black px-2.5 py-1 rounded-lg uppercase">
+                        {swapFromCurrency} WALLET
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Amount to Swap */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Swap</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">
+                      {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={swapAmount}
+                      onChange={(e) => setSwapAmount(e.target.value)}
+                      placeholder="Enter amount"
+                      className="w-full bg-white border border-gray-200 rounded-2xl pl-16 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00] shadow-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Rates Loader & Breakdown Card */}
+                {isRatesLoading ? (
+                  <div className="flex items-center gap-2.5 p-3.5 bg-[#FFF9F5] border border-[#FFECD8] rounded-xl text-xs font-bold text-[#FC7A00] animate-pulse">
+                    <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                    <span>Fetching live exchange rate...</span>
+                  </div>
+                ) : (
+                  swapRate !== null && (
+                    <div className="bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-4 space-y-2 text-xs">
+                      <div className="flex justify-between items-center text-gray-600">
+                        <span className="font-semibold">Exchange Rate</span>
+                        <div className="text-right">
+                          <span className="font-mono font-black text-black block">
+                            1 {swapFromCurrency} = {swapRate < 0.01 ? swapRate.toFixed(6) : swapRate.toFixed(4)} {swapToCurrency}
+                          </span>
+                          {swapRate > 0 && (
+                            <span className="font-mono text-[10px] text-gray-400 font-bold block">
+                              (1 {swapToCurrency} = {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}{(1 / swapRate).toLocaleString(undefined, { maximumFractionDigits: 2 })})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {swapFee > 0 && (
+                        <div className="flex justify-between text-gray-500 border-t border-gray-200/60 pt-2 items-center">
+                          <span className="font-semibold">Swap Fee / Commission</span>
+                          <span className="font-mono font-bold text-amber-600">
+                            {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}{swapFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between text-gray-600 border-t border-gray-200/60 pt-2 items-center">
+                        <span className="font-bold">You will receive</span>
+                        <span className="font-mono font-black text-emerald-600 text-sm">
+                          {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                )}
+
+                {(() => {
+                  const avail = swapFromCurrency === "NGN" ? walletBalances.NGN : (swapFromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
+                  const parsedAmt = parseFloat(swapAmount);
+                  const isExceeded = !isNaN(parsedAmt) && parsedAmt > avail;
+
+                  return (
+                    <button
+                      type="submit"
+                      disabled={isSwapping || isRatesLoading || !swapAmount || isNaN(parsedAmt) || parsedAmt <= 0 || isExceeded}
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                      {isExceeded ? "Insufficient Wallet Balance" : "Authorize Swap"}
+                    </button>
+                  );
+                })()}
+              </form>
+            ) : (
+              /* PIN Authorization Step */
+              <div className="space-y-4 text-left">
+                <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4 space-y-2 font-hanken">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap Summary</p>
+                  <div className="flex justify-between text-xs font-bold text-black">
+                    <span>Swapping:</span>
+                    <span className="font-mono text-amber-700">
+                      {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}{parseFloat(swapAmount).toLocaleString()} {swapFromCurrency}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs font-bold text-black border-t border-gray-200/60 pt-2">
+                    <span>Target Received:</span>
+                    <span className="font-mono text-emerald-600">
+                      {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {swapToCurrency}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-center py-2">
+                  <label className="text-xs font-extrabold text-black block">Enter 4-Digit Transaction PIN</label>
+                  <p className="text-[11px] text-gray-500 font-medium">Authorizes debit of {swapFromCurrency} wallet to credit {swapToCurrency} wallet.</p>
+
+                  <div className="flex justify-center gap-2 pt-2">
+                    {[0, 1, 2, 3].map((idx) => (
+                      <div
+                        key={idx}
+                        className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
+                          swapPin.length > idx
+                            ? "border-[#FC7A00] bg-orange-50/40 text-black"
+                            : "border-gray-200 bg-white"
                         }`}
                       >
-                        {c}
-                      </button>
+                        {swapPin[idx] ? "•" : ""}
+                      </div>
                     ))}
-                </div>
-              </div>
+                  </div>
 
-              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Available Balance</p>
-                  <p className="font-mono font-black text-black text-sm mt-0.5">
-                    {selectedCurrency === "NGN" ? "₦" : (selectedCurrency === "USD" ? "$" : "CFA ")}{currentSelectedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <span className="text-[10px] bg-[#FC7A00]/10 text-[#FC7A00] font-black px-2 py-0.5 rounded">
-                  {selectedCurrency} WALLET
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Swap</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono font-bold text-lg text-gray-500">
-                    {selectedCurrency === "NGN" ? "₦" : (selectedCurrency === "USD" ? "$" : "CFA ")}
-                  </span>
                   <input
-                    type="number"
-                    step="any"
-                    required
-                    value={swapAmount}
-                    onChange={(e) => setSwapAmount(e.target.value)}
-                    placeholder="Enter amount"
-                    className="w-full bg-white border border-gray-100 rounded-2xl pl-16 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00]/40 shadow-sm transition-all"
+                    type="password"
+                    maxLength={4}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoFocus
+                    value={swapPin}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      setSwapPin(val);
+                    }}
+                    className="opacity-0 absolute -z-10"
                   />
                 </div>
+
+                {/* Custom Keypad for PIN input */}
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => {
+                        if (swapPin.length < 4) setSwapPin((prev) => prev + num);
+                      }}
+                      className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                    >
+                      {num}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setSwapPin("")}
+                    className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
+                  >
+                    CLEAR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (swapPin.length < 4) setSwapPin((prev) => prev + "0");
+                    }}
+                    className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                  >
+                    0
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSwapPin((prev) => prev.slice(0, -1))}
+                    className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">backspace</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSwapExecute()}
+                  disabled={isSwapping || swapPin.length < 4}
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2"
+                >
+                  {isSwapping ? (
+                    <>
+                      <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                      Authorizing Swap...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">lock</span>
+                      Confirm & Execute Swap
+                    </>
+                  )}
+                </button>
               </div>
-
-              {isRatesLoading && (
-                <div className="flex items-center gap-2.5 p-3 bg-[#FFF9F5] border border-[#FFECD8] rounded-xl text-xs font-bold text-[#FC7A00] animate-pulse">
-                  <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-                  <span>Fetching live exchange rate...</span>
-                </div>
-              )}
-
-              {!isRatesLoading && swapRate !== null && (
-                <div className="bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-4 space-y-2 text-xs">
-                  <div className="flex justify-between text-gray-500">
-                    <span className="font-semibold">Exchange Rate</span>
-                    <span className="font-mono font-black text-black">
-                      1 {selectedCurrency} = {swapRate.toFixed(6)} {swapToCurrency}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-gray-500 border-t border-gray-150 pt-2 items-center">
-                    <span className="font-bold">You will receive</span>
-                    <span className="font-mono font-black text-emerald-600 text-sm">
-                      {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSwapping || isRatesLoading || !swapAmount || parseFloat(swapAmount) > currentSelectedBalance}
-                className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                Authorize Swap
-              </button>
-            </form>
+            )}
           </motion.div>
         </>
       )}
