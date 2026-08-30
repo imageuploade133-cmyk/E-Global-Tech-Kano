@@ -4082,55 +4082,60 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       )}
     </AnimatePresence>
 
-    {/* Multi-Currency Swap Modal */}
+    {/* Full-Screen Multi-Currency Swap Modal */}
     <AnimatePresence>
       {isSwapOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSwapOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
-          />
-
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar"
-          >
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto" />
-
-            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
-              <div className="flex items-center gap-2">
-                {swapStep === "pin" && (
-                  <button
-                    type="button"
-                    onClick={() => setSwapStep("form")}
-                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:text-black cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] font-bold">arrow_back</span>
-                  </button>
-                )}
-                <h3 className="font-hanken font-bold text-base text-black">
-                  {swapStep === "pin" ? "Authorize Swap PIN" : `Swap ${swapFromCurrency} → ${swapToCurrency}`}
+        <motion.div
+          initial={{ opacity: 0, y: "100%" }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: "100%" }}
+          transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+          className="fixed inset-0 bg-white z-[99999] flex flex-col justify-between overflow-hidden text-black font-hanken"
+        >
+          {/* Top Header */}
+          <div className="w-full px-5 py-4 border-b border-gray-200/80 flex items-center justify-between bg-white flex-shrink-0">
+            <div className="flex items-center gap-3">
+              {swapStep === "pin" ? (
+                <button
+                  type="button"
+                  onClick={() => setSwapStep("form")}
+                  className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 hover:text-black cursor-pointer active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSwapOpen(false)}
+                  className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 hover:text-black cursor-pointer active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+                </button>
+              )}
+              <div>
+                <h3 className="font-extrabold text-base text-black leading-tight">
+                  {swapStep === "pin" ? "Authorize Swap PIN" : "Multi-Currency Swap"}
                 </h3>
+                <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
+                  {swapStep === "pin" ? "Confirm details to complete swap" : `${swapFromCurrency} → ${swapToCurrency}`}
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsSwapOpen(false)}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsSwapOpen(false)}
+              className="w-9 h-9 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined text-[18px] font-bold">close</span>
+            </button>
+          </div>
 
+          {/* Body Content */}
+          <div className="flex-1 overflow-y-auto px-5 py-6 max-w-md mx-auto w-full no-scrollbar space-y-5">
             {swapStep === "form" ? (
-              <form onSubmit={handleSwapFormContinue} className="space-y-4 text-left">
+              <form onSubmit={handleSwapFormContinue} className="space-y-5 text-left">
                 {/* Dynamic Swap Direction & Currency pill selector */}
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap To Currency</label>
                     <button
@@ -4141,9 +4146,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         setSwapFromCurrency(prevTo);
                         setSwapToCurrency(prevFrom);
                       }}
-                      className="text-[10px] font-bold text-[#FC7A00] flex items-center gap-1 hover:underline cursor-pointer"
+                      className="text-[11px] font-extrabold text-[#FC7A00] flex items-center gap-1 hover:underline cursor-pointer bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-100"
                     >
-                      <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
+                      <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
                       Switch Direction
                     </button>
                   </div>
@@ -4155,10 +4160,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           key={c}
                           type="button"
                           onClick={() => setSwapToCurrency(c)}
-                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer border ${
+                          className={`flex-1 py-3 rounded-xl text-xs font-black uppercase transition-all cursor-pointer border ${
                             swapToCurrency === c
-                              ? "bg-[#FC7A00]/10 border-[#FC7A00] text-[#FC7A00]"
-                              : "bg-gray-50 border-gray-250 text-gray-500 hover:text-black"
+                              ? "bg-[#FC7A00]/10 border-[#FC7A00] text-[#FC7A00] shadow-sm"
+                              : "bg-gray-50 border-gray-200 text-gray-500 hover:text-black"
                           }`}
                         >
                           {c}
@@ -4172,14 +4177,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   const avail = swapFromCurrency === "NGN" ? walletBalances.NGN : (swapFromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
                   const symbol = swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ");
                   return (
-                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 flex items-center justify-between">
+                    <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200/80 flex items-center justify-between shadow-xs">
                       <div>
                         <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Available Balance</p>
-                        <p className="font-mono font-black text-black text-sm mt-0.5">
+                        <p className="font-mono font-black text-black text-base mt-0.5">
                           {symbol}{avail.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
                       </div>
-                      <span className="text-[10px] bg-[#FC7A00]/10 text-[#FC7A00] font-black px-2.5 py-1 rounded-lg uppercase">
+                      <span className="text-[10px] bg-[#FC7A00]/10 text-[#FC7A00] font-black px-3 py-1 rounded-lg uppercase tracking-wider border border-[#FC7A00]/20">
                         {swapFromCurrency} WALLET
                       </span>
                     </div>
@@ -4199,48 +4204,59 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       required
                       value={swapAmount}
                       onChange={(e) => setSwapAmount(e.target.value)}
-                      placeholder="Enter amount"
-                      className="w-full bg-white border border-gray-200 rounded-2xl pl-16 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00] shadow-sm transition-all"
+                      placeholder="0.00"
+                      className="w-full bg-white border border-gray-250 rounded-2xl pl-16 pr-4 py-4 text-sm font-black text-black placeholder-gray-300 outline-none focus:border-[#FC7A00] shadow-sm transition-all"
                     />
                   </div>
                 </div>
 
                 {/* Rates Loader & Breakdown Card */}
                 {isRatesLoading ? (
-                  <div className="flex items-center gap-2.5 p-3.5 bg-[#FFF9F5] border border-[#FFECD8] rounded-xl text-xs font-bold text-[#FC7A00] animate-pulse">
-                    <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                  <div className="flex items-center justify-center gap-2.5 p-4 bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl text-xs font-bold text-[#FC7A00] animate-pulse">
+                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
                     <span>Fetching live exchange rate...</span>
                   </div>
                 ) : (
                   swapRate !== null && (
-                    <div className="bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-4 space-y-2 text-xs">
+                    <div className="bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-4.5 space-y-3 text-xs shadow-xs">
                       <div className="flex justify-between items-center text-gray-600">
-                        <span className="font-semibold">Exchange Rate</span>
+                        <span className="font-bold">Live Exchange Rate</span>
                         <div className="text-right">
-                          <span className="font-mono font-black text-black block">
+                          <span className="font-mono font-black text-black text-xs block">
                             1 {swapFromCurrency} = {swapRate < 0.01 ? swapRate.toFixed(6) : swapRate.toFixed(4)} {swapToCurrency}
                           </span>
                           {swapRate > 0 && (
-                            <span className="font-mono text-[10px] text-gray-400 font-bold block">
+                            <span className="font-mono text-[10px] text-gray-400 font-extrabold block mt-0.5">
                               (1 {swapToCurrency} = {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}{(1 / swapRate).toLocaleString(undefined, { maximumFractionDigits: 2 })})
                             </span>
                           )}
                         </div>
                       </div>
 
+                      {/* Explicit Total Amount Deducted Breakdown */}
+                      <div className="flex justify-between text-gray-600 border-t border-gray-200/60 pt-2.5 items-center">
+                        <span className="font-extrabold text-black">Total Amount Deducted:</span>
+                        <span className="font-mono font-black text-amber-700 text-xs">
+                          {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}
+                          {(parseFloat(swapAmount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} {swapFromCurrency}
+                        </span>
+                      </div>
+
                       {swapFee > 0 && (
                         <div className="flex justify-between text-gray-500 border-t border-gray-200/60 pt-2 items-center">
-                          <span className="font-semibold">Swap Fee / Commission</span>
+                          <span className="font-semibold">Swap Fee / Commission Included:</span>
                           <span className="font-mono font-bold text-amber-600">
                             {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}{swapFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                       )}
 
-                      <div className="flex justify-between text-gray-600 border-t border-gray-200/60 pt-2 items-center">
-                        <span className="font-bold">You will receive</span>
+                      {/* Explicit Total Amount Credited Breakdown */}
+                      <div className="flex justify-between text-gray-800 border-t border-gray-200/80 pt-2.5 items-center">
+                        <span className="font-black text-black text-xs">Total Amount Credited:</span>
                         <span className="font-mono font-black text-emerald-600 text-sm">
-                          {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}
+                          {swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {swapToCurrency}
                         </span>
                       </div>
                     </div>
@@ -4256,7 +4272,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     <button
                       type="submit"
                       disabled={isSwapping || isRatesLoading || !swapAmount || isNaN(parsedAmt) || parsedAmt <= 0 || isExceeded}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm"
                     >
                       <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                       {isExceeded ? "Insufficient Wallet Balance" : "Authorize Swap"}
@@ -4266,25 +4282,38 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </form>
             ) : (
               /* PIN Authorization Step */
-              <div className="space-y-4 text-left">
-                <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4 space-y-2 font-hanken">
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap Summary</p>
-                  <div className="flex justify-between text-xs font-bold text-black">
-                    <span>Swapping:</span>
-                    <span className="font-mono text-amber-700">
-                      {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}{parseFloat(swapAmount).toLocaleString()} {swapFromCurrency}
+              <div className="space-y-5 text-left">
+                <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-3 font-hanken shadow-xs">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap Summary Breakdown</p>
+
+                  <div className="flex justify-between text-xs font-bold text-gray-700">
+                    <span>Total Amount Deducted:</span>
+                    <span className="font-mono font-black text-amber-700">
+                      {swapFromCurrency === "NGN" ? "₦" : (swapFromCurrency === "USD" ? "$" : "CFA ")}
+                      {parseFloat(swapAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })} {swapFromCurrency}
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs font-bold text-black border-t border-gray-200/60 pt-2">
-                    <span>Target Received:</span>
-                    <span className="font-mono text-emerald-600">
-                      {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}{swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {swapToCurrency}
+
+                  <div className="flex justify-between text-xs font-bold text-gray-700 border-t border-gray-200/60 pt-2">
+                    <span>Total Amount Credited:</span>
+                    <span className="font-mono font-black text-emerald-600">
+                      {swapToCurrency === "NGN" ? "₦" : (swapToCurrency === "USD" ? "$" : "CFA ")}
+                      {swapTargetAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {swapToCurrency}
                     </span>
                   </div>
+
+                  {swapRate !== null && (
+                    <div className="flex justify-between text-[11px] font-semibold text-gray-500 border-t border-gray-200/60 pt-2">
+                      <span>Effective Rate:</span>
+                      <span className="font-mono text-black font-extrabold">
+                        1 {swapFromCurrency} = {swapRate < 0.01 ? swapRate.toFixed(6) : swapRate.toFixed(4)} {swapToCurrency}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 text-center py-2">
-                  <label className="text-xs font-extrabold text-black block">Enter 4-Digit Transaction PIN</label>
+                  <label className="text-xs font-black text-black block">Enter 4-Digit Transaction PIN</label>
                   <p className="text-[11px] text-gray-500 font-medium">Authorizes debit of {swapFromCurrency} wallet to credit {swapToCurrency} wallet.</p>
 
                   <div className="flex justify-center gap-2 pt-2">
@@ -4318,7 +4347,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </div>
 
                 {/* Custom Keypad for PIN input */}
-                <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                     <button
                       key={num}
@@ -4360,7 +4389,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   type="button"
                   onClick={() => handleSwapExecute()}
                   disabled={isSwapping || swapPin.length < 4}
-                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2"
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2 shadow-sm"
                 >
                   {isSwapping ? (
                     <>
@@ -4376,8 +4405,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </button>
               </div>
             )}
-          </motion.div>
-        </>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
 
