@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Image from "next/image";
+import { useLogos } from "@/lib/logos-client";
+import { useAppConfig } from "@/lib/ConfigContext";
 
 export interface Transaction {
   id: string;
@@ -25,26 +27,6 @@ interface TransactionReceiptProps {
   transaction: Transaction | null;
   onClose: () => void;
 }
-
-// Map bank names / networks to professional logos or styled placeholders
-const getLogoUrl = (name: string, isBill: boolean) => {
-  const n = name.toLowerCase();
-  if (isBill) {
-    if (n.includes("mtn")) return "https://i.ibb.co/bMCvF48h/mtn.png";
-    if (n.includes("airtel")) return "https://i.ibb.co/S7mSByR8/airtel.png";
-    if (n.includes("glo")) return "https://i.ibb.co/hJ0F6GgY/glo.png";
-    if (n.includes("9mobile")) return "https://i.ibb.co/yFC4X9pC/9mobile.png";
-  }
-  if (n.includes("providus")) return "https://i.ibb.co/68Xk9X6M/providus.png";
-  if (n.includes("wema")) return "https://i.ibb.co/vxS3P98t/wema.png";
-  if (n.includes("fcmb")) return "https://i.ibb.co/3ykbNfG3/fcmb.png";
-  if (n.includes("opay") || n.includes("owealth")) return "https://i.ibb.co/Lzq2S3Wq/opay.png";
-  if (n.includes("access")) return "https://i.ibb.co/PZrQW8fB/access.png";
-  if (n.includes("first bank") || n.includes("firstbank")) return "https://i.ibb.co/gZH0b2y1/firstbank.png";
-
-  // Fallback to official E-Tech Logo
-  return "https://i.ibb.co/WWjZrtC7/E-Tech.png";
-};
 
 // Clean status normalizer inside the receipt engine
 const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
@@ -67,6 +49,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
+  const { getBillerLogo, getBankLogo } = useLogos();
+  const { config } = useAppConfig();
 
   // Prevent background scrolling while the full screen modal is displayed
   useEffect(() => {
@@ -208,7 +192,13 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const bankDisplayName = getBankOrOperatorName();
   const accountOrPhone = getAccountNumberOrPhone();
   const productName = getProductName();
-  const logoUrl = getLogoUrl(bankDisplayName, isBill);
+
+  // Resolve logo url dynamically using administrator-uploaded logos
+  const contextText = `${productName} ${bankDisplayName} ${transaction.description}`.toLowerCase();
+  const matchedLogo = isBill
+    ? (getBillerLogo(contextText) || getBillerLogo(bankDisplayName))
+    : (getBankLogo(bankDisplayName) || getBankLogo(contextText));
+  const logoUrl = matchedLogo || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
 
   // Download PDF Action using html2canvas & jsPDF
   const handleDownloadPDF = async () => {

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { useLogos } from "@/lib/logos-client";
 
 interface TransactionIconProps {
   type: string;
@@ -13,26 +14,6 @@ interface TransactionIconProps {
   iconSizeClassName?: string;
 }
 
-export const getNetworkLogo = (text: string): string | null => {
-  const t = text.toLowerCase();
-  if (t.includes("mtn")) return "https://i.ibb.co/bMCvF48h/mtn.png";
-  if (t.includes("airtel")) return "https://i.ibb.co/S7mSByR8/airtel.png";
-  if (t.includes("glo")) return "https://i.ibb.co/hJ0F6GgY/glo.png";
-  if (t.includes("9mobile") || t.includes("etisalat") || t.includes("9mob")) return "https://i.ibb.co/yFC4X9pC/9mobile.png";
-  return null;
-};
-
-export const getBankLogo = (text: string): string | null => {
-  const t = text.toLowerCase();
-  if (t.includes("providus")) return "https://i.ibb.co/68Xk9X6M/providus.png";
-  if (t.includes("wema")) return "https://i.ibb.co/vxS3P98t/wema.png";
-  if (t.includes("fcmb")) return "https://i.ibb.co/3ykbNfG3/fcmb.png";
-  if (t.includes("opay") || t.includes("owealth")) return "https://i.ibb.co/Lzq2S3Wq/opay.png";
-  if (t.includes("access")) return "https://i.ibb.co/PZrQW8fB/access.png";
-  if (t.includes("first bank") || t.includes("firstbank")) return "https://i.ibb.co/gZH0b2y1/firstbank.png";
-  return null;
-};
-
 export const TransactionIcon: React.FC<TransactionIconProps> = ({
   type,
   description = "",
@@ -42,6 +23,8 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   iconSizeClassName = "text-[20px]",
 }) => {
   const [imageError, setImageError] = useState(false);
+  const { getBillerLogo, getBankLogo } = useLogos();
+
   const normalizedType = (type || "").toUpperCase().trim();
   const fullContext = `${description} ${recipientName} ${bankName}`.toLowerCase();
 
@@ -54,14 +37,16 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   const isElectricity = normalizedType.includes("ELECTRIC") || fullContext.includes("electricity") || fullContext.includes("meter") || fullContext.includes("kedco") || fullContext.includes("ikedc");
   const isWaec = normalizedType.includes("WAEC") || fullContext.includes("waec") || fullContext.includes("exam");
 
-  // Check network logo for Airtime/Data
-  const networkLogo = (isAirtime || isData) ? getNetworkLogo(fullContext) : null;
+  // Lookup administrator-uploaded logo or fallback
+  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec)
+    ? getBillerLogo(fullContext)
+    : null;
   const bankLogo = (isTransfer || isDeposit) ? getBankLogo(fullContext) : null;
-  const logoUrl = networkLogo || bankLogo;
+  const logoUrl = billerLogo || bankLogo;
 
   if (logoUrl && !imageError) {
     return (
-      <div className={cn("relative rounded-full overflow-hidden flex items-center justify-center p-1 bg-white border border-gray-100 shadow-3xs", className)}>
+      <div className={cn("relative rounded-full overflow-hidden flex items-center justify-center p-1 bg-white border border-gray-100 shadow-3xs flex-shrink-0", className)}>
         <Image
           src={logoUrl}
           alt="Provider Logo"
