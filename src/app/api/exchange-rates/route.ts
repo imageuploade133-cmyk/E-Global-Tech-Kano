@@ -4,6 +4,7 @@ import { fetchFlutterwaveTransferRate } from "@/lib/flutterwave-rates";
 import {
   DEFAULT_FULL_EXCHANGE_RATES_CONFIG,
   FullExchangeRatesConfig,
+  NON_NGN_CURRENCIES,
   calculateDirectionalCustomerRate,
   getCurrencyAdjustments,
   isCurrencyVisible,
@@ -90,6 +91,36 @@ export async function GET() {
       xofAvailable = true;
     }
 
+    // Build base rates dictionary for all 13 non-NGN foreign currencies
+    const baseRates: Record<string, number | null> = {
+      USD: baseDollarRate,
+      XOF: baseXofRate,
+    };
+
+    // Fetch / Fallback remaining currencies
+    for (const curr of NON_NGN_CURRENCIES) {
+      if (curr === "USD" || curr === "XOF") continue;
+
+      let currBaseRate: number | null = null;
+      if (config.useFlutterwaveRate) {
+        currBaseRate = await fetchFlutterwaveTransferRate(curr, "NGN", 1);
+      }
+
+      if (currBaseRate === null) {
+        try {
+          const liveRes = await fetch(`https://api.exchangerate-api.com/v4/latest/${curr}`, { cache: "no-store" });
+          if (liveRes.ok) {
+            const liveData = await liveRes.json();
+            if (liveData?.rates?.NGN) {
+              currBaseRate = Number(liveData.rates.NGN);
+            }
+          }
+        } catch {}
+      }
+
+      baseRates[curr] = currBaseRate;
+    }
+
     // Two-sided calculation for USD & XOF
     const usdAdj = getCurrencyAdjustments(config, "USD");
     const usdSellRate = baseDollarRate !== null ? baseDollarRate + usdAdj.buyAdjustment : null;
@@ -160,6 +191,7 @@ export async function GET() {
       success: true,
       provider: primaryMode,
       currencyVisibility: config.currencyVisibility,
+      baseRates,
       rates: {
         dollarMode: usdMode,
         baseDollarRate,
