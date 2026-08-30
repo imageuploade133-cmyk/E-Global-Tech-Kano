@@ -115,8 +115,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   // Swap states
   const [swapStep, setSwapStep] = useState<"form" | "pin">("form");
   const [swapAmount, setSwapAmount] = useState("");
-  const [swapFromCurrency, setSwapFromCurrency] = useState<"NGN" | "USD" | "XOF">("NGN");
-  const [swapToCurrency, setSwapToCurrency] = useState<"NGN" | "USD" | "XOF">("USD");
+  const [swapFromCurrency, setSwapFromCurrency] = useState<string>("NGN");
+  const [swapToCurrency, setSwapToCurrency] = useState<string>("USD");
   const [swapRate, setSwapRate] = useState<number | null>(null);
   const [swapFee, setSwapFee] = useState<number>(0);
   const [swapTargetAmount, setSwapTargetAmount] = useState<number>(0);
