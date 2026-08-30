@@ -64,7 +64,7 @@ export async function GET() {
     const fetchedAt = new Date().toISOString();
 
     // 1. Resolve USD -> NGN Rate Provider State
-    let usdMode = useFlutterwaveRate ? "FLUTTERWAVE" : (useLiveWorldDollarRate ? "LIVE_WORLD" : "MANUAL");
+    const usdMode = useFlutterwaveRate ? "FLUTTERWAVE" : (useLiveWorldDollarRate ? "LIVE_WORLD" : "MANUAL");
     let usdAvailable = false;
     let baseDollarRate: number | null = null;
 
@@ -95,7 +95,7 @@ export async function GET() {
     const effectiveDollarSellRate = (baseDollarRate !== null) ? baseDollarRate + dollarCommissionFee : null;
 
     // 2. Resolve XOF -> NGN Rate Provider State
-    let xofMode = useFlutterwaveXofRate ? "FLUTTERWAVE" : (useLiveWorldXofRate ? "LIVE_WORLD" : "MANUAL");
+    const xofMode = useFlutterwaveXofRate ? "FLUTTERWAVE" : (useLiveWorldXofRate ? "LIVE_WORLD" : "MANUAL");
     let xofAvailable = false;
     let baseXofRate: number | null = null;
 
