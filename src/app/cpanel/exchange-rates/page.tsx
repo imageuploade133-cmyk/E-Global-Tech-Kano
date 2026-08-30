@@ -81,7 +81,9 @@ function CpanelExchangeRatesContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Live World Rates State
+  // Live Provider Rates State
+  const [flwDollarRate, setFlwDollarRate] = useState<number | null>(null);
+  const [flwXofRate, setFlwXofRate] = useState<number | null>(null);
   const [liveWorldDollarRate, setLiveWorldDollarRate] = useState<number | null>(null);
   const [isFetchingLiveDollar, setIsFetchingLiveDollar] = useState(false);
 
@@ -118,12 +120,14 @@ function CpanelExchangeRatesContent() {
             const fetchedXof = Number(publicData.rates.baseXofRate);
 
             if (!isNaN(fetchedDollar) && fetchedDollar > 0) {
+              setFlwDollarRate(fetchedDollar);
               setLiveWorldDollarRate(fetchedDollar);
               if (data.config.useFlutterwaveRate || data.config.useLiveWorldDollarRate) {
                 setConfig((prev) => ({ ...prev, manualDollarRate: fetchedDollar }));
               }
             }
             if (!isNaN(fetchedXof) && fetchedXof > 0) {
+              setFlwXofRate(fetchedXof);
               setLiveWorldXofRate(fetchedXof);
               if (data.config.useFlutterwaveXofRate || data.config.useLiveWorldXofRate) {
                 setConfig((prev) => ({ ...prev, manualXofRate: fetchedXof }));
@@ -274,14 +278,14 @@ function CpanelExchangeRatesContent() {
     ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
     : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
 
-  const activeBaseDollarRate = config.useLiveWorldDollarRate
-    ? (liveWorldDollarRate || config.manualDollarRate)
-    : config.manualDollarRate;
+  const activeBaseDollarRate = config.useFlutterwaveRate
+    ? (flwDollarRate || liveWorldDollarRate || config.manualDollarRate)
+    : (config.useLiveWorldDollarRate ? (liveWorldDollarRate || config.manualDollarRate) : config.manualDollarRate);
   const effectiveDollarRate = activeBaseDollarRate + config.dollarCommissionFee;
 
-  const activeBaseXofRate = config.useLiveWorldXofRate
-    ? (liveWorldXofRate || config.manualXofRate)
-    : config.manualXofRate;
+  const activeBaseXofRate = config.useFlutterwaveXofRate
+    ? (flwXofRate || liveWorldXofRate || config.manualXofRate)
+    : (config.useLiveWorldXofRate ? (liveWorldXofRate || config.manualXofRate) : config.manualXofRate);
   const effectiveXofRate = activeBaseXofRate + config.xofCommissionFee;
 
   // Pair key helper
