@@ -23,11 +23,12 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   iconSizeClassName = "text-[20px]",
 }) => {
   const [imageError, setImageError] = useState(false);
-  const { getBillerLogo, getBankLogo } = useLogos();
+  const { getBillerLogo, getBankLogo, getStoreLogo } = useLogos();
 
   const normalizedType = (type || "").toUpperCase().trim();
   const fullContext = `${description} ${recipientName} ${bankName}`.toLowerCase();
 
+  const isStore = normalizedType.includes("STORE") || fullContext.includes("store order") || fullContext.includes("store purchase") || fullContext.includes("store");
   const isAirtime = normalizedType.includes("AIRTIME") || fullContext.includes("airtime");
   const isData = normalizedType.includes("DATA") || fullContext.includes("data");
   const isSwap = normalizedType.includes("SWAP") || fullContext.includes("swap") || fullContext.includes("exchange");
@@ -38,11 +39,12 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   const isWaec = normalizedType.includes("WAEC") || fullContext.includes("waec") || fullContext.includes("exam");
 
   // Lookup administrator-uploaded logo or fallback
+  const storeLogo = isStore ? getStoreLogo() : null;
   const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec)
     ? getBillerLogo(fullContext)
     : null;
   const bankLogo = (isTransfer || isDeposit) ? getBankLogo(fullContext) : null;
-  const logoUrl = billerLogo || bankLogo;
+  const logoUrl = storeLogo || billerLogo || bankLogo;
 
   if (logoUrl && !imageError) {
     return (
@@ -64,7 +66,10 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   let iconName = "receipt_long";
   let iconBgColor = "bg-gray-50 text-gray-700 border-gray-200";
 
-  if (isDeposit) {
+  if (isStore) {
+    iconName = "shopping_bag";
+    iconBgColor = "bg-orange-50 text-orange-600 border-orange-200/50";
+  } else if (isDeposit) {
     iconName = "south_west";
     iconBgColor = "bg-emerald-50 text-emerald-600 border-emerald-200/50";
   } else if (isTransfer) {
