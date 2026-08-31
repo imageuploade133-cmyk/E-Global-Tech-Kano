@@ -453,8 +453,9 @@ export async function POST(req: Request) {
         }
 
         // Update provider token / reference if returned
-        const provRef = paymentRes.tx_ref || paymentRes.flw_ref || paymentRes.reference;
-        const token = paymentRes.token || paymentRes.recharge_token || paymentRes.data?.token;
+        const resObj = paymentRes as Record<string, any>;
+        const provRef = resObj.tx_ref || resObj.flw_ref || resObj.reference;
+        const token = resObj.token || resObj.recharge_token || resObj.data?.token;
 
         if (provRef || token) {
           try {
