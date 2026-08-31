@@ -8,6 +8,12 @@ export interface NotificationPayload {
   body: string;
   type: NotificationType;
   url?: string;
+  amount?: number;
+  currency?: string;
+  reference?: string;
+  recipientName?: string;
+  bankName?: string;
+  channel?: string;
 }
 
 export class NotificationService {
@@ -32,6 +38,12 @@ export class NotificationService {
             read: false,
             createdAt: now,
             url: payload.url || "",
+            amount: payload.amount !== undefined ? payload.amount : null,
+            currency: payload.currency || "NGN",
+            reference: payload.reference || "",
+            recipientName: payload.recipientName || "",
+            bankName: payload.bankName || "",
+            channel: payload.channel || "",
           });
           console.log(`[NotificationService] Saved notification history for user=${userId} | docId=${notificationRef.id}`);
         } catch (fsErr: any) {

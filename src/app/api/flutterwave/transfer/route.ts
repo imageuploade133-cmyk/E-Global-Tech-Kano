@@ -281,6 +281,12 @@ export async function POST(req: Request) {
           body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
           type: "transaction",
           url: "/history",
+          amount: trfAmount,
+          currency: trfCurrency || "NGN",
+          reference: trfReference,
+          recipientName: trfName,
+          bankName: trfBankName || "Bank Transfer",
+          channel: "Outward Transfer",
         });
       } catch (notifErr: any) {
         console.error("[Notification Warning] Failed to dispatch mock transfer notification:", notifErr.message);
@@ -340,6 +346,12 @@ export async function POST(req: Request) {
             body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
             type: "transaction",
             url: "/history",
+            amount: trfAmount,
+            currency: trfCurrency || "NGN",
+            reference: trfReference,
+            recipientName: trfName,
+            bankName: trfBankName || "Bank Transfer",
+            channel: "Outward Transfer",
           });
         } catch (notifErr: any) {
           console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);

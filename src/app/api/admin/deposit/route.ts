@@ -104,7 +104,14 @@ export async function POST(req: Request) {
       await NotificationService.sendPushNotification(targetUid, {
         title: "Capital Credited Successfully",
         body: `Your wallet has been credited with ${currencySymbol}${parsedAmount.toLocaleString()} via admin capital provisioning.`,
-        type: "transaction"
+        type: "transaction",
+        url: "/history",
+        amount: parsedAmount,
+        currency: currency || "NGN",
+        reference: secureRef,
+        recipientName: "Main Wallet",
+        bankName: "Admin Capital Deposit",
+        channel: "Direct Deposit",
       });
     } catch (notifErr: any) {
       console.error("[Admin Deposit Notif Error]:", notifErr.message);

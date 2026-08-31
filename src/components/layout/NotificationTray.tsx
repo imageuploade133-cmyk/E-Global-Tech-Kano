@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export interface Notification {
   id: string;
@@ -11,6 +12,12 @@ export interface Notification {
   time: string;
   type: "transaction" | "security" | "promo";
   read: boolean;
+  amount?: number;
+  currency?: string;
+  reference?: string;
+  recipientName?: string;
+  bankName?: string;
+  channel?: string;
 }
 
 interface NotificationTrayProps {
@@ -377,37 +384,87 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                     {/* Conditional rendering based on Type */}
                     {selectedNotification.type === "transaction" ? (
                       /* High-fidelity Receipt Style details for transactions */
-                      <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
-                        <div className="text-center border-b border-dashed border-gray-200 pb-4">
-                          <p className="text-[11px] text-gray-400 uppercase tracking-widest font-bold">Transaction Amount</p>
-                          <h2 className="text-3xl font-display-lg text-[#0b513d] font-bold mt-1">₦25,000.00</h2>
-                        </div>
-                        <div className="space-y-3 pt-2 text-sm font-hanken">
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Payment Channel</span>
-                            <span className="text-black font-semibold">Opay Wallet</span>
+                      (() => {
+                        const msg = selectedNotification.message || "";
+                        const title = selectedNotification.title || "";
+
+                        // Parse amount if not explicitly provided
+                        let displayAmount = selectedNotification.amount;
+                        if (displayAmount === undefined || displayAmount === null) {
+                          const amtMatch = msg.match(/(?:₦|\$|CFA|UGX|KES|GHS|ZMW|RWF|CAD)\s*([\d,]+(?:\.\d{2})?)/i) ||
+                            msg.match(/(?:of|credited|debited)\s+([\d,]+(?:\.\d{2})?)/i);
+                          if (amtMatch && amtMatch[1]) {
+                            displayAmount = parseFloat(amtMatch[1].replace(/,/g, ""));
+                          }
+                        }
+
+                        // Parse recipient/biller if not explicitly provided
+                        let displayRecipient = selectedNotification.recipientName;
+                        if (!displayRecipient) {
+                          const toMatch = msg.match(/(?:to|for)\s+([A-Za-z0-9\s\.\-+]{2,30})(?:\s+is|\.|,|$)/i);
+                          if (toMatch && toMatch[1]) {
+                            displayRecipient = toMatch[1].trim();
+                          } else {
+                            displayRecipient = "Main Wallet";
+                          }
+                        }
+
+                        // Parse bank or service name if not explicitly provided
+                        let displayBank = selectedNotification.bankName;
+                        if (!displayBank) {
+                          if (/transfer/i.test(title) || /transfer/i.test(msg)) displayBank = "Bank Transfer";
+                          else if (/bill|airtime|data|cable|electricity/i.test(msg)) displayBank = "Utility Bill Payment";
+                          else displayBank = "Wallet Settlement";
+                        }
+
+                        // Parse reference
+                        let displayRef = selectedNotification.reference;
+                        if (!displayRef) {
+                          const refMatch = msg.match(/(?:ref|tx_ref|reference|id):\s*([a-zA-Z0-9_\-]+)/i) ||
+                            msg.match(/\b(TXN-[a-zA-Z0-9_\-]+)\b/i);
+                          displayRef = refMatch ? refMatch[1] : `ALERT-${selectedNotification.id.slice(0, 10).toUpperCase()}`;
+                        }
+
+                        const currencySym = selectedNotification.currency === "USD" ? "$" : "₦";
+
+                        return (
+                          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4 text-left">
+                            <div className="text-center border-b border-dashed border-gray-200 pb-4">
+                              <p className="text-[11px] text-gray-400 uppercase tracking-widest font-bold">Transaction Amount</p>
+                              <h2 className="text-3xl font-display-lg text-[#0b513d] font-bold mt-1">
+                                {displayAmount !== undefined && displayAmount !== null
+                                  ? `${currencySym}${displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : "Notification Alert"}
+                              </h2>
+                            </div>
+                            <div className="space-y-3 pt-2 text-sm font-hanken">
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Payment Channel</span>
+                                <span className="text-black font-semibold">{selectedNotification.channel || displayBank}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Recipient / Beneficiary</span>
+                                <span className="text-black font-semibold truncate max-w-[180px]">{displayRecipient}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Status</span>
+                                <span className="text-emerald-600 font-bold flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
+                                  COMPLETED
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Service Category</span>
+                                <span className="text-black font-semibold">{displayBank}</span>
+                              </div>
+                              <div className="flex justify-between border-t border-gray-100 pt-3">
+                                <span className="text-gray-400">Reference ID</span>
+                                <span className="text-black font-mono text-xs select-all">{displayRef}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Recipient Alias</span>
-                            <span className="text-black font-semibold">STEVE</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Status</span>
-                            <span className="text-emerald-600 font-bold flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
-                              SUCCESSFUL
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Transaction Fee</span>
-                            <span className="text-black font-semibold">₦0.00</span>
-                          </div>
-                          <div className="flex justify-between border-t border-gray-100 pt-3">
-                            <span className="text-gray-400">Reference ID</span>
-                            <span className="text-black font-mono text-xs">TXN-589210-ETG</span>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })()
                     ) : selectedNotification.type === "security" ? (
                       /* Detailed Access Log information for Security type alerts */
                       <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
@@ -452,10 +509,23 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
                     )}
 
                     <div className="mt-8 flex flex-col gap-3">
+                      {selectedNotification.type === "transaction" && (
+                        <Link
+                          href="/history"
+                          onClick={() => {
+                            handleCloseDetail();
+                            onClose();
+                          }}
+                          className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-none text-center cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                          <span>View Full History Ledger</span>
+                        </Link>
+                      )}
                       <button
                         type="button"
                         onClick={handleCloseDetail}
-                        className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
+                        className="w-full py-3.5 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer"
                       >
                         Acknowledge Alert
                       </button>

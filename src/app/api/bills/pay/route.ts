@@ -371,6 +371,12 @@ export async function POST(req: Request) {
         NotificationService.sendPushNotification(uid, {
           ...payload,
           url: "/history",
+          amount: totalUserDebit,
+          currency: "NGN",
+          reference: reference,
+          recipientName: targetNumber || customerName || "Biller Operator",
+          bankName: billerCode ? billerCode.toUpperCase() : "Utility Bill Payment",
+          channel: "Bill Payment",
         });
       } catch (notifErr: any) {
         console.error("[Notification Warning] Failed to dispatch mock bill payment notification:", notifErr.message);
@@ -416,6 +422,12 @@ export async function POST(req: Request) {
           NotificationService.sendPushNotification(uid, {
             ...payload,
             url: "/history",
+            amount: totalUserDebit,
+            currency: "NGN",
+            reference: reference,
+            recipientName: targetNumber || customerName || "Biller Operator",
+            bankName: billerCode ? billerCode.toUpperCase() : "Utility Bill Payment",
+            channel: "Bill Payment",
           });
         } catch (notifErr: any) {
           console.error("[Notification Warning] Failed to dispatch real bill payment notification:", notifErr.message);
