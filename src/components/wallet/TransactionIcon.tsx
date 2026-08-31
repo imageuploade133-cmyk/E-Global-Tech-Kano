@@ -34,16 +34,17 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   const isSwap = normalizedType.includes("SWAP") || fullContext.includes("swap") || fullContext.includes("exchange");
   const isTransfer = normalizedType.includes("TRANSFER") || normalizedType.includes("WITHDRAWAL") || normalizedType.includes("SEND");
   const isDeposit = normalizedType.includes("DEPOSIT") || normalizedType.includes("CASHOUT") || normalizedType.includes("CARD_FUND");
+  const isInvestment = normalizedType.includes("INVESTMENT") || fullContext.includes("investment") || fullContext.includes("fixed deposit");
   const isCable = normalizedType.includes("CABLE") || fullContext.includes("dstv") || fullContext.includes("gotv") || fullContext.includes("startimes");
   const isElectricity = normalizedType.includes("ELECTRIC") || fullContext.includes("electricity") || fullContext.includes("meter") || fullContext.includes("kedco") || fullContext.includes("ikedc");
   const isWaec = normalizedType.includes("WAEC") || fullContext.includes("waec") || fullContext.includes("exam");
 
   // Lookup administrator-uploaded logo or fallback
-  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec || isSwap || isStore)
+  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec || isSwap || isStore || isInvestment || isDeposit)
     ? getBillerLogo(fullContext)
     : null;
   const storeLogo = isStore ? (billerLogo || getStoreLogo()) : null;
-  const bankLogo = (isTransfer || isDeposit) ? getBankLogo(fullContext) : null;
+  const bankLogo = (isTransfer || isDeposit) ? (billerLogo || getBankLogo(fullContext)) : null;
   const logoUrl = storeLogo || billerLogo || bankLogo;
 
   if (logoUrl && !imageError) {

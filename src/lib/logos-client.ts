@@ -120,10 +120,12 @@ export const matchBillerLogo = (text: string, billLogos?: Record<string, string>
   if (t.includes("gotv")) return logos["gotv"] || null;
   if (t.includes("startimes")) return logos["startimes"] || null;
 
-  // Exam, Swaps & Store
+  // Exam, Swaps, Store, Investment & Deposits
   if (t.includes("waec")) return logos["waec"] || null;
   if (t.includes("swap") || t.includes("exchange")) return logos["swap"] || null;
   if (t.includes("store")) return logos["store"] || null;
+  if (t.includes("investment") || t.includes("fixed deposit")) return logos["investment"] || null;
+  if (t.includes("deposit") || t.includes("funding") || t.includes("cashout") || t.includes("card_fund")) return logos["deposit"] || null;
 
   // General lookup across all administrator defined bill keys
   for (const [code, url] of Object.entries(logos)) {
