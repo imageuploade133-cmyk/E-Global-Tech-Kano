@@ -108,7 +108,7 @@ export async function POST(req: Request) {
         url: "/history",
         amount: parsedAmount,
         currency: currency || "NGN",
-        reference: secureRef,
+        reference: result.secureRef,
         recipientName: "Main Wallet",
         bankName: "Cash Deposit",
         channel: "Cash Deposit",

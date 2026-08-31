@@ -578,7 +578,7 @@ function CpanelUsersPageContent() {
 
                             {/* Administrative Deposit */}
                             <div className={cn("p-3.5 rounded-xl border space-y-3 transition-colors duration-300", isDark ? "bg-gray-900 border-gray-850" : "bg-gray-50 border-gray-150")}>
-                              <p className="text-[10px] font-black uppercase text-emerald-500">Secured Administrative Capital Deposit</p>
+                              <p className="text-[10px] font-black uppercase text-emerald-500">Cash Deposit</p>
 
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
