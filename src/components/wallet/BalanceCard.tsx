@@ -4060,19 +4060,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           {/* Top Header */}
           <div className="w-full px-5 py-4 border-b border-gray-200/80 flex items-center justify-between bg-white flex-shrink-0">
             <div className="flex items-center gap-3">
-              {swapStep === "pin" ? (
+              {swapStep === "pin" && (
                 <button
                   type="button"
                   onClick={() => setSwapStep("form")}
                   className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 hover:text-black cursor-pointer active:scale-95 transition-all"
-                >
-                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsSwapOpen(false)}
-                  className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 hover:text-black cursor-pointer active:scale-95 transition-all"
+                  title="Back to Swap Form"
                 >
                   <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
