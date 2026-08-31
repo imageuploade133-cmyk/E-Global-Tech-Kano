@@ -424,7 +424,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <RouteGuard>
-      <div className="min-h-dvh bg-[#F4F5F7] text-black pb-28">
+      <div id="store-page-root" className="min-h-dvh bg-[#F4F5F7] text-black pb-28">
         {/* Sticky Top Header Bar - Minimal Space */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-3.5 py-2 border-0 shadow-none">
           <div className="max-w-md mx-auto flex items-center justify-between gap-2">
