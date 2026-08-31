@@ -95,6 +95,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
         const data = docSnap.data();
         list.push({
           id: docSnap.id,
+          ...data,
           reference: data.reference || docSnap.id,
           type: data.type || "DEPOSIT",
           amount: Number(data.amount) || 0,
@@ -106,7 +107,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           date: data.date || "",
           time: data.time || "",
           fee: Number(data.fee) || 0,
-        });
+        } as Transaction);
       });
 
       setTransactions(list);

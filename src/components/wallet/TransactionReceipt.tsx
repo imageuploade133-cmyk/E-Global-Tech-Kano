@@ -358,9 +358,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   {isSwap
                     ? "Currency Exchange Swap"
                     : isDeposit
-                    ? (transaction.fundingMethod || "Virtual Account Deposit")
+                    ? (transaction.senderName ? `Transfer From ${transaction.senderName}` : "Transfer From Virtual Account")
                     : isTransfer
-                    ? "Outward Bank Transfer"
+                    ? (`Transfer To ${transaction.beneficiaryName || transaction.recipientName || "Beneficiary"}`)
                     : isAirtime
                     ? "Airtime Top-up"
                     : isData
@@ -421,35 +421,26 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 {isTransfer && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Beneficiary Name</span>
+                      <span>Transfer To</span>
                       <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">
                         {transaction.beneficiaryName || transaction.recipientName || "Not available"}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Beneficiary Bank</span>
-                      <span className="text-black font-bold text-right">
-                        {transaction.beneficiaryBankName || transaction.bankName || "Not available"}
+                      <span>Recipient Details</span>
+                      <span className="text-black font-bold text-right max-w-[220px]">
+                        {[
+                          transaction.beneficiaryName || transaction.recipientName,
+                          transaction.beneficiaryBankName || transaction.bankName,
+                          transaction.beneficiaryAccountNumber
+                        ].filter(Boolean).join(" • ") || "Not available"}
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Account Number</span>
-                      <div className="flex items-center gap-1">
-                        <span className="font-mono text-black font-bold">
-                          {transaction.beneficiaryAccountNumber || "Not available"}
-                        </span>
-                        {transaction.beneficiaryAccountNumber && (
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(transaction.beneficiaryAccountNumber!, "Account number")}
-                            className="text-[#FC7A00]"
-                          >
-                            <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Category</span>
+                      <span className="text-black font-bold">Transfer</span>
                     </div>
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
@@ -644,15 +635,35 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 {/* 6. DEPOSIT */}
                 {isDeposit && (
                   <>
+                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                      <span>Transfer From</span>
+                      <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">
+                        {transaction.senderName || "Virtual Account"}
+                      </span>
+                    </div>
+
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Credited Amount</span>
-                      <span className="text-emerald-600 font-extrabold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span>Credited to</span>
+                      <span className="text-black font-bold">Available Balance</span>
                     </div>
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Funding Method</span>
                       <span className="text-black font-bold">{transaction.fundingMethod || "Virtual Account"}</span>
                     </div>
+
+                    {(transaction.senderName || transaction.senderBankName || transaction.senderAccountNumber) && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Sender Details</span>
+                        <span className="text-black font-bold text-right max-w-[220px]">
+                          {[
+                            transaction.senderName,
+                            transaction.senderBankName,
+                            transaction.senderAccountNumber
+                          ].filter(Boolean).join(" • ")}
+                        </span>
+                      </div>
+                    )}
 
                     {transaction.virtualAccountNumber && (
                       <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -677,40 +688,24 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       </div>
                     )}
 
-                    {transaction.senderName && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Sender Name</span>
-                        <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">{transaction.senderName}</span>
-                      </div>
-                    )}
-
-                    {transaction.senderAccountNumber && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Sender Account</span>
-                        <span className="font-mono text-black font-bold">{transaction.senderAccountNumber}</span>
-                      </div>
-                    )}
-
-                    {transaction.senderBankName && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Sender Bank</span>
-                        <span className="text-black font-bold">{transaction.senderBankName}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
+                      <span>Credited Amount</span>
+                      <span className="text-emerald-600 font-extrabold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
                   </>
                 )}
 
                 {/* UNIFIED METADATA */}
                 <div className="border-t border-gray-100 pt-3 space-y-3">
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Transaction Reference</span>
+                    <span>Transaction Number</span>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-black font-bold uppercase text-[11px]">
                         {transaction.reference}
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleCopy(transaction.reference, "Reference")}
+                        onClick={() => handleCopy(transaction.reference, "Transaction number")}
                         className="text-[#FC7A00] hover:brightness-90 active:scale-90"
                       >
                         <span className="material-symbols-outlined text-[13px] font-bold">content_copy</span>
@@ -755,7 +750,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   )}
 
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Date & Time</span>
+                    <span>Transaction Date</span>
                     <span className="text-black font-bold text-right">
                       {transaction.date} {transaction.time}
                     </span>
