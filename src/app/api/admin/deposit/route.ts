@@ -86,9 +86,9 @@ export async function POST(req: Request) {
         currency: currency,
         type: "DEPOSIT",
         status: "SUCCESSFUL",
-        description: `Secured Administrative Credit (${currency})`,
+        description: `Cash Deposit (${currency})`,
         reference: secureRef,
-        recipientName: "System Credit",
+        recipientName: "Cash Deposit",
         createdAt: new Date().toISOString()
       });
 
@@ -102,16 +102,16 @@ export async function POST(req: Request) {
     try {
       const currencySymbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : "CFA";
       await NotificationService.sendPushNotification(targetUid, {
-        title: "Capital Credited Successfully",
-        body: `Your wallet has been credited with ${currencySymbol}${parsedAmount.toLocaleString()} via admin capital provisioning.`,
+        title: "Cash Deposit Received",
+        body: `Your wallet has been credited with ${currencySymbol}${parsedAmount.toLocaleString()} via Cash Deposit.`,
         type: "transaction",
         url: "/history",
         amount: parsedAmount,
         currency: currency || "NGN",
         reference: secureRef,
         recipientName: "Main Wallet",
-        bankName: "Admin Capital Deposit",
-        channel: "Direct Deposit",
+        bankName: "Cash Deposit",
+        channel: "Cash Deposit",
       });
     } catch (notifErr: any) {
       console.error("[Admin Deposit Notif Error]:", notifErr.message);
