@@ -379,83 +379,119 @@ function CpanelBillLogosPageContent() {
           </form>
         </div>
 
-        {/* Filter Bar & Categories */}
+        {/* Swapped Filter Bar & User-Friendly Interactive Category Tabs */}
         <div className={cn("p-5 rounded-2xl border space-y-4", panelClass)}>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          {/* Top Row: Mobile Quick Select Dropdown + Horizontal Tab Strip with Easy Swapping */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">swap_horiz</span>
+                <span>Select Biller Category:</span>
+              </div>
+
+              {/* Mobile Quick Swap Dropdown (Shown on Mobile screens) */}
+              <div className="md:hidden w-48">
+                <select
+                  value={activeCategory}
+                  onChange={(e) => setActiveCategory(e.target.value)}
+                  className={cn(inputClass, "h-9 text-[11px] font-extrabold cursor-pointer")}
+                >
+                  {categoriesWithIcons.map(({ name }) => {
+                    const count = name === "ALL"
+                      ? billers.length
+                      : billers.filter((b) => b.category === name).length;
+                    return (
+                      <option key={name} value={name}>
+                        {name} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* User-Friendly Swappable Category Tabs */}
+            <div className="relative flex items-center">
+              <div
+                id="cpanel-category-tabs-scroll"
+                className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 select-none w-full scroll-smooth"
+              >
+                {categoriesWithIcons.map(({ name, icon }) => {
+                  const count = name === "ALL"
+                    ? billers.length
+                    : billers.filter((b) => b.category === name).length;
+                  const isActive = activeCategory === name;
+
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setActiveCategory(name)}
+                      className={cn(
+                        "px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-2 border shadow-3xs active:scale-95 flex-shrink-0",
+                        isActive
+                          ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-sm ring-2 ring-[#FC7A00]/30 scale-[1.02]"
+                          : isDark
+                          ? "bg-gray-800/90 text-gray-300 border-gray-700 hover:bg-gray-700 hover:text-white"
+                          : "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 hover:text-black"
+                      )}
+                    >
+                      <span className={cn("material-symbols-outlined text-[17px]", isActive ? "text-white" : "text-[#FC7A00]")}>
+                        {icon}
+                      </span>
+                      <span>{name}</span>
+                      <span
+                        className={cn(
+                          "px-1.5 py-0.5 rounded-full text-[9px] font-mono font-black min-w-[20px] text-center",
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : isDark
+                            ? "bg-gray-700 text-gray-300"
+                            : "bg-gray-200 text-gray-700"
+                        )}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {(activeCategory !== "ALL" || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveCategory("ALL");
+                      setSearchQuery("");
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 border border-rose-500/30 ml-auto flex-shrink-0"
+                    title="Reset active category and search filter"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                    Reset Filter
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Row: Search Filter Input & Counter */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t border-gray-200/40 pt-3">
             <div className="relative flex-1 w-full">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">search</span>
               <input
                 type="text"
-                placeholder="Filter biller name or code (e.g. MTN, KEDCO, DStv)..."
+                placeholder="Search biller name or code (e.g. MTN, KEDCO, DStv)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={cn(inputClass, "pl-10 pr-4 h-11")}
               />
             </div>
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 flex-shrink-0">
               <span>Showing:</span>
               <span className="px-2.5 py-1 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-lg">
                 {filteredBillers.length} Providers
               </span>
             </div>
-          </div>
-
-          {/* User-Friendly Category Tabs with Icons, Badges & Reset Filter */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 select-none">
-            {categoriesWithIcons.map(({ name, icon }) => {
-              const count = name === "ALL"
-                ? billers.length
-                : billers.filter((b) => b.category === name).length;
-              const isActive = activeCategory === name;
-
-              return (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => setActiveCategory(name)}
-                  className={cn(
-                    "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-2 border shadow-3xs active:scale-95",
-                    isActive
-                      ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-sm ring-2 ring-[#FC7A00]/30"
-                      : isDark
-                      ? "bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700/80 hover:text-white"
-                      : "bg-gray-100/90 text-gray-700 border-gray-200 hover:bg-gray-200/90 hover:text-black"
-                  )}
-                >
-                  <span className={cn("material-symbols-outlined text-[16px]", isActive ? "text-white" : "text-[#FC7A00]")}>
-                    {icon}
-                  </span>
-                  <span>{name}</span>
-                  <span
-                    className={cn(
-                      "px-1.5 py-0.5 rounded-full text-[9px] font-mono font-black min-w-[20px] text-center",
-                      isActive
-                        ? "bg-white/20 text-white"
-                        : isDark
-                        ? "bg-gray-700 text-gray-300"
-                        : "bg-gray-200 text-gray-700"
-                    )}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-
-            {(activeCategory !== "ALL" || searchQuery) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveCategory("ALL");
-                  setSearchQuery("");
-                }}
-                className="px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 border border-rose-500/30 ml-auto"
-                title="Reset active category and search filter"
-              >
-                <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                Reset Filter
-              </button>
-            )}
           </div>
         </div>
 
