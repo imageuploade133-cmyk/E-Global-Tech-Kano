@@ -25,6 +25,11 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   const [imageError, setImageError] = useState(false);
   const { getBillerLogo, getBankLogo, getStoreLogo } = useLogos();
 
+  // Reset image error state whenever inputs or target logo changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [type, description, recipientName, bankName]);
+
   const normalizedType = (type || "").toUpperCase().trim();
   const fullContext = `${description} ${recipientName} ${bankName}`.toLowerCase();
 
