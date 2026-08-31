@@ -496,12 +496,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           currency: fromCurrency,
           reference: txRef,
           type: "SWAP_DEBIT",
+          category: "SWAP",
+          direction: "DEBIT",
           description: `Currency Exchange: Swapped ${fromCurrency} ${amount.toLocaleString()} to ${toCurrency}${fee > 0 ? ` (Includes fee: ${fee} ${fromCurrency})` : ""}`,
           recipientName: `${toCurrency} Wallet`,
           status: "SUCCESS",
           date: dateStr,
           time: timeStr,
           fee,
+          totalDebited: amount,
+          sourceCurrency: fromCurrency,
+          sourceAmount: amount,
+          destinationCurrency: toCurrency,
+          destinationAmount: targetAmount,
+          exchangeRate: rate,
           createdAt: new Date().toISOString()
         };
 
@@ -511,12 +519,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
           currency: toCurrency,
           reference: txRef,
           type: "SWAP_CREDIT",
+          category: "SWAP",
+          direction: "CREDIT",
           description: `Currency Exchange: Received ${toCurrency} ${targetAmount.toLocaleString()} from ${fromCurrency}`,
           recipientName: `${toCurrency} Wallet`,
           status: "SUCCESS",
           date: dateStr,
           time: timeStr,
           fee: 0,
+          totalCredited: targetAmount,
+          sourceCurrency: fromCurrency,
+          sourceAmount: amount,
+          destinationCurrency: toCurrency,
+          destinationAmount: targetAmount,
+          exchangeRate: rate,
           createdAt: new Date().toISOString()
         };
 

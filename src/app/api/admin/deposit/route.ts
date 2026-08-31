@@ -85,10 +85,18 @@ export async function POST(req: Request) {
         amount: parsedAmount,
         currency: currency,
         type: "DEPOSIT",
-        status: "SUCCESSFUL",
+        category: "DEPOSIT",
+        direction: "CREDIT",
+        status: "SUCCESS",
         description: `Cash Deposit (${currency})`,
         reference: secureRef,
         recipientName: "Cash Deposit",
+        senderName: "Administrator Credit",
+        provider: "System Deposit",
+        fee: 0,
+        totalCredited: parsedAmount,
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+        time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         createdAt: new Date().toISOString()
       });
 
