@@ -8,7 +8,7 @@ export interface TransactionRecord {
   currency: string;
   reference: string;
   flwId?: string | null;
-  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS" | "SWAP_DEBIT" | "SWAP_CREDIT" | "CASHOUT" | "CARD_FUND" | "STORE_PURCHASE" | "REFUND" | string;
+  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS" | "SWAP_DEBIT" | "SWAP_CREDIT" | "CASHOUT" | "CARD_FUND" | "STORE_PURCHASE" | "REFUND" | "VIRTUAL_ACCOUNT_DEPOSIT" | string;
   category?: string;
   direction?: "CREDIT" | "DEBIT";
   description: string;
@@ -37,6 +37,9 @@ export interface TransactionRecord {
   beneficiaryBankCode?: string;
 
   // Deposit
+  fundingMethod?: string;
+  virtualAccountNumber?: string;
+  virtualAccountBankName?: string;
   senderName?: string;
   senderAccountNumber?: string;
   senderBankName?: string;
@@ -162,6 +165,9 @@ export class WalletService {
       beneficiaryAccountNumber?: string;
       beneficiaryBankName?: string;
       beneficiaryBankCode?: string;
+      fundingMethod?: string;
+      virtualAccountNumber?: string;
+      virtualAccountBankName?: string;
       senderName?: string;
       senderAccountNumber?: string;
       senderBankName?: string;
@@ -298,6 +304,9 @@ export class WalletService {
       beneficiaryBankName: params.beneficiaryBankName,
       beneficiaryBankCode: params.beneficiaryBankCode,
 
+      fundingMethod: params.fundingMethod,
+      virtualAccountNumber: params.virtualAccountNumber,
+      virtualAccountBankName: params.virtualAccountBankName,
       senderName: params.senderName,
       senderAccountNumber: params.senderAccountNumber,
       senderBankName: params.senderBankName,
@@ -376,6 +385,9 @@ export class WalletService {
       beneficiaryAccountNumber?: string;
       beneficiaryBankName?: string;
       beneficiaryBankCode?: string;
+      fundingMethod?: string;
+      virtualAccountNumber?: string;
+      virtualAccountBankName?: string;
       senderName?: string;
       senderAccountNumber?: string;
       senderBankName?: string;
@@ -516,6 +528,9 @@ export class WalletService {
       beneficiaryBankName: params.beneficiaryBankName,
       beneficiaryBankCode: params.beneficiaryBankCode,
 
+      fundingMethod: params.fundingMethod,
+      virtualAccountNumber: params.virtualAccountNumber,
+      virtualAccountBankName: params.virtualAccountBankName,
       senderName: params.senderName,
       senderAccountNumber: params.senderAccountNumber,
       senderBankName: params.senderBankName,
