@@ -39,10 +39,10 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   const isWaec = normalizedType.includes("WAEC") || fullContext.includes("waec") || fullContext.includes("exam");
 
   // Lookup administrator-uploaded logo or fallback
-  const storeLogo = isStore ? getStoreLogo() : null;
-  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec || isSwap)
+  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec || isSwap || isStore)
     ? getBillerLogo(fullContext)
     : null;
+  const storeLogo = isStore ? (billerLogo || getStoreLogo()) : null;
   const bankLogo = (isTransfer || isDeposit) ? getBankLogo(fullContext) : null;
   const logoUrl = storeLogo || billerLogo || bankLogo;
 
