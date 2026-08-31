@@ -79,7 +79,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   // Classify transaction category
   const txType = transaction.type.toUpperCase();
   const isStore = txType.includes("STORE") || transaction.description.toLowerCase().includes("store");
-  const isBill = ["BILL_PAYMENT", "AIRTIME", "DATA", "BILLS", "CABLE", "ELECTRICITY", "EXAMS", "WAEC"].includes(txType);
+  const isSwap = txType.includes("SWAP") || transaction.description.toLowerCase().includes("swap") || transaction.description.toLowerCase().includes("exchange");
+  const isBill = ["BILL_PAYMENT", "AIRTIME", "DATA", "BILLS", "CABLE", "ELECTRICITY", "EXAMS", "WAEC"].includes(txType) || isSwap;
   const isTransfer = ["TRANSFER", "WITHDRAWAL", "WITHDRAW"].includes(txType);
   const isDeposit = ["DEPOSIT", "CASHOUT", "CARD_FUND"].includes(txType);
 
