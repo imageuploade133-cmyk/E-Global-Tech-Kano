@@ -92,6 +92,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     const nextState = !isVisible;
     setIsVisible(nextState);
     sessionStorage.setItem("balance_visible", String(nextState));
+    window.dispatchEvent(new Event("balance_visibility_changed"));
   };
   const { config } = useAppConfig();
   const router = useRouter();
