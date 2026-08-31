@@ -198,7 +198,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   // Resolve logo url dynamically using administrator-uploaded logos
   const contextText = `${productName} ${bankDisplayName} ${transaction.description}`.toLowerCase();
   const matchedLogo = isStore
-    ? getStoreLogo()
+    ? (getBillerLogo("store") || getStoreLogo())
     : isBill
     ? (getBillerLogo(contextText) || getBillerLogo(bankDisplayName))
     : (getBankLogo(bankDisplayName) || getBankLogo(contextText));

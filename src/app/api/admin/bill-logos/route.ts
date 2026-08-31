@@ -27,6 +27,7 @@ const DEFAULT_BILLERS = [
   { code: "sportybet", name: "SportyBet Wallet", category: "Internet & Gaming" },
   { code: "nairabet", name: "Nairabet Wallet", category: "Internet & Gaming" },
   { code: "swap", name: "Currency Swap Service", category: "Currency Swaps" },
+  { code: "store", name: "E-Tech Store Purchase", category: "Store Orders" },
 ];
 
 export async function GET(req: Request) {
