@@ -36,7 +36,24 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const hasPushedState = React.useRef(false);
+
+  useEffect(() => {
+    const checkVisibility = () => {
+      const saved = sessionStorage.getItem("balance_visible");
+      if (saved !== null) {
+        setIsBalanceVisible(saved === "true");
+      }
+    };
+
+    checkVisibility();
+
+    window.addEventListener("balance_visibility_changed", checkVisibility);
+    return () => {
+      window.removeEventListener("balance_visibility_changed", checkVisibility);
+    };
+  }, []);
 
   const fetchRecentTransactions = async (forceRefresh = false) => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
@@ -150,26 +167,52 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
   }, [selectedTx]);
 
   return (
-    <section className="mb-stack-lg space-y-3.5">
+    <section className="mb-stack-lg p-4 bg-white/95 border border-gray-200/90 rounded-[24px] shadow-3xs space-y-3.5 transition-all">
       {/* Premium Header section */}
-      <div className="flex justify-between items-end px-1">
+      <div className="flex justify-between items-end px-0.5">
         <div>
-          <h3 className="font-headline-md text-[16px] min-[360px]:text-[19px] text-gray-900 font-bold tracking-tight">
+          <h3 className="font-headline-md text-[16px] min-[360px]:text-[18px] text-gray-900 font-bold tracking-tight">
             Quick Activity
           </h3>
           <p className="font-hanken text-[9.5px] text-gray-400 font-extrabold uppercase tracking-widest mt-0.5">Real-time ledger feeds</p>
         </div>
-        <Link
-          href="/history"
-          className="font-label-sm text-[11px] min-[360px]:text-xs text-[#FC7A00] font-black hover:brightness-110 flex items-center gap-0.5 transition-all"
-        >
-          See All
-          <span className="material-symbols-outlined text-[15px] font-bold">arrow_forward</span>
-        </Link>
+        {isBalanceVisible && (
+          <Link
+            href="/history"
+            className="font-label-sm text-[11px] min-[360px]:text-xs text-[#FC7A00] font-black hover:brightness-110 flex items-center gap-0.5 transition-all"
+          >
+            See All
+            <span className="material-symbols-outlined text-[15px] font-bold">arrow_forward</span>
+          </Link>
+        )}
       </div>
 
-      {/* Glossy Tri-Gradient Transaction Cards */}
-      <div className="space-y-3">
+      {/* Glossy Tri-Gradient Transaction Cards or Hidden State Indicator */}
+      <AnimatePresence mode="wait">
+        {!isBalanceVisible ? (
+          <motion.div
+            key="hidden-activity"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="p-5 bg-gray-50/80 border border-dashed border-gray-200 rounded-[20px] text-center space-y-2 select-none"
+          >
+            <div className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00] mx-auto">
+              <span className="material-symbols-outlined text-[20px]">visibility_off</span>
+            </div>
+            <p className="font-hanken font-bold text-xs text-gray-700">Quick Activity Hidden</p>
+            <p className="font-hanken text-[10.5px] text-gray-400 max-w-xs mx-auto">
+              Click the eye icon on your balance card above to reveal your real-time ledger feed.
+            </p>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="visible-activity"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="space-y-3"
+          >
         {(propIsLoading || loading) ? (
           // Shimmer placeholders for transactions - exact layout matching live rows
           [1, 2].map((i) => (
@@ -272,7 +315,9 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
             );
           })
         )}
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Shared Transaction Receipt details Drawer modal wrapped in AnimatePresence for smooth exit transition */}
       <AnimatePresence>
