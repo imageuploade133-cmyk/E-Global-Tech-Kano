@@ -371,11 +371,11 @@ export async function POST(req: Request) {
         NotificationService.sendPushNotification(uid, {
           ...payload,
           url: "/history",
-          amount: totalUserDebit,
+          amount: totalChargeAmount,
           currency: "NGN",
           reference: reference,
-          recipientName: targetNumber || customerName || "Biller Operator",
-          bankName: billerCode ? billerCode.toUpperCase() : "Utility Bill Payment",
+          recipientName: customer_id || "Biller Operator",
+          bankName: biller_name || (biller_code ? biller_code.toUpperCase() : "Utility Bill Payment"),
           channel: "Bill Payment",
         });
       } catch (notifErr: any) {
@@ -422,11 +422,11 @@ export async function POST(req: Request) {
           NotificationService.sendPushNotification(uid, {
             ...payload,
             url: "/history",
-            amount: totalUserDebit,
+            amount: totalChargeAmount,
             currency: "NGN",
             reference: reference,
-            recipientName: targetNumber || customerName || "Biller Operator",
-            bankName: billerCode ? billerCode.toUpperCase() : "Utility Bill Payment",
+            recipientName: customer_id || "Biller Operator",
+            bankName: biller_name || (biller_code ? biller_code.toUpperCase() : "Utility Bill Payment"),
             channel: "Bill Payment",
           });
         } catch (notifErr: any) {
