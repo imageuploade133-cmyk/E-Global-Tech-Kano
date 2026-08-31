@@ -49,7 +49,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
-  const { getBillerLogo, getBankLogo } = useLogos();
+  const { getBillerLogo, getBankLogo, getStoreLogo } = useLogos();
   const { config } = useAppConfig();
 
   // Prevent background scrolling while the full screen modal is displayed
@@ -78,6 +78,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   // Classify transaction category
   const txType = transaction.type.toUpperCase();
+  const isStore = txType.includes("STORE") || transaction.description.toLowerCase().includes("store");
   const isBill = ["BILL_PAYMENT", "AIRTIME", "DATA", "BILLS", "CABLE", "ELECTRICITY", "EXAMS", "WAEC"].includes(txType);
   const isTransfer = ["TRANSFER", "WITHDRAWAL", "WITHDRAW"].includes(txType);
   const isDeposit = ["DEPOSIT", "CASHOUT", "CARD_FUND"].includes(txType);
@@ -195,7 +196,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   // Resolve logo url dynamically using administrator-uploaded logos
   const contextText = `${productName} ${bankDisplayName} ${transaction.description}`.toLowerCase();
-  const matchedLogo = isBill
+  const matchedLogo = isStore
+    ? getStoreLogo()
+    : isBill
     ? (getBillerLogo(contextText) || getBillerLogo(bankDisplayName))
     : (getBankLogo(bankDisplayName) || getBankLogo(contextText));
   const logoUrl = matchedLogo || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";

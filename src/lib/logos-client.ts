@@ -13,6 +13,7 @@ export interface BankLogoItem {
 // In-memory cache across component mounts
 let cachedBillLogos: Record<string, string> | null = null;
 let cachedBankList: BankLogoItem[] | null = null;
+let cachedStoreLogo: string | null = null;
 let isFetching = false;
 const listeners: Set<() => void> = new Set();
 
@@ -23,22 +24,23 @@ const notifyListeners = () => {
 export const fetchLogosConfig = async (forceRefresh = false): Promise<{
   billLogos: Record<string, string>;
   banks: BankLogoItem[];
+  storeLogoUrl: string | null;
 }> => {
-  if (!forceRefresh && cachedBillLogos && cachedBankList) {
-    return { billLogos: cachedBillLogos, banks: cachedBankList };
+  if (!forceRefresh && cachedBillLogos && cachedBankList && cachedStoreLogo !== null) {
+    return { billLogos: cachedBillLogos, banks: cachedBankList, storeLogoUrl: cachedStoreLogo };
   }
 
   if (isFetching) {
-    // Return existing cache or empty fallback while fetching
-    return { billLogos: cachedBillLogos || {}, banks: cachedBankList || [] };
+    return { billLogos: cachedBillLogos || {}, banks: cachedBankList || [], storeLogoUrl: cachedStoreLogo };
   }
 
   isFetching = true;
 
   try {
-    const [billsRes, banksRes] = await Promise.allSettled([
+    const [billsRes, banksRes, storeRes] = await Promise.allSettled([
       fetch("/api/bills/logos"),
       fetch("/api/banks"),
+      fetch("/api/store"),
     ]);
 
     if (billsRes.status === "fulfilled" && billsRes.value.ok) {
@@ -68,6 +70,13 @@ export const fetchLogosConfig = async (forceRefresh = false): Promise<{
         logoBackupUrl: item.logoBackupUrl || null,
       }));
     }
+
+    if (storeRes.status === "fulfilled" && storeRes.value.ok) {
+      const storeData = await storeRes.value.json();
+      if (storeData.settings && storeData.settings.storeLogoUrl) {
+        cachedStoreLogo = storeData.settings.storeLogoUrl;
+      }
+    }
   } catch (err) {
     console.warn("[logos-client] Error loading administrator logos:", err);
   } finally {
@@ -77,7 +86,7 @@ export const fetchLogosConfig = async (forceRefresh = false): Promise<{
     notifyListeners();
   }
 
-  return { billLogos: cachedBillLogos, banks: cachedBankList };
+  return { billLogos: cachedBillLogos, banks: cachedBankList, storeLogoUrl: cachedStoreLogo };
 };
 
 /**
@@ -162,21 +171,23 @@ export const matchBankLogo = (text: string, bankList?: BankLogoItem[] | null): s
 };
 
 /**
- * React hook to access administrator-uploaded bill and bank logos with automatic background fetching.
+ * React hook to access administrator-uploaded bill, bank, and store logos with automatic background fetching.
  */
 export const useLogos = () => {
   const [billLogos, setBillLogos] = useState<Record<string, string>>(cachedBillLogos || {});
   const [banks, setBanks] = useState<BankLogoItem[]>(cachedBankList || []);
+  const [storeLogoUrl, setStoreLogoUrl] = useState<string | null>(cachedStoreLogo);
 
   useEffect(() => {
     const updateState = () => {
       if (cachedBillLogos) setBillLogos({ ...cachedBillLogos });
       if (cachedBankList) setBanks([...cachedBankList]);
+      if (cachedStoreLogo !== null) setStoreLogoUrl(cachedStoreLogo);
     };
 
     listeners.add(updateState);
 
-    if (!cachedBillLogos || !cachedBankList) {
+    if (!cachedBillLogos || !cachedBankList || cachedStoreLogo === null) {
       fetchLogosConfig();
     } else {
       updateState();
@@ -190,7 +201,9 @@ export const useLogos = () => {
   return {
     billLogos,
     banks,
+    storeLogoUrl,
     getBillerLogo: (text: string) => matchBillerLogo(text, billLogos),
     getBankLogo: (text: string) => matchBankLogo(text, banks),
+    getStoreLogo: () => storeLogoUrl,
   };
 };
