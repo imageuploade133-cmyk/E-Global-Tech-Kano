@@ -17,7 +17,7 @@ const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "R
   if (s === "SUCCESS" || s === "SUCCESSFUL" || s === "COMPLETED" || s === "COMPLETE" || s === "ACTIVE" || s === "DELIVERED") {
     return "SUCCESS";
   }
-  if (s === "PENDING" || s === "PROCESSING") {
+  if (s === "PENDING" || s === "PROCESSING" || !status) {
     return "PENDING";
   }
   if (s === "REFUND" || s === "REFUNDED" || s === "REVERSED") {
@@ -114,7 +114,7 @@ export default function HistoryPage() {
           description: data.description || "",
           recipientName: data.recipientName || "",
           bankName: data.bankName || "",
-          status: data.status || "SUCCESS",
+          status: data.status || "PENDING",
           date: data.date || "",
           time: data.time || "",
           fee: Number(data.fee) || 0,
@@ -195,7 +195,7 @@ export default function HistoryPage() {
           description: data.description || "",
           recipientName: data.recipientName || "",
           bankName: data.bankName || "",
-          status: data.status || "SUCCESS",
+          status: data.status || "PENDING",
           date: data.date || "",
           time: data.time || "",
           fee: Number(data.fee) || 0,
