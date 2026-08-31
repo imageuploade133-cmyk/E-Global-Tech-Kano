@@ -44,6 +44,9 @@ export interface Transaction {
   beneficiaryBankCode?: string;
 
   // Deposit
+  fundingMethod?: string;
+  virtualAccountNumber?: string;
+  virtualAccountBankName?: string;
   senderName?: string;
   senderAccountNumber?: string;
   senderBankName?: string;
@@ -155,8 +158,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const isWaec = !isSwap && (txType === "WAEC" || cat === "WAEC" || desc.includes("waec") || desc.includes("exam"));
   const isBill = !isSwap && (isAirtime || isData || isCable || isElectricity || isWaec || txType === "BILLS" || cat === "BILLS" || txType === "BILL_PAYMENT");
 
-  const isTransfer = !isSwap && (txType === "TRANSFER" || cat === "TRANSFER" || txType === "WITHDRAWAL" || desc.includes("transfer"));
-  const isDeposit = !isSwap && (txType === "DEPOSIT" || cat === "DEPOSIT" || txType === "CASHOUT" || desc.includes("deposit"));
+  const isTransfer = !isSwap && (txType === "TRANSFER" || cat === "TRANSFER" || txType === "WITHDRAWAL" || (desc.includes("transfer") && !desc.includes("bank transfer") && !desc.includes("virtual account")));
+  const isDeposit = !isSwap && (txType === "DEPOSIT" || cat === "DEPOSIT" || txType === "VIRTUAL_ACCOUNT_DEPOSIT" || txType === "CASHOUT" || desc.includes("deposit") || desc.includes("virtual account"));
   const isInvestment = !isSwap && (txType === "INVESTMENT" || cat === "INVESTMENT" || desc.includes("investment") || desc.includes("fixed deposit"));
 
   // Pure presentation values
@@ -354,10 +357,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug mt-0.5">
                   {isSwap
                     ? "Currency Exchange Swap"
+                    : isDeposit
+                    ? (transaction.fundingMethod || "Virtual Account Deposit")
                     : isTransfer
                     ? "Outward Bank Transfer"
-                    : isDeposit
-                    ? "Wallet Cash Deposit"
                     : isAirtime
                     ? "Airtime Top-up"
                     : isData
@@ -641,22 +644,59 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 {/* 6. DEPOSIT */}
                 {isDeposit && (
                   <>
-                    <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Source Channel</span>
-                      <span className="text-black font-bold uppercase">{transaction.senderName || transaction.recipientName || "Direct Deposit"}</span>
-                    </div>
-
-                    {transaction.senderBankName && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Sourcing Bank</span>
-                        <span className="text-black font-bold">{transaction.senderBankName}</span>
-                      </div>
-                    )}
-
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Credited Amount</span>
                       <span className="text-emerald-600 font-extrabold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Funding Method</span>
+                      <span className="text-black font-bold">{transaction.fundingMethod || "Virtual Account"}</span>
+                    </div>
+
+                    {transaction.virtualAccountNumber && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Virtual Account Number</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-black font-bold">{transaction.virtualAccountNumber}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(transaction.virtualAccountNumber!, "Virtual account number")}
+                            className="text-[#FC7A00]"
+                          >
+                            <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {transaction.virtualAccountBankName && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Virtual Account Bank</span>
+                        <span className="text-black font-bold">{transaction.virtualAccountBankName}</span>
+                      </div>
+                    )}
+
+                    {transaction.senderName && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Sender Name</span>
+                        <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">{transaction.senderName}</span>
+                      </div>
+                    )}
+
+                    {transaction.senderAccountNumber && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Sender Account</span>
+                        <span className="font-mono text-black font-bold">{transaction.senderAccountNumber}</span>
+                      </div>
+                    )}
+
+                    {transaction.senderBankName && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Sender Bank</span>
+                        <span className="text-black font-bold">{transaction.senderBankName}</span>
+                      </div>
+                    )}
                   </>
                 )}
 
