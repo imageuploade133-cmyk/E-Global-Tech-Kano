@@ -255,7 +255,17 @@ function CpanelBillLogosPageContent() {
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ["ALL", "Airtime & Data", "Electricity Discos", "Cable TV", "Education", "Internet & Gaming", "Currency Swaps", "Store Orders", "Custom Billers"];
+  const categoriesWithIcons = [
+    { name: "ALL", icon: "grid_view" },
+    { name: "Airtime & Data", icon: "cell_tower" },
+    { name: "Electricity Discos", icon: "bolt" },
+    { name: "Cable TV", icon: "tv" },
+    { name: "Education", icon: "school" },
+    { name: "Internet & Gaming", icon: "wifi" },
+    { name: "Currency Swaps", icon: "swap_horiz" },
+    { name: "Store Orders", icon: "shopping_bag" },
+    { name: "Custom Billers", icon: "tune" },
+  ];
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
   const panelClass = isDark
@@ -384,23 +394,62 @@ function CpanelBillLogosPageContent() {
             </div>
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-            {categories.map((cat) => (
+          {/* User-Friendly Category Tabs with Icons, Badges & Reset Filter */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 select-none">
+            {categoriesWithIcons.map(({ name, icon }) => {
+              const count = name === "ALL"
+                ? billers.length
+                : billers.filter((b) => b.category === name).length;
+              const isActive = activeCategory === name;
+
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setActiveCategory(name)}
+                  className={cn(
+                    "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-2 border shadow-3xs active:scale-95",
+                    isActive
+                      ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-sm ring-2 ring-[#FC7A00]/30"
+                      : isDark
+                      ? "bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700/80 hover:text-white"
+                      : "bg-gray-100/90 text-gray-700 border-gray-200 hover:bg-gray-200/90 hover:text-black"
+                  )}
+                >
+                  <span className={cn("material-symbols-outlined text-[16px]", isActive ? "text-white" : "text-[#FC7A00]")}>
+                    {icon}
+                  </span>
+                  <span>{name}</span>
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[9px] font-mono font-black min-w-[20px] text-center",
+                      isActive
+                        ? "bg-white/20 text-white"
+                        : isDark
+                        ? "bg-gray-700 text-gray-300"
+                        : "bg-gray-200 text-gray-700"
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {(activeCategory !== "ALL" || searchQuery) && (
               <button
-                key={cat}
                 type="button"
-                onClick={() => setActiveCategory(cat)}
-                className={cn(
-                  "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer",
-                  activeCategory === cat
-                    ? "bg-[#FC7A00] text-white shadow-sm"
-                    : isDark ? "bg-gray-800 text-gray-400 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                )}
+                onClick={() => {
+                  setActiveCategory("ALL");
+                  setSearchQuery("");
+                }}
+                className="px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 text-rose-500 hover:bg-rose-500/10 border border-rose-500/30 ml-auto"
+                title="Reset active category and search filter"
               >
-                {cat}
+                <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                Reset Filter
               </button>
-            ))}
+            )}
           </div>
         </div>
 
