@@ -28,6 +28,8 @@ const DEFAULT_BILLERS = [
   { code: "nairabet", name: "Nairabet Wallet", category: "Internet & Gaming" },
   { code: "swap", name: "Currency Swap Service", category: "Currency Swaps" },
   { code: "store", name: "E-Tech Store Purchase", category: "Store Orders" },
+  { code: "investment", name: "Fixed Deposit Investment", category: "Investments" },
+  { code: "deposit", name: "Deposit Funding Service", category: "Wallet Deposits" },
 ];
 
 export async function GET(req: Request) {

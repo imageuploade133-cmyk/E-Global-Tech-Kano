@@ -201,6 +201,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     ? (getBillerLogo("store") || getStoreLogo())
     : isBill
     ? (getBillerLogo(contextText) || getBillerLogo(bankDisplayName))
+    : isDeposit
+    ? (getBillerLogo(contextText) || getBankLogo(bankDisplayName) || getBankLogo(contextText))
     : (getBankLogo(bankDisplayName) || getBankLogo(contextText));
   const logoUrl = matchedLogo || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
 

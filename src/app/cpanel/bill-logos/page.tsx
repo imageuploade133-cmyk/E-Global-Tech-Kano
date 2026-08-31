@@ -53,6 +53,8 @@ function CpanelBillLogosPageContent() {
     { code: "nairabet", name: "Nairabet Wallet", category: "Internet & Gaming" },
     { code: "swap", name: "Currency Swap Service", category: "Currency Swaps" },
     { code: "store", name: "E-Tech Store Purchase", category: "Store Orders" },
+    { code: "investment", name: "Fixed Deposit Investment", category: "Investments" },
+    { code: "deposit", name: "Deposit Funding Service", category: "Wallet Deposits" },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -264,6 +266,8 @@ function CpanelBillLogosPageContent() {
     { name: "Internet & Gaming", icon: "wifi" },
     { name: "Currency Swaps", icon: "swap_horiz" },
     { name: "Store Orders", icon: "shopping_bag" },
+    { name: "Investments", icon: "trending_up" },
+    { name: "Wallet Deposits", icon: "add_card" },
     { name: "Custom Billers", icon: "tune" },
   ];
 
@@ -362,6 +366,8 @@ function CpanelBillLogosPageContent() {
               <option value="Internet & Gaming">Internet & Gaming</option>
               <option value="Currency Swaps">Currency Swaps</option>
               <option value="Store Orders">Store Orders</option>
+              <option value="Investments">Investments</option>
+              <option value="Wallet Deposits">Wallet Deposits</option>
               <option value="Custom Billers">Custom Billers</option>
             </select>
             <button
