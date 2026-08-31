@@ -133,6 +133,12 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
             time: formatNotificationTime(data.createdAt),
             type: (data.type || "transaction") as "transaction" | "security" | "promo",
             read: !!data.read,
+            amount: typeof data.amount === "number" ? data.amount : undefined,
+            currency: data.currency || "NGN",
+            reference: data.reference || "",
+            recipientName: data.recipientName || "",
+            bankName: data.bankName || "",
+            channel: data.channel || "",
           });
         });
 

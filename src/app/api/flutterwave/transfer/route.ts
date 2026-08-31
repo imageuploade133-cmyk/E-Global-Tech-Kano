@@ -64,9 +64,13 @@ export async function POST(req: Request) {
     const reference = body.reference as string | undefined;
     const pin = body.pin as string | undefined;
 
+    const bank_name = body.bank_name;
+    const bankName = body.bankName;
+
     const trfAmount = Number(amount);
     const trfAccount = (account_number !== undefined && account_number !== null) ? String(account_number).trim() : ((accountNumber !== undefined && accountNumber !== null) ? String(accountNumber).trim() : "");
     const trfBank = (bankCode !== undefined && bankCode !== null) ? String(bankCode).trim() : ((accountBank !== undefined && accountBank !== null) ? String(accountBank).trim() : ((account_bank !== undefined && account_bank !== null) ? String(account_bank).trim() : ""));
+    const trfBankName = (bank_name !== undefined && bank_name !== null) ? String(bank_name).trim() : ((bankName !== undefined && bankName !== null) ? String(bankName).trim() : "Bank Transfer");
     const trfName = (account_name !== undefined && account_name !== null) ? String(account_name).trim() : ((accountName !== undefined && accountName !== null) ? String(accountName).trim() : "Beneficiary");
     const trfCurrency = currency ? String(currency).trim() : "NGN";
     const trfReference = reference ? String(reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
@@ -281,6 +285,12 @@ export async function POST(req: Request) {
           body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
           type: "transaction",
           url: "/history",
+          amount: trfAmount,
+          currency: trfCurrency || "NGN",
+          reference: trfReference,
+          recipientName: trfName,
+          bankName: trfBankName || "Bank Transfer",
+          channel: "Outward Transfer",
         });
       } catch (notifErr: any) {
         console.error("[Notification Warning] Failed to dispatch mock transfer notification:", notifErr.message);
@@ -340,6 +350,12 @@ export async function POST(req: Request) {
             body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
             type: "transaction",
             url: "/history",
+            amount: trfAmount,
+            currency: trfCurrency || "NGN",
+            reference: trfReference,
+            recipientName: trfName,
+            bankName: trfBankName || "Bank Transfer",
+            channel: "Outward Transfer",
           });
         } catch (notifErr: any) {
           console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);
