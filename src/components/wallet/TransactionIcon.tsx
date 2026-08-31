@@ -40,7 +40,7 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
 
   // Lookup administrator-uploaded logo or fallback
   const storeLogo = isStore ? getStoreLogo() : null;
-  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec)
+  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec || isSwap)
     ? getBillerLogo(fullContext)
     : null;
   const bankLogo = (isTransfer || isDeposit) ? getBankLogo(fullContext) : null;

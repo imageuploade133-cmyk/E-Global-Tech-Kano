@@ -26,6 +26,7 @@ const DEFAULT_BILLERS = [
   { code: "bet9ja", name: "Bet9ja Wallet", category: "Internet & Gaming" },
   { code: "sportybet", name: "SportyBet Wallet", category: "Internet & Gaming" },
   { code: "nairabet", name: "Nairabet Wallet", category: "Internet & Gaming" },
+  { code: "swap", name: "Currency Swap Service", category: "Currency Swaps" },
 ];
 
 export async function GET(req: Request) {

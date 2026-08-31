@@ -51,6 +51,7 @@ function CpanelBillLogosPageContent() {
     { code: "bet9ja", name: "Bet9ja Wallet", category: "Internet & Gaming" },
     { code: "sportybet", name: "SportyBet Wallet", category: "Internet & Gaming" },
     { code: "nairabet", name: "Nairabet Wallet", category: "Internet & Gaming" },
+    { code: "swap", name: "Currency Swap Service", category: "Currency Swaps" },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -253,7 +254,7 @@ function CpanelBillLogosPageContent() {
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ["ALL", "Airtime & Data", "Electricity Discos", "Cable TV", "Education", "Internet & Gaming", "Custom Billers"];
+  const categories = ["ALL", "Airtime & Data", "Electricity Discos", "Cable TV", "Education", "Internet & Gaming", "Currency Swaps", "Custom Billers"];
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
   const panelClass = isDark
@@ -348,6 +349,7 @@ function CpanelBillLogosPageContent() {
               <option value="Cable TV">Cable TV</option>
               <option value="Education">Education</option>
               <option value="Internet & Gaming">Internet & Gaming</option>
+              <option value="Currency Swaps">Currency Swaps</option>
               <option value="Custom Billers">Custom Billers</option>
             </select>
             <button

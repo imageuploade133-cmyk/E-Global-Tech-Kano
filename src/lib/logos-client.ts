@@ -120,8 +120,9 @@ export const matchBillerLogo = (text: string, billLogos?: Record<string, string>
   if (t.includes("gotv")) return logos["gotv"] || null;
   if (t.includes("startimes")) return logos["startimes"] || null;
 
-  // Exam
+  // Exam & Swaps
   if (t.includes("waec")) return logos["waec"] || null;
+  if (t.includes("swap") || t.includes("exchange")) return logos["swap"] || null;
 
   // General lookup across all administrator defined bill keys
   for (const [code, url] of Object.entries(logos)) {
