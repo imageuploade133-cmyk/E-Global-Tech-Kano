@@ -280,14 +280,33 @@ export async function POST(req: Request) {
       // 2. ALL WRITES: Execute all updates sequentially
       await WalletService.debitWallet(transaction, {
         userId: uid,
-        amount: totalChargeAmount,
+        amount: numAmount,
         currency: "NGN",
         reference,
         type: transactionType,
+        category: biller_type?.toUpperCase() || "BILLS",
+        direction: "DEBIT",
         description,
         recipientName: customer_id,
         fee: appliedMarkupFee,
+        markup: appliedMarkupFee,
+        totalDebited: totalChargeAmount,
         walletType: walletType || "MAIN",
+
+        billerCode: biller_code,
+        billerName: biller_name,
+        billerType: biller_type,
+        customerId: customer_id,
+        itemCode: item_code,
+        itemName: matchedItemName || undefined,
+        planName: matchedItemName || undefined,
+
+        network: (biller_type?.toUpperCase() === "AIRTIME" || biller_type?.toUpperCase() === "DATA") ? (biller_name || biller_code) : undefined,
+        phoneNumber: (biller_type?.toUpperCase() === "AIRTIME" || biller_type?.toUpperCase() === "DATA") ? customer_id : undefined,
+        meterNumber: (biller_type?.toUpperCase() === "ELECTRICITY" || biller_type?.toUpperCase() === "UTILITY") ? customer_id : undefined,
+        smartcardNumber: (biller_type?.toUpperCase() === "CABLE") ? customer_id : undefined,
+
+        provider: "Flutterwave",
         preLoadedUser,
         preLoadedWallet,
       });
@@ -431,6 +450,22 @@ export async function POST(req: Request) {
           });
         } catch (notifErr: any) {
           console.error("[Notification Warning] Failed to dispatch real bill payment notification:", notifErr.message);
+        }
+
+        // Update provider token / reference if returned
+        const provRef = paymentRes.tx_ref || paymentRes.flw_ref || paymentRes.reference;
+        const token = paymentRes.token || paymentRes.recharge_token || paymentRes.data?.token;
+
+        if (provRef || token) {
+          try {
+            const updatePayload: Record<string, any> = {};
+            if (provRef) updatePayload.providerReference = String(provRef);
+            if (token) updatePayload.token = String(token);
+
+            await adminDb.collection("transactions").doc(`tx-${reference}`).update(updatePayload);
+          } catch (updateErr: any) {
+            console.warn("[Bills Pay] Failed to update transaction provider metadata:", updateErr.message);
+          }
         }
 
         return NextResponse.json({

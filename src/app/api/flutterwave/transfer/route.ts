@@ -235,13 +235,24 @@ export async function POST(req: Request) {
       console.log("STEP 8 - Calling WalletService.debitWallet() with preloaded parameters");
       await WalletService.debitWallet(transaction, {
         userId: uid,
-        amount: finalTotalDeduction,
+        amount: trfAmount,
         currency: trfCurrency,
         reference: trfReference,
         type: "TRANSFER",
+        category: "TRANSFER",
+        direction: "DEBIT",
         description,
+        narration: narration || `Direct transfer to ${trfName} (${trfAccount})`,
         recipientName: trfName,
         fee: finalFee,
+        vat: 0,
+        markup: transferProfitMargin,
+        totalDebited: finalTotalDeduction,
+        beneficiaryName: trfName,
+        beneficiaryAccountNumber: trfAccount,
+        beneficiaryBankName: trfBankName,
+        beneficiaryBankCode: trfBank,
+        provider: "Flutterwave",
         preLoadedUser: {
           ref: userRef,
           data: userData,
@@ -359,6 +370,20 @@ export async function POST(req: Request) {
           });
         } catch (notifErr: any) {
           console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);
+        }
+
+        // Update transaction record with provider reference if returned
+        const provRef = gatewayData.provider_reference || gatewayData.data?.id || gatewayData.data?.reference;
+        if (provRef) {
+          try {
+            await adminDb.collection("transactions").doc(`tx-${trfReference}`).update({
+              providerReference: String(provRef),
+              providerTransactionId: gatewayData.data?.id ? String(gatewayData.data.id) : undefined,
+              status: "SUCCESS"
+            });
+          } catch (updateErr: any) {
+            console.warn("[Transfer API] Failed to update transaction providerReference:", updateErr.message);
+          }
         }
 
         return NextResponse.json({

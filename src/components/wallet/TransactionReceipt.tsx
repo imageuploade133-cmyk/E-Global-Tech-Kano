@@ -10,17 +10,82 @@ import { useAppConfig } from "@/lib/ConfigContext";
 
 export interface Transaction {
   id: string;
+  userId?: string;
   reference: string;
   type: string;
+  category?: string;
+  direction?: "CREDIT" | "DEBIT" | string;
   amount: number;
-  currency?: "NGN" | "USD";
+  currency?: "NGN" | "USD" | string;
+  fee?: number;
+  vat?: number;
+  markup?: number;
+  totalDebited?: number;
+  totalCredited?: number;
+  status: string;
   description: string;
-  recipientName?: string;
-  bankName?: string;
-  status: string; // Dynamic status
+  narration?: string;
   date: string;
   time: string;
-  fee: number;
+  createdAt?: string;
+  completedAt?: string;
+  recipientName?: string;
+
+  // Provider details
+  provider?: string;
+  providerReference?: string;
+  providerTransactionId?: string;
+  sessionId?: string;
+
+  // Bank transfer
+  beneficiaryName?: string;
+  beneficiaryAccountNumber?: string;
+  beneficiaryBankName?: string;
+  beneficiaryBankCode?: string;
+
+  // Deposit
+  senderName?: string;
+  senderAccountNumber?: string;
+  senderBankName?: string;
+
+  // Airtime / Data
+  network?: string;
+  phoneNumber?: string;
+  itemCode?: string;
+  itemName?: string;
+  planName?: string;
+
+  // Bills
+  billerCode?: string;
+  billerName?: string;
+  billerType?: string;
+  customerId?: string;
+  customerName?: string;
+
+  // Electricity
+  meterNumber?: string;
+  meterType?: string;
+  token?: string;
+
+  // Cable
+  smartcardNumber?: string;
+  packageName?: string;
+
+  // Swap
+  sourceCurrency?: string;
+  sourceAmount?: number;
+  destinationCurrency?: string;
+  destinationAmount?: number;
+  exchangeRate?: number;
+
+  // Wallet
+  walletType?: "MAIN" | "BONUS";
+
+  // Metadata
+  metadata?: Record<string, unknown>;
+
+  // Legacy compatibility fallbacks
+  bankName?: string;
 }
 
 interface TransactionReceiptProps {
@@ -28,7 +93,7 @@ interface TransactionReceiptProps {
   onClose: () => void;
 }
 
-// Clean status normalizer inside the receipt engine
+// Clean status normalizer
 const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
   const s = String(status || "").toUpperCase().trim();
   if (s === "SUCCESS" || s === "SUCCESSFUL" || s === "COMPLETED" || s === "COMPLETE" || s === "ACTIVE" || s === "DELIVERED") {
@@ -52,7 +117,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const { getBillerLogo, getBankLogo, getStoreLogo } = useLogos();
   const { config } = useAppConfig();
 
-  // Prevent background scrolling while the full screen modal is displayed
+  // Prevent background scrolling while modal is open
   useEffect(() => {
     if (transaction) {
       document.body.style.overflow = "hidden";
@@ -76,142 +141,51 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const normalizedStatus = normalizeStatus(transaction.status);
   const currencySymbol = transaction.currency === "USD" ? "$" : "₦";
 
-  // Classify transaction category
-  const txType = transaction.type.toUpperCase();
-  const isStore = txType.includes("STORE") || transaction.description.toLowerCase().includes("store");
-  const isSwap = txType.includes("SWAP") || transaction.description.toLowerCase().includes("swap") || transaction.description.toLowerCase().includes("exchange");
-  const isBill = ["BILL_PAYMENT", "AIRTIME", "DATA", "BILLS", "CABLE", "ELECTRICITY", "EXAMS", "WAEC"].includes(txType) || isSwap;
-  const isTransfer = ["TRANSFER", "WITHDRAWAL", "WITHDRAW"].includes(txType);
-  const isDeposit = ["DEPOSIT", "CASHOUT", "CARD_FUND"].includes(txType);
+  // Transaction Category Classification
+  const txType = (transaction.type || "").toUpperCase();
+  const cat = (transaction.category || "").toUpperCase();
+  const desc = (transaction.description || "").toLowerCase();
 
-  // Dynamic Session ID generator (perfect 30-digit NIBSS compliant code derived from reference)
-  const generateSessionId = (ref: string) => {
-    let hash = 0;
-    for (let i = 0; i < ref.length; i++) {
-      hash = ref.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const absHash = Math.abs(hash).toString().padEnd(20, "1");
-    return `11000226081013${absHash.slice(0, 16)}`;
-  };
+  const isSwap = txType.includes("SWAP") || cat.includes("SWAP") || desc.includes("swap") || desc.includes("exchange");
+  const isStore = txType.includes("STORE") || cat.includes("STORE") || desc.includes("store");
+  const isAirtime = !isSwap && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime"));
+  const isData = !isSwap && (txType === "DATA" || cat === "DATA" || desc.includes("data"));
+  const isCable = !isSwap && (txType === "CABLE" || cat === "CABLE" || desc.includes("cable") || desc.includes("dstv") || desc.includes("gotv") || desc.includes("startimes"));
+  const isElectricity = !isSwap && (txType === "ELECTRICITY" || cat === "ELECTRICITY" || desc.includes("electricity") || desc.includes("meter"));
+  const isWaec = !isSwap && (txType === "WAEC" || cat === "WAEC" || desc.includes("waec") || desc.includes("exam"));
+  const isBill = !isSwap && (isAirtime || isData || isCable || isElectricity || isWaec || txType === "BILLS" || cat === "BILLS" || txType === "BILL_PAYMENT");
 
-  // Dynamic account number/meter/smartcard/phone number parser
-  const getAccountNumberOrPhone = () => {
-    const desc = transaction.description || "";
-    // Match any 10-11 digit phone or account number
-    const match = desc.match(/(?:0|234|\+234)[789][01]\d{8}|\b[0-9]{10,11}\b/);
-    if (match && match[0]) {
-      return match[0].trim();
-    }
-    // Deterministic fallback based on reference
-    let hash = 0;
-    for (let i = 0; i < transaction.reference.length; i++) {
-      hash = transaction.reference.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const num = Math.abs(hash % 9000000000) + 1000000000;
-    return `0${num.toString().slice(0, 10)}`;
-  };
+  const isTransfer = !isSwap && (txType === "TRANSFER" || cat === "TRANSFER" || txType === "WITHDRAWAL" || desc.includes("transfer"));
+  const isDeposit = !isSwap && (txType === "DEPOSIT" || cat === "DEPOSIT" || txType === "CASHOUT" || desc.includes("deposit"));
+  const isInvestment = !isSwap && (txType === "INVESTMENT" || cat === "INVESTMENT" || desc.includes("investment") || desc.includes("fixed deposit"));
 
-  // Dynamic recipient name parser
-  const getRecipientName = () => {
-    if (transaction.recipientName) return transaction.recipientName;
-    const desc = transaction.description || "";
+  // Pure presentation values
+  const fee = transaction.fee ?? 0;
+  const vat = transaction.vat ?? 0;
+  const markup = transaction.markup ?? 0;
+  const totalDebited = transaction.totalDebited ?? (transaction.amount + fee + vat);
 
-    // Parse things like "Transfer of 500 to ABDULKADIR SHABA" or "Direct outward transfer to ABDULKADIR SHABA"
-    const match = desc.match(/(?:to|transfer to|outward transfer to)\s+([A-Za-z\s]{3,35})/i);
-    if (match && match[1]) {
-      // Exclude strings that look like operators or meter keywords
-      const val = match[1].trim();
-      if (!/mtn|airtel|glo|9mobile|dstv|gotv|startimes|meter/i.test(val)) {
-        return val.toUpperCase();
-      }
-    }
-    return isDeposit ? "DIRECT DEPOSIT FUNDING" : "E-TECH SECURE NODE";
-  };
-
-  // Dynamic Bank/Operator name parser
-  const getBankOrOperatorName = () => {
-    if (transaction.bankName) return transaction.bankName;
-    const desc = transaction.description || "";
-
-    if (isBill) {
-      if (/mtn/i.test(desc)) return "MTN";
-      if (/airtel/i.test(desc)) return "Airtel";
-      if (/glo/i.test(desc)) return "Glo";
-      if (/9mobile/i.test(desc)) return "9mobile";
-      if (/dstv/i.test(desc)) return "DSTV";
-      if (/gotv/i.test(desc)) return "GOtv";
-      if (/startimes/i.test(desc)) return "Startimes";
-      if (/waec/i.test(desc)) return "WAEC Exams";
-      return "Utility Provider";
-    }
-
-    // Parse bank names
-    if (/opay/i.test(desc)) return "Opay";
-    if (/palmpay/i.test(desc)) return "Palmpay";
-    if (/kuda/i.test(desc)) return "Kuda Bank";
-    if (/wema/i.test(desc)) return "Wema Bank";
-    if (/providus/i.test(desc)) return "Providus Bank";
-    if (/access/i.test(desc)) return "Access Bank";
-    if (/gtb|gtbank/i.test(desc)) return "GTBank";
-    if (/firstbank|first bank/i.test(desc)) return "First Bank";
-    if (/zenith/i.test(desc)) return "Zenith Bank";
-
-    return isDeposit ? "Providus Bank" : "Opay";
-  };
-
-  // Dynamic product/service name parser
-  const getProductName = () => {
-    const desc = transaction.description || "";
-    if (isBill) {
-      if (txType.includes("AIRTIME") || /airtime/i.test(desc)) {
-        return "Airtime Top-up";
-      }
-      if (txType.includes("DATA") || /data/i.test(desc)) {
-        const valMatch = desc.match(/\b\d+(?:GB|MB|MB)\b/i);
-        return valMatch ? `${getBankOrOperatorName()} ${valMatch[0]} Data` : "Data Subscription";
-      }
-      if (txType.includes("CABLE") || /cable/i.test(desc)) {
-        return "Cable TV Subscription";
-      }
-      if (txType.includes("ELECTRIC") || /electricity|meter/i.test(desc)) {
-        return "Electricity Bill Tokens";
-      }
-      if (txType.includes("WAEC") || /waec|exam/i.test(desc)) {
-        return "WAEC Registration Scratch Card Pin";
-      }
-      return "Utility Payment";
-    }
-    return transaction.description;
-  };
-
-  // Calculation parameters
-  const baseFee = transaction.fee || (isTransfer ? 10 : 0);
-  const vatAmount = isTransfer ? parseFloat((baseFee * 0.075).toFixed(2)) : 0;
-  const totalDebited = transaction.amount + baseFee + vatAmount;
-
-  const sessionId = generateSessionId(transaction.reference);
-  const entityName = getRecipientName();
-  const bankDisplayName = getBankOrOperatorName();
-  const accountOrPhone = getAccountNumberOrPhone();
-  const productName = getProductName();
-
-  // Resolve logo url dynamically using administrator-uploaded logos
-  const contextText = `${productName} ${bankDisplayName} ${transaction.description}`.toLowerCase();
+  // Logo Resolution
   const matchedLogo = isStore
     ? (getBillerLogo("store") || getStoreLogo())
-    : isBill
-    ? (getBillerLogo(contextText) || getBillerLogo(bankDisplayName))
+    : isSwap
+    ? getBillerLogo("swap")
+    : isInvestment
+    ? getBillerLogo("investment")
     : isDeposit
-    ? (getBillerLogo(contextText) || getBankLogo(bankDisplayName) || getBankLogo(contextText))
-    : (getBankLogo(bankDisplayName) || getBankLogo(contextText));
+    ? (getBillerLogo("deposit") || getBillerLogo("Cash Deposit") || getBankLogo(transaction.senderBankName || transaction.bankName || ""))
+    : isBill
+    ? (getBillerLogo(transaction.network || transaction.billerName || transaction.billerCode || "") || getBillerLogo(desc))
+    : (getBankLogo(transaction.beneficiaryBankName || transaction.bankName || "") || getBankLogo(desc));
+
   const logoUrl = matchedLogo || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
 
-  // Download PDF Action using html2canvas & jsPDF
+  // PDF Export
   const handleDownloadPDF = async () => {
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Generating professional PDF receipt...");
+      toast.loading("Generating PDF receipt...");
 
       const html2canvas = (await import("html2canvas")).default;
       const { jsPDF } = await import("jspdf");
@@ -224,11 +198,11 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
-      const imgWidth = 190; // mm
-      const pageHeight = 295; // mm
+      const imgWidth = 190;
+      const pageHeight = 295;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
-      let position = 10; // margin top
+      let position = 10;
 
       pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
@@ -242,22 +216,22 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       pdf.save(`Receipt_${transaction.reference}.pdf`);
       toast.dismiss();
-      toast.success("PDF Receipt downloaded successfully!");
-    } catch (err: any) {
+      toast.success("PDF Receipt downloaded!");
+    } catch (err) {
       console.error("PDF generation failed:", err);
       toast.dismiss();
-      toast.error("Failed to generate PDF. Please try again.");
+      toast.error("Failed to generate PDF.");
     } finally {
       setGenerating(false);
     }
   };
 
-  // Download Image Action using html2canvas
+  // Image Export
   const handleDownloadImage = async () => {
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Generating high-quality receipt image...");
+      toast.loading("Generating PNG image...");
 
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(receiptRef.current, {
@@ -273,8 +247,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       link.click();
 
       toast.dismiss();
-      toast.success("Receipt image downloaded successfully!");
-    } catch (err: any) {
+      toast.success("Image downloaded!");
+    } catch (err) {
       console.error("Image generation failed:", err);
       toast.dismiss();
       toast.error("Failed to generate image.");
@@ -283,12 +257,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     }
   };
 
-  // Share Action
+  // Share Receipt
   const handleShareReceipt = async () => {
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Preparing receipt file for sharing...");
+      toast.loading("Preparing receipt for sharing...");
 
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(receiptRef.current, {
@@ -300,7 +274,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       canvas.toBlob(async (blob) => {
         if (!blob) {
           toast.dismiss();
-          toast.error("Failed to compile receipt files.");
+          toast.error("Failed to compile receipt.");
           return;
         }
 
@@ -311,23 +285,22 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           await navigator.share({
             files: [file],
             title: "Transaction Receipt",
-            text: `Receipt of transaction reference ${transaction.reference} from E-Tech Global Hub`,
+            text: `Transaction Receipt - ${transaction.reference}`,
           });
         } else {
           toast.dismiss();
-          // Fallback
           const imgData = canvas.toDataURL("image/png");
           const link = document.createElement("a");
           link.href = imgData;
           link.download = `Receipt_${transaction.reference}.png`;
           link.click();
-          toast.success("Share API unsupported. Receipt image downloaded to device instead.");
+          toast.success("Downloaded receipt to device.");
         }
       }, "image/png");
-    } catch (err: any) {
-      console.error("Sharing receipt failed:", err);
+    } catch (err) {
+      console.error("Share failed:", err);
       toast.dismiss();
-      toast.error("Failed to prepare share file.");
+      toast.error("Failed to share receipt.");
     } finally {
       setGenerating(false);
     }
@@ -341,7 +314,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         exit={{ opacity: 0 }}
         className="fixed inset-0 w-full h-full bg-gray-50 z-[100000] flex flex-col select-none overflow-hidden"
       >
-        {/* Full-Screen Page Sticky Header */}
+        {/* Sticky Header */}
         <div className="safe-top bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center shrink-0 shadow-3xs">
           <button
             onClick={onClose}
@@ -357,36 +330,47 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           <div className="w-10" />
         </div>
 
-        {/* Scrollable Receipt Canvas Container */}
+        {/* Scrollable Receipt Canvas */}
         <div className="flex-1 overflow-y-auto p-margin-mobile flex flex-col items-center custom-scrollbar pb-28">
-
-          {/* Printable Receipt Card Ref */}
           <div
             ref={receiptRef}
             className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-sm flex flex-col space-y-5 text-black"
           >
-            {/* Top Logo & Title segment */}
-            <div className="text-center border-b border-dashed border-gray-200 pb-5 space-y-4">
+            {/* Header / Logo */}
+            <div className="text-center border-b border-dashed border-gray-200 pb-5 space-y-3">
               <div className="relative w-14 h-14 mx-auto bg-gray-50 rounded-full border border-gray-100 p-1 flex items-center justify-center overflow-hidden">
                 <Image
                   src={logoUrl}
-                  alt={`${bankDisplayName} Logo`}
+                  alt="Receipt Logo"
                   fill
                   className="object-contain p-1.5"
                 />
               </div>
 
-              <div className="space-y-1">
+              <div>
                 <p className="font-hanken font-extrabold text-[10.5px] uppercase tracking-widest text-gray-400">
-                  {isBill ? productName : bankDisplayName}
+                  E-TECH GLOBAL HUB
                 </p>
-                <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug">
-                  {isDeposit
-                    ? `Funds Received from ${entityName}`
-                    : isBill
-                    ? `Bill Payment to ${bankDisplayName}`
-                    : `Transfer to ${entityName}`
-                  }
+                <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug mt-0.5">
+                  {isSwap
+                    ? "Currency Exchange Swap"
+                    : isTransfer
+                    ? "Outward Bank Transfer"
+                    : isDeposit
+                    ? "Wallet Cash Deposit"
+                    : isAirtime
+                    ? "Airtime Top-up"
+                    : isData
+                    ? "Data Bundle Recharge"
+                    : isElectricity
+                    ? "Electricity Utility Tokens"
+                    : isCable
+                    ? "Cable TV Subscription"
+                    : isWaec
+                    ? "WAEC Scratch Card Pin"
+                    : isStore
+                    ? "Store Order Payment"
+                    : "Payment Transaction"}
                 </h2>
                 <h1 className="font-mono text-3xl font-black text-black tracking-tight mt-1">
                   {currencySymbol}
@@ -397,7 +381,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 </h1>
               </div>
 
-              {/* Status Indicator */}
+              {/* Status Badge */}
               <div className="flex items-center justify-center gap-1.5 text-xs font-bold leading-none">
                 {normalizedStatus === "SUCCESS" ? (
                   <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-100">
@@ -423,98 +407,64 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               </div>
             </div>
 
-            {/* Outward Transfer timeline inside card */}
-            {!isDeposit && normalizedStatus === "SUCCESS" && (
-              <div className="border-b border-dashed border-gray-200 pb-5 space-y-3 text-center">
-                <div className="flex items-center justify-between px-2">
-                  <div className="flex flex-col items-center">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[10px] font-bold">check</span>
-                    </div>
-                    <span className="text-[8px] font-black text-gray-400 mt-1 uppercase leading-none">Sent</span>
-                  </div>
-                  <div className="flex-1 h-0.5 bg-emerald-500 mx-2 -mt-4" />
-                  <div className="flex flex-col items-center">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[10px] font-bold">check</span>
-                    </div>
-                    <span className="text-[8px] font-black text-gray-400 mt-1 uppercase leading-none">Processed</span>
-                  </div>
-                  <div className="flex-1 h-0.5 bg-emerald-500 mx-2 -mt-4" />
-                  <div className="flex flex-col items-center">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[10px] font-bold">check</span>
-                    </div>
-                    <span className="text-[8px] font-black text-gray-400 mt-1 uppercase leading-none">Received</span>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-gray-50 border border-gray-100 rounded-2xl text-left">
-                  <p className="text-[9px] text-gray-500 font-semibold leading-relaxed">
-                    {isBill
-                      ? "Your utility token or network value has been delivered directly to your provider node successfully."
-                      : "The recipient account is expected to be credited within 5 minutes, subject to notification by the bank."
-                    }
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Detailed Transaction Specifications */}
+            {/* Type-Aware Structured Details */}
             <div className="space-y-4">
               <h3 className="font-hanken font-extrabold text-[10.5px] text-gray-400 uppercase tracking-widest leading-none">
-                Transaction Details
+                Payment Specifications
               </h3>
 
-              <div className="space-y-3.5 text-xs">
-                {/* 1. Dynamic Categorized Layout Fields */}
+              <div className="space-y-3 text-xs">
+                {/* 1. BANK TRANSFER */}
                 {isTransfer && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Beneficiary Name</span>
                       <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">
-                        {entityName}
+                        {transaction.beneficiaryName || transaction.recipientName || "Not available"}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Beneficiary Bank</span>
-                      <span className="text-black font-bold">{bankDisplayName}</span>
+                      <span className="text-black font-bold text-right">
+                        {transaction.beneficiaryBankName || transaction.bankName || "Not available"}
+                      </span>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Beneficiary Account</span>
+                      <span>Account Number</span>
                       <div className="flex items-center gap-1">
-                        <span className="font-mono text-black font-bold text-[11px]">{accountOrPhone}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(accountOrPhone, "Account number")}
-                          className="text-[#FC7A00]"
-                        >
-                          <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
-                        </button>
+                        <span className="font-mono text-black font-bold">
+                          {transaction.beneficiaryAccountNumber || "Not available"}
+                        </span>
+                        {transaction.beneficiaryAccountNumber && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(transaction.beneficiaryAccountNumber!, "Account number")}
+                            className="text-[#FC7A00]"
+                          >
+                            <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Balance Debited</span>
-                      <span className="text-black font-bold">Main Balance</span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Amount Sent</span>
-                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString()}</span>
+                      <span>Amount</span>
+                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Transfer Fee</span>
-                      <span className="text-black font-bold">{currencySymbol}{baseFee.toLocaleString()}</span>
+                      <span className="text-black font-bold">{currencySymbol}{fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>VAT (7.5%)</span>
-                      <span className="text-black font-bold">{currencySymbol}{vatAmount.toFixed(2)}</span>
-                    </div>
+                    {vat > 0 && (
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>VAT</span>
+                        <span className="text-black font-bold">{currencySymbol}{vat.toFixed(2)}</span>
+                      </div>
+                    )}
 
                     <div className="flex justify-between items-center border-t border-gray-100 pt-2 text-gray-500 font-semibold">
                       <span>Total Debited</span>
@@ -523,87 +473,246 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </>
                 )}
 
-                {isBill && (
+                {/* 2. AIRTIME & DATA */}
+                {(isAirtime || isData) && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Product Purchased</span>
-                      <span className="text-black font-bold text-right max-w-[200px] truncate">{productName}</span>
+                      <span>Network Provider</span>
+                      <span className="text-black font-bold uppercase">{transaction.network || transaction.billerName || "Not available"}</span>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Mobile Network</span>
-                      <span className="text-black font-bold">{bankDisplayName}</span>
-                    </div>
-
-                    <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Mobile / Smart Number</span>
+                      <span>Mobile Number</span>
                       <div className="flex items-center gap-1">
-                        <span className="font-mono text-black font-bold text-[11px]">{accountOrPhone}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(accountOrPhone, "Number")}
-                          className="text-[#FC7A00]"
-                        >
-                          <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
-                        </button>
+                        <span className="font-mono text-black font-bold">
+                          {transaction.phoneNumber || transaction.customerId || "Not available"}
+                        </span>
+                        {(transaction.phoneNumber || transaction.customerId) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(transaction.phoneNumber || transaction.customerId!, "Phone number")}
+                            className="text-[#FC7A00]"
+                          >
+                            <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Charged Amount</span>
-                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString()}</span>
-                    </div>
+                    {isData && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Data Plan</span>
+                        <span className="text-black font-bold text-right max-w-[180px] truncate">
+                          {transaction.planName || transaction.itemName || "Data Package"}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Processing Fee</span>
-                      <span className="text-black font-bold">{currencySymbol}0.00</span>
+                      <span>Amount</span>
+                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                   </>
                 )}
 
+                {/* 3. ELECTRICITY */}
+                {isElectricity && (
+                  <>
+                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                      <span>DISCO Operator</span>
+                      <span className="text-black font-bold uppercase">{transaction.billerName || "Electricity Provider"}</span>
+                    </div>
+
+                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                      <span>Meter Number</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-black font-bold">
+                          {transaction.meterNumber || transaction.customerId || "Not available"}
+                        </span>
+                        {(transaction.meterNumber || transaction.customerId) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(transaction.meterNumber || transaction.customerId!, "Meter number")}
+                            className="text-[#FC7A00]"
+                          >
+                            <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {transaction.customerName && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Customer Name</span>
+                        <span className="text-black font-bold text-right uppercase">{transaction.customerName}</span>
+                      </div>
+                    )}
+
+                    {transaction.token && (
+                      <div className="p-3 bg-amber-50 border border-amber-200/60 rounded-2xl space-y-1 my-1">
+                        <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider block">Meter Token Code</span>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-sm font-black text-black tracking-widest">{transaction.token}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(transaction.token!, "Meter token")}
+                            className="text-[#FC7A00] hover:brightness-90 active:scale-90"
+                          >
+                            <span className="material-symbols-outlined text-sm font-bold">content_copy</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Amount Paid</span>
+                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* 4. CABLE TV */}
+                {isCable && (
+                  <>
+                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                      <span>Cable Operator</span>
+                      <span className="text-black font-bold uppercase">{transaction.billerName || "Cable Provider"}</span>
+                    </div>
+
+                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                      <span>Smartcard / UIC Number</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-black font-bold">
+                          {transaction.smartcardNumber || transaction.customerId || "Not available"}
+                        </span>
+                        {(transaction.smartcardNumber || transaction.customerId) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(transaction.smartcardNumber || transaction.customerId!, "Smartcard number")}
+                            className="text-[#FC7A00]"
+                          >
+                            <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {transaction.packageName && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Package Plan</span>
+                        <span className="text-black font-bold text-right">{transaction.packageName}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Subscription Fee</span>
+                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* 5. CURRENCY SWAP */}
+                {isSwap && (
+                  <>
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Source Exchange</span>
+                      <span className="text-black font-bold">{transaction.sourceCurrency || "NGN"} {transaction.sourceAmount?.toLocaleString() || transaction.amount.toLocaleString()}</span>
+                    </div>
+
+                    {transaction.exchangeRate && (
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Applied Rate</span>
+                        <span className="text-black font-bold font-mono">1 {transaction.sourceCurrency} = {transaction.exchangeRate} {transaction.destinationCurrency}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Destination Yield</span>
+                      <span className="text-emerald-600 font-extrabold">{transaction.destinationCurrency || "USD"} {transaction.destinationAmount?.toLocaleString() || "Not available"}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Swap Processing Fee</span>
+                      <span className="text-black font-bold">{currencySymbol}{fee.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* 6. DEPOSIT */}
                 {isDeposit && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Sender Account</span>
-                      <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">
-                        {entityName}
-                      </span>
+                      <span>Source Channel</span>
+                      <span className="text-black font-bold uppercase">{transaction.senderName || transaction.recipientName || "Direct Deposit"}</span>
                     </div>
 
-                    <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Receiving Bank</span>
-                      <span className="text-black font-bold">{bankDisplayName}</span>
-                    </div>
+                    {transaction.senderBankName && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Sourcing Bank</span>
+                        <span className="text-black font-bold">{transaction.senderBankName}</span>
+                      </div>
+                    )}
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Credited Amount</span>
-                      <span className="text-emerald-600 font-extrabold">{currencySymbol}{transaction.amount.toLocaleString()}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Sourcing Wallet</span>
-                      <span className="text-black font-bold">Main Wallet (NGN)</span>
+                      <span className="text-emerald-600 font-extrabold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                   </>
                 )}
 
-                {/* 2. Unified Bank Metadata segment */}
-                <div className="border-t border-gray-100 pt-3 flex flex-col gap-3">
+                {/* UNIFIED METADATA */}
+                <div className="border-t border-gray-100 pt-3 space-y-3">
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Transaction Ref.</span>
+                    <span>Transaction Reference</span>
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-black font-bold uppercase text-[11px]">
                         {transaction.reference}
                       </span>
                       <button
                         type="button"
-                        onClick={() => handleCopy(transaction.reference, "Transaction number")}
-                        className="text-[#FC7A00] hover:brightness-90 active:scale-90 flex items-center justify-center cursor-pointer"
+                        onClick={() => handleCopy(transaction.reference, "Reference")}
+                        className="text-[#FC7A00] hover:brightness-90 active:scale-90"
                       >
                         <span className="material-symbols-outlined text-[13px] font-bold">content_copy</span>
                       </button>
                     </div>
                   </div>
+
+                  {transaction.providerReference && (
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Provider Reference</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-black font-bold uppercase text-[11px] truncate max-w-[140px]">
+                          {transaction.providerReference}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(transaction.providerReference!, "Provider reference")}
+                          className="text-[#FC7A00] hover:brightness-90 active:scale-90"
+                        >
+                          <span className="material-symbols-outlined text-[13px] font-bold">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {transaction.sessionId && (
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>NIBSS Session ID</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-black font-bold uppercase text-[11px] truncate max-w-[140px]">
+                          {transaction.sessionId}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(transaction.sessionId!, "Session ID")}
+                          className="text-[#FC7A00] hover:brightness-90 active:scale-90"
+                        >
+                          <span className="material-symbols-outlined text-[13px] font-bold">content_copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
                     <span>Date & Time</span>
@@ -612,41 +721,22 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Session ID / Proof</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-black font-bold uppercase text-[11px] truncate max-w-[120px]">
-                        {sessionId}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(sessionId, "Session ID")}
-                        className="text-[#FC7A00] hover:brightness-90 active:scale-90 flex items-center justify-center cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[13px] font-bold">content_copy</span>
-                      </button>
+                  {transaction.narration && (
+                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                      <span>Narration</span>
+                      <span className="text-black font-bold text-right max-w-[180px] truncate">{transaction.narration}</span>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Initiated by</span>
-                    <span className="text-black font-bold">API</span>
-                  </div>
-
-                  <div className="flex justify-between items-center text-gray-500 font-semibold">
-                    <span>Status</span>
-                    <span className={cn(
-                      "font-bold uppercase tracking-wider",
-                      normalizedStatus === "SUCCESS" ? "text-emerald-600" : normalizedStatus === "PENDING" ? "text-amber-500" : normalizedStatus === "REFUND" ? "text-blue-500" : "text-red-500"
-                    )}>
-                      {normalizedStatus === "SUCCESS" ? "Completed" : normalizedStatus === "REFUND" ? "Refunded" : normalizedStatus === "PENDING" ? "Pending" : "Failed"}
-                    </span>
+                    <span>Provider Channel</span>
+                    <span className="text-black font-bold">{transaction.provider || "E-Tech Gateway"}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Official footer sign-off inside card */}
+            {/* Footer */}
             <div className="pt-5 border-t border-gray-100 flex flex-col items-center justify-center space-y-1">
               <div className="relative w-20 h-5 opacity-40">
                 <Image
@@ -663,7 +753,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           </div>
         </div>
 
-        {/* Floating, Sticky bottom action drawer panel with 3 small side-by-side buttons */}
+        {/* Action Buttons Panel */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex gap-2 shadow-lg z-10">
           <button
             type="button"

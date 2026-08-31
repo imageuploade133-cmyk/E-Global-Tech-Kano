@@ -2,20 +2,77 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue, Transaction } from "firebase-admin/firestore";
 
 export interface TransactionRecord {
+  id?: string;
   userId: string;
   amount: number;
   currency: string;
   reference: string;
   flwId?: string | null;
-  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS" | "SWAP_DEBIT" | "SWAP_CREDIT";
+  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS" | "SWAP_DEBIT" | "SWAP_CREDIT" | "CASHOUT" | "CARD_FUND" | "STORE_PURCHASE" | "REFUND" | string;
+  category?: string;
+  direction?: "CREDIT" | "DEBIT";
   description: string;
-  recipientName: string;
-  status: "SUCCESS" | "FAILED" | "PENDING";
+  narration?: string;
+  recipientName?: string;
+  status: "SUCCESS" | "FAILED" | "PENDING" | "REFUND" | string;
   date: string;
   time: string;
   fee: number;
+  vat?: number;
+  markup?: number;
+  totalDebited?: number;
+  totalCredited?: number;
+  provider?: string;
+  providerReference?: string;
+  providerTransactionId?: string;
+  sessionId?: string;
   createdAt: string;
+  completedAt?: string;
   walletType?: "MAIN" | "BONUS";
+
+  // Bank transfer
+  beneficiaryName?: string;
+  beneficiaryAccountNumber?: string;
+  beneficiaryBankName?: string;
+  beneficiaryBankCode?: string;
+
+  // Deposit
+  senderName?: string;
+  senderAccountNumber?: string;
+  senderBankName?: string;
+
+  // Airtime / Data
+  network?: string;
+  phoneNumber?: string;
+  itemCode?: string;
+  itemName?: string;
+  planName?: string;
+
+  // Bills
+  billerCode?: string;
+  billerName?: string;
+  billerType?: string;
+  customerId?: string;
+  customerName?: string;
+
+  // Electricity
+  meterNumber?: string;
+  meterType?: string;
+  token?: string;
+
+  // Cable
+  smartcardNumber?: string;
+  packageName?: string;
+
+  // Swap
+  sourceCurrency?: string;
+  sourceAmount?: number;
+  destinationCurrency?: string;
+  destinationAmount?: number;
+  exchangeRate?: number;
+
+  // Metadata
+  metadata?: Record<string, unknown>;
 }
 
 export class WalletService {
@@ -89,6 +146,46 @@ export class WalletService {
       fee?: number;
       type?: TransactionRecord["type"];
       walletType?: "MAIN" | "BONUS";
+      category?: string;
+      direction?: "CREDIT" | "DEBIT";
+      narration?: string;
+      vat?: number;
+      markup?: number;
+      totalDebited?: number;
+      totalCredited?: number;
+      provider?: string;
+      providerReference?: string;
+      providerTransactionId?: string;
+      sessionId?: string;
+      completedAt?: string;
+      beneficiaryName?: string;
+      beneficiaryAccountNumber?: string;
+      beneficiaryBankName?: string;
+      beneficiaryBankCode?: string;
+      senderName?: string;
+      senderAccountNumber?: string;
+      senderBankName?: string;
+      network?: string;
+      phoneNumber?: string;
+      itemCode?: string;
+      itemName?: string;
+      planName?: string;
+      billerCode?: string;
+      billerName?: string;
+      billerType?: string;
+      customerId?: string;
+      customerName?: string;
+      meterNumber?: string;
+      meterType?: string;
+      token?: string;
+      smartcardNumber?: string;
+      packageName?: string;
+      sourceCurrency?: string;
+      sourceAmount?: number;
+      destinationCurrency?: string;
+      destinationAmount?: number;
+      exchangeRate?: number;
+      metadata?: Record<string, unknown>;
       preLoadedUser?: {
         ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
         data: FirebaseFirestore.DocumentData;
@@ -175,15 +272,68 @@ export class WalletService {
       reference,
       flwId: flwId || null,
       type,
+      category: params.category,
+      direction: params.direction || "CREDIT",
       description,
+      narration: params.narration,
       recipientName,
       status: "SUCCESS",
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
       fee,
+      vat: params.vat,
+      markup: params.markup,
+      totalDebited: params.totalDebited,
+      totalCredited: params.totalCredited ?? creditAmount,
+      provider: params.provider,
+      providerReference: params.providerReference || flwId || undefined,
+      providerTransactionId: params.providerTransactionId,
+      sessionId: params.sessionId,
       createdAt: new Date().toISOString(),
+      completedAt: params.completedAt || new Date().toISOString(),
       walletType,
+
+      beneficiaryName: params.beneficiaryName,
+      beneficiaryAccountNumber: params.beneficiaryAccountNumber,
+      beneficiaryBankName: params.beneficiaryBankName,
+      beneficiaryBankCode: params.beneficiaryBankCode,
+
+      senderName: params.senderName,
+      senderAccountNumber: params.senderAccountNumber,
+      senderBankName: params.senderBankName,
+
+      network: params.network,
+      phoneNumber: params.phoneNumber,
+      itemCode: params.itemCode,
+      itemName: params.itemName,
+      planName: params.planName,
+
+      billerCode: params.billerCode,
+      billerName: params.billerName,
+      billerType: params.billerType,
+      customerId: params.customerId,
+      customerName: params.customerName,
+
+      meterNumber: params.meterNumber,
+      meterType: params.meterType,
+      token: params.token,
+
+      smartcardNumber: params.smartcardNumber,
+      packageName: params.packageName,
+
+      sourceCurrency: params.sourceCurrency,
+      sourceAmount: params.sourceAmount,
+      destinationCurrency: params.destinationCurrency,
+      destinationAmount: params.destinationAmount,
+      exchangeRate: params.exchangeRate,
+
+      metadata: params.metadata,
     };
+
+    // Filter out undefined keys before writing to Firestore
+    Object.keys(ledgerRecord).forEach(
+      (key) => (ledgerRecord as any)[key] === undefined && delete (ledgerRecord as any)[key]
+    );
 
     transaction.set(ledgerRef, ledgerRecord);
 
@@ -210,6 +360,46 @@ export class WalletService {
       fee?: number;
       isPending?: boolean; // If true, sets status to PENDING instead of SUCCESS
       walletType?: "MAIN" | "BONUS";
+      category?: string;
+      direction?: "CREDIT" | "DEBIT";
+      narration?: string;
+      vat?: number;
+      markup?: number;
+      totalDebited?: number;
+      totalCredited?: number;
+      provider?: string;
+      providerReference?: string;
+      providerTransactionId?: string;
+      sessionId?: string;
+      completedAt?: string;
+      beneficiaryName?: string;
+      beneficiaryAccountNumber?: string;
+      beneficiaryBankName?: string;
+      beneficiaryBankCode?: string;
+      senderName?: string;
+      senderAccountNumber?: string;
+      senderBankName?: string;
+      network?: string;
+      phoneNumber?: string;
+      itemCode?: string;
+      itemName?: string;
+      planName?: string;
+      billerCode?: string;
+      billerName?: string;
+      billerType?: string;
+      customerId?: string;
+      customerName?: string;
+      meterNumber?: string;
+      meterType?: string;
+      token?: string;
+      smartcardNumber?: string;
+      packageName?: string;
+      sourceCurrency?: string;
+      sourceAmount?: number;
+      destinationCurrency?: string;
+      destinationAmount?: number;
+      exchangeRate?: number;
+      metadata?: Record<string, unknown>;
       preLoadedUser?: {
         ref: FirebaseFirestore.DocumentReference<FirebaseFirestore.DocumentData>;
         data: FirebaseFirestore.DocumentData;
@@ -300,15 +490,68 @@ export class WalletService {
       currency: ucCurrency,
       reference,
       type,
+      category: params.category,
+      direction: params.direction || "DEBIT",
       description,
+      narration: params.narration,
       recipientName,
       status: isPending ? "PENDING" : "SUCCESS",
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
       fee,
+      vat: params.vat,
+      markup: params.markup,
+      totalDebited: params.totalDebited ?? (amount + fee + (params.vat || 0)),
+      totalCredited: params.totalCredited,
+      provider: params.provider,
+      providerReference: params.providerReference,
+      providerTransactionId: params.providerTransactionId,
+      sessionId: params.sessionId,
       createdAt: new Date().toISOString(),
+      completedAt: isPending ? undefined : (params.completedAt || new Date().toISOString()),
       walletType,
+
+      beneficiaryName: params.beneficiaryName,
+      beneficiaryAccountNumber: params.beneficiaryAccountNumber,
+      beneficiaryBankName: params.beneficiaryBankName,
+      beneficiaryBankCode: params.beneficiaryBankCode,
+
+      senderName: params.senderName,
+      senderAccountNumber: params.senderAccountNumber,
+      senderBankName: params.senderBankName,
+
+      network: params.network,
+      phoneNumber: params.phoneNumber,
+      itemCode: params.itemCode,
+      itemName: params.itemName,
+      planName: params.planName,
+
+      billerCode: params.billerCode,
+      billerName: params.billerName,
+      billerType: params.billerType,
+      customerId: params.customerId,
+      customerName: params.customerName,
+
+      meterNumber: params.meterNumber,
+      meterType: params.meterType,
+      token: params.token,
+
+      smartcardNumber: params.smartcardNumber,
+      packageName: params.packageName,
+
+      sourceCurrency: params.sourceCurrency,
+      sourceAmount: params.sourceAmount,
+      destinationCurrency: params.destinationCurrency,
+      destinationAmount: params.destinationAmount,
+      exchangeRate: params.exchangeRate,
+
+      metadata: params.metadata,
     };
+
+    // Filter out undefined keys before writing to Firestore
+    Object.keys(ledgerRecord).forEach(
+      (key) => (ledgerRecord as any)[key] === undefined && delete (ledgerRecord as any)[key]
+    );
 
     transaction.set(ledgerRef, ledgerRecord);
 

@@ -106,6 +106,7 @@ export default function HistoryPage() {
         const data = docSnap.data();
         list.push({
           id: docSnap.id,
+          ...data,
           reference: data.reference || docSnap.id,
           type: data.type || "DEPOSIT",
           amount: Number(data.amount) || 0,
@@ -186,6 +187,7 @@ export default function HistoryPage() {
         const data = docSnap.data();
         list.push({
           id: docSnap.id,
+          ...data,
           reference: data.reference || docSnap.id,
           type: data.type || "DEPOSIT",
           amount: Number(data.amount) || 0,
