@@ -55,13 +55,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Transaction PIN is required to authorize bulk transfers." }, { status: 400 });
     }
 
-    // Calculate total amounts and fees
+    // Calculate total principal amount
     const totalAmt = trfRecipients.reduce((sum: number, rec: BulkRecipient) => sum + (Number(rec.amount) || 0), 0);
-    const flatFee = 10.00;
-    const totalFees = trfRecipients.length * flatFee;
-    const totalDeduction = totalAmt + totalFees;
 
-    if (isNaN(totalDeduction) || totalDeduction <= 0) {
+    if (isNaN(totalAmt) || totalAmt <= 0) {
       return NextResponse.json({ error: "Invalid total bulk transfer amount." }, { status: 400 });
     }
 
@@ -90,7 +87,7 @@ export async function POST(req: Request) {
 
       const userData = userDoc.data() || {};
 
-      // Server-side Account Freeze Check (Blocks hacker bypasses)
+      // Server-side Account Freeze Check
       if (userData.isFrozen) {
         const freezeMsg = userData.freezeMessage || "Dear Customer please Contact Us or Visit Our Office for assistance";
         return {
@@ -166,13 +163,57 @@ export async function POST(req: Request) {
         }
       }
 
-      // Calculate total fee by evaluating each recipient amount against tiered rules (or falling back to default bulk markup)
+      const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+
       let finalTotalFees = 0;
-      for (const rec of trfRecipients) {
+      let finalTotalProviderFees = 0;
+      let finalTotalMarkupFees = 0;
+
+      const structuredBulkRecipients: any[] = [];
+
+      for (let i = 0; i < trfRecipients.length; i++) {
+        const rec = trfRecipients[i];
         const recAmt = Number(rec.amount) || 0;
+        const bankCodeRaw = rec.bankId || rec.bank_code || rec.bankCode || rec.accountBank || rec.account_bank;
+        const accountNumberRaw = rec.accountNumber || rec.account_number || rec.recipientAccount;
+        const bankCode = (bankCodeRaw !== undefined && bankCodeRaw !== null) ? String(bankCodeRaw).trim() : "";
+        const accountNumber = (accountNumberRaw !== undefined && accountNumberRaw !== null) ? String(accountNumberRaw).trim() : "";
+
+        let recProviderFee = 0;
+        try {
+          const feeRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer-fee?amount=${recAmt}&currency=NGN`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+          const feeData = await feeRes.json();
+          if (feeRes.ok && feeData.success) {
+            recProviderFee = Number(feeData.fee) || 0;
+          }
+        } catch (feeErr) {
+          recProviderFee = 0;
+        }
+
         const recMarkup = calculateTransferMarkupFee(recAmt, defaultBulkTransferProfitMargin, bulkTransferTieredMargins);
-        finalTotalFees += (10.00 + recMarkup);
+        const itemFee = recProviderFee + recMarkup;
+
+        finalTotalProviderFees += recProviderFee;
+        finalTotalMarkupFees += recMarkup;
+        finalTotalFees += itemFee;
+
+        structuredBulkRecipients.push({
+          accountNumber,
+          bankCode,
+          amount: recAmt,
+          narration: rec.narration ? String(rec.narration).trim() : `Bulk Item ${i + 1}`,
+          reference: rec.reference ? String(rec.reference).trim() : `blk-${Date.now()}-${i}-${uid.slice(-4)}`,
+          providerFee: recProviderFee,
+          markupFee: recMarkup,
+          itemFee,
+        });
       }
+
       const finalTotalDeduction = totalAmt + finalTotalFees;
 
       // Check balance using preloaded wallet
@@ -190,9 +231,23 @@ export async function POST(req: Request) {
         currency: "NGN",
         reference: trfReference,
         type: "TRANSFER",
+        category: "TRANSFER",
+        direction: "DEBIT",
         description,
-        recipientName: "Bulk Recipients",
+        recipientName: `Bulk Transfer (${trfRecipients.length} Recipients)`,
         fee: finalTotalFees,
+        markup: finalTotalMarkupFees,
+        totalDebited: finalTotalDeduction,
+        metadata: {
+          isBulk: true,
+          recipientCount: trfRecipients.length,
+          totalAmount: totalAmt,
+          totalProviderFees: finalTotalProviderFees,
+          totalMarkupFees: finalTotalMarkupFees,
+          totalFees: finalTotalFees,
+          totalDeduction: finalTotalDeduction,
+          bulkRecipients: structuredBulkRecipients,
+        },
         preLoadedUser: {
           ref: userRef,
           data: userData,
@@ -323,43 +378,33 @@ export async function POST(req: Request) {
       const err = apiErr as Error;
       console.error("[Bulk Transfer API] Gateway bulk transfer failed. Rolling back local wallet debit:", err.message);
 
-      // Rollback debit atomically inside transaction
+      // Rollback debit atomically inside transaction using the exact stored debit amount
       await adminDb.runTransaction(async (rollbackTx) => {
         const userDoc = await rollbackTx.get(userRef);
         const walletDoc = await rollbackTx.get(walletRef);
         if (userDoc.exists) {
           // Update the original transaction document to FAILED
           const origTxRef = adminDb.collection("transactions").doc(`tx-${trfReference}`);
+          const origTxSnap = await rollbackTx.get(origTxRef);
+          let exactRefundAmount = totalAmt;
+
+          if (origTxSnap.exists) {
+            const origData = origTxSnap.data() || {};
+            exactRefundAmount = Number(origData.totalDebited) || (Number(origData.amount) + Number(origData.fee) + (Number(origData.vat) || 0));
+          }
+
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
-          let defaultBulkTransferProfitMargin = 0;
-          let bulkTransferTieredMargins: TransferTieredMarkup[] = [];
-          const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
-          const marginSnap = await rollbackTx.get(marginRef);
-          if (marginSnap.exists) {
-            const marginData = marginSnap.data() || {};
-            defaultBulkTransferProfitMargin = Number(marginData.bulkTransferProfitMargin) || 0;
-            if (Array.isArray(marginData.bulkTransferTieredMargins)) {
-              bulkTransferTieredMargins = marginData.bulkTransferTieredMargins;
-            }
-          }
-          let finalTotalFees = 0;
-          for (const rec of trfRecipients) {
-            const recAmt = Number(rec.amount) || 0;
-            const recMarkup = calculateTransferMarkupFee(recAmt, defaultBulkTransferProfitMargin, bulkTransferTieredMargins);
-            finalTotalFees += (10.00 + recMarkup);
-          }
-          const finalTotalDeduction = totalAmt + finalTotalFees;
-
           const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
-            amount: finalTotalDeduction,
+            amount: exactRefundAmount,
             currency: "NGN",
             reference: `REFUND-${trfReference}`,
             description: `Refund for failed bulk transfer: ${description}`,
-            recipientName: "Bulk Recipients",
+            recipientName: `Bulk Transfer (${trfRecipients.length} Recipients)`,
             preLoadedUser: {
               ref: userRef,
               data: uData,
