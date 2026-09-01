@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Image from "next/image";
 import { useLogos } from "@/lib/logos-client";
+import { BankLogoResolver } from "@/components/wallet/BankLogoResolver";
 import { useAppConfig } from "@/lib/ConfigContext";
 
 export interface Transaction {
@@ -38,6 +39,8 @@ export interface Transaction {
   sessionId?: string;
 
   // Bank transfer
+  recipientBankName?: string;
+  recipientAccountNumber?: string;
   beneficiaryName?: string;
   beneficiaryAccountNumber?: string;
   beneficiaryBankName?: string;
@@ -429,13 +432,26 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Recipient Details</span>
-                      <span className="text-black font-bold text-right max-w-[220px]">
-                        {[
-                          transaction.beneficiaryName || transaction.recipientName,
-                          transaction.beneficiaryBankName || transaction.bankName,
-                          transaction.beneficiaryAccountNumber
-                        ].filter(Boolean).join(" • ") || "Not available"}
-                      </span>
+                      <div className="flex flex-col items-end text-right max-w-[220px]">
+                        <span className="text-black font-bold uppercase">
+                          {transaction.beneficiaryName || transaction.recipientName || "Not available"}
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <BankLogoResolver
+                            bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName}
+                            bankCode={transaction.beneficiaryBankCode}
+                            className="w-5 h-5"
+                          />
+                          <span className="text-gray-900 font-extrabold text-[11.5px]">
+                            {transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName || "Bank"}
+                          </span>
+                        </div>
+                        {(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
+                          <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
+                            Account: {transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
@@ -638,7 +654,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Transfer From</span>
                       <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">
-                        {transaction.senderName || "Virtual Account"}
+                        {transaction.senderName || "Bank Transfer"}
                       </span>
                     </div>
 
@@ -649,19 +665,35 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Funding Method</span>
-                      <span className="text-black font-bold">{transaction.fundingMethod || "Virtual Account"}</span>
+                      <span className="text-black font-bold">Your bank Account</span>
                     </div>
 
                     {(transaction.senderName || transaction.senderBankName || transaction.senderAccountNumber) && (
                       <div className="flex justify-between items-start text-gray-500 font-semibold">
                         <span>Sender Details</span>
-                        <span className="text-black font-bold text-right max-w-[220px]">
-                          {[
-                            transaction.senderName,
-                            transaction.senderBankName,
-                            transaction.senderAccountNumber
-                          ].filter(Boolean).join(" • ")}
-                        </span>
+                        <div className="flex flex-col items-end text-right max-w-[220px]">
+                          {transaction.senderName && (
+                            <span className="text-black font-bold uppercase">
+                              {transaction.senderName}
+                            </span>
+                          )}
+                          {transaction.senderBankName && (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <BankLogoResolver
+                                bankName={transaction.senderBankName}
+                                className="w-5 h-5"
+                              />
+                              <span className="text-gray-900 font-extrabold text-[11.5px]">
+                                {transaction.senderBankName}
+                              </span>
+                            </div>
+                          )}
+                          {transaction.senderAccountNumber && (
+                            <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
+                              Account: {transaction.senderAccountNumber}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
 
