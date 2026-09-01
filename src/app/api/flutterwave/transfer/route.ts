@@ -324,6 +324,7 @@ export async function POST(req: Request) {
         account_number: trfAccount,
         account_bank: trfBank,
         account_name: trfName,
+        bank_name: trfBankName,
         currency: trfCurrency,
         narration: description,
         reference: trfReference,
