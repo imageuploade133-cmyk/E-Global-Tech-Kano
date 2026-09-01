@@ -456,7 +456,9 @@ export class WalletService {
     }
 
     // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
-    const totalDeduction = amount; // Fee is handled separately or included in amount
+    const feeNum = Number(fee) || 0;
+    const vatNum = Number(params.vat) || 0;
+    const totalDeduction = amount + feeNum + vatNum;
 
     if (currentBalance < totalDeduction) {
       throw new Error(`Insufficient ${isBonus ? "bonus reward" : "wallet"} funds to complete this ${type.toLowerCase()}. Required: ${ucCurrency === "NGN" ? "₦" : "$"}${totalDeduction}, Available: ${ucCurrency === "NGN" ? "₦" : "$"}${currentBalance}`);
@@ -513,7 +515,7 @@ export class WalletService {
       fee,
       vat: params.vat,
       markup: params.markup,
-      totalDebited: params.totalDebited ?? (amount + fee + (params.vat || 0)),
+      totalDebited: params.totalDebited ?? totalDeduction,
       totalCredited: params.totalCredited,
       provider: params.provider,
       providerReference: params.providerReference,
