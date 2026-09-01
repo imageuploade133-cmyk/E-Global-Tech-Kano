@@ -459,9 +459,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                           <BankLogoResolver
                             bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName}
                             bankCode={transaction.beneficiaryBankCode}
-                            className="w-5 h-5"
+                            className="w-5 h-5 shrink-0"
                           />
-                          <span className="text-gray-900 font-extrabold text-[11.5px]">
+                          <span className="text-black font-extrabold text-xs tracking-tight">
                             {transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName || "Bank"}
                           </span>
                         </div>
@@ -696,14 +696,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                               {transaction.senderName}
                             </span>
                           )}
-                          {transaction.senderBankName && (
+                          {(transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName) && (
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <BankLogoResolver
-                                bankName={transaction.senderBankName}
-                                className="w-5 h-5"
+                                bankName={transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName}
+                                className="w-5 h-5 shrink-0"
                               />
-                              <span className="text-gray-900 font-extrabold text-[11.5px]">
-                                {transaction.senderBankName}
+                              <span className="text-black font-extrabold text-xs tracking-tight">
+                                {transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName}
                               </span>
                             </div>
                           )}
