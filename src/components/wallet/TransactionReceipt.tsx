@@ -8,6 +8,7 @@ import Image from "next/image";
 import { useLogos } from "@/lib/logos-client";
 import { BankLogoResolver } from "@/components/wallet/BankLogoResolver";
 import { useAppConfig } from "@/lib/ConfigContext";
+import { formatTransactionDateTime } from "@/lib/date-utils";
 
 export interface Transaction {
   id: string;
@@ -803,7 +804,11 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
                     <span>Transaction Date</span>
                     <span className="text-black font-bold text-right">
-                      {transaction.date} {transaction.time}
+                      {formatTransactionDateTime(
+                        transaction.createdAt,
+                        transaction.date,
+                        transaction.time
+                      ).dateTime}
                     </span>
                   </div>
 
