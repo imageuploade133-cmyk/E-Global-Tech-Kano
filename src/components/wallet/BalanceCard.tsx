@@ -923,15 +923,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           setTrfFee(data.fee);
           setTrfTotalDebit(data.totalDebit);
         } else {
-          // Backend error message or fallback
-          const fallbackFee = isBulkMode ? bulkRecipients.length * 10.00 : 10.00;
-          setTrfFee(fallbackFee);
-          setTrfTotalDebit(amt + fallbackFee);
+          // Fallback to 0 if server estimation is unavailable
+          setTrfFee(0);
+          setTrfTotalDebit(amt);
         }
       } catch {
-        const fallbackFee = isBulkMode ? bulkRecipients.length * 10.00 : 10.00;
-        setTrfFee(fallbackFee);
-        setTrfTotalDebit(amt + fallbackFee);
+        setTrfFee(0);
+        setTrfTotalDebit(amt);
       } finally {
         setIsFeeLoading(false);
       }
