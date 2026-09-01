@@ -9,6 +9,7 @@ import { useLogos } from "@/lib/logos-client";
 import { BankLogoResolver } from "@/components/wallet/BankLogoResolver";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { formatTransactionDateTime } from "@/lib/date-utils";
+import { resolveBankName } from "@/lib/bank-resolver";
 
 export interface Transaction {
   id: string;
@@ -42,6 +43,7 @@ export interface Transaction {
   // Bank transfer
   recipientBankName?: string;
   recipientAccountNumber?: string;
+  recipientBankCode?: string;
   beneficiaryName?: string;
   beneficiaryAccountNumber?: string;
   beneficiaryBankName?: string;
@@ -54,6 +56,7 @@ export interface Transaction {
   senderName?: string;
   senderAccountNumber?: string;
   senderBankName?: string;
+  senderBankCode?: string;
 
   // Airtime / Data
   network?: string;
@@ -93,6 +96,7 @@ export interface Transaction {
 
   // Legacy compatibility fallbacks
   bankName?: string;
+  bankCode?: string;
 }
 
 interface TransactionReceiptProps {
@@ -121,7 +125,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
-  const { getBillerLogo, getBankLogo, getStoreLogo } = useLogos();
+  const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
 
   // Prevent background scrolling while modal is open
@@ -172,6 +176,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const markup = transaction.markup ?? 0;
   const totalDebited = transaction.totalDebited ?? (transaction.amount + fee + vat);
 
+  const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");
+  const resolvedTransferFromBank = resolveBankName(transaction, banks, "TRANSFER_FROM");
+  const resolvedBankName = isDeposit ? resolvedTransferFromBank : resolvedTransferToBank;
+
   // Logo Resolution
   const matchedLogo = isStore
     ? (getBillerLogo("store") || getStoreLogo())
@@ -180,10 +188,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     : isInvestment
     ? getBillerLogo("investment")
     : isDeposit
-    ? (getBillerLogo("deposit") || getBillerLogo("Cash Deposit") || getBankLogo(transaction.senderBankName || transaction.bankName || ""))
+    ? (getBillerLogo("deposit") || getBillerLogo("Cash Deposit") || getBankLogo(resolvedTransferFromBank))
     : isBill
     ? (getBillerLogo(transaction.network || transaction.billerName || transaction.billerCode || "") || getBillerLogo(desc))
-    : (getBankLogo(transaction.beneficiaryBankName || transaction.bankName || "") || getBankLogo(desc));
+    : (getBankLogo(resolvedTransferToBank) || getBankLogo(desc));
 
   const logoUrl = matchedLogo || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
 
@@ -348,15 +356,16 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
                 {isTransfer ? (
                   <BankLogoResolver
-                    bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName || (transaction.description.includes("•") ? transaction.description.split("•")[1]?.trim() : undefined)}
-                    bankCode={transaction.beneficiaryBankCode}
+                    bankName={resolvedTransferToBank}
+                    bankCode={transaction.beneficiaryBankCode || transaction.recipientBankCode || transaction.bankCode}
                     className="w-14 h-14"
                     size={48}
                     iconSizeClassName="text-[28px]"
                   />
                 ) : isDeposit ? (
                   <BankLogoResolver
-                    bankName={transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName}
+                    bankName={resolvedTransferFromBank}
+                    bankCode={transaction.senderBankCode || transaction.bankCode}
                     className="w-14 h-14"
                     size={48}
                     iconSizeClassName="text-[28px]"
@@ -458,12 +467,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <BankLogoResolver
-                            bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName || (transaction.description.includes("•") ? transaction.description.split("•")[1]?.trim() : undefined)}
-                            bankCode={transaction.beneficiaryBankCode}
+                            bankName={resolvedTransferToBank}
+                            bankCode={transaction.beneficiaryBankCode || transaction.recipientBankCode || transaction.bankCode}
                             className="w-5 h-5 shrink-0"
                           />
                           <span className="text-black font-extrabold text-xs tracking-tight">
-                            {transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName || "Bank"}
+                            {resolvedTransferToBank}
                           </span>
                         </div>
                         {(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
@@ -697,14 +706,15 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                               {transaction.senderName}
                             </span>
                           )}
-                          {(transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName) && (
+                          {(transaction.senderName || transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName || transaction.senderBankCode || transaction.bankCode) && (
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <BankLogoResolver
-                                bankName={transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName}
+                                bankName={resolvedTransferFromBank}
+                                bankCode={transaction.senderBankCode || transaction.bankCode}
                                 className="w-5 h-5 shrink-0"
                               />
                               <span className="text-black font-extrabold text-xs tracking-tight">
-                                {transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName}
+                                {resolvedTransferFromBank}
                               </span>
                             </div>
                           )}
