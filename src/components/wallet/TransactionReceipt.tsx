@@ -253,26 +253,54 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       setGenerating(true);
       toast.loading("Generating PNG image...");
 
+      // Wait for all images inside receipt element to finish loading (or complete with error fallback)
+      const images = Array.from(receiptRef.current.querySelectorAll("img"));
+      await Promise.all(
+        images.map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve(); // Gracefully proceed on broken images
+          });
+        })
+      );
+
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(receiptRef.current, {
         scale: 3,
         useCORS: true,
         backgroundColor: "#FFFFFF",
+        logging: false,
       });
 
-      const imgData = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = imgData;
-      link.download = `Receipt_${transaction.reference}.png`;
-      link.click();
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          toast.dismiss();
+          toast.error("Failed to generate PNG image.");
+          setGenerating(false);
+          return;
+        }
 
-      toast.dismiss();
-      toast.success("Image downloaded!");
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = `Receipt_${transaction.reference}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => {
+          URL.revokeObjectURL(objectUrl);
+        }, 1000);
+
+        toast.dismiss();
+        toast.success("Image downloaded!");
+        setGenerating(false);
+      }, "image/png");
     } catch (err) {
       console.error("Image generation failed:", err);
       toast.dismiss();
       toast.error("Failed to generate image.");
-    } finally {
       setGenerating(false);
     }
   };
