@@ -337,11 +337,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           });
         } else {
           toast.dismiss();
-          const imgData = canvas.toDataURL("image/png");
+          const objectUrl = URL.createObjectURL(blob);
           const link = document.createElement("a");
-          link.href = imgData;
+          link.href = objectUrl;
           link.download = `Receipt_${transaction.reference}.png`;
+          document.body.appendChild(link);
           link.click();
+          document.body.removeChild(link);
+
+          setTimeout(() => {
+            URL.revokeObjectURL(objectUrl);
+          }, 1000);
+
           toast.success("Downloaded receipt to device.");
         }
       }, "image/png");
