@@ -347,7 +347,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
                 {isTransfer ? (
                   <BankLogoResolver
-                    bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName}
+                    bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName || (transaction.description.includes("•") ? transaction.description.split("•")[1]?.trim() : undefined)}
                     bankCode={transaction.beneficiaryBankCode}
                     className="w-14 h-14"
                     size={48}
@@ -457,7 +457,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <BankLogoResolver
-                            bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName}
+                            bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName || (transaction.description.includes("•") ? transaction.description.split("•")[1]?.trim() : undefined)}
                             bankCode={transaction.beneficiaryBankCode}
                             className="w-5 h-5 shrink-0"
                           />
