@@ -1,3 +1,5 @@
+import { BankLogoItem } from "./logos-client";
+
 export interface TransactionBankFields {
   recipientBankName?: string | null;
   beneficiaryBankName?: string | null;
@@ -11,7 +13,7 @@ export interface TransactionBankFields {
   bankCode?: string | null;
 }
 
-export interface BankListItem {
+export type BankListItem = BankLogoItem | {
   id?: string | number | null;
   code?: string | number | null;
   bankCode?: string | number | null;
@@ -19,8 +21,8 @@ export interface BankListItem {
   name?: string | null;
   bankName?: string | null;
   bank_name?: string | null;
-  [key: string]: unknown;
-}
+  [key: string]: any;
+};
 
 /**
  * Resolves the display bank name for a transaction using a 3-tier priority rule:
@@ -30,18 +32,27 @@ export interface BankListItem {
  */
 export function resolveBankName(
   transaction?: TransactionBankFields | null,
-  bankList?: BankListItem[] | null
+  bankList?: BankListItem[] | BankLogoItem[] | null,
+  direction?: "TRANSFER_TO" | "TRANSFER_FROM"
 ): string {
   if (!transaction) return "Bank";
 
-  // PRIORITY 1 — EXISTING STORED BANK NAME
-  const candidateNames = [
-    transaction.recipientBankName,
-    transaction.beneficiaryBankName,
-    transaction.senderBankName,
-    transaction.virtualAccountBankName,
-    transaction.bankName,
-  ];
+  // Priority order based on directional context
+  const candidateNames = direction === "TRANSFER_FROM"
+    ? [
+        transaction.senderBankName,
+        transaction.virtualAccountBankName,
+        transaction.bankName,
+        transaction.recipientBankName,
+        transaction.beneficiaryBankName,
+      ]
+    : [
+        transaction.recipientBankName,
+        transaction.beneficiaryBankName,
+        transaction.bankName,
+        transaction.senderBankName,
+        transaction.virtualAccountBankName,
+      ];
 
   for (const name of candidateNames) {
     if (typeof name === "string") {
@@ -53,12 +64,19 @@ export function resolveBankName(
   }
 
   // PRIORITY 2 — BANK CODE LOOKUP (STRICT STRING LOOKUP)
-  const candidateCodes = [
-    transaction.recipientBankCode,
-    transaction.beneficiaryBankCode,
-    transaction.senderBankCode,
-    transaction.bankCode,
-  ];
+  const candidateCodes = direction === "TRANSFER_FROM"
+    ? [
+        transaction.senderBankCode,
+        transaction.bankCode,
+        transaction.recipientBankCode,
+        transaction.beneficiaryBankCode,
+      ]
+    : [
+        transaction.recipientBankCode,
+        transaction.beneficiaryBankCode,
+        transaction.bankCode,
+        transaction.senderBankCode,
+      ];
 
   let targetCode: string | null = null;
   for (const c of candidateCodes) {
@@ -72,7 +90,7 @@ export function resolveBankName(
   }
 
   if (targetCode && Array.isArray(bankList) && bankList.length > 0) {
-    const matchedBank = bankList.find((b) => {
+    const matchedBank = bankList.find((b: any) => {
       if (!b) return false;
       const itemCode = b.code !== undefined && b.code !== null ? String(b.code).trim() : null;
       const itemBankCode = b.bankCode !== undefined && b.bankCode !== null ? String(b.bankCode).trim() : null;
@@ -89,9 +107,9 @@ export function resolveBankName(
 
     if (matchedBank) {
       const matchedName = (
-        matchedBank.name ||
-        matchedBank.bankName ||
-        matchedBank.bank_name ||
+        (matchedBank as any).name ||
+        (matchedBank as any).bankName ||
+        (matchedBank as any).bank_name ||
         ""
       );
       if (typeof matchedName === "string" && matchedName.trim().length > 0) {

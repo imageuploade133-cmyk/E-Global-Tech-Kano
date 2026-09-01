@@ -176,7 +176,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const markup = transaction.markup ?? 0;
   const totalDebited = transaction.totalDebited ?? (transaction.amount + fee + vat);
 
-  const resolvedBankName = resolveBankName(transaction, banks);
+  const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");
+  const resolvedTransferFromBank = resolveBankName(transaction, banks, "TRANSFER_FROM");
+  const resolvedBankName = isDeposit ? resolvedTransferFromBank : resolvedTransferToBank;
 
   // Logo Resolution
   const matchedLogo = isStore
@@ -186,10 +188,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     : isInvestment
     ? getBillerLogo("investment")
     : isDeposit
-    ? (getBillerLogo("deposit") || getBillerLogo("Cash Deposit") || getBankLogo(resolvedBankName))
+    ? (getBillerLogo("deposit") || getBillerLogo("Cash Deposit") || getBankLogo(resolvedTransferFromBank))
     : isBill
     ? (getBillerLogo(transaction.network || transaction.billerName || transaction.billerCode || "") || getBillerLogo(desc))
-    : (getBankLogo(resolvedBankName) || getBankLogo(desc));
+    : (getBankLogo(resolvedTransferToBank) || getBankLogo(desc));
 
   const logoUrl = matchedLogo || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
 
@@ -354,7 +356,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
                 {isTransfer ? (
                   <BankLogoResolver
-                    bankName={resolvedBankName}
+                    bankName={resolvedTransferToBank}
                     bankCode={transaction.beneficiaryBankCode || transaction.recipientBankCode || transaction.bankCode}
                     className="w-14 h-14"
                     size={48}
@@ -362,7 +364,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   />
                 ) : isDeposit ? (
                   <BankLogoResolver
-                    bankName={resolvedBankName}
+                    bankName={resolvedTransferFromBank}
                     bankCode={transaction.senderBankCode || transaction.bankCode}
                     className="w-14 h-14"
                     size={48}
@@ -465,12 +467,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <BankLogoResolver
-                            bankName={resolvedBankName}
+                            bankName={resolvedTransferToBank}
                             bankCode={transaction.beneficiaryBankCode || transaction.recipientBankCode || transaction.bankCode}
                             className="w-5 h-5 shrink-0"
                           />
                           <span className="text-black font-extrabold text-xs tracking-tight">
-                            {resolvedBankName}
+                            {resolvedTransferToBank}
                           </span>
                         </div>
                         {(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
@@ -707,12 +709,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                           {(transaction.senderName || transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName || transaction.senderBankCode || transaction.bankCode) && (
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <BankLogoResolver
-                                bankName={resolvedBankName}
+                                bankName={resolvedTransferFromBank}
                                 bankCode={transaction.senderBankCode || transaction.bankCode}
                                 className="w-5 h-5 shrink-0"
                               />
                               <span className="text-black font-extrabold text-xs tracking-tight">
-                                {resolvedBankName}
+                                {resolvedTransferFromBank}
                               </span>
                             </div>
                           )}
