@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
 import { TransactionReceipt, Transaction } from "@/components/wallet/TransactionReceipt";
 import { TransactionIcon } from "@/components/wallet/TransactionIcon";
+import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import Link from "next/link";
@@ -376,7 +377,7 @@ export default function BillsHistoryPage() {
                           {tx.description}
                         </p>
                         <p className="font-hanken text-[9px] text-gray-400 mt-1 font-semibold uppercase tracking-wider">
-                          {tx.date} • {tx.time}
+                          {formatTransactionDateTime(tx.createdAt, tx.date, tx.time).dateTime}
                         </p>
                       </div>
                     </div>

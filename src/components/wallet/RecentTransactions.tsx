@@ -6,6 +6,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { TransactionReceipt, Transaction } from "./TransactionReceipt";
 import { TransactionIcon } from "./TransactionIcon";
+import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
@@ -274,11 +275,16 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
                     <p className="font-hanken font-extrabold text-[13px] text-gray-900 leading-tight truncate">
                       {tx.description}
                     </p>
-                    <p className="font-hanken text-[9.5px] text-gray-400 mt-1 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                      <span>{tx.date}</span>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span>{tx.time}</span>
-                    </p>
+                    {(() => {
+                      const dt = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
+                      return (
+                        <p className="font-hanken text-[9.5px] text-gray-400 mt-1 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                          <span>{dt.date}</span>
+                          <span className="w-1 h-1 rounded-full bg-gray-300" />
+                          <span>{dt.time}</span>
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
 

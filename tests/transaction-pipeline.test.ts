@@ -1,5 +1,6 @@
 import { expect, test, describe } from "bun:test";
 import { Transaction } from "@/components/wallet/TransactionReceipt";
+import { TransactionRecord } from "@/services/wallet-service";
 
 describe("Transaction Data Pipeline & Presentation", () => {
   test("Virtual account deposit normalizes sender details and receipt presentation accurately", () => {
