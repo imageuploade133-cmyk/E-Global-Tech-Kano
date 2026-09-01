@@ -344,13 +344,32 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           >
             {/* Header / Logo */}
             <div className="text-center border-b border-dashed border-gray-200 pb-5 space-y-3">
-              <div className="relative w-14 h-14 mx-auto bg-gray-50 rounded-full border border-gray-100 p-1 flex items-center justify-center overflow-hidden">
-                <Image
-                  src={logoUrl}
-                  alt="Receipt Logo"
-                  fill
-                  className="object-contain p-1.5"
-                />
+              <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
+                {isTransfer ? (
+                  <BankLogoResolver
+                    bankName={transaction.beneficiaryBankName || transaction.recipientBankName || transaction.bankName}
+                    bankCode={transaction.beneficiaryBankCode}
+                    className="w-14 h-14"
+                    size={48}
+                    iconSizeClassName="text-[28px]"
+                  />
+                ) : isDeposit ? (
+                  <BankLogoResolver
+                    bankName={transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName}
+                    className="w-14 h-14"
+                    size={48}
+                    iconSizeClassName="text-[28px]"
+                  />
+                ) : (
+                  <div className="relative w-14 h-14 bg-gray-50 rounded-full border border-gray-100 p-1 flex items-center justify-center overflow-hidden shadow-3xs">
+                    <Image
+                      src={logoUrl}
+                      alt="Receipt Logo"
+                      fill
+                      className="object-contain p-1.5"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
