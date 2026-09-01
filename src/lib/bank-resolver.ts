@@ -19,14 +19,14 @@ export type BankListItem = BankLogoItem | {
   bankCode?: string | number | null;
   bank_code?: string | number | null;
   name?: string | null;
-  bankName?: string | null;
-  bank_name?: string | null;
+  bankName?: string | number | null;
+  bank_name?: string | number | null;
   [key: string]: any;
 };
 
 /**
  * Resolves the display bank name for a transaction using a 3-tier priority rule:
- * 1. Existing stored bank name (first non-empty string after trimming)
+ * 1. Directionally appropriate stored bank name (first non-empty string after trimming)
  * 2. Bank code lookup against the existing bank list (string matching, preserving leading zeros)
  * 3. Fallback to "Bank"
  */
@@ -37,21 +37,25 @@ export function resolveBankName(
 ): string {
   if (!transaction) return "Bank";
 
-  // Priority order based on directional context
+  // Priority 1: Stored Bank Name aligned with direction
   const candidateNames = direction === "TRANSFER_FROM"
     ? [
         transaction.senderBankName,
         transaction.virtualAccountBankName,
         transaction.bankName,
+      ]
+    : direction === "TRANSFER_TO"
+    ? [
         transaction.recipientBankName,
         transaction.beneficiaryBankName,
+        transaction.bankName,
       ]
     : [
         transaction.recipientBankName,
         transaction.beneficiaryBankName,
-        transaction.bankName,
         transaction.senderBankName,
         transaction.virtualAccountBankName,
+        transaction.bankName,
       ];
 
   for (const name of candidateNames) {
@@ -63,19 +67,23 @@ export function resolveBankName(
     }
   }
 
-  // PRIORITY 2 — BANK CODE LOOKUP (STRICT STRING LOOKUP)
+  // Priority 2: Bank Code Lookup aligned with direction
   const candidateCodes = direction === "TRANSFER_FROM"
     ? [
         transaction.senderBankCode,
         transaction.bankCode,
+      ]
+    : direction === "TRANSFER_TO"
+    ? [
         transaction.recipientBankCode,
         transaction.beneficiaryBankCode,
+        transaction.bankCode,
       ]
     : [
         transaction.recipientBankCode,
         transaction.beneficiaryBankCode,
-        transaction.bankCode,
         transaction.senderBankCode,
+        transaction.bankCode,
       ];
 
   let targetCode: string | null = null;
@@ -118,6 +126,6 @@ export function resolveBankName(
     }
   }
 
-  // PRIORITY 3 — EXISTING FALLBACK
+  // Priority 3: Fallback string "Bank"
   return "Bank";
 }
