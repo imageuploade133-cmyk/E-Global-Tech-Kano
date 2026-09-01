@@ -57,7 +57,7 @@ export class CardService {
         // Execute Wallet Debit
         await WalletService.debitWallet(transaction, {
           userId,
-          amount: totalDeduction,
+          amount,
           currency,
           reference: txRef,
           type: "TRANSFER",

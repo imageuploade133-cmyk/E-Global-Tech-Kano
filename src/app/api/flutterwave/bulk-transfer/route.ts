@@ -186,7 +186,7 @@ export async function POST(req: Request) {
       // Perform local debit atomically with preloaded context
       await WalletService.debitWallet(transaction, {
         userId: uid,
-        amount: finalTotalDeduction,
+        amount: totalAmt,
         currency: "NGN",
         reference: trfReference,
         type: "TRANSFER",
