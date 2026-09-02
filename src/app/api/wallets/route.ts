@@ -61,7 +61,7 @@ export async function GET(req: Request) {
         const origFee = Number(tx.fee) || 0;
         const origMarkup = Number(tx.markup) || 0;
         const origVat = Number(tx.vat) || 0;
-        const refundAmount = Number(tx.totalDebited) || (origAmount + origFee + origVat);
+        const refundAmount = Number(tx.totalDebited) || (origAmount + origFee + origMarkup + origVat);
 
         console.log(`[Auto-Refund Engine] [${reqId}] Found unrefunded failed transaction [${tx.reference}] with total debited amount ₦${refundAmount}. Executing full refund...`);
 
