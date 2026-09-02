@@ -88,8 +88,8 @@ export async function POST(req: Request) {
 
     const isMock = uid === "mock-uid";
 
-    // 2. Fetch transfer fee dynamically from gateway or fallback to 10.00 NGN
-    let fee = 10.00;
+    // 2. Fetch base provider transfer fee dynamically from gateway VM or fallback to 10.00 NGN
+    let providerFee = 10.00;
     if (!isMock) {
       try {
         const feeRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer-fee?amount=${trfAmount}&currency=${trfCurrency}`, {
@@ -100,16 +100,15 @@ export async function POST(req: Request) {
         });
         const feeData = await feeRes.json();
         if (feeRes.ok && feeData.success) {
-          fee = Number(feeData.fee) || 10.00;
+          providerFee = Number(feeData.fee) || 10.00;
         }
       } catch (err: unknown) {
         const error = err as Error;
-        console.warn("[Transfer API] Failed to fetch dynamic fee. Using fallback 10 NGN:", error.message);
+        console.warn("[Transfer API] Failed to fetch dynamic provider fee. Using fallback 10 NGN:", error.message);
       }
     }
-    console.log(`STEP 3 - Transfer fee fetched: ${fee}`);
+    console.log(`STEP 3 - Base provider fee fetched: ${providerFee}`);
 
-    const totalDeduction = trfAmount + fee;
     const description = narration || `Direct transfer to ${trfName} (${trfAccount})`;
 
     // 3. Atomically verify PIN and debit user balance inside Firestore transaction
@@ -219,8 +218,8 @@ export async function POST(req: Request) {
       // PIN matches, reset attempts (WRITE operation starts here)
       transaction.update(userRef, { pinAttempts: 0, lockedUntil: null });
 
-      const finalFee = fee + transferProfitMargin;
-      const finalTotalDeduction = trfAmount + finalFee;
+      const combinedFee = providerFee + transferProfitMargin;
+      const finalTotalDeduction = trfAmount + combinedFee;
 
       // Check balance using the pre-loaded specific wallet balance
       console.log(`STEP 7 - Balance checked. Available wallet: ${walletBalance}, Required: ${finalTotalDeduction}`);
@@ -244,7 +243,7 @@ export async function POST(req: Request) {
         description,
         narration: narration || `Direct transfer to ${trfName} (${trfAccount})`,
         recipientName: trfName,
-        fee: finalFee,
+        fee: combinedFee,
         vat: 0,
         markup: transferProfitMargin,
         totalDebited: finalTotalDeduction,
@@ -329,7 +328,7 @@ export async function POST(req: Request) {
         narration: description,
         reference: trfReference,
         userId: uid,
-        fee: fee,
+        fee: providerFee,
       };
 
       const gatewayRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer`, {
@@ -433,7 +432,7 @@ export async function POST(req: Request) {
               }
             }
             const transferProfitMargin = calculateTransferMarkupFee(trfAmount, defaultTransferProfitMargin, transferTieredMargins);
-            exactRefundAmount = trfAmount + fee + transferProfitMargin;
+            exactRefundAmount = trfAmount + providerFee + transferProfitMargin;
           }
 
           rollbackTx.update(origTxRef, { status: "FAILED" });
