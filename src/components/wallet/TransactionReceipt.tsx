@@ -143,6 +143,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const cat = (transaction.category || "").toUpperCase();
   const desc = (transaction.description || "").toLowerCase();
 
+  const isSwap = txType.includes("SWAP") || cat.includes("SWAP") || desc.includes("swap") || desc.includes("exchange");
+
   const isRefund = !isSwap && (
     txType === "REFUND" ||
     cat === "REFUND" ||
@@ -152,8 +154,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     desc.includes("reversal") ||
     ledgerStatus.label === "Reversal"
   );
-
-  const isSwap = txType.includes("SWAP") || cat.includes("SWAP") || desc.includes("swap") || desc.includes("exchange");
   const isStore = !isRefund && (txType.includes("STORE") || cat.includes("STORE") || desc.includes("store"));
   const isAirtime = !isSwap && !isRefund && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime"));
   const isData = !isSwap && !isRefund && (txType === "DATA" || cat === "DATA" || desc.includes("data"));
