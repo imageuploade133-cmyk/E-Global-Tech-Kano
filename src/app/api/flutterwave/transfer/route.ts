@@ -330,6 +330,9 @@ export async function POST(req: Request) {
         reference: trfReference,
         userId: uid,
         fee: providerFee,
+        markup: transferProfitMargin,
+        combinedFee: providerFee + transferProfitMargin,
+        totalDebited: trfAmount + providerFee + transferProfitMargin,
       };
 
       const gatewayRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer`, {
