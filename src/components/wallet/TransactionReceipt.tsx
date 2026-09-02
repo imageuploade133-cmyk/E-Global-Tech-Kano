@@ -10,6 +10,7 @@ import { BankLogoResolver } from "@/components/wallet/BankLogoResolver";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { resolveBankName } from "@/lib/bank-resolver";
+import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
 
 export interface Transaction {
   id: string;
@@ -104,21 +105,6 @@ interface TransactionReceiptProps {
   onClose: () => void;
 }
 
-// Clean status normalizer
-const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
-  const s = String(status || "").toUpperCase().trim();
-  if (s === "SUCCESS" || s === "SUCCESSFUL" || s === "COMPLETED" || s === "COMPLETE" || s === "ACTIVE" || s === "DELIVERED") {
-    return "SUCCESS";
-  }
-  if (s === "PENDING" || s === "PROCESSING") {
-    return "PENDING";
-  }
-  if (s === "REFUND" || s === "REFUNDED" || s === "REVERSED") {
-    return "REFUND";
-  }
-  return "FAILED";
-};
-
 export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   transaction,
   onClose,
@@ -149,7 +135,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   if (!transaction) return null;
 
-  const normalizedStatus = normalizeStatus(transaction.status);
+  const ledgerStatus = getTransactionLedgerStatus(transaction);
   const currencySymbol = transaction.currency === "USD" ? "$" : "₦";
 
   // Transaction Category Classification
@@ -504,29 +490,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 </h1>
               </div>
 
-              {/* Status Badge */}
+              {/* Official Status Badge */}
               <div className="flex items-center justify-center gap-1.5 text-xs font-bold leading-none">
-                {normalizedStatus === "SUCCESS" ? (
-                  <div className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-100">
-                    <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
-                    <span>Successful</span>
-                  </div>
-                ) : normalizedStatus === "REFUND" ? (
-                  <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-3.5 py-1.5 rounded-full border border-blue-100">
-                    <span className="material-symbols-outlined text-sm font-bold">keyboard_backup_api</span>
-                    <span>Refunded</span>
-                  </div>
-                ) : normalizedStatus === "PENDING" ? (
-                  <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-3.5 py-1.5 rounded-full border border-amber-100">
-                    <span className="material-symbols-outlined text-sm font-bold">schedule</span>
-                    <span>Processing</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 text-red-600 bg-red-50 px-3.5 py-1.5 rounded-full border border-red-100">
-                    <span className="material-symbols-outlined text-sm font-bold">cancel</span>
-                    <span>Failed</span>
-                  </div>
-                )}
+                <div className={cn("flex items-center gap-1 px-3.5 py-1.5 rounded-full border", ledgerStatus.badgeBg, ledgerStatus.badgeText, ledgerStatus.badgeBorder)}>
+                  <span className="material-symbols-outlined text-sm font-bold">{ledgerStatus.icon}</span>
+                  <span>{ledgerStatus.label}</span>
+                </div>
               </div>
             </div>
 
@@ -924,6 +893,13 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                 {/* UNIFIED METADATA */}
                 <div className="border-t border-gray-100 pt-3 space-y-3">
+                  <div className="flex justify-between items-center text-gray-500 font-semibold">
+                    <span>Transaction Status</span>
+                    <span className={cn("font-bold text-xs uppercase px-2 py-0.5 rounded-md border", ledgerStatus.badgeBg, ledgerStatus.badgeText, ledgerStatus.badgeBorder)}>
+                      {ledgerStatus.label}
+                    </span>
+                  </div>
+
                   <div className="flex justify-between items-center text-gray-500 font-semibold">
                     <span>Transaction Number</span>
                     <div className="flex items-center gap-1.5">

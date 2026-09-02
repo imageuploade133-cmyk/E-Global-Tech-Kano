@@ -10,24 +10,11 @@ import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
 
 interface RecentTransactionsProps {
   isLoading?: boolean;
 }
-
-const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
-  const s = String(status || "").toUpperCase().trim();
-  if (s === "SUCCESS" || s === "SUCCESSFUL" || s === "COMPLETED" || s === "COMPLETE" || s === "ACTIVE" || s === "DELIVERED") {
-    return "SUCCESS";
-  }
-  if (s === "PENDING" || s === "PROCESSING") {
-    return "PENDING";
-  }
-  if (s === "REFUND" || s === "REFUNDED" || s === "REVERSED") {
-    return "REFUND";
-  }
-  return "FAILED";
-};
 
 const RECENT_TX_CACHE_KEY = "recent_transactions_cache";
 const RECENT_TX_TTL_MS = 3 * 60 * 1000; // 3-minute cache to drastically save Firestore read budget
@@ -304,18 +291,15 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
                   </p>
 
                   {(() => {
-                    const normalized = normalizeStatus(tx.status);
+                    const ledgerStatus = getTransactionLedgerStatus(tx);
                     return (
                       <div className="inline-flex items-center gap-1 bg-gray-50 border border-gray-150 rounded-full px-2 py-0.5 mt-1.5 shadow-3xs">
                         <span className={cn(
                           "w-1.5 h-1.5 rounded-full animate-pulse",
-                          normalized === "SUCCESS" && "bg-emerald-500",
-                          normalized === "PENDING" && "bg-amber-500",
-                          normalized === "REFUND" && "bg-blue-500",
-                          normalized === "FAILED" && "bg-red-500"
+                          ledgerStatus.dotBg
                         )} />
                         <span className="font-hanken text-[8px] font-black uppercase tracking-widest text-gray-500">
-                          {normalized === "SUCCESS" ? "Successful" : normalized === "REFUND" ? "Refunded" : normalized === "PENDING" ? "Pending" : "Failed"}
+                          {ledgerStatus.label}
                         </span>
                       </div>
                     );
