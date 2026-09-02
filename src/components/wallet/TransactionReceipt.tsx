@@ -172,11 +172,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   // 3. Otherwise, if storedTotalDebited > transaction.amount, use storedTotalDebited - transaction.amount - vat.
   // 4. Fall back to rawFee.
   const storedTotalDebited = Number(transaction.totalDebited) || 0;
-  const combinedTransferFee = markup > 0
-    ? (rawFee + markup)
-    : (storedTotalDebited > transaction.amount
-      ? Math.max(0, storedTotalDebited - transaction.amount - vat)
-      : rawFee);
+  let combinedTransferFee = rawFee;
+  if (markup > 0) {
+    combinedTransferFee = (rawFee > markup && rawFee >= markup + 5) ? rawFee : (rawFee + markup);
+  } else if (storedTotalDebited > transaction.amount) {
+    combinedTransferFee = Math.max(0, storedTotalDebited - transaction.amount - vat);
+  }
 
   const fee = combinedTransferFee;
   const totalDebited = (storedTotalDebited > 0 && storedTotalDebited >= transaction.amount + fee + vat)
