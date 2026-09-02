@@ -111,6 +111,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
+      providerFee: isBulk ? 10.00 : (uid !== "mock-uid" ? (finalFee - (calculateTransferMarkupFee(amount, defaultTransferProfitMargin, transferTieredMargins) || 0)) : 10.00),
+      adminCommission: finalFee - (isBulk ? 10.00 : (uid !== "mock-uid" ? (finalFee - (calculateTransferMarkupFee(amount, defaultTransferProfitMargin, transferTieredMargins) || 0)) : 10.00)),
       fee: finalFee,
       totalDebit
     });

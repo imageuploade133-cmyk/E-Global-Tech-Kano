@@ -176,9 +176,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const isInvestment = !isSwap && (txType === "INVESTMENT" || cat === "INVESTMENT" || desc.includes("investment") || desc.includes("fixed deposit"));
 
   // Pure presentation values
-  const fee = transaction.fee ?? 0;
+  const rawFee = transaction.fee ?? 0;
   const vat = transaction.vat ?? 0;
   const markup = transaction.markup ?? 0;
+
+  // Calculate combined transfer fee authoritatively:
+  // If totalDebited is present, combined fee is totalDebited - amount - vat.
+  // Otherwise, use rawFee + markup (or rawFee if already combined).
+  const combinedTransferFee = (typeof transaction.totalDebited === "number" && transaction.totalDebited > 0)
+    ? Math.max(0, transaction.totalDebited - transaction.amount - vat)
+    : (rawFee > 0 && markup > 0 && rawFee < rawFee + markup ? rawFee + markup : rawFee);
+
+  const fee = combinedTransferFee;
   const totalDebited = transaction.totalDebited ?? (transaction.amount + fee + vat);
 
   const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");

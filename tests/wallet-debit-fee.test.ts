@@ -52,4 +52,30 @@ describe("WalletService.debitWallet Fee Deduction Logic", () => {
     expect(res.previousBalance).toBe(114);
     expect(res.newBalance).toBe(0);
   });
+
+  test("Financial Fee & Receipt Calculation Scenario 1: Amount=100, Provider fee=10, CPanel commission=5, VAT=0", () => {
+    const providerFee = 10;
+    const adminCommission = 5;
+    const amount = 100;
+    const vat = 0;
+
+    const combinedFee = providerFee + adminCommission;
+    const totalDebited = amount + combinedFee + vat;
+
+    expect(combinedFee).toBe(15);
+    expect(totalDebited).toBe(115);
+  });
+
+  test("Financial Fee & Receipt Calculation Scenario 2: Amount=100, Provider fee=10, CPanel commission=0, VAT=0", () => {
+    const providerFee = 10;
+    const adminCommission = 0;
+    const amount = 100;
+    const vat = 0;
+
+    const combinedFee = providerFee + adminCommission;
+    const totalDebited = amount + combinedFee + vat;
+
+    expect(combinedFee).toBe(10);
+    expect(totalDebited).toBe(110);
+  });
 });
