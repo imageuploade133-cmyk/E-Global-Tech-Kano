@@ -13,20 +13,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import Link from "next/link";
 import { toast } from "sonner";
-
-const normalizeStatus = (status?: string): "SUCCESS" | "PENDING" | "FAILED" | "REFUND" => {
-  const s = String(status || "").toUpperCase().trim();
-  if (s === "SUCCESS" || s === "SUCCESSFUL" || s === "COMPLETED" || s === "COMPLETE" || s === "ACTIVE" || s === "DELIVERED") {
-    return "SUCCESS";
-  }
-  if (s === "PENDING" || s === "PROCESSING") {
-    return "PENDING";
-  }
-  if (s === "REFUND" || s === "REFUNDED" || s === "REVERSED") {
-    return "REFUND";
-  }
-  return "FAILED";
-};
+import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
 
 const BILL_TYPES = ["BILL_PAYMENT", "AIRTIME", "DATA", "BILLS", "CABLE", "ELECTRICITY", "WAEC", "BETTING", "UTILITY"];
 
@@ -388,18 +375,17 @@ export default function BillsHistoryPage() {
                       </p>
 
                       {(() => {
-                        const normalized = normalizeStatus(tx.status);
+                        const ledgerStatus = getTransactionLedgerStatus(tx);
                         return (
                           <span
                             className={cn(
-                              "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase",
-                              normalized === "SUCCESS" && "bg-emerald-50 text-emerald-600",
-                              normalized === "PENDING" && "bg-amber-50 text-amber-600",
-                              normalized === "REFUND" && "bg-blue-50 text-blue-600",
-                              normalized === "FAILED" && "bg-error/5 text-error"
+                              "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase border",
+                              ledgerStatus.badgeBg,
+                              ledgerStatus.badgeText,
+                              ledgerStatus.badgeBorder
                             )}
                           >
-                            {normalized === "SUCCESS" ? "Successful" : normalized === "REFUND" ? "Refunded" : normalized === "PENDING" ? "Pending" : "Failed"}
+                            {ledgerStatus.label}
                           </span>
                         );
                       })()}
