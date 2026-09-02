@@ -56,9 +56,10 @@ export async function GET(req: Request) {
         if (!refundQuery.empty) continue;
 
         // Process the refund atomically
-        console.log(`[Auto-Refund Engine] [${reqId}] Found unrefunded failed transaction [${tx.reference}] of amount ₦${tx.amount}. Executing refund...`);
-
         const txCurrency = tx.currency || "NGN";
+        const refundAmount = Number(tx.totalDebited) || (Number(tx.amount) + (Number(tx.fee) || 0) + (Number(tx.vat) || 0));
+
+        console.log(`[Auto-Refund Engine] [${reqId}] Found unrefunded failed transaction [${tx.reference}] with total debited amount ₦${refundAmount}. Executing full refund...`);
 
         await adminDb.runTransaction(async (refundTransaction) => {
           const uRef = adminDb.collection("users").doc(uid);
@@ -76,12 +77,16 @@ export async function GET(req: Request) {
 
           await WalletService.creditWallet(refundTransaction, {
             userId: uid,
-            amount: Number(tx.amount),
+            amount: refundAmount,
             currency: txCurrency,
             reference: `REFUND-${tx.reference}`,
             docId: refundRefId,
+            type: "REFUND",
+            category: "REFUND",
+            direction: "CREDIT",
             description: `Auto-Refund for failed ${tx.type.toLowerCase()}: ${tx.description || ""}`,
             recipientName: tx.recipientName || "System Refund",
+            totalCredited: refundAmount,
             preLoadedUser: {
               ref: uRef,
               data: uData,

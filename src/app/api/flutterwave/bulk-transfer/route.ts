@@ -403,8 +403,12 @@ export async function POST(req: Request) {
             amount: exactRefundAmount,
             currency: "NGN",
             reference: `REFUND-${trfReference}`,
+            type: "REFUND",
+            category: "REFUND",
+            direction: "CREDIT",
             description: `Refund for failed bulk transfer: ${description}`,
             recipientName: `Bulk Transfer (${trfRecipients.length} Recipients)`,
+            totalCredited: exactRefundAmount,
             preLoadedUser: {
               ref: userRef,
               data: uData,
