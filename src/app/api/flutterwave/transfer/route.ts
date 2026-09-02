@@ -11,6 +11,7 @@ export async function POST(req: Request) {
   const startTime = Date.now();
   let uid = "";
   let requestBody: Record<string, unknown> | null = null;
+  let transferProfitMargin = 0;
   const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
   console.log("STEP 1 - Request received");
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
           transferTieredMargins = marginData.transferTieredMargins;
         }
       }
-      const transferProfitMargin = calculateTransferMarkupFee(trfAmount, defaultTransferProfitMargin, transferTieredMargins);
+      transferProfitMargin = calculateTransferMarkupFee(trfAmount, defaultTransferProfitMargin, transferTieredMargins);
 
       const userData = userDoc.data() || {};
 
@@ -330,6 +331,9 @@ export async function POST(req: Request) {
         reference: trfReference,
         userId: uid,
         fee: providerFee,
+        markup: transferProfitMargin,
+        combinedFee: providerFee + transferProfitMargin,
+        totalDebited: trfAmount + providerFee + transferProfitMargin,
       };
 
       const gatewayRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer`, {

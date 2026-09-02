@@ -167,16 +167,21 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const markup = Number(transaction.markup) || 0;
 
   // Calculate combined transfer fee authoritatively for both legacy and new transactions:
-  // 1. If totalDebited is stored and > amount, the total fee is totalDebited - amount - vat.
-  // 2. Otherwise, if markup > 0 and rawFee equals the base provider fee (or rawFee + markup), combine them.
-  // 3. Fall back to rawFee.
+  // 1. If storedTotalDebited > transaction.amount + rawFee, use (storedTotalDebited - transaction.amount - vat).
+  // 2. If markup > 0, combine rawFee + markup.
+  // 3. Otherwise, if storedTotalDebited > transaction.amount, use storedTotalDebited - transaction.amount - vat.
+  // 4. Fall back to rawFee.
   const storedTotalDebited = Number(transaction.totalDebited) || 0;
-  const combinedTransferFee = (storedTotalDebited > transaction.amount)
-    ? Math.max(0, storedTotalDebited - transaction.amount - vat)
-    : (markup > 0 ? rawFee + markup : rawFee);
+  const combinedTransferFee = markup > 0
+    ? (rawFee + markup)
+    : (storedTotalDebited > transaction.amount
+      ? Math.max(0, storedTotalDebited - transaction.amount - vat)
+      : rawFee);
 
   const fee = combinedTransferFee;
-  const totalDebited = storedTotalDebited > 0 ? storedTotalDebited : (transaction.amount + fee + vat);
+  const totalDebited = (storedTotalDebited > 0 && storedTotalDebited >= transaction.amount + fee + vat)
+    ? storedTotalDebited
+    : (transaction.amount + fee + vat);
 
   const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");
   const resolvedTransferFromBank = resolveBankName(transaction, banks, "TRANSFER_FROM");
