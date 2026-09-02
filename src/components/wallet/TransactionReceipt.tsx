@@ -144,22 +144,32 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const desc = (transaction.description || "").toLowerCase();
 
   const isSwap = txType.includes("SWAP") || cat.includes("SWAP") || desc.includes("swap") || desc.includes("exchange");
-  const isStore = txType.includes("STORE") || cat.includes("STORE") || desc.includes("store");
-  const isAirtime = !isSwap && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime"));
-  const isData = !isSwap && (txType === "DATA" || cat === "DATA" || desc.includes("data"));
-  const isCable = !isSwap && (txType === "CABLE" || cat === "CABLE" || desc.includes("cable") || desc.includes("dstv") || desc.includes("gotv") || desc.includes("startimes"));
-  const isElectricity = !isSwap && (txType === "ELECTRICITY" || cat === "ELECTRICITY" || desc.includes("electricity") || desc.includes("meter"));
-  const isWaec = !isSwap && (txType === "WAEC" || cat === "WAEC" || desc.includes("waec") || desc.includes("exam"));
-  const isBill = !isSwap && (isAirtime || isData || isCable || isElectricity || isWaec || txType === "BILLS" || cat === "BILLS" || txType === "BILL_PAYMENT");
 
-  const isBulkTransfer = !isSwap && (
+  const isRefund = !isSwap && (
+    txType === "REFUND" ||
+    cat === "REFUND" ||
+    transaction.status === "REFUND" ||
+    transaction.status === "REFUNDED" ||
+    desc.includes("refund") ||
+    desc.includes("reversal") ||
+    ledgerStatus.label === "Reversal"
+  );
+  const isStore = !isRefund && (txType.includes("STORE") || cat.includes("STORE") || desc.includes("store"));
+  const isAirtime = !isSwap && !isRefund && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime"));
+  const isData = !isSwap && !isRefund && (txType === "DATA" || cat === "DATA" || desc.includes("data"));
+  const isCable = !isSwap && !isRefund && (txType === "CABLE" || cat === "CABLE" || desc.includes("cable") || desc.includes("dstv") || desc.includes("gotv") || desc.includes("startimes"));
+  const isElectricity = !isSwap && !isRefund && (txType === "ELECTRICITY" || cat === "ELECTRICITY" || desc.includes("electricity") || desc.includes("meter"));
+  const isWaec = !isSwap && !isRefund && (txType === "WAEC" || cat === "WAEC" || desc.includes("waec") || desc.includes("exam"));
+  const isBill = !isSwap && !isRefund && (isAirtime || isData || isCable || isElectricity || isWaec || txType === "BILLS" || cat === "BILLS" || txType === "BILL_PAYMENT");
+
+  const isBulkTransfer = !isSwap && !isRefund && (
     (transaction.metadata && Boolean(transaction.metadata.isBulk)) ||
     desc.includes("bulk") ||
     (transaction.recipientName && transaction.recipientName.toLowerCase().includes("bulk"))
   );
-  const isTransfer = !isSwap && !isBulkTransfer && (txType === "TRANSFER" || cat === "TRANSFER" || txType === "WITHDRAWAL" || (desc.includes("transfer") && !desc.includes("bank transfer") && !desc.includes("virtual account")));
-  const isDeposit = !isSwap && (txType === "DEPOSIT" || cat === "DEPOSIT" || txType === "VIRTUAL_ACCOUNT_DEPOSIT" || txType === "CASHOUT" || desc.includes("deposit") || desc.includes("virtual account"));
-  const isInvestment = !isSwap && (txType === "INVESTMENT" || cat === "INVESTMENT" || desc.includes("investment") || desc.includes("fixed deposit"));
+  const isTransfer = !isSwap && !isRefund && !isBulkTransfer && (txType === "TRANSFER" || cat === "TRANSFER" || txType === "WITHDRAWAL" || (desc.includes("transfer") && !desc.includes("bank transfer") && !desc.includes("virtual account")));
+  const isDeposit = !isSwap && !isRefund && (txType === "DEPOSIT" || cat === "DEPOSIT" || txType === "VIRTUAL_ACCOUNT_DEPOSIT" || txType === "CASHOUT" || desc.includes("deposit") || desc.includes("virtual account"));
+  const isInvestment = !isSwap && !isRefund && (txType === "INVESTMENT" || cat === "INVESTMENT" || desc.includes("investment") || desc.includes("fixed deposit"));
 
   // Pure presentation values
   const rawFee = Number(transaction.fee) || 0;
@@ -467,7 +477,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   {receiptHeaderName}
                 </p>
                 <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug mt-0.5">
-                  {isSwap
+                  {isRefund
+                    ? (`Reversal for Failed ${transaction.beneficiaryName || transaction.recipientName ? `Transfer to ${transaction.beneficiaryName || transaction.recipientName}` : "Transaction"}`)
+                    : isSwap
                     ? "Currency Exchange Swap"
                     : isDeposit
                     ? (transaction.senderName ? `Transfer From ${transaction.senderName}` : "Transfer From Virtual Account")
@@ -491,7 +503,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 </h2>
                 <h1 className="font-mono text-3xl font-black text-black tracking-tight mt-1">
                   {currencySymbol}
-                  {transaction.amount.toLocaleString(undefined, {
+                  {(isRefund ? (Number(transaction.totalCredited) || (transaction.amount + fee + vat)) : transaction.amount).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -815,6 +827,66 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Swap Processing Fee</span>
                       <span className="text-black font-bold">{currencySymbol}{fee.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* 0. REVERSAL / REFUND */}
+                {isRefund && (
+                  <>
+                    {(transaction.beneficiaryName || transaction.recipientName) && (
+                      <div className="flex justify-between items-start text-gray-500 font-semibold">
+                        <span>Reversal Target</span>
+                        <div className="flex flex-col items-end text-right max-w-[220px]">
+                          <span className="text-black font-bold uppercase">
+                            {transaction.beneficiaryName || transaction.recipientName}
+                          </span>
+                          {(transaction.beneficiaryBankName || transaction.recipientBankName || resolvedTransferToBank) && (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <BankLogoResolver
+                                bankName={resolvedTransferToBank}
+                                bankCode={transaction.beneficiaryBankCode || transaction.recipientBankCode || transaction.bankCode}
+                                className="w-5 h-5 shrink-0"
+                              />
+                              <span className="text-black font-extrabold text-xs tracking-tight">
+                                {resolvedTransferToBank}
+                              </span>
+                            </div>
+                          )}
+                          {(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
+                            <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
+                              Account: {transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Principal Amount</span>
+                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Transfer Fee Refunded</span>
+                      <span className="text-black font-bold">{currencySymbol}{fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    {vat > 0 && (
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>VAT Refunded</span>
+                        <span className="text-black font-bold">{currencySymbol}{vat.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Credited to</span>
+                      <span className="text-black font-bold">Available Balance</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
+                      <span>Total Credited / Refunded</span>
+                      <span className="text-emerald-600 font-extrabold text-sm">{currencySymbol}{(Number(transaction.totalCredited) || (transaction.amount + fee + vat)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                   </>
                 )}

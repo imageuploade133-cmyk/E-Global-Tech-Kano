@@ -454,9 +454,16 @@ export async function POST(req: Request) {
 
           const uData = userDoc.data() || {};
           const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
+          // Preserve transfer breakdown in refund record
+          const origData = origTxSnap.exists ? origTxSnap.data() || {} : {};
+          const origAmount = Number(origData.amount) || trfAmount;
+          const origFee = Number(origData.fee) || (providerFee + transferProfitMargin);
+          const origMarkup = Number(origData.markup) || transferProfitMargin;
+
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
-            amount: exactRefundAmount,
+            amount: origAmount,
             currency: trfCurrency,
             reference: `REFUND-${trfReference}`,
             type: "REFUND",
@@ -464,7 +471,13 @@ export async function POST(req: Request) {
             direction: "CREDIT",
             description: `Refund for failed transfer: ${description}`,
             recipientName: trfName,
+            fee: origFee,
+            markup: origMarkup,
             totalCredited: exactRefundAmount,
+            beneficiaryName: trfName,
+            beneficiaryAccountNumber: trfAccount,
+            beneficiaryBankName: trfBankName,
+            beneficiaryBankCode: trfBank,
             preLoadedUser: {
               ref: userRef,
               data: uData,

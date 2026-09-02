@@ -57,7 +57,11 @@ export async function GET(req: Request) {
 
         // Process the refund atomically
         const txCurrency = tx.currency || "NGN";
-        const refundAmount = Number(tx.totalDebited) || (Number(tx.amount) + (Number(tx.fee) || 0) + (Number(tx.vat) || 0));
+        const origAmount = Number(tx.amount) || 0;
+        const origFee = Number(tx.fee) || 0;
+        const origMarkup = Number(tx.markup) || 0;
+        const origVat = Number(tx.vat) || 0;
+        const refundAmount = Number(tx.totalDebited) || (origAmount + origFee + origVat);
 
         console.log(`[Auto-Refund Engine] [${reqId}] Found unrefunded failed transaction [${tx.reference}] with total debited amount ₦${refundAmount}. Executing full refund...`);
 
@@ -77,7 +81,7 @@ export async function GET(req: Request) {
 
           await WalletService.creditWallet(refundTransaction, {
             userId: uid,
-            amount: refundAmount,
+            amount: origAmount > 0 ? origAmount : refundAmount,
             currency: txCurrency,
             reference: `REFUND-${tx.reference}`,
             docId: refundRefId,
@@ -86,7 +90,14 @@ export async function GET(req: Request) {
             direction: "CREDIT",
             description: `Auto-Refund for failed ${tx.type.toLowerCase()}: ${tx.description || ""}`,
             recipientName: tx.recipientName || "System Refund",
+            fee: origFee,
+            markup: origMarkup,
+            vat: origVat,
             totalCredited: refundAmount,
+            beneficiaryName: tx.beneficiaryName || tx.recipientName,
+            beneficiaryAccountNumber: tx.beneficiaryAccountNumber || tx.recipientAccountNumber,
+            beneficiaryBankName: tx.beneficiaryBankName || tx.recipientBankName,
+            beneficiaryBankCode: tx.beneficiaryBankCode || tx.recipientBankCode,
             preLoadedUser: {
               ref: uRef,
               data: uData,
