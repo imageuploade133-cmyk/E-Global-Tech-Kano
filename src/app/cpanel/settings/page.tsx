@@ -25,6 +25,8 @@ function CpanelSettingsPageContent() {
 
   const { isDark, toggleTheme } = useCpanelTheme();
   const [logoInput, setLogoInput] = useState(config.logoUrl);
+  const [receiptLogoInput, setReceiptLogoInput] = useState(config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
+  const [receiptNameInput, setReceiptNameInput] = useState(config.receiptName || "E-TECH GLOBAL HUB");
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
   const [emailInput, setEmailInput] = useState(config.supportEmail);
@@ -35,6 +37,7 @@ function CpanelSettingsPageContent() {
 
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingReceiptLogo, setIsUploadingReceiptLogo] = useState(false);
 
 
 
@@ -42,6 +45,8 @@ function CpanelSettingsPageContent() {
 
   useEffect(() => {
     setLogoInput(config.logoUrl);
+    setReceiptLogoInput(config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
+    setReceiptNameInput(config.receiptName || "E-TECH GLOBAL HUB");
     setPhone1Input(config.supportPhone1);
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
@@ -57,6 +62,8 @@ function CpanelSettingsPageContent() {
     try {
       await updateConfig({
         logoUrl: logoInput,
+        receiptLogoUrl: receiptLogoInput,
+        receiptName: receiptNameInput,
         supportPhone1: phone1Input,
         supportPhone2: phone2Input,
         supportEmail: emailInput,
@@ -65,12 +72,39 @@ function CpanelSettingsPageContent() {
         whatsappPollingEnabled,
         whatsappPollingIntervalMinutes,
       });
-      toast.success("Branding, Support and API configurations applied!");
+      toast.success("Branding, Receipt, Support and API configurations applied!");
     } catch (err: unknown) {
       console.error(err);
       toast.error("Failed to commit settings updates to system storage.");
     } finally {
       setIsSavingBranding(false);
+    }
+  };
+
+  const handleReceiptLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingReceiptLogo(true);
+    toast.loading("Uploading receipt logo securely...");
+
+    try {
+      const result = await uploadImageSecurely(file, "receipt_logo");
+      toast.dismiss();
+
+      if (result.success && result.url) {
+        const uploadedUrl = result.url;
+        setReceiptLogoInput(uploadedUrl);
+        updateConfig({ receiptLogoUrl: uploadedUrl });
+        toast.success("Receipt logo successfully uploaded and updated!");
+      } else {
+        toast.error(result.error || "Failed to upload receipt logo!");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Receipt logo upload failed.");
+    } finally {
+      setIsUploadingReceiptLogo(false);
     }
   };
 
@@ -227,6 +261,51 @@ function CpanelSettingsPageContent() {
                     </select>
                   </div>
                 )}
+              </div>
+
+              {/* Receipt Branding Settings */}
+              <div className={cn("p-4 rounded-xl border space-y-4 transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                    Transaction Receipt Branding & Logo
+                  </label>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Customize the header name and logo image displayed on PDF, PNG, and Shared Receipts.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Receipt Header Title / Name</label>
+                  <input
+                    type="text"
+                    value={receiptNameInput}
+                    onChange={(e) => setReceiptNameInput(e.target.value)}
+                    placeholder="e.g. E-TECH GLOBAL HUB"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Receipt Custom Logo URL</label>
+                    <input
+                      type="url"
+                      value={receiptLogoInput}
+                      onChange={(e) => setReceiptLogoInput(e.target.value)}
+                      placeholder="https://i.ibb.co/..."
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Upload Receipt Logo File</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingReceiptLogo}
+                      onChange={handleReceiptLogoUpload}
+                      className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-[#FC7A00]/10 file:text-[#FC7A00]")}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
