@@ -144,6 +144,7 @@ describe("Transaction Data Pipeline & Presentation", () => {
       senderAccountNumber: "0123456789",
       virtualAccountNumber: "9921473281",
       virtualAccountBankName: "Wema Bank",
+      createdAt: "2026-09-01T12:00:00.000Z",
       date: "Sep 01, 2026",
       time: "12:00 PM",
       fee: 0,

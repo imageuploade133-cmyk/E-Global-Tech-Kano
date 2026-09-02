@@ -100,7 +100,8 @@ export async function POST(req: Request) {
         });
         const feeData = await feeRes.json();
         if (feeRes.ok && feeData.success) {
-          providerFee = Number(feeData.fee) || 10.00;
+          // Explicitly extract raw provider fee if provided, or use fee property
+          providerFee = Number(feeData.providerFee ?? feeData.fee) || 10.00;
         }
       } catch (err: unknown) {
         const error = err as Error;
