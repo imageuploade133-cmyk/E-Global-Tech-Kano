@@ -832,64 +832,78 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 )}
 
                 {/* 0. REVERSAL / REFUND */}
-                {isRefund && (
-                  <>
-                    {(transaction.beneficiaryName || transaction.recipientName) && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Reversal Target</span>
-                        <div className="flex flex-col items-end text-right max-w-[220px]">
-                          <span className="text-black font-bold uppercase">
-                            {transaction.beneficiaryName || transaction.recipientName}
-                          </span>
-                          {(transaction.beneficiaryBankName || transaction.recipientBankName || resolvedTransferToBank) && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <BankLogoResolver
-                                bankName={resolvedTransferToBank}
-                                bankCode={transaction.beneficiaryBankCode || transaction.recipientBankCode || transaction.bankCode}
-                                className="w-5 h-5 shrink-0"
-                              />
-                              <span className="text-black font-extrabold text-xs tracking-tight">
-                                {resolvedTransferToBank}
-                              </span>
-                            </div>
-                          )}
-                          {(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
-                            <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
-                              Account: {transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber}
+                {isRefund && (() => {
+                  const totalRefundedAmount = Number(transaction.totalCredited) || Number(transaction.totalDebited) || (transaction.amount + fee + vat);
+                  let refundFee = fee;
+                  let refundPrincipal = transaction.amount;
+
+                  // If transaction.amount was saved as the total refund amount (e.g. 5010), but fee > 0 exists,
+                  // derive the principal as totalRefundedAmount - fee so Fee + Principal always equals total credited refund.
+                  if (fee > 0 && transaction.amount >= totalRefundedAmount && totalRefundedAmount > fee) {
+                    refundPrincipal = totalRefundedAmount - fee - vat;
+                  } else if (fee === 0 && totalRefundedAmount > transaction.amount) {
+                    refundFee = totalRefundedAmount - transaction.amount - vat;
+                  }
+
+                  return (
+                    <>
+                      {(transaction.beneficiaryName || transaction.recipientName) && (
+                        <div className="flex justify-between items-start text-gray-500 font-semibold">
+                          <span>Reversal Target</span>
+                          <div className="flex flex-col items-end text-right max-w-[220px]">
+                            <span className="text-black font-bold uppercase">
+                              {transaction.beneficiaryName || transaction.recipientName}
                             </span>
-                          )}
+                            {(transaction.beneficiaryBankName || transaction.recipientBankName || resolvedTransferToBank) && (
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <BankLogoResolver
+                                  bankName={resolvedTransferToBank}
+                                  bankCode={transaction.beneficiaryBankCode || transaction.recipientBankCode || transaction.bankCode}
+                                  className="w-5 h-5 shrink-0"
+                                />
+                                <span className="text-black font-extrabold text-xs tracking-tight">
+                                  {resolvedTransferToBank}
+                                </span>
+                              </div>
+                            )}
+                            {(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
+                              <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
+                                Account: {transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Principal Amount</span>
-                      <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Transfer Fee Refunded</span>
-                      <span className="text-black font-bold">{currencySymbol}{fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-
-                    {vat > 0 && (
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
-                        <span>VAT Refunded</span>
-                        <span className="text-black font-bold">{currencySymbol}{vat.toFixed(2)}</span>
+                        <span>Principal Amount</span>
+                        <span className="text-black font-bold">{currencySymbol}{refundPrincipal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
-                    )}
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Credited to</span>
-                      <span className="text-black font-bold">Available Balance</span>
-                    </div>
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Transfer Fee Refunded</span>
+                        <span className="text-black font-bold">{currencySymbol}{refundFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
-                      <span>Total Credited / Refunded</span>
-                      <span className="text-emerald-600 font-extrabold text-sm">{currencySymbol}{(Number(transaction.totalCredited) || (transaction.amount + fee + vat)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </>
-                )}
+                      {vat > 0 && (
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>VAT Refunded</span>
+                          <span className="text-black font-bold">{currencySymbol}{vat.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Credited to</span>
+                        <span className="text-black font-bold">Available Balance</span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
+                        <span>Total Credited / Refunded</span>
+                        <span className="text-emerald-600 font-extrabold text-sm">{currencySymbol}{totalRefundedAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* 6. DEPOSIT */}
                 {isDeposit && (
