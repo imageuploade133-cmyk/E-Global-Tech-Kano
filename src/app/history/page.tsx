@@ -106,8 +106,8 @@ export default function HistoryPage() {
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         list.push({
-          id: docSnap.id,
           ...data,
+          id: docSnap.id,
           reference: data.reference || docSnap.id,
           type: data.type || "DEPOSIT",
           amount: Number(data.amount) || 0,
@@ -119,6 +119,9 @@ export default function HistoryPage() {
           date: data.date || "",
           time: data.time || "",
           fee: Number(data.fee) || 0,
+          vat: Number(data.vat) || 0,
+          markup: Number(data.markup) || 0,
+          totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
         });
       });
 
@@ -187,8 +190,8 @@ export default function HistoryPage() {
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         list.push({
-          id: docSnap.id,
           ...data,
+          id: docSnap.id,
           reference: data.reference || docSnap.id,
           type: data.type || "DEPOSIT",
           amount: Number(data.amount) || 0,
@@ -200,6 +203,9 @@ export default function HistoryPage() {
           date: data.date || "",
           time: data.time || "",
           fee: Number(data.fee) || 0,
+          vat: Number(data.vat) || 0,
+          markup: Number(data.markup) || 0,
+          totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
         });
       });
 
