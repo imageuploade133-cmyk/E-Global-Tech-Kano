@@ -189,6 +189,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const resolvedBankName = isDeposit ? resolvedTransferFromBank : resolvedTransferToBank;
 
   // Logo Resolution
+  const receiptHeaderName = config.receiptName || "E-TECH GLOBAL HUB";
+  const receiptHeaderLogo = config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
+
   const matchedLogo = isStore
     ? (getBillerLogo("store") || getStoreLogo())
     : isSwap
@@ -201,45 +204,43 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     ? (getBillerLogo(transaction.network || transaction.billerName || transaction.billerCode || "") || getBillerLogo(desc))
     : (getBankLogo(resolvedTransferToBank) || getBankLogo(desc));
 
-  const logoUrl = matchedLogo || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
+  const logoUrl = matchedLogo || receiptHeaderLogo;
 
-  // PDF Export
+  // PDF Export (HD Quality)
   const handleDownloadPDF = async () => {
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Generating PDF receipt...");
+      toast.loading("Generating HD PDF receipt...");
+
+      await waitForReceiptImages(receiptRef.current, 5000);
 
       const html2canvas = (await import("html2canvas")).default;
       const { jsPDF } = await import("jspdf");
 
       const canvas = await html2canvas(receiptRef.current, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: "#FFFFFF",
+        logging: false,
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/png", 1.0);
       const pdf = new jsPDF("p", "mm", "a4");
-      const imgWidth = 190;
-      const pageHeight = 295;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = 180;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 10;
+      const xPos = (pdfWidth - imgWidth) / 2;
+      const yPos = 15;
 
-      pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
+      pdf.addImage(imgData, "PNG", xPos, yPos, imgWidth, imgHeight, undefined, "FAST");
 
       pdf.save(`Receipt_${transaction.reference}.pdf`);
       toast.dismiss();
-      toast.success("PDF Receipt downloaded!");
+      toast.success("HD PDF Receipt downloaded!");
     } catch (err) {
       console.error("PDF generation failed:", err);
       toast.dismiss();
@@ -338,19 +339,20 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     }
   };
 
-  // Share Receipt
+  // Share Receipt (HD Quality)
   const handleShareReceipt = async () => {
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Preparing receipt for sharing...");
+      toast.loading("Preparing HD receipt for sharing...");
 
       await waitForReceiptImages(receiptRef.current, 5000);
 
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(receiptRef.current, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: "#FFFFFF",
         logging: false,
       });
@@ -370,7 +372,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           toast.dismiss();
           await navigator.share({
             files: [file],
-            title: "Transaction Receipt",
+            title: `${receiptHeaderName} Transaction Receipt`,
             text: `Transaction Receipt - ${transaction.reference}`,
           });
         } else {
@@ -387,10 +389,10 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
             URL.revokeObjectURL(objectUrl);
           }, 1000);
 
-          toast.success("Downloaded receipt to device.");
+          toast.success("Downloaded HD receipt to device.");
         }
         setGenerating(false);
-      }, "image/png");
+      }, "image/png", 1.0);
     } catch (err) {
       console.error("Image generation failed:", err);
       toast.dismiss();
@@ -462,7 +464,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
               <div>
                 <p className="font-hanken font-extrabold text-[10.5px] uppercase tracking-widest text-gray-400">
-                  E-TECH GLOBAL HUB
+                  {receiptHeaderName}
                 </p>
                 <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug mt-0.5">
                   {isSwap
@@ -988,14 +990,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
             <div className="pt-5 border-t border-gray-100 flex flex-col items-center justify-center space-y-1">
               <div className="relative w-20 h-5 opacity-40">
                 <Image
-                  src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-                  alt="E-Tech Signature"
+                  src={receiptHeaderLogo}
+                  alt="Receipt Signature"
                   fill
                   className="object-contain"
                 />
               </div>
               <p className="text-[8px] text-gray-300 font-bold uppercase tracking-widest text-center">
-                E-Tech Infinite Secure Ledger
+                {receiptHeaderName} SECURE LEDGER
               </p>
             </div>
           </div>

@@ -6,6 +6,8 @@ import { db, auth } from "@/lib/firebase";
 
 export interface AppConfig {
   logoUrl: string;
+  receiptLogoUrl?: string;
+  receiptName?: string;
   supportPhone1: string;
   supportPhone2: string;
   supportEmail: string;
@@ -42,6 +44,8 @@ export interface AppConfig {
 
 const DEFAULT_CONFIG: AppConfig = {
   logoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+  receiptLogoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+  receiptName: "E-TECH GLOBAL HUB",
   supportPhone1: "+234 800 345 6225",
   supportPhone2: "+234 901 234 5678",
   supportEmail: "support@e-globaltechhub.com",
