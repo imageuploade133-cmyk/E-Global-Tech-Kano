@@ -246,6 +246,45 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     }
   };
 
+  // Reusable helper to wait for images inside receipt before canvas capture
+  const waitForReceiptImages = async (element: HTMLElement, timeoutMs = 5000): Promise<void> => {
+    const images = Array.from(element.querySelectorAll("img"));
+    if (images.length === 0) return;
+
+    const imagePromises = images.map((img) => {
+      if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => {
+        let settled = false;
+        const done = () => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+        };
+        if (img.complete) {
+          done();
+        } else {
+          img.onload = done;
+          img.onerror = () => {
+            console.warn("[TransactionReceipt Image Load Warning] Image failed to load:", img.src);
+            done();
+          };
+        }
+      });
+    });
+
+    const timeoutPromise = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        console.warn("[TransactionReceipt Image Load Timeout] Waited for receipt images to load.");
+        resolve();
+      }, timeoutMs);
+    });
+
+    await Promise.race([Promise.all(imagePromises), timeoutPromise]);
+  };
+
   // Image Export
   const handleDownloadImage = async () => {
     if (!receiptRef.current) return;
@@ -253,20 +292,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       setGenerating(true);
       toast.loading("Generating PNG image...");
 
-      // Wait for all images inside receipt element to finish loading or detect broken images
-      const images = Array.from(receiptRef.current.querySelectorAll("img"));
-      await Promise.all(
-        images.map((img) => {
-          if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
-          return new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => {
-              console.warn("[TransactionReceipt Image Load Warning] Image failed to load:", img.src);
-              resolve(); // Gracefully proceed on broken images
-            };
-          });
-        })
-      );
+      await waitForReceiptImages(receiptRef.current, 5000);
 
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(receiptRef.current, {
@@ -278,7 +304,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       canvas.toBlob((blob) => {
         if (!blob) {
-          console.error("[TransactionReceipt PNG Error] canvas.toBlob returned null.");
+          console.error("Image generation failed: canvas.toBlob returned null.");
           toast.dismiss();
           toast.error("Failed to generate PNG image.");
           setGenerating(false);
@@ -302,7 +328,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         setGenerating(false);
       }, "image/png");
     } catch (err) {
-      console.error("[TransactionReceipt PNG Generation Exception]:", err);
+      console.error("Image generation failed:", err);
       toast.dismiss();
       toast.error("Failed to generate image.");
       setGenerating(false);
@@ -316,17 +342,22 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       setGenerating(true);
       toast.loading("Preparing receipt for sharing...");
 
+      await waitForReceiptImages(receiptRef.current, 5000);
+
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(receiptRef.current, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#FFFFFF",
+        logging: false,
       });
 
       canvas.toBlob(async (blob) => {
         if (!blob) {
+          console.error("Image generation failed: canvas.toBlob returned null.");
           toast.dismiss();
           toast.error("Failed to compile receipt.");
+          setGenerating(false);
           return;
         }
 
@@ -355,12 +386,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
           toast.success("Downloaded receipt to device.");
         }
+        setGenerating(false);
       }, "image/png");
     } catch (err) {
-      console.error("Share failed:", err);
+      console.error("Image generation failed:", err);
       toast.dismiss();
       toast.error("Failed to share receipt.");
-    } finally {
       setGenerating(false);
     }
   };
