@@ -412,30 +412,37 @@ export async function POST(req: Request) {
         const userDoc = await rollbackTx.get(userRef);
         const walletDoc = await rollbackTx.get(walletRef);
         if (userDoc.exists) {
-          // Update the original transaction document to FAILED
+          // Update the original transaction document to FAILED and read exact debited amount
           const origTxRef = adminDb.collection("transactions").doc(`tx-${trfReference}`);
+          const origTxSnap = await rollbackTx.get(origTxRef);
+          let exactRefundAmount = trfAmount;
+
+          if (origTxSnap.exists) {
+            const origData = origTxSnap.data() || {};
+            exactRefundAmount = Number(origData.totalDebited) || (Number(origData.amount) + Number(origData.fee) + (Number(origData.vat) || 0));
+          } else {
+            let defaultTransferProfitMargin = 0;
+            let transferTieredMargins: TransferTieredMarkup[] = [];
+            const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
+            const marginSnap = await rollbackTx.get(marginRef);
+            if (marginSnap.exists) {
+              const marginData = marginSnap.data() || {};
+              defaultTransferProfitMargin = Number(marginData.transferProfitMargin) || 0;
+              if (Array.isArray(marginData.transferTieredMargins)) {
+                transferTieredMargins = marginData.transferTieredMargins;
+              }
+            }
+            const transferProfitMargin = calculateTransferMarkupFee(trfAmount, defaultTransferProfitMargin, transferTieredMargins);
+            exactRefundAmount = trfAmount + fee + transferProfitMargin;
+          }
+
           rollbackTx.update(origTxRef, { status: "FAILED" });
 
           const uData = userDoc.data() || {};
-          let defaultTransferProfitMargin = 0;
-          let transferTieredMargins: TransferTieredMarkup[] = [];
-          const marginRef = adminDb.collection("config").doc("vtu_profit_margins");
-          const marginSnap = await rollbackTx.get(marginRef);
-          if (marginSnap.exists) {
-            const marginData = marginSnap.data() || {};
-            defaultTransferProfitMargin = Number(marginData.transferProfitMargin) || 0;
-            if (Array.isArray(marginData.transferTieredMargins)) {
-              transferTieredMargins = marginData.transferTieredMargins;
-            }
-          }
-          const transferProfitMargin = calculateTransferMarkupFee(trfAmount, defaultTransferProfitMargin, transferTieredMargins);
-          const finalFee = fee + transferProfitMargin;
-          const finalTotalDeduction = trfAmount + finalFee;
-
           const wBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
-            amount: finalTotalDeduction,
+            amount: exactRefundAmount,
             currency: trfCurrency,
             reference: `REFUND-${trfReference}`,
             description: `Refund for failed transfer: ${description}`,
