@@ -377,18 +377,28 @@ export async function POST(req: Request) {
           console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);
         }
 
-        // Update transaction record with provider reference if returned
+        // Update transaction record with provider reference and re-affirm customer fee & markup
         const provRef = gatewayData.provider_reference || gatewayData.data?.id || gatewayData.data?.reference;
-        if (provRef) {
-          try {
-            await adminDb.collection("transactions").doc(`tx-${trfReference}`).update({
-              providerReference: String(provRef),
-              providerTransactionId: gatewayData.data?.id ? String(gatewayData.data.id) : undefined,
-              status: "SUCCESS"
-            });
-          } catch (updateErr: any) {
-            console.warn("[Transfer API] Failed to update transaction providerReference:", updateErr.message);
+        const combinedFee = providerFee + transferProfitMargin;
+        const finalTotalDeduction = trfAmount + combinedFee;
+
+        try {
+          const updatePayload: Record<string, any> = {
+            fee: combinedFee,
+            transferFee: combinedFee,
+            markup: transferProfitMargin,
+            totalDebited: finalTotalDeduction,
+            status: "SUCCESS"
+          };
+          if (provRef) {
+            updatePayload.providerReference = String(provRef);
           }
+          if (gatewayData.data?.id) {
+            updatePayload.providerTransactionId = String(gatewayData.data.id);
+          }
+          await adminDb.collection("transactions").doc(`tx-${trfReference}`).update(updatePayload);
+        } catch (updateErr: any) {
+          console.warn("[Transfer API] Failed to update transaction providerReference:", updateErr.message);
         }
 
         return NextResponse.json({
