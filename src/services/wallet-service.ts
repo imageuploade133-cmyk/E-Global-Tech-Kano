@@ -236,7 +236,15 @@ export class WalletService {
     }
 
     // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
-    const creditAmount = amount;
+    // Calculate total refund / credit amount authoritatively:
+    // If totalCredited is provided (e.g. refund total including transfer fee + commission), credit that full amount.
+    // Otherwise fallback to amount + fee + vat.
+    const feeNum = Number(fee) || 0;
+    const vatNum = Number(params.vat) || 0;
+    const creditAmount = params.totalCredited !== undefined && params.totalCredited !== null && Number(params.totalCredited) > 0
+      ? Number(params.totalCredited)
+      : (amount + feeNum + vatNum);
+
     const newBalance = currentBalance + creditAmount;
 
     // Update specific wallet balance atomically
@@ -273,7 +281,7 @@ export class WalletService {
     const ledgerRef = adminDb.collection("transactions").doc(ledgerDocId);
     const ledgerRecord: TransactionRecord = {
       userId,
-      amount: creditAmount,
+      amount, // Preserve principal transfer amount (e.g. 5000)
       currency: ucCurrency,
       reference,
       flwId: flwId || null,
@@ -290,7 +298,7 @@ export class WalletService {
       vat: params.vat,
       markup: params.markup,
       totalDebited: params.totalDebited,
-      totalCredited: params.totalCredited ?? creditAmount,
+      totalCredited: creditAmount, // Record full credited total (e.g. 5030)
       provider: params.provider,
       providerReference: params.providerReference || flwId || undefined,
       providerTransactionId: params.providerTransactionId,
