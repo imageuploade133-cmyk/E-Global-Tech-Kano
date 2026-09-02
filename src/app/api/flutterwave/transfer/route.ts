@@ -459,8 +459,12 @@ export async function POST(req: Request) {
             amount: exactRefundAmount,
             currency: trfCurrency,
             reference: `REFUND-${trfReference}`,
+            type: "REFUND",
+            category: "REFUND",
+            direction: "CREDIT",
             description: `Refund for failed transfer: ${description}`,
             recipientName: trfName,
+            totalCredited: exactRefundAmount,
             preLoadedUser: {
               ref: userRef,
               data: uData,
