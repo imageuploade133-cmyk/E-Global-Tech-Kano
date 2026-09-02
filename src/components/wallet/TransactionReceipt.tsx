@@ -176,19 +176,21 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const isInvestment = !isSwap && (txType === "INVESTMENT" || cat === "INVESTMENT" || desc.includes("investment") || desc.includes("fixed deposit"));
 
   // Pure presentation values
-  const rawFee = transaction.fee ?? 0;
-  const vat = transaction.vat ?? 0;
-  const markup = transaction.markup ?? 0;
+  const rawFee = Number(transaction.fee) || 0;
+  const vat = Number(transaction.vat) || 0;
+  const markup = Number(transaction.markup) || 0;
 
-  // Calculate combined transfer fee authoritatively:
-  // If totalDebited is present, combined fee is totalDebited - amount - vat.
-  // Otherwise, use rawFee + markup (or rawFee if already combined).
-  const combinedTransferFee = (typeof transaction.totalDebited === "number" && transaction.totalDebited > 0)
-    ? Math.max(0, transaction.totalDebited - transaction.amount - vat)
-    : (rawFee > 0 && markup > 0 && rawFee < rawFee + markup ? rawFee + markup : rawFee);
+  // Calculate combined transfer fee authoritatively for both legacy and new transactions:
+  // 1. If totalDebited is stored and > amount, the total fee is totalDebited - amount - vat.
+  // 2. Otherwise, if markup > 0 and rawFee equals the base provider fee (or rawFee + markup), combine them.
+  // 3. Fall back to rawFee.
+  const storedTotalDebited = Number(transaction.totalDebited) || 0;
+  const combinedTransferFee = (storedTotalDebited > transaction.amount)
+    ? Math.max(0, storedTotalDebited - transaction.amount - vat)
+    : (markup > 0 ? rawFee + markup : rawFee);
 
   const fee = combinedTransferFee;
-  const totalDebited = transaction.totalDebited ?? (transaction.amount + fee + vat);
+  const totalDebited = storedTotalDebited > 0 ? storedTotalDebited : (transaction.amount + fee + vat);
 
   const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");
   const resolvedTransferFromBank = resolveBankName(transaction, banks, "TRANSFER_FROM");
