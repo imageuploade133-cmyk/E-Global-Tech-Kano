@@ -224,12 +224,13 @@ export default function HistoryPage() {
   // Map category strings back to filters
   const getCategoryFromTx = (tx: Transaction) => {
     const t = (tx.type || "").toUpperCase();
+    const fm = (tx.fundingMethod || "").toUpperCase();
     const d = (tx.description || "").toLowerCase();
-    if (t === "DEPOSIT" || t === "CASHOUT") return "deposit";
+    if (t === "DEPOSIT" || t === "CASHOUT" || t === "WALLET_FUNDING" || t === "VIRTUAL_ACCOUNT_DEPOSIT" || d.includes("funding") || d.includes("deposit")) return "deposit";
     if (t === "TRANSFER" || t === "WITHDRAWAL") return "transfer";
     if (t === "BILL_PAYMENT" || t === "AIRTIME" || t === "DATA" || t === "BILLS" || t === "CABLE" || t === "ELECTRICITY" || d.includes("airtime") || d.includes("data")) return "bills";
     if (t === "SWAP" || t === "CURRENCY_SWAP" || d.includes("swap") || d.includes("exchange")) return "swap";
-    if (t === "CARD_FUND" || t === "CARD") return "card";
+    if (t === "CARD_FUND" || t === "CARD" || fm === "CARD") return "card";
     return "all";
   };
 

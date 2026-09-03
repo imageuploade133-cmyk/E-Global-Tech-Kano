@@ -100,10 +100,12 @@ export const getTransactionLedgerStatus = (tx?: {
     dir === "CREDIT" ||
     type === "DEPOSIT" ||
     type === "VIRTUAL_ACCOUNT_DEPOSIT" ||
+    type === "WALLET_FUNDING" ||
     cat === "DEPOSIT" ||
     type === "SWAP_CREDIT" ||
     desc.includes("deposit") ||
     desc.includes("credited") ||
+    desc.includes("funding") ||
     desc.includes("transfer from") ||
     narr.includes("deposit") ||
     narr.includes("transfer from");
@@ -179,11 +181,13 @@ export const isCreditTransaction = (tx?: {
   if (
     type === "DEPOSIT" ||
     type === "VIRTUAL_ACCOUNT_DEPOSIT" ||
+    type === "WALLET_FUNDING" ||
     type === "CASHOUT" ||
     type === "SWAP_CREDIT" ||
     cat === "DEPOSIT" ||
     desc.includes("deposit") ||
     desc.includes("credited") ||
+    desc.includes("funding") ||
     desc.includes("transfer from") ||
     narr.includes("deposit") ||
     narr.includes("transfer from")

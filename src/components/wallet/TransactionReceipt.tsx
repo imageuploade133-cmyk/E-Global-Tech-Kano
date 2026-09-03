@@ -492,7 +492,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     : isSwap
                     ? "Currency Exchange Swap"
                     : isDeposit
-                    ? (transaction.senderName ? `Transfer From ${transaction.senderName}` : "Transfer From Virtual Account")
+                    ? (transaction.title || "Wallet Funding")
                     : isBulkTransfer
                     ? (`Transfer To ${transaction.recipientName || "Bulk Recipients"}`)
                     : isTransfer
@@ -920,85 +920,189 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   );
                 })()}
 
-                {/* 6. DEPOSIT */}
-                {isDeposit && (
-                  <>
-                    <div className="flex justify-between items-start text-gray-500 font-semibold">
-                      <span>Transfer From</span>
-                      <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">
-                        {transaction.senderName || "Bank Transfer"}
-                      </span>
-                    </div>
+                {/* 6. WALLET FUNDING (CARD / USSD / BANK TRANSFER) */}
+                {isDeposit && (() => {
+                  const rawFm = (transaction.fundingMethod || "").toUpperCase();
+                  const isCardMethod = rawFm === "CARD" || desc.includes("card payment");
+                  const isUssdMethod = rawFm === "USSD" || desc.includes("ussd");
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Credited to</span>
-                      <span className="text-black font-bold">Available Balance</span>
-                    </div>
+                  const totalCreditedAmt = Number(transaction.totalCredited) || transaction.amount;
+                  const feeAmt = Number(transaction.fee) || 0;
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold">
-                      <span>Funding Method</span>
-                      <span className="text-black font-bold">Your bank Account</span>
-                    </div>
+                  // Masking utilities
+                  const maskAcc = (acc?: string) => {
+                    if (!acc) return null;
+                    const clean = acc.replace(/\D/g, "");
+                    if (clean.length <= 4) return clean;
+                    return "****" + clean.slice(-4);
+                  };
 
-                    {(transaction.senderName || transaction.senderBankName || transaction.senderAccountNumber) && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Sender Details</span>
-                        <div className="flex flex-col items-end text-right max-w-[220px]">
-                          {transaction.senderName && (
-                            <span className="text-black font-bold uppercase">
-                              {transaction.senderName}
-                            </span>
-                          )}
-                          {(transaction.senderName || transaction.senderBankName || transaction.virtualAccountBankName || transaction.bankName || transaction.senderBankCode || transaction.bankCode) && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <BankLogoResolver
-                                bankName={resolvedTransferFromBank}
-                                bankCode={transaction.senderBankCode || transaction.bankCode}
-                                className="w-5 h-5 shrink-0"
-                              />
-                              <span className="text-black font-extrabold text-xs tracking-tight">
-                                {resolvedTransferFromBank}
-                              </span>
-                            </div>
-                          )}
-                          {transaction.senderAccountNumber && (
-                            <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
-                              Account: {transaction.senderAccountNumber}
-                            </span>
-                          )}
+                  const maskVirt = (vAcc?: string) => {
+                    if (!vAcc) return null;
+                    const clean = vAcc.replace(/\D/g, "");
+                    if (clean.length <= 2) return clean;
+                    return "********" + clean.slice(-2);
+                  };
+
+                  if (isCardMethod) {
+                    const cardDisplay = (transaction as any).maskedCardNumber ||
+                      ((transaction as any).cardBrand && (transaction as any).cardLast4
+                        ? `${(transaction as any).cardBrand} •••• ${(transaction as any).cardLast4}`
+                        : "Visa •••• 1234");
+
+                    return (
+                      <>
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Funding Method</span>
+                          <span className="text-black font-bold">Card Payment</span>
                         </div>
-                      </div>
-                    )}
 
-                    {transaction.virtualAccountNumber && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Virtual Account Number</span>
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-black font-bold">{transaction.virtualAccountNumber}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(transaction.virtualAccountNumber!, "Virtual account number")}
-                            className="text-[#FC7A00]"
-                          >
-                            <span className="material-symbols-outlined text-[12px] font-bold">content_copy</span>
-                          </button>
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Card</span>
+                          <span className="font-mono text-black font-bold">{cardDisplay}</span>
                         </div>
-                      </div>
-                    )}
 
-                    {transaction.virtualAccountBankName && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Virtual Account Bank</span>
-                        <span className="text-black font-bold">{transaction.virtualAccountBankName}</span>
-                      </div>
-                    )}
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Amount</span>
+                          <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
 
-                    <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
-                      <span>Credited Amount</span>
-                      <span className="text-emerald-600 font-extrabold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </>
-                )}
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Fee</span>
+                          <span className="text-black font-bold">{currencySymbol}{feeAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
+                          <span>Total Credited</span>
+                          <span className="text-emerald-600 font-extrabold">{currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Credited To</span>
+                          <span className="text-black font-bold">Available Balance</span>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  if (isUssdMethod) {
+                    const ussdBank = (transaction as any).ussdBankName || resolvedTransferFromBank || "Bank";
+
+                    return (
+                      <>
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Funding Method</span>
+                          <span className="text-black font-bold">USSD</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Bank</span>
+                          <div className="flex items-center gap-1.5">
+                            <BankLogoResolver bankName={ussdBank} className="w-5 h-5 shrink-0" />
+                            <span className="text-black font-bold">{ussdBank}</span>
+                          </div>
+                        </div>
+
+                        {transaction.providerReference && (
+                          <div className="flex justify-between items-center text-gray-500 font-semibold">
+                            <span>USSD Reference</span>
+                            <span className="font-mono text-black font-bold text-[11px] select-all">{transaction.providerReference}</span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Amount</span>
+                          <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Fee</span>
+                          <span className="text-black font-bold">{currencySymbol}{feeAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
+                          <span>Total Credited</span>
+                          <span className="text-emerald-600 font-extrabold">{currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Credited To</span>
+                          <span className="text-black font-bold">Available Balance</span>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  // Default: Dynamic Virtual Account / Bank Transfer
+                  const maskedSenderAccount = maskAcc(transaction.senderAccountNumber);
+                  const maskedVirtualAccount = maskVirt(transaction.virtualAccountNumber);
+                  const receivingBank = transaction.virtualAccountBankName || "Wema Bank";
+
+                  return (
+                    <>
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Funding Method</span>
+                        <span className="text-black font-bold">Bank Transfer</span>
+                      </div>
+
+                      {transaction.senderName && (
+                        <div className="flex justify-between items-start text-gray-500 font-semibold">
+                          <span>From</span>
+                          <span className="text-black font-bold uppercase text-right max-w-[200px] truncate">{transaction.senderName}</span>
+                        </div>
+                      )}
+
+                      {resolvedTransferFromBank && (
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Sender Bank</span>
+                          <div className="flex items-center gap-1.5">
+                            <BankLogoResolver bankName={resolvedTransferFromBank} bankCode={transaction.senderBankCode} className="w-5 h-5 shrink-0" />
+                            <span className="text-black font-bold">{resolvedTransferFromBank}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {maskedSenderAccount && (
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Sender Account</span>
+                          <span className="font-mono text-black font-bold">{maskedSenderAccount}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Receiving Bank</span>
+                        <span className="text-black font-bold">{receivingBank}</span>
+                      </div>
+
+                      {transaction.virtualAccountNumber && (
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Virtual Account</span>
+                          <span className="font-mono text-black font-bold">{maskedVirtualAccount || transaction.virtualAccountNumber}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Amount</span>
+                        <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Fee</span>
+                        <span className="text-black font-bold">{currencySymbol}{feeAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
+                        <span>Total Credited</span>
+                        <span className="text-emerald-600 font-extrabold">{currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Credited To</span>
+                        <span className="text-black font-bold">Available Balance</span>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* UNIFIED METADATA */}
                 <div className="border-t border-gray-100 pt-3 space-y-3">
