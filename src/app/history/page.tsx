@@ -12,7 +12,11 @@ import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { toast } from "sonner";
-import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
+import {
+  getTransactionLedgerStatus,
+  isCreditTransaction,
+  getTransactionDisplayAmount
+} from "@/lib/transaction-status-normalizer";
 
 export default function HistoryPage() {
   const { userData, user } = useAuth();
@@ -109,6 +113,7 @@ export default function HistoryPage() {
           vat: Number(data.vat) || 0,
           markup: Number(data.markup) || 0,
           totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+              totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
         });
       });
 
@@ -193,6 +198,7 @@ export default function HistoryPage() {
           vat: Number(data.vat) || 0,
           markup: Number(data.markup) || 0,
           totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+          totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
         });
       });
 
@@ -366,7 +372,8 @@ export default function HistoryPage() {
             ) : (
               <>
                 {filteredTransactions.map((tx) => {
-                  const isCredit = tx.type === "DEPOSIT" || tx.type === "CASHOUT";
+                  const isCredit = isCreditTransaction(tx);
+                  const displayAmount = getTransactionDisplayAmount(tx);
                   return (
                     <button
                       key={tx.id}
@@ -416,7 +423,7 @@ export default function HistoryPage() {
                         >
                           {isCredit ? "+" : "-"}
                           {tx.currency === "NGN" ? "₦" : "$"}
-                          {tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
 
                         {(() => {
