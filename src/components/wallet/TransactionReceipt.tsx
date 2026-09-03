@@ -154,6 +154,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     desc.includes("reversal") ||
     ledgerStatus.label === "Reversal"
   );
+  const isCardRefund = isRefund && (
+    cat === "CARD" ||
+    txType.includes("CARD") ||
+    desc.includes("virtual card") ||
+    desc.includes("card issuance") ||
+    desc.includes("card funding") ||
+    (transaction.recipientName && transaction.recipientName.toLowerCase().includes("virtual card"))
+  );
   const isStore = !isRefund && (txType.includes("STORE") || cat.includes("STORE") || desc.includes("store"));
   const isAirtime = !isSwap && !isRefund && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime"));
   const isData = !isSwap && !isRefund && (txType === "DATA" || cat === "DATA" || desc.includes("data"));
@@ -478,7 +486,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 </p>
                 <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug mt-0.5">
                   {isRefund
-                    ? (`Reversal for Failed ${transaction.beneficiaryName || transaction.recipientName ? `Transfer to ${transaction.beneficiaryName || transaction.recipientName}` : "Transaction"}`)
+                    ? (isCardRefund
+                        ? `Refund for Failed ${transaction.beneficiaryName || transaction.recipientName || "Virtual Card Issuing"}`
+                        : `Reversal for Failed ${transaction.beneficiaryName || transaction.recipientName ? `Transfer to ${transaction.beneficiaryName || transaction.recipientName}` : "Transaction"}`)
                     : isSwap
                     ? "Currency Exchange Swap"
                     : isDeposit
@@ -845,16 +855,21 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     refundFee = totalRefundedAmount - transaction.amount - vat;
                   }
 
+                  const rawTarget = transaction.beneficiaryName || transaction.recipientName;
+                  const isCardRef = isCardRefund || (rawTarget && rawTarget.toLowerCase().includes("virtual card"));
+                  const targetName = isCardRef ? "VIRTUAL CARD ISSUING" : rawTarget;
+                  const isBankTransferRefund = !isCardRef && (transaction.beneficiaryBankName || transaction.recipientBankName || (resolvedTransferToBank && resolvedTransferToBank !== "Bank"));
+
                   return (
                     <>
-                      {(transaction.beneficiaryName || transaction.recipientName) && (
+                      {targetName && (
                         <div className="flex justify-between items-start text-gray-500 font-semibold">
                           <span>Reversal Target</span>
                           <div className="flex flex-col items-end text-right max-w-[220px]">
                             <span className="text-black font-bold uppercase">
-                              {transaction.beneficiaryName || transaction.recipientName}
+                              {targetName}
                             </span>
-                            {(transaction.beneficiaryBankName || transaction.recipientBankName || resolvedTransferToBank) && (
+                            {isBankTransferRefund && (
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <BankLogoResolver
                                   bankName={resolvedTransferToBank}
@@ -866,7 +881,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                                 </span>
                               </div>
                             )}
-                            {(transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
+                            {isBankTransferRefund && (transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber) && (
                               <span className="font-mono text-gray-600 font-bold text-[11px] mt-0.5">
                                 Account: {transaction.beneficiaryAccountNumber || transaction.recipientAccountNumber}
                               </span>
