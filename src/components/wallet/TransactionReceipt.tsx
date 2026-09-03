@@ -17,6 +17,7 @@ export interface Transaction {
   userId?: string;
   reference: string;
   type: string;
+  title?: string;
   category?: string;
   direction?: "CREDIT" | "DEBIT" | string;
   amount: number;
