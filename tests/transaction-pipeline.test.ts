@@ -1,8 +1,124 @@
 import { expect, test, describe } from "bun:test";
 import { Transaction } from "@/components/wallet/TransactionReceipt";
 import { TransactionRecord } from "@/services/wallet-service";
+import {
+  getTransactionDisplayAmount,
+  isCreditTransaction,
+} from "@/lib/transaction-status-normalizer";
 
 describe("Transaction Data Pipeline & Presentation", () => {
+  test("Failed Virtual Card Issuing and Refund Metadata Preservation (NGN)", () => {
+    const failedIssuanceTx: Transaction = {
+      id: "tx-vc-init-101",
+      userId: "user_ngn_1",
+      amount: 2000,
+      currency: "NGN",
+      reference: "vc-init-101",
+      type: "CARD_ISSUANCE",
+      category: "CARD",
+      direction: "DEBIT",
+      description: "Virtual Card Issuing",
+      recipientName: "Virtual Card Issuing",
+      beneficiaryName: "Virtual Card Issuing",
+      status: "FAILED",
+      date: "Sep 03, 2026",
+      time: "04:00 PM",
+      fee: 0,
+      totalDebited: 2000,
+    };
+
+    expect(isCreditTransaction(failedIssuanceTx)).toBe(false);
+    expect(getTransactionDisplayAmount(failedIssuanceTx)).toBe(2000);
+    expect(failedIssuanceTx.recipientName).toBe("Virtual Card Issuing");
+
+    const refundIssuanceTx: Transaction = {
+      id: "tx-REFUND-vc-init-101",
+      userId: "user_ngn_1",
+      amount: 2000,
+      currency: "NGN",
+      reference: "REFUND-vc-init-101",
+      type: "REFUND",
+      category: "CARD",
+      direction: "CREDIT",
+      description: "Refund for Failed Virtual Card Issuing",
+      recipientName: "Virtual Card Issuing",
+      beneficiaryName: "Virtual Card Issuing",
+      status: "SUCCESS",
+      date: "Sep 03, 2026",
+      time: "04:01 PM",
+      fee: 0,
+      totalCredited: 2000,
+      metadata: {
+        originalTransactionId: "tx-vc-init-101",
+        originalTransactionType: "CARD_ISSUANCE",
+        originalOperation: "Virtual Card Issuing",
+        originalReference: "vc-init-101",
+      },
+    };
+
+    expect(isCreditTransaction(refundIssuanceTx)).toBe(true);
+    expect(getTransactionDisplayAmount(refundIssuanceTx)).toBe(2000);
+    expect(refundIssuanceTx.recipientName).toBe("Virtual Card Issuing");
+    expect(refundIssuanceTx.beneficiaryName).toBe("Virtual Card Issuing");
+    expect(refundIssuanceTx.category).toBe("CARD");
+    expect(refundIssuanceTx.currency).toBe("NGN");
+    expect(refundIssuanceTx.metadata?.originalOperation).toBe("Virtual Card Issuing");
+  });
+
+  test("Failed Virtual Card Issuing and Refund Metadata Preservation (USD with Setup Fee)", () => {
+    const failedUsdIssuanceTx: Transaction = {
+      id: "tx-vc-init-102",
+      userId: "user_usd_1",
+      amount: 2.00,
+      currency: "USD",
+      reference: "vc-init-102",
+      type: "CARD_ISSUANCE",
+      category: "CARD",
+      direction: "DEBIT",
+      description: "Virtual Card Issuing",
+      recipientName: "Virtual Card Issuing",
+      beneficiaryName: "Virtual Card Issuing",
+      status: "FAILED",
+      date: "Sep 03, 2026",
+      time: "04:05 PM",
+      fee: 2.00,
+      totalDebited: 4.00,
+    };
+
+    expect(isCreditTransaction(failedUsdIssuanceTx)).toBe(false);
+    expect(getTransactionDisplayAmount(failedUsdIssuanceTx)).toBe(4.00);
+
+    const refundUsdIssuanceTx: Transaction = {
+      id: "tx-REFUND-vc-init-102",
+      userId: "user_usd_1",
+      amount: 2.00,
+      currency: "USD",
+      reference: "REFUND-vc-init-102",
+      type: "REFUND",
+      category: "CARD",
+      direction: "CREDIT",
+      description: "Refund for Failed Virtual Card Issuing",
+      recipientName: "Virtual Card Issuing",
+      beneficiaryName: "Virtual Card Issuing",
+      status: "SUCCESS",
+      date: "Sep 03, 2026",
+      time: "04:06 PM",
+      fee: 2.00,
+      totalCredited: 4.00,
+      metadata: {
+        originalTransactionId: "tx-vc-init-102",
+        originalTransactionType: "CARD_ISSUANCE",
+        originalOperation: "Virtual Card Issuing",
+        originalReference: "vc-init-102",
+      },
+    };
+
+    expect(isCreditTransaction(refundUsdIssuanceTx)).toBe(true);
+    expect(getTransactionDisplayAmount(refundUsdIssuanceTx)).toBe(4.00);
+    expect(refundUsdIssuanceTx.currency).toBe("USD");
+    expect(refundUsdIssuanceTx.recipientName).toBe("Virtual Card Issuing");
+    expect(refundUsdIssuanceTx.totalCredited).toBe(4.00);
+  });
   test("Virtual account deposit normalizes sender details and receipt presentation accurately", () => {
     const depositRecord: Transaction = {
       id: "tx-flw-123456",
