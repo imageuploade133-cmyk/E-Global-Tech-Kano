@@ -104,12 +104,20 @@ export class CardService {
           phone: "07000000000"
         };
 
+        const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) {
+          headers["X-API-Key"] = gatewayApiKey;
+        }
+        if (idToken || gatewayApiKey) {
+          headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+        }
+
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-          },
+          headers,
           body: JSON.stringify(payload),
         });
 
@@ -305,12 +313,20 @@ export class CardService {
       });
 
       try {
+        const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) {
+          headers["X-API-Key"] = gatewayApiKey;
+        }
+        if (idToken || gatewayApiKey) {
+          headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+        }
+
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/fund`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-          },
+          headers,
           body: JSON.stringify({
             amount,
             debit_currency: currency,
@@ -454,12 +470,20 @@ export class CardService {
 
     if (!runMock) {
       try {
+        const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) {
+          headers["X-API-Key"] = gatewayApiKey;
+        }
+        if (idToken || gatewayApiKey) {
+          headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+        }
+
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/withdraw`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-          },
+          headers,
           body: JSON.stringify({ amount }),
         });
 
@@ -556,12 +580,20 @@ export class CardService {
 
       try {
         const action = isLocked ? "block" : "unblock";
+        const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) {
+          headers["X-API-Key"] = gatewayApiKey;
+        }
+        if (idToken || gatewayApiKey) {
+          headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+        }
+
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/status`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-          },
+          headers,
           body: JSON.stringify({ status_action: action }),
         });
 
@@ -613,12 +645,18 @@ export class CardService {
       const cardData = cardSnap.data() as CardItem;
 
       try {
+        const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+        const headers: Record<string, string> = {};
+        if (gatewayApiKey) {
+          headers["X-API-Key"] = gatewayApiKey;
+        }
+        if (idToken || gatewayApiKey) {
+          headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+        }
+
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/terminate`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-          },
+          headers,
         });
 
         const data = await safeParseJson(res);
@@ -711,10 +749,17 @@ export class CardService {
     const cardData = cardSnap.data() as CardItem;
 
     try {
+      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+      const headers: Record<string, string> = {};
+      if (gatewayApiKey) {
+        headers["X-API-Key"] = gatewayApiKey;
+      }
+      if (idToken || gatewayApiKey) {
+        headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+      }
+
       const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}`, {
-        headers: {
-          "Authorization": `Bearer ${idToken}`,
-        },
+        headers,
       });
 
       const data = await safeParseJson(res);
@@ -811,10 +856,17 @@ export class CardService {
       const localSnap = await cardRef.collection("card_transactions").orderBy("createdAt", "desc").get();
       const localTxs = localSnap.docs.map(doc => doc.data() as CardTransaction);
 
+      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+      const headers: Record<string, string> = {};
+      if (gatewayApiKey) {
+        headers["X-API-Key"] = gatewayApiKey;
+      }
+      if (idToken || gatewayApiKey) {
+        headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+      }
+
       const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/transactions`, {
-        headers: {
-          "Authorization": `Bearer ${idToken}`,
-        },
+        headers,
       });
 
       const data = await safeParseJson(res);
