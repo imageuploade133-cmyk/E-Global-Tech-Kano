@@ -10,7 +10,11 @@ import { formatTransactionDateTime } from "@/lib/date-utils";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
-import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
+import {
+  getTransactionLedgerStatus,
+  isCreditTransaction,
+  getTransactionDisplayAmount
+} from "@/lib/transaction-status-normalizer";
 
 interface RecentTransactionsProps {
   isLoading?: boolean;
@@ -98,6 +102,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           vat: Number(data.vat) || 0,
           markup: Number(data.markup) || 0,
           totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+              totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
         } as Transaction);
       });
 
@@ -228,7 +233,8 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           ))
         ) : (
           transactions.map((tx) => {
-            const isDeposit = tx.type === "DEPOSIT" || tx.type === "CASHOUT";
+            const isCredit = isCreditTransaction(tx);
+            const displayAmount = getTransactionDisplayAmount(tx);
 
             return (
               <motion.button
@@ -237,7 +243,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
                 onClick={() => setSelectedTx(tx)}
                 className={cn(
                   "w-full text-left relative overflow-hidden rounded-[20px] p-4.5 flex items-center justify-between gap-3 premium-gradient-border transition-all cursor-pointer shadow-xs",
-                  isDeposit
+                  isCredit
                     ? "bg-gradient-to-r from-emerald-500/[0.04] via-emerald-500/[0.01] to-white border-emerald-500/15 hover:border-emerald-500/35 hover:shadow-sm"
                     : "bg-gradient-to-r from-[#FC7A00]/[0.04] via-[#FC7A00]/[0.01] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35 hover:shadow-sm"
                 )}
@@ -246,7 +252,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
                 <div
                   className={cn(
                     "absolute left-0 top-0 bottom-0 w-[4.5px]",
-                    isDeposit
+                    isCredit
                       ? "bg-gradient-to-b from-[#07B038] via-emerald-500 to-[#034A17]"
                       : "bg-gradient-to-b from-[#FC7A00] via-[#FF9E40] to-[#B35200]"
                   )}
@@ -283,11 +289,11 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
                   <p
                     className={cn(
                       "font-mono text-[14px] min-[360px]:text-[15px] font-black tracking-tight",
-                      isDeposit ? "text-emerald-600" : "text-gray-950"
+                      isCredit ? "text-emerald-600" : "text-gray-950"
                     )}
                   >
-                    {isDeposit ? "+" : "-"}
-                    ₦{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {isCredit ? "+" : "-"}
+                    ₦{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
 
                   {(() => {
