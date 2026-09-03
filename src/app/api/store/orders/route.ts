@@ -213,7 +213,7 @@ export async function POST(req: Request) {
 
       if (currentBalance < totalAmount) {
         return NextResponse.json({
-          error: `Insufficient wallet balance. Total is ₦${totalAmount.toLocaleString()}, but balance is ₦${currentBalance.toLocaleString()}. You can switch to 'Pay with Card / Checkout Link' to complete your order.`,
+          error: `Insufficient wallet balance. Total is ₦${totalAmount.toLocaleString()}, but balance is ₦${currentBalance.toLocaleString()}. You can switch to 'Fund with Card / Checkout Link' to complete your order.`,
         }, { status: 400 });
       }
 

@@ -2574,7 +2574,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               <span className="material-symbols-outlined text-[20px]">credit_card</span>
                             </div>
                             <div className="text-left">
-                              <p className="font-hanken font-extrabold text-xs text-black">Pay with Card</p>
+                              <p className="font-hanken font-extrabold text-xs text-black">Fund with Card</p>
                               <p className="font-hanken text-[10px] text-gray-400">Secure Direct Checkout Element</p>
                             </div>
                           </div>
@@ -2593,7 +2593,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               <span className="material-symbols-outlined text-[20px]">cell_tower</span>
                             </div>
                             <div className="text-left">
-                              <p className="font-hanken font-extrabold text-xs text-black">Pay with USSD Dial Code</p>
+                              <p className="font-hanken font-extrabold text-xs text-black">Fund with USSD Dial Code</p>
                               <p className="font-hanken text-[10px] text-gray-400">Instant code generation for all bank dials</p>
                             </div>
                           </div>
@@ -2612,7 +2612,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                               <span className="material-symbols-outlined text-[20px]">account_balance</span>
                             </div>
                             <div className="text-left">
-                              <p className="font-hanken font-extrabold text-xs text-black">Pay with Direct Bank Transfer</p>
+                              <p className="font-hanken font-extrabold text-xs text-black">Fund with Direct Bank Transfer</p>
                               <p className="font-hanken text-[10px] text-gray-400">Generate temporary Wema Virtual Account</p>
                             </div>
                           </div>
