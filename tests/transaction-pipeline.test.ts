@@ -1,8 +1,61 @@
 import { expect, test, describe } from "bun:test";
 import { Transaction } from "@/components/wallet/TransactionReceipt";
 import { TransactionRecord } from "@/services/wallet-service";
+import {
+  getTransactionDisplayAmount,
+  isCreditTransaction,
+} from "@/lib/transaction-status-normalizer";
 
 describe("Transaction Data Pipeline & Presentation", () => {
+  test("Activity Log & History Display Amount Normalization Rules", () => {
+    // 1. Transfer (Debit) with ₦5000 principal, ₦10 provider fee, ₦20 markup => totalDebited = ₦5030
+    const transferTx: Partial<Transaction> = {
+      amount: 5000,
+      fee: 10,
+      markup: 20,
+      vat: 0,
+      totalDebited: 5030,
+      type: "TRANSFER",
+      category: "TRANSFER",
+      direction: "DEBIT",
+      description: "Transfer to ABDULKADIR SHABA",
+      status: "FAILED",
+    };
+
+    expect(isCreditTransaction(transferTx as any)).toBe(false);
+    expect(getTransactionDisplayAmount(transferTx as any)).toBe(5030);
+
+    // 2. Refund (Credit) with ₦5000 principal, ₦10 provider fee, ₦20 markup => totalCredited = ₦5030
+    const refundTx: Partial<Transaction> = {
+      amount: 5000,
+      fee: 10,
+      markup: 20,
+      vat: 0,
+      totalCredited: 5030,
+      type: "REFUND",
+      category: "REFUND",
+      direction: "CREDIT",
+      description: "Refund for failed transfer: Transfer to ABDULKADIR SHABA",
+      status: "SUCCESS",
+    };
+
+    expect(isCreditTransaction(refundTx as any)).toBe(true);
+    expect(getTransactionDisplayAmount(refundTx as any)).toBe(5030);
+
+    // 3. Reversal (Credit) without explicit totalCredited fallback
+    const reversalTx: Partial<Transaction> = {
+      amount: 5000,
+      providerFee: 10,
+      markup: 20,
+      vat: 0,
+      type: "REVERSAL",
+      status: "REVERSED",
+      description: "Reversal for failed transfer",
+    };
+
+    expect(isCreditTransaction(reversalTx as any)).toBe(true);
+    expect(getTransactionDisplayAmount(reversalTx as any)).toBe(5030);
+  });
   test("Virtual account deposit normalizes sender details and receipt presentation accurately", () => {
     const depositRecord: Transaction = {
       id: "tx-flw-123456",
