@@ -13,11 +13,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import Link from "next/link";
 import { toast } from "sonner";
-import {
-  getTransactionLedgerStatus,
-  isCreditTransaction,
-  getTransactionDisplayAmount
-} from "@/lib/transaction-status-normalizer";
+import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
 
 const BILL_TYPES = ["BILL_PAYMENT", "AIRTIME", "DATA", "BILLS", "CABLE", "ELECTRICITY", "WAEC", "BETTING", "UTILITY"];
 
@@ -99,7 +95,6 @@ export default function BillsHistoryPage() {
 
           if (isBill) {
             list.push({
-              ...data,
               id: docSnap.id,
               reference: data.reference || docSnap.id,
               type: data.type || "BILL_PAYMENT",
@@ -112,10 +107,6 @@ export default function BillsHistoryPage() {
               date: data.date || "",
               time: data.time || "",
               fee: Number(data.fee) || 0,
-              vat: Number(data.vat) || 0,
-              markup: Number(data.markup) || 0,
-              totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
-              totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
             });
           }
         });
@@ -178,7 +169,6 @@ export default function BillsHistoryPage() {
 
         if (isBill) {
           list.push({
-            ...data,
             id: docSnap.id,
             reference: data.reference || docSnap.id,
             type: data.type || "BILL_PAYMENT",
@@ -191,10 +181,6 @@ export default function BillsHistoryPage() {
             date: data.date || "",
             time: data.time || "",
             fee: Number(data.fee) || 0,
-            vat: Number(data.vat) || 0,
-            markup: Number(data.markup) || 0,
-            totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
-            totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
           });
         }
       });
@@ -356,58 +342,37 @@ export default function BillsHistoryPage() {
               </div>
             ) : (
               <>
-                {filteredTransactions.map((tx) => {
-                  const isCredit = isCreditTransaction(tx);
-                  const displayAmount = getTransactionDisplayAmount(tx);
+                {filteredTransactions.map((tx) => (
+                  <button
+                    key={tx.id}
+                    onClick={() => setSelectedTx(tx)}
+                    className="w-full text-left relative overflow-hidden bg-gradient-to-r from-[#FC7A00]/[0.03] via-[#FC7A00]/[0.005] to-white border border-[#FC7A00]/15 hover:border-[#FC7A00]/35 rounded-2xl p-4 pl-5 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-3xs"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-gradient-to-b from-[#FC7A00] to-[#FF9022]" />
 
-                  return (
-                    <button
-                      key={tx.id}
-                      onClick={() => setSelectedTx(tx)}
-                      className={cn(
-                        "w-full text-left relative overflow-hidden rounded-2xl p-4 pl-5 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-3xs border",
-                        isCredit
-                          ? "bg-gradient-to-r from-emerald-500/[0.03] via-emerald-500/[0.005] to-white border-emerald-500/15 hover:border-emerald-500/35"
-                          : "bg-gradient-to-r from-[#FC7A00]/[0.03] via-[#FC7A00]/[0.005] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35"
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "absolute left-0 top-0 bottom-0 w-[4px]",
-                          isCredit
-                            ? "bg-gradient-to-b from-emerald-400 to-emerald-600"
-                            : "bg-gradient-to-b from-[#FC7A00] to-[#FF9022]"
-                        )}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <TransactionIcon
+                        type={tx.type}
+                        description={tx.description}
+                        recipientName={tx.recipientName}
+                        bankName={tx.bankName}
+                        className="w-10 h-10"
                       />
 
-                      <div className="flex items-center gap-3 min-w-0">
-                        <TransactionIcon
-                          type={tx.type}
-                          description={tx.description}
-                          recipientName={tx.recipientName}
-                          bankName={tx.bankName}
-                          className="w-10 h-10"
-                        />
-
-                        <div className="min-w-0">
-                          <p className="font-hanken font-extrabold text-xs text-black leading-tight truncate">
-                            {tx.description}
-                          </p>
-                          <p className="font-hanken text-[9px] text-gray-400 mt-1 font-semibold uppercase tracking-wider">
-                            {formatTransactionDateTime(tx.createdAt, tx.date, tx.time).dateTime}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="text-right flex-shrink-0">
-                        <p
-                          className={cn(
-                            "font-mono text-xs min-[360px]:text-sm font-bold",
-                            isCredit ? "text-emerald-600" : "text-black"
-                          )}
-                        >
-                          {isCredit ? "+" : "-"}₦{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <div className="min-w-0">
+                        <p className="font-hanken font-extrabold text-xs text-black leading-tight truncate">
+                          {tx.description}
                         </p>
+                        <p className="font-hanken text-[9px] text-gray-400 mt-1 font-semibold uppercase tracking-wider">
+                          {formatTransactionDateTime(tx.createdAt, tx.date, tx.time).dateTime}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-mono text-xs min-[360px]:text-sm font-bold text-black">
+                        -₦{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
 
                       {(() => {
                         const ledgerStatus = getTransactionLedgerStatus(tx);
@@ -426,8 +391,7 @@ export default function BillsHistoryPage() {
                       })()}
                     </div>
                   </button>
-                );
-              })}
+                ))}
 
                 {/* Skeleton placeholders when loading more bill items so user continues seamlessly */}
                 {loadingMore && (
