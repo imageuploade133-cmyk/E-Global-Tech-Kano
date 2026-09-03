@@ -33,24 +33,24 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   const normalizedType = (type || "").toUpperCase().trim();
   const fullContext = `${description} ${recipientName} ${bankName}`.toLowerCase();
 
-  const isStore = normalizedType.includes("STORE") || fullContext.includes("store order") || fullContext.includes("store purchase") || fullContext.includes("store");
-  const isAirtime = normalizedType.includes("AIRTIME") || fullContext.includes("airtime");
-  const isData = normalizedType.includes("DATA") || fullContext.includes("data");
-  const isSwap = normalizedType.includes("SWAP") || fullContext.includes("swap") || fullContext.includes("exchange");
-  const isTransfer = normalizedType.includes("TRANSFER") || normalizedType.includes("WITHDRAWAL") || normalizedType.includes("SEND");
-  const isDeposit = normalizedType.includes("DEPOSIT") || normalizedType.includes("CASHOUT") || normalizedType.includes("CARD_FUND");
-  const isInvestment = normalizedType.includes("INVESTMENT") || fullContext.includes("investment") || fullContext.includes("fixed deposit");
-  const isCable = normalizedType.includes("CABLE") || fullContext.includes("dstv") || fullContext.includes("gotv") || fullContext.includes("startimes");
-  const isElectricity = normalizedType.includes("ELECTRIC") || fullContext.includes("electricity") || fullContext.includes("meter") || fullContext.includes("kedco") || fullContext.includes("ikedc");
-  const isWaec = normalizedType.includes("WAEC") || fullContext.includes("waec") || fullContext.includes("exam");
+  const isRefund = normalizedType.includes("REFUND") || normalizedType.includes("REVERSAL") || fullContext.includes("refund") || fullContext.includes("reversal");
+  const isStore = !isRefund && (normalizedType.includes("STORE") || fullContext.includes("store order") || fullContext.includes("store purchase") || fullContext.includes("store"));
+  const isAirtime = !isRefund && (normalizedType.includes("AIRTIME") || fullContext.includes("airtime"));
+  const isData = !isRefund && (normalizedType.includes("DATA") || fullContext.includes("data"));
+  const isSwap = !isRefund && (normalizedType.includes("SWAP") || fullContext.includes("swap") || fullContext.includes("exchange"));
+  const isTransfer = !isRefund && (normalizedType.includes("TRANSFER") || normalizedType.includes("WITHDRAWAL") || normalizedType.includes("SEND") || fullContext.includes("transfer to"));
+  const isDeposit = !isRefund && (normalizedType.includes("DEPOSIT") || normalizedType.includes("CASHOUT") || normalizedType.includes("CARD_FUND"));
+  const isInvestment = !isRefund && (normalizedType.includes("INVESTMENT") || fullContext.includes("investment") || fullContext.includes("fixed deposit"));
+  const isCable = !isRefund && (normalizedType.includes("CABLE") || fullContext.includes("dstv") || fullContext.includes("gotv") || fullContext.includes("startimes"));
+  const isElectricity = !isRefund && (normalizedType.includes("ELECTRIC") || fullContext.includes("electricity") || fullContext.includes("meter") || fullContext.includes("kedco") || fullContext.includes("ikedc"));
+  const isWaec = !isRefund && (normalizedType.includes("WAEC") || fullContext.includes("waec") || fullContext.includes("exam"));
 
   // Lookup administrator-uploaded logo or fallback
-  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec || isSwap || isStore || isInvestment || isDeposit)
+  const billerLogo = (isAirtime || isData || isCable || isElectricity || isWaec || isSwap || isStore || isInvestment)
     ? getBillerLogo(fullContext)
     : null;
   const storeLogo = isStore ? (billerLogo || getStoreLogo()) : null;
-  const bankLogo = (isTransfer || isDeposit) ? (billerLogo || getBankLogo(fullContext)) : null;
-  const logoUrl = storeLogo || billerLogo || bankLogo;
+  const logoUrl = storeLogo || billerLogo;
 
   if (logoUrl && !imageError) {
     return (
@@ -75,10 +75,12 @@ export const TransactionIcon: React.FC<TransactionIconProps> = ({
   if (isStore) {
     iconName = "shopping_bag";
     iconBgColor = "bg-orange-50 text-orange-600 border-orange-200/50";
-  } else if (isDeposit) {
+  } else if (isRefund || isDeposit) {
+    // ↙ INCOMING GREEN ARROW ICON
     iconName = "south_west";
     iconBgColor = "bg-emerald-50 text-emerald-600 border-emerald-200/50";
   } else if (isTransfer) {
+    // ↗ OUTGOING ORANGE ARROW ICON
     iconName = "north_east";
     iconBgColor = "bg-[#FFF2E6] text-[#FC7A00] border-[#FFE4CC]/50";
   } else if (isSwap) {
