@@ -173,7 +173,7 @@ export class PaymentService {
    * Queries transaction status by tx_ref on the VM Payment Gateway
    */
   static async checkPaymentStatus(txRef: string, idToken: string) {
-    const response = await fetch(`${FLW_BASE_URL}/verify`, {
+    const response = await fetch("/api/flutterwave/verify", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${idToken}`,
