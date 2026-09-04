@@ -286,15 +286,20 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
 
                 {/* Amount and Status Pill layout */}
                 <div className="text-right flex-shrink-0">
-                  <p
-                    className={cn(
-                      "font-mono text-[14px] min-[360px]:text-[15px] font-black tracking-tight",
-                      isCredit ? "text-emerald-600" : "text-gray-950"
-                    )}
-                  >
-                    {isCredit ? "+" : "-"}
-                    ₦{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
+                  {(() => {
+                    const isFundingAttempt = tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT" || tx.type === "VIRTUAL_ACCOUNT_DEPOSIT" || tx.category === "deposit";
+                    const prefix = isCredit ? "+" : (isFundingAttempt ? "" : "-");
+                    return (
+                      <p
+                        className={cn(
+                          "font-mono text-[14px] min-[360px]:text-[15px] font-black tracking-tight",
+                          isCredit ? "text-emerald-600" : "text-gray-950"
+                        )}
+                      >
+                        {prefix}₦{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    );
+                  })()}
 
                   {(() => {
                     const ledgerStatus = getTransactionLedgerStatus(tx);
