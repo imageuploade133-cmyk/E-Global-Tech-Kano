@@ -948,7 +948,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   const totalCreditedAmt = isSuccessFunding ? (Number(transaction.totalCredited) || transaction.amount) : 0;
                   const reasonMsg = (transaction as any).reason || (transaction as any).message ||
                     (!isSuccessFunding
-                      ? (ledgerStatus.label === "Canceled" ? "Payment canceled by user" : ledgerStatus.label === "Expired" ? "Payment expired" : ledgerStatus.label === "Pending" ? "Waiting for payment confirmation" : "Payment declined or failed")
+                      ? (ledgerStatus.label === "Canceled" ? "Payment canceled by user" : ledgerStatus.label === "Expired" ? "Funding expired" : ledgerStatus.label === "Pending" ? "Waiting for payment confirmation" : "Payment declined or failed")
                       : null);
 
                   if (isCardMethod) {
