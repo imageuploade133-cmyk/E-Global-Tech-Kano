@@ -239,7 +239,9 @@ export default function HistoryPage() {
     const txCategory = getCategoryFromTx(tx);
     const matchesCategory = activeCategory === "all" || txCategory === activeCategory;
     const matchesCurrency = selectedCurrencyFilter === "ALL" || (tx.currency || "NGN") === selectedCurrencyFilter;
-    const matchesSearch =
+    const isPendingFunding = (tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT") && (tx.status === "PENDING" || tx.status === "pending");
+      if (isPendingFunding) return false;
+      const matchesSearch =
       tx.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       tx.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (tx.recipientName && tx.recipientName.toLowerCase().includes(searchTerm.toLowerCase())) ||
