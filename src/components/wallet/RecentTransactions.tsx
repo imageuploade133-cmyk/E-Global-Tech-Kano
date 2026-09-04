@@ -74,7 +74,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
         collection(db, "transactions"),
         where("userId", "==", user.uid),
         orderBy("createdAt", "desc"),
-        limit(3)
+        limit(15)
       );
 
       const snapshot = await getDocs(q);
@@ -98,6 +98,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           vat: Number(data.vat) || 0,
           markup: Number(data.markup) || 0,
           totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+            totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
         } as Transaction);
       });
 
@@ -230,7 +231,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           transactions.filter((tx) => {
             const isPendingFunding = (tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT") && (tx.status === "PENDING" || tx.status === "pending");
             return !isPendingFunding;
-          }).map((tx) => {
+          }).slice(0, 3).map((tx) => {
             const isDeposit = tx.type === "DEPOSIT" || tx.type === "CASHOUT";
 
             return (

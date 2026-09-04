@@ -109,6 +109,7 @@ export default function HistoryPage() {
           vat: Number(data.vat) || 0,
           markup: Number(data.markup) || 0,
           totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+          totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
         });
       });
 
