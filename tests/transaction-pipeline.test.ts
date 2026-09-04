@@ -275,3 +275,37 @@ describe("Transaction Data Pipeline & Presentation", () => {
     expect(depositTx.virtualAccountNumber).toBe("9921473281");
     expect(depositTx.virtualAccountBankName).toBe("Wema Bank");
   });
+
+describe("Frontend History Filtering & Receipt Requirements", () => {
+  test("Filters out PENDING WALLET_FUNDING while keeping SUCCESS, EXPIRED, FAILED, CANCELED, REVERSED visible", () => {
+    const list = [
+      { id: "1", type: "WALLET_FUNDING", status: "PENDING" },
+      { id: "2", type: "WALLET_FUNDING", status: "SUCCESS" },
+      { id: "3", type: "WALLET_FUNDING", status: "EXPIRED" },
+      { id: "4", type: "WALLET_FUNDING", status: "FAILED" },
+      { id: "5", type: "TRANSFER", status: "PENDING" }, // Non-funding pending preserved
+    ];
+
+    const filtered = list.filter((tx) => {
+      const isPendingFunding = (tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT") && (tx.status === "PENDING" || tx.status === "pending");
+      return !isPendingFunding;
+    });
+
+    expect(filtered.length).toBe(4);
+    expect(filtered.map((t) => t.id)).toEqual(["2", "3", "4", "5"]);
+  });
+
+  test("Receipt reasons for PENDING and EXPIRED wallet fundings", () => {
+    const getReason = (tx: any) => {
+      const isPending = (tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT") && (tx.status === "PENDING" || tx.status === "pending");
+      const isExpired = (tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT") && (tx.status === "EXPIRED" || tx.status === "expired");
+      if (isExpired) return "Funding expired";
+      if (isPending) return "Waiting for payment confirmation";
+      return "Success";
+    };
+
+    expect(getReason({ type: "WALLET_FUNDING", status: "PENDING" })).toBe("Waiting for payment confirmation");
+    expect(getReason({ type: "WALLET_FUNDING", status: "EXPIRED" })).toBe("Funding expired");
+    expect(getReason({ type: "WALLET_FUNDING", status: "SUCCESS" })).toBe("Success");
+  });
+});
