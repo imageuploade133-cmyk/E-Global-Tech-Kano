@@ -955,7 +955,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     const cardDisplay = (transaction as any).maskedCardNumber ||
                       ((transaction as any).cardBrand && (transaction as any).cardLast4
                         ? `${(transaction as any).cardBrand} •••• ${(transaction as any).cardLast4}`
-                        : "Visa •••• 1234");
+                        : null);
 
                     return (
                       <>
@@ -964,10 +964,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                           <span className="text-black font-bold">Card Payment</span>
                         </div>
 
-                        <div className="flex justify-between items-center text-gray-500 font-semibold">
-                          <span>Card</span>
-                          <span className="font-mono text-black font-bold">{cardDisplay}</span>
-                        </div>
+                        {cardDisplay && (
+                          <div className="flex justify-between items-center text-gray-500 font-semibold">
+                            <span>Card</span>
+                            <span className="font-mono text-black font-bold">{cardDisplay}</span>
+                          </div>
+                        )}
 
                         <div className="flex justify-between items-center text-gray-500 font-semibold">
                           <span>{isSuccessFunding ? "Amount" : "Attempted Amount"}</span>
@@ -1002,7 +1004,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   }
 
                   if (isUssdMethod) {
-                    const ussdBank = (transaction as any).ussdBankName || resolvedTransferFromBank || "Bank";
+                    const ussdBank = (transaction as any).ussdBankName || (resolvedTransferFromBank !== "Bank" ? resolvedTransferFromBank : null);
 
                     return (
                       <>
@@ -1011,13 +1013,15 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                           <span className="text-black font-bold">USSD</span>
                         </div>
 
-                        <div className="flex justify-between items-center text-gray-500 font-semibold">
-                          <span>Bank</span>
-                          <div className="flex items-center gap-1.5">
-                            <BankLogoResolver bankName={ussdBank} className="w-5 h-5 shrink-0" />
-                            <span className="text-black font-bold">{ussdBank}</span>
+                        {ussdBank && (
+                          <div className="flex justify-between items-center text-gray-500 font-semibold">
+                            <span>Bank</span>
+                            <div className="flex items-center gap-1.5">
+                              <BankLogoResolver bankName={ussdBank} className="w-5 h-5 shrink-0" />
+                              <span className="text-black font-bold">{ussdBank}</span>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         {transaction.providerReference && (
                           <div className="flex justify-between items-center text-gray-500 font-semibold">
