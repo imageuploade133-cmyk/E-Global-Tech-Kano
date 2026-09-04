@@ -927,7 +927,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   const isCardMethod = rawFm === "CARD" || desc.includes("card payment");
                   const isUssdMethod = rawFm === "USSD" || desc.includes("ussd");
 
-                  const totalCreditedAmt = Number(transaction.totalCredited) || transaction.amount;
                   const feeAmt = Number(transaction.fee) || 0;
 
                   // Masking utilities
