@@ -49,6 +49,31 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
     });
 
+    // Write pending ledger transaction document in transactions collection for activity history
+    await adminDb.collection("transactions").doc(`tx-FUNDING-${tx_ref}`).set({
+      userId: uid,
+      amount: payAmount,
+      currency: payCurrency,
+      reference: tx_ref,
+      transactionNumber: tx_ref,
+      providerReference: tx_ref,
+      type: "WALLET_FUNDING",
+      category: "deposit",
+      direction: "CREDIT",
+      title: "Wallet Funding",
+      description: "Bank Transfer",
+      recipientName: "Self",
+      creditedTo: "Available Balance",
+      fundingMethod: "BANK_TRANSFER",
+      status: "PENDING",
+      fee: 0,
+      totalCredited: 0,
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      transactionDate: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    }, { merge: true });
+
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
 

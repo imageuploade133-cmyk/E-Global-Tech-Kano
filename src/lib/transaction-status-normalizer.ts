@@ -82,7 +82,33 @@ export const getTransactionLedgerStatus = (tx?: {
     };
   }
 
-  // 3. FAILED
+  // 3. CANCELED
+  if (s === "CANCELED" || s === "CANCELLED") {
+    return {
+      code: "FAILED",
+      label: "Canceled",
+      badgeBg: "bg-gray-100",
+      badgeText: "text-gray-600",
+      badgeBorder: "border-gray-200",
+      dotBg: "bg-gray-400",
+      icon: "cancel",
+    };
+  }
+
+  // 4. EXPIRED
+  if (s === "EXPIRED") {
+    return {
+      code: "FAILED",
+      label: "Expired",
+      badgeBg: "bg-amber-50",
+      badgeText: "text-amber-700",
+      badgeBorder: "border-amber-200",
+      dotBg: "bg-amber-600",
+      icon: "timer_off",
+    };
+  }
+
+  // 5. FAILED
   if (s === "FAILED" || s === "DECLINED" || s === "REJECTED") {
     return {
       code: "FAILED",
@@ -155,6 +181,16 @@ export const isCreditTransaction = (tx?: {
   const cat = String(tx.category || "").toUpperCase().trim();
   const desc = String(tx.description || "").toLowerCase();
   const narr = String(tx.narration || "").toLowerCase();
+
+  // Non-successful status for WALLET_FUNDING / DEPOSIT is NOT a confirmed credit (no + sign)
+  if (
+    (type === "WALLET_FUNDING" || type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || cat === "DEPOSIT") &&
+    s !== "SUCCESS" &&
+    s !== "SUCCESSFUL" &&
+    s !== "CREDITED"
+  ) {
+    return false;
+  }
 
   // 1. REFUND / REVERSAL is strictly a CREDIT (wallet refund)
   if (

@@ -416,16 +416,22 @@ export default function HistoryPage() {
                       </div>
 
                       <div className="text-right flex-shrink-0">
-                        <p
-                          className={cn(
-                            "font-mono text-xs min-[360px]:text-sm font-bold",
-                            isCredit ? "text-emerald-600" : "text-black"
-                          )}
-                        >
-                          {isCredit ? "+" : "-"}
-                          {tx.currency === "NGN" ? "₦" : "$"}
-                          {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
+                        {(() => {
+                          const isFundingAttempt = tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT" || tx.type === "VIRTUAL_ACCOUNT_DEPOSIT" || tx.category === "deposit";
+                          const prefix = isCredit ? "+" : (isFundingAttempt ? "" : "-");
+                          return (
+                            <p
+                              className={cn(
+                                "font-mono text-xs min-[360px]:text-sm font-bold",
+                                isCredit ? "text-emerald-600" : "text-black"
+                              )}
+                            >
+                              {prefix}
+                              {tx.currency === "NGN" ? "₦" : "$"}
+                              {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          );
+                        })()}
 
                         {(() => {
                           const ledgerStatus = getTransactionLedgerStatus(tx);

@@ -945,6 +945,13 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     return "********" + clean.slice(-2);
                   };
 
+                  const isSuccessFunding = ledgerStatus.code === "CREDITED" || (transaction.status || "").toUpperCase() === "SUCCESS" || (transaction.status || "").toUpperCase() === "SUCCESSFUL";
+                  const totalCreditedAmt = isSuccessFunding ? (Number(transaction.totalCredited) || transaction.amount) : 0;
+                  const reasonMsg = (transaction as any).reason || (transaction as any).message ||
+                    (!isSuccessFunding
+                      ? (ledgerStatus.label === "Canceled" ? "Payment canceled by user" : ledgerStatus.label === "Expired" ? "Payment expired" : ledgerStatus.label === "Pending" ? "Waiting for payment confirmation" : "Payment declined or failed")
+                      : null);
+
                   if (isCardMethod) {
                     const cardDisplay = (transaction as any).maskedCardNumber ||
                       ((transaction as any).cardBrand && (transaction as any).cardLast4
@@ -964,7 +971,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </div>
 
                         <div className="flex justify-between items-center text-gray-500 font-semibold">
-                          <span>Amount</span>
+                          <span>{isSuccessFunding ? "Amount" : "Attempted Amount"}</span>
                           <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
 
@@ -974,9 +981,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </div>
 
                         <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
-                          <span>Total Credited</span>
-                          <span className="text-emerald-600 font-extrabold">{currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span>{isSuccessFunding ? "Total Credited" : "Amount Credited"}</span>
+                          <span className={cn("font-extrabold", isSuccessFunding ? "text-emerald-600" : "text-gray-500")}>
+                            {currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
                         </div>
+
+                        {reasonMsg && (
+                          <div className="flex justify-between items-start text-gray-500 font-semibold">
+                            <span>Reason</span>
+                            <span className="text-rose-600 font-bold text-right max-w-[200px]">{reasonMsg}</span>
+                          </div>
+                        )}
 
                         <div className="flex justify-between items-center text-gray-500 font-semibold">
                           <span>Credited To</span>
@@ -1012,7 +1028,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         )}
 
                         <div className="flex justify-between items-center text-gray-500 font-semibold">
-                          <span>Amount</span>
+                          <span>{isSuccessFunding ? "Amount" : "Attempted Amount"}</span>
                           <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
 
@@ -1022,9 +1038,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </div>
 
                         <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
-                          <span>Total Credited</span>
-                          <span className="text-emerald-600 font-extrabold">{currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span>{isSuccessFunding ? "Total Credited" : "Amount Credited"}</span>
+                          <span className={cn("font-extrabold", isSuccessFunding ? "text-emerald-600" : "text-gray-500")}>
+                            {currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
                         </div>
+
+                        {reasonMsg && (
+                          <div className="flex justify-between items-start text-gray-500 font-semibold">
+                            <span>Reason</span>
+                            <span className="text-rose-600 font-bold text-right max-w-[200px]">{reasonMsg}</span>
+                          </div>
+                        )}
 
                         <div className="flex justify-between items-center text-gray-500 font-semibold">
                           <span>Credited To</span>
@@ -1083,7 +1108,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       )}
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
-                        <span>Amount</span>
+                        <span>{isSuccessFunding ? "Amount" : "Attempted Amount"}</span>
                         <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
 
@@ -1093,9 +1118,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       </div>
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
-                        <span>Total Credited</span>
-                        <span className="text-emerald-600 font-extrabold">{currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span>{isSuccessFunding ? "Total Credited" : "Amount Credited"}</span>
+                        <span className={cn("font-extrabold", isSuccessFunding ? "text-emerald-600" : "text-gray-500")}>
+                          {currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
+
+                      {reasonMsg && (
+                        <div className="flex justify-between items-start text-gray-500 font-semibold">
+                          <span>Reason</span>
+                          <span className="text-rose-600 font-bold text-right max-w-[200px]">{reasonMsg}</span>
+                        </div>
+                      )}
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
                         <span>Credited To</span>
