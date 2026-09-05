@@ -654,11 +654,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     transferNote: string;
   } | null>(null);
 
+  const [confirmedCreditedAmount, setConfirmedCreditedAmount] = useState<number | null>(null);
+
   // Timer & Polling Refs
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes default
   const [paymentStatus, setPaymentStatus] = useState<"PENDING" | "PROCESSING" | "PAID" | "EXPIRED" | "FAILED">("PENDING");
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollInFlightRef = useRef<boolean>(false);
+  const isPollingActiveRef = useRef<boolean>(false);
 
   const resolvedName = (
     userName ||
@@ -1180,6 +1184,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     };
   }, [isAddMoneyOpen, wizardStep]);
 
+  const stopPolling = () => {
+    isPollingActiveRef.current = false;
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    pollInFlightRef.current = false;
+  };
+
   // Status Polling Effect
   const startPolling = (txRef: string) => {
     stopPolling();
@@ -1187,10 +1200,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       console.warn("[Polling Cancelled] No authenticated user present.");
       return;
     }
+
+    isPollingActiveRef.current = true;
     console.log(`[Polling Started] Checking status for txRef: ${txRef}`);
 
-    const pollOnce = async () => {
-      if (!user) return;
+    const executePoll = async () => {
+      if (!user || !isPollingActiveRef.current || pollInFlightRef.current) {
+        return;
+      }
+
+      pollInFlightRef.current = true;
       try {
         const idToken = await user.getIdToken();
         const res = await fetch(`/api/payments/status?txRef=${encodeURIComponent(txRef)}`, {
@@ -1201,47 +1220,57 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         });
         const data = await res.json();
 
+        if (!isPollingActiveRef.current) {
+          return;
+        }
+
         if (res.status === 401 || res.status === 403) {
           console.warn(`[Polling Stopped] Authorization error ${res.status}`);
           stopPolling();
           return;
         }
 
-        if (data.success || data.status) {
-          if (data.status === "SUCCESS") {
-            setPaymentStatus("PAID");
-            stopPolling();
-            if (timerRef.current) clearInterval(timerRef.current);
-            setWizardStep("success");
-            toast.success("Wallet credited successfully!");
-            fetchWalletBalances();
-            fetchInvestmentBalance();
-            window.dispatchEvent(new Event("app-refresh"));
-          } else if (data.status === "FAILED" || data.status === "EXPIRED" || data.status === "CANCELED") {
-            setPaymentStatus(data.status);
-            stopPolling();
-            if (timerRef.current) clearInterval(timerRef.current);
-          }
+        if (data.status === "SUCCESS") {
+          const creditedAmt = Number(data.totalCredited ?? data.fundedAmount ?? data.amount ?? 0);
+          setConfirmedCreditedAmount(creditedAmt > 0 ? creditedAmt : null);
+          setPaymentStatus("PAID");
+          stopPolling();
+          if (timerRef.current) clearInterval(timerRef.current);
+          setWizardStep("success");
+          toast.success("Wallet credited successfully!");
+          fetchWalletBalances();
+          fetchInvestmentBalance();
+          window.dispatchEvent(new Event("app-refresh"));
+        } else if (data.status === "FAILED" || data.status === "EXPIRED" || data.status === "CANCELED") {
+          setConfirmedCreditedAmount(0);
+          setPaymentStatus(data.status);
+          stopPolling();
+          if (timerRef.current) clearInterval(timerRef.current);
         }
       } catch (err) {
         console.error("Polling Error:", err);
+      } finally {
+        pollInFlightRef.current = false;
       }
     };
 
-    // Immediate initial check
-    pollOnce();
-
-    pollingRef.current = setInterval(pollOnce, 4000); // Poll every 4 seconds
+    // Immediate initial poll
+    executePoll().then(() => {
+      // Only start 4-second interval if polling is still active (non-terminal)
+      if (isPollingActiveRef.current) {
+        pollingRef.current = setInterval(executePoll, 4000);
+      }
+    });
   };
 
-  const stopPolling = () => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-  };
+  // Clean up polling and timers when closing modal or unmounting
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
-  // Clean up polling and timers when closing modal
   const handleCloseModal = () => {
     setIsAddMoneyOpen(false);
     stopPolling();
@@ -1255,6 +1284,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setSelectedBank(null);
       setUssdCode("");
       setTransferDetails(null);
+      setConfirmedCreditedAmount(null);
       setUssdErrorMessage("");
     }, 300);
   };
@@ -2900,13 +2930,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-500 font-bold uppercase text-[10px]">Transferred Amount</span>
                       <span className="font-mono font-bold text-gray-900">
-                        ₦{transferDetails?.transferAmount ? transferDetails.transferAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : parseFloat(addAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₦{transferDetails?.transferAmount ? transferDetails.transferAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : (parseFloat(addAmount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-xs border-t border-gray-200/60 pt-2">
                       <span className="text-gray-500 font-bold uppercase text-[10px]">Credited Amount</span>
                       <span className="font-mono text-xl font-black text-emerald-600">
-                        +₦{parseFloat(addAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        +₦{(confirmedCreditedAmount ?? parseFloat(addAmount) ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>

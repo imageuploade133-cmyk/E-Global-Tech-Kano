@@ -51,31 +51,61 @@ export class PaymentService {
       throw new Error(resData.message || "Failed to contact VM verification api.");
     }
 
-    if (resData.status === "EXPIRED" || resData.status === "FAILED" || resData.status === "CANCELED" || resData.status === "REVERSED") {
-      return { status: resData.status, credited: false, fundedAmount: 0, totalCredited: 0, message: resData.message };
-    }
+    const flwStatusRaw = (resData.status || (resData.success ? "SUCCESSFUL" : "PENDING")).toString().toUpperCase();
+    const isSuccess = flwStatusRaw === "SUCCESS" || flwStatusRaw === "SUCCESSFUL" || resData.success === true;
+    const isFailed = flwStatusRaw === "FAILED" || (resData.error && resData.error.toLowerCase().includes("failed"));
+    const isExpired = flwStatusRaw === "EXPIRED" || (resData.error && resData.error.toLowerCase().includes("expired"));
+    const isCanceled = flwStatusRaw === "CANCELED" || flwStatusRaw === "CANCELLED" || (resData.error && resData.error.toLowerCase().includes("cancel"));
 
-    // Provider SUCCESS is not sufficient for the UI. The wallet must be confirmed credited.
-    if (resData.success && resData.credited === true) {
-      const fundedAmount = Number(resData.totalCredited ?? resData.fundedAmount ?? resData.amount);
-      const totalCredited = Number(resData.totalCredited ?? resData.fundedAmount ?? resData.amount);
+    const confirmedAmount = Number(resData.totalCredited ?? resData.fundedAmount ?? resData.amount ?? 0);
+
+    if (isSuccess) {
       return {
+        success: true,
         status: "SUCCESS",
-        fundedAmount: Number.isFinite(fundedAmount) && fundedAmount >= 0 ? fundedAmount : undefined,
-        totalCredited: Number.isFinite(totalCredited) && totalCredited >= 0 ? totalCredited : undefined,
-        credited: true,
+        fundedAmount: confirmedAmount,
+        totalCredited: confirmedAmount,
+        amount: confirmedAmount,
+        credited: resData.credited ?? true,
         newBalance: resData.newBalance,
         duplicate: resData.duplicate,
         message: resData.message,
       };
+    } else if (isFailed) {
+      return {
+        success: false,
+        status: "FAILED",
+        fundedAmount: 0,
+        totalCredited: 0,
+        amount: 0,
+        credited: false,
+      };
+    } else if (isExpired) {
+      return {
+        success: false,
+        status: "EXPIRED",
+        fundedAmount: 0,
+        totalCredited: 0,
+        amount: 0,
+        credited: false,
+      };
+    } else if (isCanceled) {
+      return {
+        success: false,
+        status: "CANCELED",
+        fundedAmount: 0,
+        totalCredited: 0,
+        amount: 0,
+        credited: false,
+      };
     }
 
-    if (resData.success && resData.credited !== true) {
-      console.warn(`[Polling Status Info] Provider verification succeeded but wallet credit is not confirmed for ${txRef}. Keeping status PENDING.`);
-      return { status: "PENDING", credited: false, fundedAmount: 0, totalCredited: 0, message: resData.message };
-    }
-
-    if (resData.error && String(resData.error).toLowerCase().includes("failed")) return { status: "FAILED" };
-    return { status: "PENDING" };
+    return {
+      success: true,
+      status: "PENDING",
+      fundedAmount: 0,
+      totalCredited: 0,
+      credited: false,
+    };
   }
 }
