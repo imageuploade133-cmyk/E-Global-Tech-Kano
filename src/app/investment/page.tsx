@@ -8,16 +8,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import BannerSlideshow from "@/components/BannerSlideshow";
-
-interface InvestmentProduct {
-  id: string;
-  name: string;
-  type: "SAVINGS" | "FIXED_DEPOSIT";
-  apr: number; // e.g. 0.085 for 8.5%
-  durationDays: number;
-  interestType: "SIMPLE" | "COMPOUND";
-  status: "ACTIVE" | "INACTIVE";
-}
+import { SavingsPlanData, DEFAULT_SAVINGS_PLANS } from "@/lib/savings-plans-types";
 
 interface ActiveInvestment {
   id: string;
@@ -38,55 +29,28 @@ interface ActiveInvestment {
   updatedAt: string;
 }
 
-const DEFAULT_PRODUCTS: InvestmentProduct[] = [
-  {
-    id: "vault-flex",
-    name: "Flexi Wealth Vault",
-    type: "SAVINGS",
-    apr: 0.085,
-    durationDays: 30,
-    interestType: "SIMPLE",
-    status: "ACTIVE"
-  },
-  {
-    id: "vault-pro",
-    name: "Pro Yield Vault",
-    type: "FIXED_DEPOSIT",
-    apr: 0.125,
-    durationDays: 90,
-    interestType: "SIMPLE",
-    status: "ACTIVE"
-  },
-  {
-    id: "vault-elite",
-    name: "Elite Compounder",
-    type: "FIXED_DEPOSIT",
-    apr: 0.18,
-    durationDays: 365,
-    interestType: "COMPOUND",
-    status: "ACTIVE"
-  }
-];
-
 export default function InvestmentPage() {
   const { userData, updateUserData, user } = useAuth();
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
   // DB-driven specs
-  const [products, setProducts] = useState<InvestmentProduct[]>(DEFAULT_PRODUCTS);
+  const [plans, setPlans] = useState<SavingsPlanData[]>(DEFAULT_SAVINGS_PLANS);
   const [penaltyRate, setPenaltyRate] = useState<number>(0.10); // 10% Early Cancellation Penalty
-  const [minInvestment, setMinInvestment] = useState<number>(1000);
-  const [maxInvestment, setMaxInvestment] = useState<number>(10000000);
 
-  const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(true);
+  const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(true);
 
   // States for creation
-  const [selectedProductId, setSelectedProductId] = useState<string>("vault-flex");
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("target-savings");
   const [amountStr, setAmountStr] = useState<string>("");
-  const [maturityDate, setMaturityDate] = useState<string>("");
   const [walletTypeSelected, setWalletTypeSelected] = useState<"MAIN" | "BONUS">("MAIN");
+
+  // UNLOCK DURATION STATES ("WHEN DO YOU WANT TO UNLOCK YOUR SAVINGS")
+  const [unlockMode, setUnlockMode] = useState<"MONTHS" | "YEARS" | "CUSTOM">("MONTHS");
+  const [selectedMonth, setSelectedMonth] = useState<number>(3);
+  const [selectedYear, setSelectedYear] = useState<number>(1);
+  const [customMaturityDate, setCustomMaturityDate] = useState<string>("");
 
   // Active holdings
   const [investments, setInvestments] = useState<ActiveInvestment[]>([]);
@@ -99,216 +63,58 @@ export default function InvestmentPage() {
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
 
-  const renderCalendarModal = () => {
-    if (!showCalendarModal) return null;
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || DEFAULT_SAVINGS_PLANS[0];
 
-    const minAllowedDate = new Date();
-    minAllowedDate.setDate(minAllowedDate.getDate() + selectedProduct.durationDays);
-    // strip hours for clean day boundary comparisons
-    minAllowedDate.setHours(0, 0, 0, 0);
-
-    const year = calendarMonth.getFullYear();
-    const month = calendarMonth.getMonth();
-
-    const firstDayOfMonth = new Date(year, month, 1);
-    const startDayOfWeek = firstDayOfMonth.getDay(); // 0 is Sunday, 6 is Saturday
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    // construct an array of the days to display
-    const daysArray: (Date | null)[] = [];
-    // pre-padding days
-    for (let i = 0; i < startDayOfWeek; i++) {
-      daysArray.push(null);
+  // Sync unlock options when selected plan changes
+  useEffect(() => {
+    if (selectedPlan) {
+      if (selectedPlan.allowMonths && Array.isArray(selectedPlan.monthOptions) && selectedPlan.monthOptions.length > 0) {
+        setUnlockMode("MONTHS");
+        setSelectedMonth(selectedPlan.monthOptions[0]);
+      } else if (selectedPlan.allowYears && Array.isArray(selectedPlan.yearOptions) && selectedPlan.yearOptions.length > 0) {
+        setUnlockMode("YEARS");
+        setSelectedYear(selectedPlan.yearOptions[0]);
+      } else if (selectedPlan.allowCustom) {
+        setUnlockMode("CUSTOM");
+      }
     }
-    // actual days
-    for (let day = 1; day <= daysInMonth; day++) {
-      daysArray.push(new Date(year, month, day));
+  }, [selectedPlanId, selectedPlan]);
+
+  // Compute calculated lock days and maturity date
+  const getCalculatedMaturityDate = (): Date => {
+    const date = new Date();
+    if (unlockMode === "MONTHS") {
+      date.setMonth(date.getMonth() + (selectedMonth || 1));
+    } else if (unlockMode === "YEARS") {
+      date.setFullYear(date.getFullYear() + (selectedYear || 1));
+    } else if (unlockMode === "CUSTOM" && customMaturityDate) {
+      return new Date(customMaturityDate);
+    } else {
+      date.setDate(date.getDate() + (selectedPlan?.defaultDurationDays || 30));
     }
-
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-
-    const handlePrevMonth = () => {
-      setCalendarMonth(new Date(year, month - 1, 1));
-    };
-
-    const handleNextMonth = () => {
-      setCalendarMonth(new Date(year, month + 1, 1));
-    };
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
-        <div className="absolute inset-0" onClick={() => setShowCalendarModal(false)} />
-
-        <motion.div
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "100%" }}
-          transition={{ type: "spring", damping: 25, stiffness: 220 }}
-          className="relative bg-white w-full max-w-md rounded-t-[32px] p-6 shadow-2xl border-t border-gray-100 z-10"
-        >
-          <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
-
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bodoni text-[16px] font-bold text-black flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-primary text-[20px]">
-                calendar_month
-              </span>
-              Pick Maturity Date
-            </h3>
-            <button
-              type="button"
-              onClick={() => setShowCalendarModal(false)}
-              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          </div>
-
-          {/* Guide Warning Description banner */}
-          <div className="bg-[#FFF9F5] border border-[#FFECD8] rounded-2xl p-3.5 mb-4 text-xs">
-            <p className="font-hanken font-bold text-black leading-snug">
-              Lock Duration: {selectedProduct.durationDays} Days Minimum
-            </p>
-            <p className="font-hanken text-[10.5px] text-gray-500 mt-1 leading-relaxed">
-              Your chosen savings plan requires capital to be locked for at least {selectedProduct.durationDays} days. Days before <span className="text-primary font-bold">{minAllowedDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span> are locked and cannot be selected.
-            </p>
-          </div>
-
-          {/* Month Navigation */}
-          <div className="flex items-center justify-between mb-4 px-1">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-            </button>
-            <span className="font-hanken text-sm font-extrabold text-black">
-              {monthNames[month]} {year}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-            </button>
-          </div>
-
-          {/* Calendar Grid Header */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1">
-            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((dayName) => (
-              <span key={dayName} className="font-hanken text-[10px] font-extrabold text-gray-400 uppercase tracking-wider py-1">
-                {dayName}
-              </span>
-            ))}
-          </div>
-
-          {/* Calendar Grid Body */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-6">
-            {daysArray.map((dayDate, idx) => {
-              if (!dayDate) {
-                return <div key={`empty-${idx}`} className="aspect-square" />;
-              }
-
-              // compare purely on dates without hours/mins
-              const compareDate = new Date(dayDate);
-              compareDate.setHours(0, 0, 0, 0);
-
-              const isBeforeMin = compareDate < minAllowedDate;
-              const formattedValue = dayDate.toISOString().split("T")[0];
-              const isSelected = maturityDate === formattedValue;
-
-              return (
-                <button
-                  key={formattedValue}
-                  type="button"
-                  disabled={isBeforeMin}
-                  onClick={() => {
-                    setMaturityDate(formattedValue);
-                    setShowCalendarModal(false);
-                  }}
-                  className={`aspect-square rounded-xl font-hanken text-xs font-bold transition-all flex flex-col items-center justify-center relative cursor-pointer ${
-                    isSelected
-                      ? "bg-primary text-white shadow-sm"
-                      : isBeforeMin
-                      ? "text-gray-300 bg-gray-50/50 cursor-not-allowed line-through"
-                      : "text-black hover:bg-gray-100 active:scale-95"
-                  }`}
-                >
-                  <span>{dayDate.getDate()}</span>
-                  {isSelected && (
-                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Bottom Cancel Button */}
-          <button
-            type="button"
-            onClick={() => setShowCalendarModal(false)}
-            className="w-full py-3.5 border border-gray-200 text-gray-500 hover:text-black rounded-xl font-hanken text-[12.5px] font-bold tracking-wide active:scale-95 transition-all"
-          >
-            Close Calendar
-          </button>
-        </motion.div>
-      </div>
-    );
+    return date;
   };
 
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
+  const calculatedMaturityDateObj = getCalculatedMaturityDate();
+  const calculatedMaturityDateStr = calculatedMaturityDateObj.toISOString().split("T")[0];
 
-  // Sync state with browser back history (device physical/swipe back button support)
-  const hasPushedState = React.useRef(false);
+  const getCalculatedLockDays = (): number => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(calculatedMaturityDateObj);
+    end.setHours(0, 0, 0, 0);
+    const diffTime = end.getTime() - start.getTime();
+    return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  };
 
-  useEffect(() => {
-    if (showConfirmModal || showCancelModal || showCalendarModal) {
-      window.history.pushState({ modalOpen: true }, "");
-      hasPushedState.current = true;
+  const calculatedLockDays = getCalculatedLockDays();
 
-      const handlePopState = (e: PopStateEvent) => {
-        e.preventDefault();
-        hasPushedState.current = false;
-        setShowConfirmModal(false);
-        setShowCancelModal(false);
-        setShowCalendarModal(false);
-      };
-
-      window.addEventListener("popstate", handlePopState);
-      return () => {
-        window.removeEventListener("popstate", handlePopState);
-        if (hasPushedState.current) {
-          window.history.back();
-          hasPushedState.current = false;
-        }
-      };
-    }
-  }, [showConfirmModal, showCancelModal, showCalendarModal]);
-
-  // Prevent background scroll when investment confirm, cancel or calendar modals are open
-  useEffect(() => {
-    if (showConfirmModal || showCancelModal || showCalendarModal) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [showConfirmModal, showCancelModal, showCalendarModal]);
-
-  // Load specs and records from dynamic backend or sessionStorage fallback
+  // Load plans and records
   const loadInvestmentData = async () => {
     const isMock = sessionStorage.getItem("mock") === "true";
 
     if (isMock) {
-      setIsLoadingProducts(false);
+      setIsLoadingPlans(false);
       setIsLoadingHistory(false);
       const saved = sessionStorage.getItem("active_investments");
       if (saved) {
@@ -321,56 +127,46 @@ export default function InvestmentPage() {
       return;
     }
 
-    if (!user) return;
-
     try {
-      setIsLoadingProducts(true);
+      setIsLoadingPlans(true);
       setIsLoadingHistory(true);
 
-      const idToken = await user.getIdToken();
-
-      // Fetch dynamic configuration
-      const configRes = await fetch("/api/investments/settings", {
-        headers: { Authorization: `Bearer ${idToken}` }
-      });
-      if (configRes.ok) {
-        const configData = await configRes.json();
-        if (configData.success && configData.settings) {
-          setPenaltyRate(configData.settings.penaltyRate ?? 0.10);
-          setMinInvestment(configData.settings.minInvestment ?? 1000);
-          setMaxInvestment(configData.settings.maxInvestment ?? 10000000);
+      let idToken = "mock-token";
+      if (user && typeof user.getIdToken === "function") {
+        try {
+          idToken = await user.getIdToken();
+        } catch {
+          // ignore
         }
       }
 
-      // Fetch dynamic products and rates
-      const productsRes = await fetch("/api/investments/interest-rates", {
-        headers: { Authorization: `Bearer ${idToken}` }
-      });
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        if (productsData.success && Array.isArray(productsData.rates)) {
-          setProducts(productsData.rates);
-          if (productsData.rates.length > 0) {
-            setSelectedProductId(productsData.rates[0].id);
+      // Fetch dynamic savings plans from public endpoint
+      const plansRes = await fetch("/api/investments/plans");
+      if (plansRes.ok) {
+        const plansData = await plansRes.json();
+        if (plansData.success && Array.isArray(plansData.plans) && plansData.plans.length > 0) {
+          setPlans(plansData.plans);
+          setSelectedPlanId(plansData.plans[0].id);
+        }
+      }
+      setIsLoadingPlans(false);
+
+      if (user) {
+        // Fetch dynamic active user holdings
+        const holdingsRes = await fetch("/api/investments", {
+          headers: { Authorization: `Bearer ${idToken}` }
+        });
+        if (holdingsRes.ok) {
+          const holdingsData = await holdingsRes.json();
+          if (holdingsData.success && Array.isArray(holdingsData.investments)) {
+            setInvestments(holdingsData.investments);
           }
-        }
-      }
-      setIsLoadingProducts(false);
-
-      // Fetch dynamic active user holdings
-      const holdingsRes = await fetch("/api/investments", {
-        headers: { Authorization: `Bearer ${idToken}` }
-      });
-      if (holdingsRes.ok) {
-        const holdingsData = await holdingsRes.json();
-        if (holdingsData.success && Array.isArray(holdingsData.investments)) {
-          setInvestments(holdingsData.investments);
         }
       }
       setIsLoadingHistory(false);
     } catch (err) {
       console.error("Failed to load backend investment records:", err);
-      setIsLoadingProducts(false);
+      setIsLoadingPlans(false);
       setIsLoadingHistory(false);
     }
   };
@@ -380,36 +176,25 @@ export default function InvestmentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const selectedProduct = products.find(p => p.id === selectedProductId) || products[0] || DEFAULT_PRODUCTS[0];
   const mainBalance = (userData?.balance as number) ?? 0;
   const bonusBalance = (userData?.bonusBalance as number) ?? 0;
   const userBalance = walletTypeSelected === "BONUS" ? bonusBalance : mainBalance;
 
-  // Real-time server-side mimicking reward calculation for display
+  // Real-time server-side reward calculation
   const getEstimatedReward = () => {
-    const amt = parseFloat(amountStr);
-    if (isNaN(amt) || amt <= 0 || !maturityDate) return 0;
+    const amt = parseFloat(amountStr) || 0;
+    if (amt <= 0) return 0;
 
-    const start = new Date();
-    const end = new Date(maturityDate);
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const aprDecimal = (selectedPlan.apr || 10) / 100;
+    const diffDays = calculatedLockDays;
 
-    if (selectedProduct.interestType === "SIMPLE") {
-      const reward = amt * selectedProduct.apr * (diffDays / 365);
+    if (selectedPlan.interestType === "SIMPLE") {
+      const reward = amt * aprDecimal * (diffDays / 365);
       return parseFloat(reward.toFixed(2));
     } else {
-      const reward = amt * (Math.pow(1 + selectedProduct.apr / 365, diffDays) - 1);
+      const reward = amt * (Math.pow(1 + aprDecimal / 365, diffDays) - 1);
       return parseFloat(reward.toFixed(2));
     }
-  };
-
-  const getInvestmentDays = () => {
-    if (!maturityDate) return 0;
-    const start = new Date();
-    const end = new Date(maturityDate);
-    const diffTime = end.getTime() - start.getTime();
-    return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   };
 
   // Form Prevalidation
@@ -417,54 +202,60 @@ export default function InvestmentPage() {
     e.preventDefault();
     const amt = parseFloat(amountStr);
 
-    if (isNaN(amt) || amt <= 0) {
-      toast.error("Please enter a valid investment amount");
-      return;
+    if (selectedPlan.isAmountRequired) {
+      if (isNaN(amt) || amt <= 0) {
+        toast.error("Please enter a valid investment amount");
+        return;
+      }
+
+      if (amt < selectedPlan.minInvestment) {
+        toast.error(`Minimum investment limit for ${selectedPlan.name} is ₦${selectedPlan.minInvestment.toLocaleString()}`);
+        return;
+      }
+
+      if (amt > selectedPlan.maxInvestment) {
+        toast.error(`Maximum investment limit for ${selectedPlan.name} is ₦${selectedPlan.maxInvestment.toLocaleString()}`);
+        return;
+      }
+
+      if (amt > userBalance) {
+        toast.error("Insufficient wallet balance for this investment amount");
+        return;
+      }
     }
 
-    if (amt < minInvestment) {
-      toast.error(`Minimum investment limit is ₦${minInvestment.toLocaleString()}`);
-      return;
-    }
-
-    if (amt > maxInvestment) {
-      toast.error(`Maximum investment limit is ₦${maxInvestment.toLocaleString()}`);
-      return;
-    }
-
-    if (amt > userBalance) {
-      toast.error("Insufficient wallet balance for this investment amount");
-      return;
-    }
-
-    if (!maturityDate) {
-      toast.error("Please select a target maturity date");
-      return;
-    }
-
-    const minMaturity = new Date();
-    minMaturity.setDate(minMaturity.getDate() + selectedProduct.durationDays);
-    const chosenDate = new Date(maturityDate);
-
-    if (chosenDate < minMaturity) {
-      toast.error(`Maturity date must be at least ${selectedProduct.durationDays} days from today for this plan.`);
-      return;
+    if (unlockMode === "CUSTOM") {
+      if (!customMaturityDate) {
+        toast.error("Please pick a custom unlock date from the calendar");
+        return;
+      }
+      if (calculatedLockDays < selectedPlan.minCustomDays) {
+        toast.error(`Custom lock duration must be at least ${selectedPlan.minCustomDays} days for this plan.`);
+        return;
+      }
+      if (calculatedLockDays > selectedPlan.maxCustomDays) {
+        toast.error(`Custom lock duration cannot exceed ${selectedPlan.maxCustomDays} days for this plan.`);
+        return;
+      }
     }
 
     setShowConfirmModal(true);
   };
 
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
+
   // Confirm Lock Setup
   const handleConfirmInvestment = async () => {
     setIsSubmitting(true);
-    const amt = parseFloat(amountStr);
+    const amt = parseFloat(amountStr) || 0;
     const estimatedReward = getEstimatedReward();
 
     try {
       const isMock = sessionStorage.getItem("mock") === "true";
 
       if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
 
         const nextBalance = userBalance - amt;
         await updateUserData({ balance: nextBalance });
@@ -472,18 +263,18 @@ export default function InvestmentPage() {
         const newInvest: ActiveInvestment = {
           id: "INV-" + Math.floor(100000 + Math.random() * 900000),
           userId: user?.uid || "mock-user",
-          type: selectedProduct.type,
+          type: selectedPlan.type,
           amount: amt,
           currency: "NGN",
           startDate: new Date().toISOString(),
-          maturityDate: new Date(maturityDate).toISOString(),
-          interestRate: selectedProduct.apr,
-          interestType: selectedProduct.interestType,
+          maturityDate: calculatedMaturityDateObj.toISOString(),
+          interestRate: (selectedPlan.apr || 10) / 100,
+          interestType: selectedPlan.interestType,
           accumulatedInterest: estimatedReward,
           totalValue: amt + estimatedReward,
           status: "ACTIVE",
-          optionId: selectedProduct.id,
-          optionName: selectedProduct.name,
+          optionId: selectedPlan.id,
+          optionName: selectedPlan.name,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -492,7 +283,7 @@ export default function InvestmentPage() {
         setInvestments(updatedList);
         sessionStorage.setItem("active_investments", JSON.stringify(updatedList));
 
-        toast.success("Investment Vault locked successfully!");
+        toast.success(`Savings locked successfully under ${selectedPlan.name}!`);
       } else {
         if (!user) {
           toast.error("Authentication required.");
@@ -501,7 +292,7 @@ export default function InvestmentPage() {
         }
 
         const idToken = await user.getIdToken();
-        const endpoint = selectedProduct.type === "SAVINGS" ? "/api/investments/savings" : "/api/investments/fixed-deposit";
+        const endpoint = selectedPlan.type === "SAVINGS" ? "/api/investments/savings" : "/api/investments/fixed-deposit";
 
         const res = await fetch(endpoint, {
           method: "POST",
@@ -512,28 +303,29 @@ export default function InvestmentPage() {
           body: JSON.stringify({
             amount: amt,
             currency: "NGN",
-            productId: selectedProduct.id,
+            productId: selectedPlan.id,
             walletType: walletTypeSelected,
+            durationDays: calculatedLockDays,
+            maturityDate: calculatedMaturityDateStr,
           })
         });
 
         const data = await res.json();
         if (res.ok && data.success) {
-          toast.success(data.message || "Investment Vault locked successfully!");
+          toast.success(data.message || `Savings locked successfully under ${selectedPlan.name}!`);
           await loadInvestmentData();
         } else {
-          toast.error(data.error || "Failed to establish secure vault lock.");
+          toast.error(data.error || "Failed to establish savings lock.");
           setIsSubmitting(false);
           return;
         }
       }
 
       setAmountStr("");
-      setMaturityDate("");
       setShowConfirmModal(false);
     } catch (err) {
       console.error("Investment Error:", err);
-      toast.error("Failed to secure vault nodes. Please try again.");
+      toast.error("Failed to process savings lock. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -542,15 +334,15 @@ export default function InvestmentPage() {
   // Claim Earnings
   const handleClaim = async (invId: string) => {
     const isMock = sessionStorage.getItem("mock") === "true";
-    toast.loading("Processing your maturity claim payout on ledger rails...");
+    toast.loading("Processing your payout claim on ledger...");
 
     try {
       if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
         const matched = investments.find(inv => inv.id === invId);
         if (!matched) {
           toast.dismiss();
-          toast.error("Investment lock not found.");
+          toast.error("Savings lock not found.");
           return;
         }
 
@@ -584,20 +376,13 @@ export default function InvestmentPage() {
           toast.success(data.message);
           await loadInvestmentData();
         } else {
-          toast.error(data.error || "Maturity claim processing failed.");
+          toast.error(data.error || "Claim processing failed.");
         }
       }
-    } catch (err) {
-      console.error("Claim Exception:", err);
+    } catch {
       toast.dismiss();
       toast.error("Network error during payout claim execution.");
     }
-  };
-
-  // Open Cancel Penalty Confirmation Warning
-  const triggerCancelPrompt = (invId: string) => {
-    setSelectedCancelId(invId);
-    setShowCancelModal(true);
   };
 
   // Early Cancel Execution
@@ -607,12 +392,12 @@ export default function InvestmentPage() {
 
     try {
       if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
         const matched = investments.find(inv => inv.id === selectedCancelId);
         if (!matched) {
           setIsLiquidating(false);
           setShowCancelModal(false);
-          toast.error("Investment lock not found.");
+          toast.error("Savings lock not found.");
           return;
         }
 
@@ -631,7 +416,7 @@ export default function InvestmentPage() {
         setInvestments(updated);
         sessionStorage.setItem("active_investments", JSON.stringify(updated));
 
-        toast.success(`Early cancellation success! Penalty: ₦${penalty.toLocaleString()}. Refunded: ₦${refund.toLocaleString()}`);
+        toast.success(`Early cancellation success! Refunded: ₦${refund.toLocaleString()}`);
       } else {
         if (!user) return;
         const idToken = await user.getIdToken();
@@ -649,12 +434,144 @@ export default function InvestmentPage() {
         }
       }
       setShowCancelModal(false);
-    } catch (err) {
-      console.error("Cancel Exception:", err);
+    } catch {
       toast.error("Network connection failure during early liquidation.");
     } finally {
       setIsLiquidating(false);
     }
+  };
+
+  // Custom Calendar Modal Renderer
+  const renderCalendarModal = () => {
+    if (!showCalendarModal) return null;
+
+    const minAllowedDate = new Date();
+    minAllowedDate.setDate(minAllowedDate.getDate() + (selectedPlan.minCustomDays || 1));
+    minAllowedDate.setHours(0, 0, 0, 0);
+
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const startDayOfWeek = firstDayOfMonth.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const daysArray: (Date | null)[] = [];
+    for (let i = 0; i < startDayOfWeek; i++) {
+      daysArray.push(null);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      daysArray.push(new Date(year, month, day));
+    }
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+        <div className="absolute inset-0" onClick={() => setShowCalendarModal(false)} />
+
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 220 }}
+          className="relative bg-white w-full max-w-md rounded-t-[32px] p-6 shadow-2xl border-t border-gray-100 z-10"
+        >
+          <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bodoni text-[16px] font-bold text-black flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-primary text-[20px]">
+                calendar_month
+              </span>
+              Pick Unlock Date
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowCalendarModal(false)}
+              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between mb-4 px-1">
+            <button
+              type="button"
+              onClick={() => setCalendarMonth(new Date(year, month - 1, 1))}
+              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+            </button>
+            <span className="font-hanken text-sm font-extrabold text-black">
+              {monthNames[month]} {year}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCalendarMonth(new Date(year, month + 1, 1))}
+              className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center mb-1">
+            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((dayName) => (
+              <span key={dayName} className="font-hanken text-[10px] font-extrabold text-gray-400 uppercase tracking-wider py-1">
+                {dayName}
+              </span>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center mb-6">
+            {daysArray.map((dayDate, idx) => {
+              if (!dayDate) {
+                return <div key={`empty-${idx}`} className="aspect-square" />;
+              }
+
+              const compareDate = new Date(dayDate);
+              compareDate.setHours(0, 0, 0, 0);
+
+              const isBeforeMin = compareDate < minAllowedDate;
+              const formattedValue = dayDate.toISOString().split("T")[0];
+              const isSelected = customMaturityDate === formattedValue;
+
+              return (
+                <button
+                  key={formattedValue}
+                  type="button"
+                  disabled={isBeforeMin}
+                  onClick={() => {
+                    setCustomMaturityDate(formattedValue);
+                    setShowCalendarModal(false);
+                  }}
+                  className={`aspect-square rounded-xl font-hanken text-xs font-bold transition-all flex flex-col items-center justify-center relative cursor-pointer ${
+                    isSelected
+                      ? "bg-primary text-white shadow-sm"
+                      : isBeforeMin
+                      ? "text-gray-300 bg-gray-50/50 cursor-not-allowed line-through"
+                      : "text-black hover:bg-gray-100 active:scale-95"
+                  }`}
+                >
+                  <span>{dayDate.getDate()}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowCalendarModal(false)}
+            className="w-full py-3.5 border border-gray-200 text-gray-500 hover:text-black rounded-xl font-hanken text-[12.5px] font-bold tracking-wide active:scale-95 transition-all"
+          >
+            Close Calendar
+          </button>
+        </motion.div>
+      </div>
+    );
   };
 
   return (
@@ -680,16 +597,15 @@ export default function InvestmentPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <h1 className="font-bodoni text-[18px] min-[375px]:text-[20px] font-bold tracking-tight text-black truncate">
-                  Investment & Savings Center
+                  CHOOSE YOUR SAVINGS PLAN
                 </h1>
                 <p className="font-hanken text-[11px] text-gray-500 font-bold leading-none mt-1 truncate">
-                  Lock capital, grow earnings, compounding yield
+                  Select a savings plan, unlock duration & earn high returns
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Marketing Slide Banners - displayed below page title and back history */}
           <BannerSlideshow page="investment" />
 
           {/* Current Available Balance */}
@@ -705,7 +621,7 @@ export default function InvestmentPage() {
                 lock
               </span>
               <p className="font-hanken text-[9px] text-gray-300 font-semibold">
-                Your money is completely safe and secure.
+                Your savings are 100% secured with guaranteed interest.
               </p>
             </div>
           </div>
@@ -714,12 +630,12 @@ export default function InvestmentPage() {
           <form onSubmit={handlePrevalidate} className="bg-white rounded-[24px] border border-gray-100 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.015)] mb-6 animate-fade-in">
             <h2 className="font-bodoni text-[15px] font-bold text-black mb-4 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-primary text-[18px]">
-                add_task
+                savings
               </span>
-              Start Saving & Earning
+              CHOOSE YOUR SAVINGS PLAN
             </h2>
 
-            {/* Premium Wallet Selector */}
+            {/* Sourcing Wallet */}
             <div className="mb-5">
               <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
                 Select Sourcing Wallet
@@ -748,19 +664,14 @@ export default function InvestmentPage() {
                   Bonus (₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
                 </button>
               </div>
-              {walletTypeSelected === "BONUS" && (
-                <p className="font-hanken text-[9.5px] text-gray-500 mt-2 leading-relaxed">
-                  * Investing with bonus funds requires a minimum of ₦3,000 NGN in your main wallet or cumulative deposits.
-                </p>
-              )}
             </div>
 
-            {/* Select Options Scroll */}
+            {/* Dynamic Plans Grid */}
             <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2.5">
-              Choose Your Savings Plan
+              Savings Plans
             </label>
 
-            {isLoadingProducts ? (
+            {isLoadingPlans ? (
               <div className="flex flex-col gap-2 mb-5">
                 {[1, 2, 3].map((n) => (
                   <div key={n} className="skeleton-shimmer h-16 w-full rounded-xl" />
@@ -768,40 +679,49 @@ export default function InvestmentPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-2.5 mb-5">
-                {products.map((opt) => {
-                  const isSelected = selectedProductId === opt.id;
+                {plans.map((plan) => {
+                  const isSelected = selectedPlanId === plan.id;
                   return (
                     <button
-                      key={opt.id}
+                      key={plan.id}
                       type="button"
                       onClick={() => {
-                        setSelectedProductId(opt.id);
-                        setAmountStr(""); // Clear so min check triggers accurately per scheme
+                        setSelectedPlanId(plan.id);
+                        setAmountStr("");
                       }}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border text-left transition-all ${
                         isSelected
                           ? "border-primary bg-[#FFF9F5] shadow-sm"
                           : "border-gray-100 hover:border-gray-200"
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg bg-gradient-to-br from-[#FC7A00] to-[#FF9E43] text-white flex items-center justify-center shadow-inner`}>
-                          <span className="material-symbols-outlined text-[18px]">
-                            {opt.type === "SAVINGS" ? "savings" : "lock_clock"}
-                          </span>
+                        <div className="w-10 h-10 rounded-xl border border-gray-200 bg-white p-1 flex items-center justify-center overflow-hidden flex-shrink-0 relative shadow-2xs">
+                          <img
+                            src={plan.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
+                            alt={plan.name}
+                            className="w-full h-full object-contain p-0.5"
+                          />
                         </div>
                         <div>
-                          <h3 className="font-hanken text-[12.5px] font-bold text-black leading-snug">
-                            {opt.name}
-                          </h3>
-                          <p className="font-hanken text-[10px] text-gray-500 font-semibold uppercase">
-                            {opt.type} | {opt.interestType}
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-hanken text-[12.5px] font-bold text-black leading-snug">
+                              {plan.name}
+                            </h3>
+                            {plan.badgeTag && (
+                              <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                                {plan.badgeTag}
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-hanken text-[10px] text-gray-500 font-semibold uppercase mt-0.5">
+                            {plan.type} • {plan.interestType}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <span className="block font-hanken text-[14.5px] font-extrabold text-primary">
-                          {(opt.apr * 100).toFixed(1)}% APR
+                          {plan.apr}% APR
                         </span>
                         <span className="font-hanken text-[9px] text-gray-400 font-bold uppercase tracking-wider">
                           Interest Rate
@@ -813,20 +733,151 @@ export default function InvestmentPage() {
               </div>
             )}
 
-            {/* Selected Option Description */}
-            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100 mb-5">
-              <p className="font-hanken text-[10.5px] text-gray-600 leading-relaxed font-medium">
-                {selectedProduct.type === "SAVINGS"
-                  ? "Standard Savings Vault with high-liquidity access. Earn interest based on your deposit duration with Simple Interest compounding configurations."
-                  : "Fixed Deposit plan with highly secure locked-in yields. Perfect for long-term compounding growth."
-                }
-              </p>
+            {/* Plan Description */}
+            {selectedPlan && (
+              <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100 mb-5">
+                <p className="font-hanken text-[10.5px] text-gray-600 leading-relaxed font-medium">
+                  {selectedPlan.description || "Lock capital securely and earn high guaranteed interest."}
+                </p>
+              </div>
+            )}
+
+            {/* "WHEN DO YOU WANT TO UNLOCK YOUR SAVINGS" CONFIGURABLE SECTION */}
+            <div className="mb-5 p-4 rounded-2xl bg-orange-50/40 border border-orange-100 space-y-3">
+              <label className="block font-hanken text-[11px] font-black text-black uppercase tracking-wider">
+                WHEN DO YOU WANT TO UNLOCK YOUR SAVINGS?
+              </label>
+
+              {/* Mode Toggle Tabs */}
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-white rounded-xl border border-gray-200/80">
+                {selectedPlan?.allowMonths && (
+                  <button
+                    type="button"
+                    onClick={() => setUnlockMode("MONTHS")}
+                    className={`py-2 text-[10.5px] font-extrabold uppercase rounded-lg transition-all ${
+                      unlockMode === "MONTHS" ? "bg-primary text-white shadow-2xs" : "text-gray-500 hover:text-black"
+                    }`}
+                  >
+                    By Month
+                  </button>
+                )}
+
+                {selectedPlan?.allowYears && (
+                  <button
+                    type="button"
+                    onClick={() => setUnlockMode("YEARS")}
+                    className={`py-2 text-[10.5px] font-extrabold uppercase rounded-lg transition-all ${
+                      unlockMode === "YEARS" ? "bg-primary text-white shadow-2xs" : "text-gray-500 hover:text-black"
+                    }`}
+                  >
+                    By Year
+                  </button>
+                )}
+
+                {selectedPlan?.allowCustom && (
+                  <button
+                    type="button"
+                    onClick={() => setUnlockMode("CUSTOM")}
+                    className={`py-2 text-[10.5px] font-extrabold uppercase rounded-lg transition-all ${
+                      unlockMode === "CUSTOM" ? "bg-primary text-white shadow-2xs" : "text-gray-500 hover:text-black"
+                    }`}
+                  >
+                    Custom Date
+                  </button>
+                )}
+              </div>
+
+              {/* MODE 1: MONTHS PRESETS */}
+              {unlockMode === "MONTHS" && selectedPlan?.allowMonths && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Select Month Duration:</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(selectedPlan.monthOptions || [1, 3, 6, 9]).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setSelectedMonth(m)}
+                        className={`py-2.5 rounded-xl text-xs font-extrabold font-mono transition-all border ${
+                          selectedMonth === m
+                            ? "bg-black border-black text-white shadow-2xs"
+                            : "bg-white border-gray-200 text-gray-700 hover:border-black"
+                        }`}
+                      >
+                        {m} {m === 1 ? "Month" : "Months"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* MODE 2: YEARS PRESETS */}
+              {unlockMode === "YEARS" && selectedPlan?.allowYears && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Select Year Duration:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(selectedPlan.yearOptions || [1, 2, 3]).map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => setSelectedYear(y)}
+                        className={`py-2.5 rounded-xl text-xs font-extrabold font-mono transition-all border ${
+                          selectedYear === y
+                            ? "bg-black border-black text-white shadow-2xs"
+                            : "bg-white border-gray-200 text-gray-700 hover:border-black"
+                        }`}
+                      >
+                        {y} {y === 1 ? "Year" : "Years"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* MODE 3: CUSTOM CALENDAR */}
+              {unlockMode === "CUSTOM" && selectedPlan?.allowCustom && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Custom Date (Min {selectedPlan.minCustomDays || 7} Days - Max {selectedPlan.maxCustomDays || 1095} Days):
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const minDays = selectedPlan.minCustomDays || 7;
+                      const initialDate = new Date();
+                      initialDate.setDate(initialDate.getDate() + minDays);
+                      setCalendarMonth(initialDate);
+                      setShowCalendarModal(true);
+                    }}
+                    className="w-full text-left px-4 py-3 bg-white border border-black rounded-xl flex items-center justify-between shadow-2xs active:scale-98 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-primary">
+                        calendar_month
+                      </span>
+                      <span className="font-hanken text-xs font-semibold text-black">
+                        {customMaturityDate
+                          ? new Date(customMaturityDate).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+                          : "Tap to Select Custom Unlock Date"
+                        }
+                      </span>
+                    </div>
+                    <span className="material-symbols-outlined text-[16px] text-gray-400">
+                      chevron_right
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-xs font-bold pt-1 border-t border-orange-200/60">
+                <span className="text-gray-500">Target Unlock Date:</span>
+                <span className="text-primary font-mono font-black">{calculatedMaturityDateObj.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} ({calculatedLockDays} Days)</span>
+              </div>
             </div>
 
             {/* Form Fields: Amount */}
             <div className="mb-4">
               <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                How much do you want to save? (₦)
+                How much do you want to save? (₦) {selectedPlan.isAmountRequired ? "*" : "(Optional)"}
               </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-hanken text-[14px] font-bold text-gray-400">
@@ -834,7 +885,7 @@ export default function InvestmentPage() {
                 </span>
                 <input
                   type="number"
-                  placeholder={`Min ₦${minInvestment.toLocaleString()}`}
+                  placeholder={`Min ₦${selectedPlan.minInvestment?.toLocaleString()} - Max ₦${selectedPlan.maxInvestment?.toLocaleString()}`}
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
                   className="w-full pl-8 pr-12 py-3.5 bg-white border border-black rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
@@ -849,59 +900,23 @@ export default function InvestmentPage() {
               </div>
             </div>
 
-            {/* Maturity end date selectpicker */}
-            <div className="mb-5">
-              <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                When do you want to unlock your savings?
-              </label>
-              <p className="font-hanken text-[10px] text-gray-400 mb-2 leading-relaxed">
-                Click the button below to view the secure vault calendar and pick a lock date. Days matching your plan&apos;s lock duration will be highlighted.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  const minDays = selectedProduct.durationDays;
-                  const initialDate = new Date();
-                  initialDate.setDate(initialDate.getDate() + minDays);
-                  setCalendarMonth(initialDate);
-                  setShowCalendarModal(true);
-                }}
-                className="w-full text-left px-4 py-3.5 bg-white border border-black rounded-2xl flex items-center justify-between shadow-sm active:scale-98 transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px] text-primary">
-                    calendar_month
-                  </span>
-                  <span className="font-hanken text-xs font-semibold text-black">
-                    {maturityDate
-                      ? new Date(maturityDate).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
-                      : "Tap to Pick Maturity Date"
-                    }
-                  </span>
-                </div>
-                <span className="material-symbols-outlined text-[16px] text-gray-400">
-                  chevron_right
-                </span>
-              </button>
-            </div>
-
             {/* Live Reward Calculation Summary */}
-            {amountStr && maturityDate && (
+            {amountStr && (
               <div className="mb-5 p-4 rounded-xl bg-gradient-to-r from-[#FFFBF7] to-[#FFF7EF] border border-[#FFECD8] animate-fade-in">
                 <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">
-                  Your Estimated Earnings
+                  Estimated Yield Calculation
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <span className="block font-hanken text-[9px] text-gray-500 font-medium font-bold">Extra Interest You Earn</span>
+                    <span className="block font-hanken text-[9px] text-gray-500 font-bold">Extra Interest You Earn</span>
                     <span className="font-hanken text-[15px] font-extrabold text-green-600">
                       +₦{getEstimatedReward().toLocaleString()}
                     </span>
                   </div>
                   <div>
-                    <span className="block font-hanken text-[9px] text-gray-500 font-medium font-bold">Time Locked</span>
+                    <span className="block font-hanken text-[9px] text-gray-500 font-bold">Time Locked</span>
                     <span className="font-hanken text-[13px] font-extrabold text-black">
-                      {getInvestmentDays()} Days
+                      {calculatedLockDays} Days
                     </span>
                   </div>
                 </div>
@@ -1010,7 +1025,6 @@ export default function InvestmentPage() {
                         </div>
                       </div>
 
-                      {/* Interactive Payout/Cancel Buttons for Active Locks */}
                       {!isTerminal && (
                         <div className="mt-3 flex gap-2 pt-1">
                           {isMatured ? (
@@ -1034,7 +1048,10 @@ export default function InvestmentPage() {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => triggerCancelPrompt(inv.id)}
+                                onClick={() => {
+                                  setSelectedCancelId(inv.id);
+                                  setShowCancelModal(true);
+                                }}
                                 className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-hanken text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 active:scale-95 transition-all"
                               >
                                 <span className="material-symbols-outlined text-[13px]">block</span>
@@ -1076,29 +1093,29 @@ export default function InvestmentPage() {
                     </span>
                   </div>
                   <h3 className="font-bodoni text-[18px] font-bold text-black">
-                    Locked Savings Plan Rules
+                    Confirm Savings Lock Rules
                   </h3>
                   <p className="font-hanken text-[11px] text-gray-500 max-w-[280px] mt-1 font-semibold leading-relaxed">
-                    Please read these simple rules before you lock your savings.
+                    Please review rules before locking your capital.
                   </p>
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-5">
                   <div className="flex justify-between py-2 border-b border-gray-100/60 font-hanken text-[12px]">
                     <span className="text-gray-500 font-semibold">Savings Plan</span>
-                    <span className="text-black font-bold">{selectedProduct.name}</span>
+                    <span className="text-black font-bold">{selectedPlan.name}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100/60 font-hanken text-[12px]">
                     <span className="text-gray-500 font-semibold">Amount Saved</span>
-                    <span className="text-black font-bold">₦{parseFloat(amountStr).toLocaleString()}</span>
+                    <span className="text-black font-bold">₦{parseFloat(amountStr || "0").toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-100/60 font-hanken text-[12px]">
                     <span className="text-gray-500 font-semibold">Withdrawal Date</span>
-                    <span className="text-[#FC7A00] font-extrabold">{new Date(maturityDate).toLocaleDateString()}</span>
+                    <span className="text-[#FC7A00] font-extrabold">{calculatedMaturityDateObj.toLocaleDateString()}</span>
                   </div>
                   <div className="flex justify-between py-2 font-hanken text-[12px]">
                     <span className="text-gray-500 font-semibold">Extra Interest You Earn</span>
-                    <span className="text-green-600 font-extrabold">+{getEstimatedReward().toLocaleString()} ({(selectedProduct.apr * 100).toFixed(1)}%)</span>
+                    <span className="text-green-600 font-extrabold">+{getEstimatedReward().toLocaleString()} ({selectedPlan.apr}%)</span>
                   </div>
                 </div>
 
@@ -1108,9 +1125,9 @@ export default function InvestmentPage() {
                     SECURE SAVINGS RULES
                   </h4>
                   <ul className="list-disc list-inside space-y-1 font-hanken text-[10px] text-gray-600 font-semibold leading-relaxed">
-                    <li>This savings plan is fully locked and automatic.</li>
-                    <li>Early cancellations are allowed but carry a <strong>{(penaltyRate * 100).toFixed(0)}% liquidation penalty</strong>.</li>
-                    <li>Your money and extra interest rewards will return directly to your main wallet balance on <strong className="text-black">{new Date(maturityDate).toLocaleDateString()}</strong>.</li>
+                    <li>This savings plan is locked until maturity.</li>
+                    <li>Early cancellations carry a <strong>{(penaltyRate * 100).toFixed(0)}% liquidation penalty</strong>.</li>
+                    <li>Your money and extra interest rewards will return directly to your wallet balance on <strong className="text-black">{calculatedMaturityDateObj.toLocaleDateString()}</strong>.</li>
                   </ul>
                 </div>
 
@@ -1221,7 +1238,7 @@ export default function InvestmentPage() {
           )}
         </AnimatePresence>
 
-        {/* Premium Interactive Custom Calendar Picker Modal */}
+        {/* Custom Calendar Picker Modal */}
         <AnimatePresence>
           {renderCalendarModal()}
         </AnimatePresence>
