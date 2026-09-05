@@ -902,7 +902,7 @@ function AdminFixedDepositsPageContent() {
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-orange-500 text-[18px]">lock_clock</span>
                     <h4 className="font-extrabold text-xs uppercase tracking-wider text-orange-500">
-                      "WHEN DO YOU WANT TO UNLOCK YOUR SAVINGS" CONFIGURATION
+                      &quot;WHEN DO YOU WANT TO UNLOCK YOUR SAVINGS&quot; CONFIGURATION
                     </h4>
                   </div>
 

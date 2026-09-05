@@ -3,9 +3,6 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { SavingsPlanData, DEFAULT_SAVINGS_PLANS } from "@/lib/savings-plans-types";
 
-export type { SavingsPlanData };
-export { DEFAULT_SAVINGS_PLANS };
-
 export async function GET(req: Request) {
   try {
     const perm = await requireAdminPermission(req, "investments.manage");
