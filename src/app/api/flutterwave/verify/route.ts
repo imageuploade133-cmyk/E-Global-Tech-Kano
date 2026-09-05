@@ -25,40 +25,66 @@ export async function POST(req: Request) {
       );
     }
 
-    // Fail-closed ownership verification: check Firestore transaction ledger for matching UID
+    // Fast-path Firestore check: If the webhook has already credited the transaction in Firestore, return immediately!
     try {
-      let isOwnerVerified = false;
+      let candidateDocs: any[] = [];
 
       if (txRef) {
         const docId = txRef.startsWith("tx-FUNDING-") ? txRef : `tx-FUNDING-${txRef}`;
         const txDoc = await adminDb.collection("transactions").doc(docId).get();
         if (txDoc.exists) {
-          const txData = txDoc.data();
-          if (txData?.userId && txData.userId !== authenticatedUser.uid) {
-            return NextResponse.json(
-              { success: false, error: "Forbidden: You do not own this transaction." },
-              { status: 403 }
-            );
-          }
-          if (txData?.userId === authenticatedUser.uid) {
-            isOwnerVerified = true;
-          }
+          candidateDocs.push(txDoc);
         }
       }
 
-      if (!isOwnerVerified && transactionId) {
-        const querySnap = await adminDb.collection("transactions")
+      if (candidateDocs.length === 0 && txRef) {
+        const qSnap = await adminDb.collection("transactions")
+          .where("reference", "==", String(txRef))
+          .limit(1)
+          .get();
+        if (!qSnap.empty) {
+          candidateDocs.push(qSnap.docs[0]);
+        }
+      }
+
+      if (candidateDocs.length === 0 && transactionId) {
+        const qSnap = await adminDb.collection("transactions")
           .where("flwId", "==", String(transactionId))
           .limit(1)
           .get();
+        if (!qSnap.empty) {
+          candidateDocs.push(qSnap.docs[0]);
+        }
+      }
 
-        if (!querySnap.empty) {
-          const txData = querySnap.docs[0].data();
-          if (txData?.userId && txData.userId !== authenticatedUser.uid) {
+      for (const docSnap of candidateDocs) {
+        const txData = docSnap.data();
+        if (txData?.userId) {
+          if (txData.userId !== authenticatedUser.uid) {
             return NextResponse.json(
               { success: false, error: "Forbidden: You do not own this transaction." },
               { status: 403 }
             );
+          }
+
+          // Ownership is verified! Check if transaction is already credited/SUCCESS
+          if (txData.status === "SUCCESS" || txData.credited === true) {
+            const userDoc = await adminDb.collection("users").doc(authenticatedUser.uid).get();
+            const currentBal = Number(userDoc.data()?.balance) || 0;
+            const confirmedAmount = Number(txData.totalCredited || txData.amount || 0);
+
+            console.log(`[Verify Route Fast-Path] Transaction ${docSnap.id} is already SUCCESS in Firestore. Returning immediate SUCCESS.`);
+            return NextResponse.json({
+              success: true,
+              status: "SUCCESS",
+              credited: true,
+              alreadyCredited: true,
+              fundedAmount: confirmedAmount,
+              totalCredited: confirmedAmount,
+              amount: confirmedAmount,
+              newBalance: currentBal,
+              message: "Payment verified and wallet credited successfully."
+            });
           }
         }
       }
