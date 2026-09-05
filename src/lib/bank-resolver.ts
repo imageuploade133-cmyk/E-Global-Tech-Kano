@@ -41,13 +41,13 @@ export function resolveBankName(
   const candidateNames = direction === "TRANSFER_FROM"
     ? [
         transaction.senderBankName,
-        transaction.virtualAccountBankName,
         transaction.bankName,
       ]
     : direction === "TRANSFER_TO"
     ? [
         transaction.recipientBankName,
         transaction.beneficiaryBankName,
+        transaction.virtualAccountBankName,
         transaction.bankName,
       ]
     : [

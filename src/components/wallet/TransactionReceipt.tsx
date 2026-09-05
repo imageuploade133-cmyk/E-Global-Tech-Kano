@@ -1065,7 +1065,31 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   // Default: Dynamic Virtual Account / Bank Transfer
                   const maskedSenderAccount = maskAcc(transaction.senderAccountNumber);
                   const maskedVirtualAccount = maskVirt(transaction.virtualAccountNumber);
-                  const receivingBank = transaction.virtualAccountBankName || "Wema Bank";
+
+                  const resolvedSenderBank = resolveBankName(
+                    {
+                      senderBankName: transaction.senderBankName,
+                      senderBankCode: transaction.senderBankCode,
+                      bankName: transaction.senderBankName,
+                      bankCode: transaction.senderBankCode,
+                    },
+                    banks,
+                    "TRANSFER_FROM"
+                  );
+
+                  const resolvedReceivingBank = resolveBankName(
+                    {
+                      virtualAccountBankName: transaction.virtualAccountBankName,
+                      recipientBankName: transaction.recipientBankName || transaction.virtualAccountBankName,
+                      recipientBankCode: transaction.recipientBankCode || transaction.beneficiaryBankCode,
+                    },
+                    banks,
+                    "TRANSFER_TO"
+                  );
+
+                  const displayReceivingBank = resolvedReceivingBank !== "Bank"
+                    ? resolvedReceivingBank
+                    : (transaction.virtualAccountBankName || "Wema Bank");
 
                   return (
                     <>
@@ -1081,15 +1105,17 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </div>
                       )}
 
-                      {resolvedTransferFromBank && (
-                        <div className="flex justify-between items-center text-gray-500 font-semibold">
-                          <span>Sender Bank</span>
-                          <div className="flex items-center gap-1.5">
-                            <BankLogoResolver bankName={resolvedTransferFromBank} bankCode={transaction.senderBankCode} className="w-5 h-5 shrink-0" />
-                            <span className="text-black font-bold">{resolvedTransferFromBank}</span>
-                          </div>
+                      <div className="flex justify-between items-center text-gray-500 font-semibold">
+                        <span>Sender Bank</span>
+                        <div className="flex items-center gap-1.5">
+                          <BankLogoResolver
+                            bankName={resolvedSenderBank}
+                            bankCode={transaction.senderBankCode}
+                            className="w-5 h-5 shrink-0"
+                          />
+                          <span className="text-black font-bold">{resolvedSenderBank}</span>
                         </div>
-                      )}
+                      </div>
 
                       {maskedSenderAccount && (
                         <div className="flex justify-between items-center text-gray-500 font-semibold">
@@ -1100,7 +1126,14 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
                         <span>Receiving Bank</span>
-                        <span className="text-black font-bold">{receivingBank}</span>
+                        <div className="flex items-center gap-1.5">
+                          <BankLogoResolver
+                            bankName={displayReceivingBank}
+                            bankCode={transaction.recipientBankCode || transaction.beneficiaryBankCode}
+                            className="w-5 h-5 shrink-0"
+                          />
+                          <span className="text-black font-bold">{displayReceivingBank}</span>
+                        </div>
                       </div>
 
                       {transaction.virtualAccountNumber && (
