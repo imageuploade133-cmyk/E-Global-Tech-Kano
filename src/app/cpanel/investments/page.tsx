@@ -68,8 +68,69 @@ function AdminFixedDepositsPageContent() {
     ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
     : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
 
-  // Navigation tab: AUDIT vs PLANS
-  const [activeTab, setActiveTab] = useState<"PLANS" | "AUDIT">("PLANS");
+  // Navigation tab: AUDIT vs PLANS vs SETTINGS
+  const [activeTab, setActiveTab] = useState<"PLANS" | "AUDIT" | "SETTINGS">("PLANS");
+
+  // Global Investment Settings States
+  const [globalPenaltyPct, setGlobalPenaltyPct] = useState<number>(10);
+  const [globalPolicyText, setGlobalPolicyText] = useState<string>("");
+  const [globalMinInvest, setGlobalMinInvest] = useState<number>(1000);
+  const [globalMaxInvest, setGlobalMaxInvest] = useState<number>(10000000);
+  const [isLoadingSettings, setIsLoadingSettings] = useState<boolean>(false);
+  const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
+
+  const fetchGlobalSettings = async () => {
+    setIsLoadingSettings(true);
+    try {
+      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+      const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const res = await fetch("/api/admin/investments/settings", { headers });
+      const data = await res.json();
+      if (res.ok && data.success && data.settings) {
+        setGlobalPenaltyPct(Math.round((Number(data.settings.penaltyRate) || 0.10) * 100));
+        setGlobalPolicyText(data.settings.penaltyPolicyText || "");
+        setGlobalMinInvest(Number(data.settings.minInvestment) || 1000);
+        setGlobalMaxInvest(Number(data.settings.maxInvestment) || 10000000);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch global investment settings:", err);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const handleSaveGlobalSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/investments/settings", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          penaltyRate: globalPenaltyPct / 100,
+          penaltyPolicyText: globalPolicyText,
+          minInvestment: globalMinInvest,
+          maxInvestment: globalMaxInvest,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Investment Policy & Settings saved!");
+      } else {
+        toast.error(data.error || "Failed to update investment settings.");
+      }
+    } catch {
+      toast.error("Network error updating investment settings.");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   // Auth Session Check
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
@@ -161,6 +222,7 @@ function AdminFixedDepositsPageContent() {
     if (isAdminUnlocked) {
       fetchPlans();
       fetchInvestments();
+      fetchGlobalSettings();
     }
   }, [isAdminUnlocked, user]);
 
@@ -488,35 +550,49 @@ function AdminFixedDepositsPageContent() {
 
       <div className="p-4 md:p-8 overflow-y-auto flex-1 max-w-6xl w-full mx-auto space-y-6 pb-24 md:pb-8">
 
-        {/* Top Tab Bar: Manage Savings Plans vs Audit Fixed Deposits */}
+        {/* Top Tab Bar: Manage Savings Plans vs Audit Fixed Deposits vs Policy Settings */}
         <div className={cn("p-2 rounded-2xl border flex items-center justify-between gap-2", panelClass)}>
-          <div className="grid grid-cols-2 gap-2 w-full max-w-md">
+          <div className="grid grid-cols-3 gap-2 w-full max-w-xl">
             <button
               type="button"
               onClick={() => setActiveTab("PLANS")}
               className={cn(
-                "py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2",
+                "py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5",
                 activeTab === "PLANS"
                   ? "bg-[#FC7A00] text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white"
               )}
             >
               <span className="material-symbols-outlined text-[18px]">savings</span>
-              <span>Choose Savings Plans ({plans.length})</span>
+              <span>Plans ({plans.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("AUDIT")}
               className={cn(
-                "py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2",
+                "py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5",
                 activeTab === "AUDIT"
                   ? "bg-[#FC7A00] text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white"
               )}
             >
               <span className="material-symbols-outlined text-[18px]">query_stats</span>
-              <span>Audit Placements ({investments.length})</span>
+              <span>Audits ({investments.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("SETTINGS")}
+              className={cn(
+                "py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                activeTab === "SETTINGS"
+                  ? "bg-[#FC7A00] text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">policy</span>
+              <span>Policy Rules</span>
             </button>
           </div>
 
@@ -524,10 +600,10 @@ function AdminFixedDepositsPageContent() {
             <button
               type="button"
               onClick={() => handleOpenModal()}
-              className="px-5 h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              className="px-5 h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
             >
               <span className="material-symbols-outlined text-[18px]">add_circle</span>
-              <span>Add Savings Plan</span>
+              <span className="hidden sm:inline">Add Savings Plan</span>
             </button>
           )}
         </div>
@@ -625,6 +701,103 @@ function AdminFixedDepositsPageContent() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: POLICY RULES & LIQUIDATION SETTINGS */}
+        {activeTab === "SETTINGS" && (
+          <div className={cn("p-6 rounded-2xl border space-y-6", panelClass)}>
+            <div className="border-b border-gray-200/40 pb-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-base text-black dark:text-white uppercase tracking-tight">
+                  Early Withdrawal Policy & Deduction Customizer
+                </h3>
+                <p className="text-xs text-gray-400 font-semibold mt-0.5">
+                  Set early liquidation penalty percentage and write dynamic policy disclosures shown to users during savings cancellation.
+                </p>
+              </div>
+              <span className="material-symbols-outlined text-[#FC7A00] text-[32px]">gavel</span>
+            </div>
+
+            {isLoadingSettings ? (
+              <div className="text-center py-16 text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+                <ButtonSpinner /> Loading policy settings...
+              </div>
+            ) : (
+              <form onSubmit={handleSaveGlobalSettings} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="space-y-1.5 p-4 rounded-xl bg-orange-500/5 border border-orange-500/20">
+                    <label className="text-xs font-black uppercase text-[#FC7A00] flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">percent</span>
+                      <span>Early Withdrawal Penalty (%)</span>
+                    </label>
+                    <p className="text-[10px] text-gray-400">Deducted from principal if user cancels before target unlock date.</p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        required
+                        value={globalPenaltyPct}
+                        onChange={(e) => setGlobalPenaltyPct(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                        className={inputClass}
+                      />
+                      <span className="font-mono font-black text-sm text-[#FC7A00]">%</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                    <label className="text-xs font-black uppercase text-gray-400">Global Min Investment (₦)</label>
+                    <p className="text-[10px] text-gray-400">Minimum allowed capital placement across all products.</p>
+                    <input
+                      type="number"
+                      required
+                      value={globalMinInvest}
+                      onChange={(e) => setGlobalMinInvest(parseFloat(e.target.value) || 0)}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                    <label className="text-xs font-black uppercase text-gray-400">Global Max Investment (₦)</label>
+                    <p className="text-[10px] text-gray-400">Maximum allowed capital placement per single transaction.</p>
+                    <input
+                      type="number"
+                      required
+                      value={globalMaxInvest}
+                      onChange={(e) => setGlobalMaxInvest(parseFloat(e.target.value) || 0)}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase text-gray-400 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px]">description</span>
+                    <span>Custom Policy Disclosure Text (Displayed on User Cancellation Modal)</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={globalPolicyText}
+                    onChange={(e) => setGlobalPolicyText(e.target.value)}
+                    placeholder="Write the custom early withdrawal penalty terms and conditions shown to users..."
+                    className={cn(inputClass, "h-auto py-3 leading-relaxed font-normal text-xs")}
+                  />
+                  <p className="text-[10px] text-gray-400">This text appears directly inside the user&apos;s early cancellation confirm drawer before they authorize the refund debit.</p>
+                </div>
+
+                <div className="flex justify-end pt-3 border-t border-gray-200/40">
+                  <button
+                    type="submit"
+                    disabled={isSavingSettings}
+                    className="px-8 h-12 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-md active:scale-95 transition-all"
+                  >
+                    {isSavingSettings ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">save</span>}
+                    <span>Save Policy & Settings</span>
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         )}
