@@ -34,12 +34,20 @@ export default function InvestmentPage() {
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
-  // DB-driven specs
+  // DB-driven specs & Settings
   const [plans, setPlans] = useState<SavingsPlanData[]>(DEFAULT_SAVINGS_PLANS);
-  const [penaltyRate, setPenaltyRate] = useState<number>(0.10); // 10% Early Cancellation Penalty
+  const [penaltyRate, setPenaltyRate] = useState<number>(0.10); // Early Cancellation Penalty decimal (e.g. 0.10)
+  const [penaltyPolicyText, setPenaltyPolicyText] = useState<string>(
+    "Early liquidation of locked savings before the target unlock date incurs a 10% penalty on principal. The remaining 90% balance will be instantly refunded to your wallet."
+  );
 
   const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(true);
+
+  // Holding Navigation & Modal States
+  const [activeHoldingTab, setActiveHoldingTab] = useState<"ACTIVE" | "HISTORY">("ACTIVE");
+  const [historyFilter, setHistoryFilter] = useState<"ALL" | "CLAIMED" | "CANCELLED">("ALL");
+  const [selectedDetailInv, setSelectedDetailInv] = useState<ActiveInvestment | null>(null);
 
   // States for creation
   const [selectedPlanId, setSelectedPlanId] = useState<string>("target-savings");
@@ -140,8 +148,12 @@ export default function InvestmentPage() {
         }
       }
 
-      // Fetch dynamic savings plans from public endpoint
-      const plansRes = await fetch("/api/investments/plans");
+      // Fetch dynamic savings plans and global penalty policy
+      const [plansRes, settingsRes] = await Promise.all([
+        fetch("/api/investments/plans"),
+        fetch("/api/investments/settings")
+      ]);
+
       if (plansRes.ok) {
         const plansData = await plansRes.json();
         if (plansData.success && Array.isArray(plansData.plans) && plansData.plans.length > 0) {
@@ -149,10 +161,22 @@ export default function InvestmentPage() {
           setSelectedPlanId(plansData.plans[0].id);
         }
       }
+
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        if (settingsData.success && settingsData.settings) {
+          if (settingsData.settings.penaltyRate !== undefined) {
+            setPenaltyRate(Number(settingsData.settings.penaltyRate));
+          }
+          if (settingsData.settings.penaltyPolicyText) {
+            setPenaltyPolicyText(settingsData.settings.penaltyPolicyText);
+          }
+        }
+      }
       setIsLoadingPlans(false);
 
       if (user) {
-        // Fetch dynamic active user holdings
+        // Fetch user holdings
         const holdingsRes = await fetch("/api/investments", {
           headers: { Authorization: `Bearer ${idToken}` }
         });
@@ -387,53 +411,35 @@ export default function InvestmentPage() {
 
   // Early Cancel Execution
   const handleEarlyCancel = async () => {
+    if (!selectedCancelId) return;
     setIsLiquidating(true);
-    const isMock = sessionStorage.getItem("mock") === "true";
 
     try {
-      if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        const matched = investments.find(inv => inv.id === selectedCancelId);
-        if (!matched) {
-          setIsLiquidating(false);
-          setShowCancelModal(false);
-          toast.error("Savings lock not found.");
-          return;
-        }
-
-        const penalty = Number((matched.amount * penaltyRate).toFixed(2));
-        const refund = Math.max(0, matched.amount - penalty);
-
-        await updateUserData({ balance: userBalance + refund });
-
-        const updated = investments.map(inv => {
-          if (inv.id === selectedCancelId) {
-            return { ...inv, status: "CANCELLED" as const, totalValue: refund };
-          }
-          return inv;
-        });
-
-        setInvestments(updated);
-        sessionStorage.setItem("active_investments", JSON.stringify(updated));
-
-        toast.success(`Early cancellation success! Refunded: ₦${refund.toLocaleString()}`);
-      } else {
-        if (!user) return;
-        const idToken = await user.getIdToken();
-        const res = await fetch(`/api/investments/${selectedCancelId}/cancel`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${idToken}` }
-        });
-
-        const data = await res.json();
-        if (res.ok && data.success) {
-          toast.success(data.message);
-          await loadInvestmentData();
-        } else {
-          toast.error(data.error || "Early cancellation request failed.");
+      let idToken = "mock-token";
+      if (user && typeof user.getIdToken === "function") {
+        try {
+          idToken = await user.getIdToken();
+        } catch {
+          // ignore
         }
       }
-      setShowCancelModal(false);
+
+      const res = await fetch(`/api/investments/${selectedCancelId}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Savings lock liquidated successfully!");
+        setShowCancelModal(false);
+        await loadInvestmentData();
+      } else {
+        toast.error(data.error || "Early cancellation request failed.");
+      }
     } catch {
       toast.error("Network connection failure during early liquidation.");
     } finally {
@@ -935,135 +941,260 @@ export default function InvestmentPage() {
             </button>
           </form>
 
-          {/* Active Vault list */}
-          <div className="animate-fade-in">
-            <h2 className="font-bodoni text-[15px] font-bold text-black mb-3 flex items-center gap-1.5 px-0.5">
-              <span className="material-symbols-outlined text-green-500 text-[18px]">
-                lock_clock
-              </span>
-              My Active Savings ({investments.length})
-            </h2>
+          {/* Active Vault & History Tab Section */}
+          <div className="animate-fade-in space-y-4">
+            {/* Navigation Pills */}
+            <div className="flex items-center justify-between bg-gray-100 p-1.5 rounded-2xl border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setActiveHoldingTab("ACTIVE")}
+                className={`flex-1 py-2.5 rounded-xl font-hanken text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeHoldingTab === "ACTIVE"
+                    ? "bg-white text-black shadow-xs border border-gray-200"
+                    : "text-gray-500 hover:text-black"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">lock_clock</span>
+                <span>Active Savings ({investments.filter((i) => i.status === "ACTIVE").length})</span>
+              </button>
 
-            {isLoadingHistory ? (
-              <div className="flex flex-col gap-3">
-                {[1, 2].map((n) => (
-                  <div key={n} className="skeleton-shimmer h-32 w-full rounded-2xl" />
-                ))}
-              </div>
-            ) : investments.length === 0 ? (
-              <div className="bg-white rounded-[24px] border border-gray-100 p-8 text-center flex flex-col items-center justify-center min-h-[160px] shadow-sm">
-                <span className="material-symbols-outlined text-gray-300 text-[36px] mb-2">
-                  hourglass_empty
-                </span>
-                <p className="font-hanken text-[12px] font-bold text-black mb-1">
-                  No Active Savings
-                </p>
-                <p className="font-hanken text-[10px] text-gray-400 leading-relaxed max-w-[220px]">
-                  Pick a savings plan above to securely lock and grow your savings.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {investments.map((inv) => {
-                  const isMatured = new Date() >= new Date(inv.maturityDate);
-                  const isTerminal = inv.status === "CLAIMED" || inv.status === "CANCELLED";
+              <button
+                type="button"
+                onClick={() => setActiveHoldingTab("HISTORY")}
+                className={`flex-1 py-2.5 rounded-xl font-hanken text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeHoldingTab === "HISTORY"
+                    ? "bg-white text-black shadow-xs border border-gray-200"
+                    : "text-gray-500 hover:text-black"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">history</span>
+                <span>Savings History ({investments.filter((i) => i.status !== "ACTIVE").length})</span>
+              </button>
+            </div>
 
-                  return (
-                    <div
-                      key={inv.id}
-                      className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm animate-fade-in"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-hanken text-[8px] font-extrabold uppercase tracking-wide mb-1.5 ${
-                            inv.status === "CLAIMED"
-                              ? "bg-blue-50 text-blue-600"
-                              : inv.status === "CANCELLED"
-                              ? "bg-red-50 text-red-600"
-                              : isMatured
-                              ? "bg-yellow-50 text-yellow-600 animate-pulse"
-                              : "bg-green-50 text-green-600"
-                          }`}>
-                            <span className="material-symbols-outlined text-[10px]">
-                              {inv.status === "CLAIMED" ? "check_circle" : inv.status === "CANCELLED" ? "cancel" : "lock"}
-                            </span>
-                            {inv.status}
-                          </span>
-                          <h3 className="font-hanken text-[12.5px] font-extrabold text-black leading-snug">
-                            {inv.optionName}
-                          </h3>
-                          <span className="font-hanken text-[9px] text-gray-400 font-semibold">
-                            {inv.id}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="block font-hanken text-[13.5px] font-extrabold text-black">
-                            ₦{inv.amount.toLocaleString()}
-                          </span>
-                          <span className="font-hanken text-[9.5px] text-green-600 font-extrabold">
-                            +{(inv.interestRate * 100).toFixed(1)}% {inv.interestType}
-                          </span>
-                        </div>
-                      </div>
+            {/* VIEW 1: ACTIVE SAVINGS */}
+            {activeHoldingTab === "ACTIVE" && (
+              <div className="space-y-3">
+                {isLoadingHistory ? (
+                  <div className="flex flex-col gap-3">
+                    {[1, 2].map((n) => (
+                      <div key={n} className="skeleton-shimmer h-32 w-full rounded-2xl" />
+                    ))}
+                  </div>
+                ) : investments.filter((i) => i.status === "ACTIVE").length === 0 ? (
+                  <div className="bg-white rounded-[24px] border border-gray-100 p-8 text-center flex flex-col items-center justify-center min-h-[160px] shadow-sm">
+                    <span className="material-symbols-outlined text-gray-300 text-[36px] mb-2">
+                      hourglass_empty
+                    </span>
+                    <p className="font-hanken text-[12px] font-bold text-black mb-1">
+                      No Active Savings
+                    </p>
+                    <p className="font-hanken text-[10px] text-gray-400 leading-relaxed max-w-[220px]">
+                      Pick a savings plan above to securely lock and grow your savings.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {investments
+                      .filter((inv) => inv.status === "ACTIVE")
+                      .map((inv) => {
+                        const isMatured = new Date() >= new Date(inv.maturityDate);
 
-                      <div className="border-t border-gray-50 pt-3 flex items-center justify-between">
-                        <div>
-                          <span className="block font-hanken text-[8.5px] text-gray-400 font-bold uppercase tracking-wide">
-                            Start Date
-                          </span>
-                          <span className="font-hanken text-[10px] font-semibold text-gray-600">
-                            {new Date(inv.startDate).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="block font-hanken text-[8.5px] text-gray-400 font-bold uppercase tracking-wide">
-                            Maturity Date
-                          </span>
-                          <span className="font-hanken text-[10px] font-extrabold text-primary">
-                            {new Date(inv.maturityDate).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-
-                      {!isTerminal && (
-                        <div className="mt-3 flex gap-2 pt-1">
-                          {isMatured ? (
-                            <button
-                              type="button"
-                              onClick={() => handleClaim(inv.id)}
-                              className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">payments</span>
-                              Claim Matured Payout
-                            </button>
-                          ) : (
-                            <>
-                              <div className="flex-1 bg-gray-50 rounded-lg px-2 py-1.5 flex items-center gap-1 justify-center border border-gray-100">
-                                <span className="material-symbols-outlined text-[11px] text-primary animate-spin">
-                                  progress_activity
+                        return (
+                          <div
+                            key={inv.id}
+                            className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm animate-fade-in hover:border-gray-300 transition-all cursor-pointer"
+                            onClick={() => setSelectedDetailInv(inv)}
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded font-hanken text-[8px] font-extrabold uppercase tracking-wide mb-1.5 bg-green-50 text-green-600">
+                                  <span className="material-symbols-outlined text-[10px]">lock</span>
+                                  {isMatured ? "MATURED - READY" : "ACTIVE"}
                                 </span>
-                                <p className="font-hanken text-[9px] text-gray-500 font-bold">
-                                  Growing secure yields...
-                                </p>
+                                <h3 className="font-hanken text-[13px] font-extrabold text-black leading-snug">
+                                  {inv.optionName}
+                                </h3>
+                                <span className="font-hanken text-[9px] text-gray-400 font-mono">
+                                  {inv.id}
+                                </span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCancelId(inv.id);
-                                  setShowCancelModal(true);
-                                }}
-                                className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-hanken text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 active:scale-95 transition-all"
-                              >
-                                <span className="material-symbols-outlined text-[13px]">block</span>
-                                Cancel
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                              <div className="text-right">
+                                <span className="block font-hanken text-[14px] font-extrabold text-black font-mono">
+                                  ₦{inv.amount.toLocaleString()}
+                                </span>
+                                <span className="font-hanken text-[9.5px] text-green-600 font-extrabold font-mono">
+                                  +{(inv.interestRate * 100).toFixed(1)}% {inv.interestType}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-gray-50 pt-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="block font-hanken text-[8.5px] text-gray-400 font-bold uppercase tracking-wide">
+                                  Start Date
+                                </span>
+                                <span className="font-hanken text-[10px] font-semibold text-gray-600">
+                                  {new Date(inv.startDate).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="block font-hanken text-[8.5px] text-gray-400 font-bold uppercase tracking-wide">
+                                  Maturity Date
+                                </span>
+                                <span className="font-hanken text-[10px] font-extrabold text-[#FC7A00]">
+                                  {new Date(inv.maturityDate).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                              {isMatured ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleClaim(inv.id)}
+                                  className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[14px]">payments</span>
+                                  Claim Matured Payout
+                                </button>
+                              ) : (
+                                <>
+                                  <div className="flex-1 bg-gray-50 rounded-xl px-2 py-1.5 flex items-center gap-1 justify-center border border-gray-100">
+                                    <span className="material-symbols-outlined text-[11px] text-[#FC7A00] animate-spin">
+                                      progress_activity
+                                    </span>
+                                    <p className="font-hanken text-[9px] text-gray-500 font-bold">
+                                      Growing yield...
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedCancelId(inv.id);
+                                      setShowCancelModal(true);
+                                    }}
+                                    className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-hanken text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                                  >
+                                    Liquidate Early
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VIEW 2: SAVINGS HISTORY */}
+            {activeHoldingTab === "HISTORY" && (
+              <div className="space-y-3">
+                {/* Filter Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                  {(["ALL", "CLAIMED", "CANCELLED"] as const).map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setHistoryFilter(chip)}
+                      className={`px-3 py-1 rounded-full font-hanken text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        historyFilter === chip
+                          ? "bg-black text-white"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+
+                {isLoadingHistory ? (
+                  <div className="flex flex-col gap-3">
+                    {[1, 2].map((n) => (
+                      <div key={n} className="skeleton-shimmer h-28 w-full rounded-2xl" />
+                    ))}
+                  </div>
+                ) : investments.filter((i) => {
+                    if (i.status === "ACTIVE") return false;
+                    if (historyFilter === "CLAIMED") return i.status === "CLAIMED";
+                    if (historyFilter === "CANCELLED") return i.status === "CANCELLED";
+                    return true;
+                  }).length === 0 ? (
+                  <div className="bg-white rounded-[24px] border border-gray-100 p-8 text-center flex flex-col items-center justify-center min-h-[160px] shadow-sm">
+                    <span className="material-symbols-outlined text-gray-300 text-[36px] mb-2">
+                      history
+                    </span>
+                    <p className="font-hanken text-[12px] font-bold text-black mb-1">
+                      No Investment History Found
+                    </p>
+                    <p className="font-hanken text-[10px] text-gray-400 leading-relaxed max-w-[220px]">
+                      Completed payouts and early cancellations will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {investments
+                      .filter((inv) => {
+                        if (inv.status === "ACTIVE") return false;
+                        if (historyFilter === "CLAIMED") return inv.status === "CLAIMED";
+                        if (historyFilter === "CANCELLED") return inv.status === "CANCELLED";
+                        return true;
+                      })
+                      .map((inv) => {
+                        const isClaimed = inv.status === "CLAIMED";
+                        const isCancelled = inv.status === "CANCELLED";
+
+                        return (
+                          <div
+                            key={inv.id}
+                            onClick={() => setSelectedDetailInv(inv)}
+                            className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm animate-fade-in hover:border-gray-300 transition-all cursor-pointer"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-hanken text-[8.5px] font-black uppercase tracking-wider mb-1.5 border ${
+                                  isClaimed
+                                    ? "bg-blue-50 text-blue-600 border-blue-200"
+                                    : isCancelled
+                                    ? "bg-red-50 text-red-600 border-red-200"
+                                    : "bg-gray-50 text-gray-600 border-gray-200"
+                                }`}>
+                                  <span className="material-symbols-outlined text-[10px]">
+                                    {isClaimed ? "check_circle" : "cancel"}
+                                  </span>
+                                  {inv.status}
+                                </span>
+                                <h3 className="font-hanken text-[13px] font-extrabold text-black leading-snug">
+                                  {inv.optionName}
+                                </h3>
+                                <span className="font-hanken text-[9px] text-gray-400 font-mono">
+                                  {inv.id}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="block font-hanken text-[14px] font-extrabold text-black font-mono">
+                                  ₦{inv.amount.toLocaleString()}
+                                </span>
+                                <span className={`font-hanken text-[9.5px] font-extrabold font-mono ${isCancelled ? "text-red-500 line-through" : "text-blue-600"}`}>
+                                  {isCancelled ? "Canceled Lock" : `Settled: ₦${inv.totalValue?.toLocaleString() || inv.amount.toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="border-t border-gray-50 pt-2 flex items-center justify-between text-[9.5px] font-hanken text-gray-500 font-semibold">
+                              <span>Locked: {new Date(inv.startDate).toLocaleDateString()}</span>
+                              <span className="text-[#FC7A00] font-extrabold flex items-center gap-1">
+                                <span>View Details</span>
+                                <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1196,12 +1327,15 @@ export default function InvestmentPage() {
                 <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-6">
                   <h4 className="font-hanken text-[11px] font-extrabold text-orange-700 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[14px]">warning</span>
-                    PENALTY DETAILS
+                    PENALTY & POLICY DISCLOSURE
                   </h4>
-                  <ul className="list-disc list-inside space-y-1 font-hanken text-[10px] text-gray-700 font-semibold leading-relaxed">
+                  <p className="font-hanken text-[10.5px] text-gray-700 font-semibold leading-relaxed mb-2">
+                    {penaltyPolicyText}
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 font-hanken text-[10px] text-gray-700 font-semibold leading-relaxed border-t border-orange-200/60 pt-2">
                     <li>An early withdrawal penalty of <strong>{(penaltyRate * 100).toFixed(0)}% of principal</strong> will be deducted.</li>
-                    <li>Any accumulated interest will be forfeit.</li>
-                    <li>The remaining refunded capital will be credited instantly back to your available wallet.</li>
+                    <li>Any accumulated interest will be forfeit upon early liquidation.</li>
+                    <li>The remaining refunded capital will be credited instantly back to your wallet.</li>
                   </ul>
                 </div>
 
@@ -1241,6 +1375,106 @@ export default function InvestmentPage() {
         {/* Custom Calendar Picker Modal */}
         <AnimatePresence>
           {renderCalendarModal()}
+        </AnimatePresence>
+
+        {/* FULL SCREEN INVESTMENT TRANSACTION DETAILS MODAL */}
+        <AnimatePresence>
+          {selectedDetailInv && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4"
+            >
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                className="bg-white w-full max-w-lg rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
+              >
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">savings</span>
+                    <h3 className="font-bodoni font-bold text-base text-black uppercase tracking-tight">
+                      Investment Transaction Details
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDetailInv(null)}
+                    className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-black cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-center space-y-1">
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border mb-1 ${
+                    selectedDetailInv.status === "CLAIMED"
+                      ? "bg-blue-50 text-blue-600 border-blue-200"
+                      : selectedDetailInv.status === "CANCELLED"
+                      ? "bg-red-50 text-red-600 border-red-200"
+                      : "bg-green-50 text-green-600 border-green-200"
+                  }`}>
+                    {selectedDetailInv.status}
+                  </span>
+                  <p className="text-xs font-bold text-gray-400 font-hanken uppercase">{selectedDetailInv.optionName}</p>
+                  <p className="font-mono font-black text-2xl text-black">
+                    ₦{selectedDetailInv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs font-hanken">
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-400 font-semibold uppercase text-[10px]">Transaction Ref / ID</span>
+                    <span className="font-mono font-bold text-black">{selectedDetailInv.id}</span>
+                  </div>
+
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-400 font-semibold uppercase text-[10px]">Annual Interest APR</span>
+                    <span className="font-mono font-bold text-green-600">+{(selectedDetailInv.interestRate * 100).toFixed(1)}% ({selectedDetailInv.interestType})</span>
+                  </div>
+
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-400 font-semibold uppercase text-[10px]">Lock Start Date</span>
+                    <span className="font-semibold text-gray-800">{new Date(selectedDetailInv.startDate).toLocaleString()}</span>
+                  </div>
+
+                  <div className="flex justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-400 font-semibold uppercase text-[10px]">Maturity / Unlock Date</span>
+                    <span className="font-bold text-[#FC7A00]">{new Date(selectedDetailInv.maturityDate).toLocaleDateString()}</span>
+                  </div>
+
+                  {selectedDetailInv.status === "CANCELLED" ? (
+                    <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-1 mt-2">
+                      <div className="flex justify-between text-red-600 font-bold">
+                        <span>Early Penalty Deducted ({(penaltyRate * 100).toFixed(0)}%):</span>
+                        <span className="font-mono">-₦{(selectedDetailInv.amount * penaltyRate).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-black font-extrabold border-t border-red-200/60 pt-1">
+                        <span>Net Refunded to Wallet:</span>
+                        <span className="font-mono text-emerald-600">₦{selectedDetailInv.totalValue?.toLocaleString() || (selectedDetailInv.amount * (1 - penaltyRate)).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-gray-400 font-semibold uppercase text-[10px]">Payout / Settled Value</span>
+                      <span className="font-mono font-bold text-emerald-600">₦{selectedDetailInv.totalValue?.toLocaleString() || selectedDetailInv.amount.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedDetailInv(null)}
+                  className="w-full py-3 bg-[#FC7A00] text-white rounded-2xl font-bold uppercase text-xs tracking-wider cursor-pointer shadow-sm active:scale-95 transition-all"
+                >
+                  Close Details
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </RouteGuard>

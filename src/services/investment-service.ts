@@ -4,7 +4,8 @@ import { WalletService } from "./wallet-service";
 export interface InvestmentSettings {
   minInvestment: number;
   maxInvestment: number;
-  penaltyRate: number; // e.g. 0.10 for 10% early withdrawal penalty on interest or principal
+  penaltyRate: number; // e.g. 0.10 for 10% early withdrawal penalty on principal
+  penaltyPolicyText?: string; // Custom policy disclosure text set by admin
   savingsRate: number; // e.g. 0.08 for 8%
   updatedAt: string;
 }
@@ -52,7 +53,8 @@ export class InvestmentService {
       const defaultSettings: InvestmentSettings = {
         minInvestment: 1000,
         maxInvestment: 10000000,
-        penaltyRate: 0.10, // 10% penalty on early withdrawal of principal/interest
+        penaltyRate: 0.10, // 10% penalty on early withdrawal of principal
+        penaltyPolicyText: "Early liquidation of locked savings before the target unlock date incurs a 10% penalty on principal. The remaining 90% balance will be instantly refunded to your wallet.",
         savingsRate: 0.08,
         updatedAt: new Date().toISOString(),
       };
@@ -101,7 +103,34 @@ export class InvestmentService {
   static async getSettings(): Promise<InvestmentSettings> {
     await this.seedDatabaseIfNeeded();
     const doc = await adminDb.collection("investmentSettings").doc("global").get();
-    return doc.data() as InvestmentSettings;
+    const data = doc.data() || {};
+    return {
+      minInvestment: Number(data.minInvestment) || 1000,
+      maxInvestment: Number(data.maxInvestment) || 10000000,
+      penaltyRate: data.penaltyRate !== undefined ? Number(data.penaltyRate) : 0.10,
+      penaltyPolicyText: data.penaltyPolicyText || "Early liquidation of locked savings before the target unlock date incurs a 10% penalty on principal. The remaining 90% balance will be instantly refunded to your wallet.",
+      savingsRate: Number(data.savingsRate) || 0.08,
+      updatedAt: data.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Updates global investment settings (Admin authorization checked in route layer).
+   */
+  static async updateSettings(params: Partial<InvestmentSettings>): Promise<InvestmentSettings> {
+    await this.seedDatabaseIfNeeded();
+    const settingsRef = adminDb.collection("investmentSettings").doc("global");
+    const current = await this.getSettings();
+
+    const updated: InvestmentSettings = {
+      ...current,
+      ...params,
+      penaltyRate: params.penaltyRate !== undefined ? Math.max(0, Math.min(1, Number(params.penaltyRate))) : current.penaltyRate,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await settingsRef.set(updated, { merge: true });
+    return updated;
   }
 
   /**
