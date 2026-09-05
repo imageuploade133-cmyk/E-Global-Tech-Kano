@@ -784,7 +784,7 @@ function AdminFixedDepositsPageContent() {
                     placeholder="Write the custom early withdrawal penalty terms and conditions shown to users..."
                     className={cn(inputClass, "h-auto py-3 leading-relaxed font-normal text-xs")}
                   />
-                  <p className="text-[10px] text-gray-400">This text appears directly inside the user's early cancellation confirm drawer before they authorize the refund debit.</p>
+                  <p className="text-[10px] text-gray-400">This text appears directly inside the user&apos;s early cancellation confirm drawer before they authorize the refund debit.</p>
                 </div>
 
                 <div className="flex justify-end pt-3 border-t border-gray-200/40">
