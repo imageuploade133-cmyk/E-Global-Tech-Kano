@@ -1371,8 +1371,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
 
   const handleAddBulkRecipient = () => {
+    const activeMinTransfer = Number(config.minTransferAmount ?? (config as any).globalMinTransferAmount) || 100;
     const amt = parseFloat(bulkAmountVal);
-    if (!bulkBank || bulkAccount.length !== 10 || !bulkName || isNaN(amt) || amt <= 0) {
+
+    if (isNaN(amt) || amt < activeMinTransfer) {
+      toast.error(`Minimum transfer amount per recipient is ₦${activeMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`);
+      return;
+    }
+
+    if (!bulkBank || bulkAccount.length !== 10 || !bulkName) {
       toast.error("Complete verification and specify a positive amount first.");
       return;
     }
@@ -3330,51 +3337,68 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           </div>
 
                           {/* Live Transfer Fee and Cumulative Total Breakdown */}
-                          {parseFloat(trfAmount) > 0 && (
-                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 font-hanken text-xs">
-                              <div className="flex justify-between text-gray-500">
-                                <span className="font-semibold">Transfer Principal</span>
-                                <span className="font-mono font-bold text-black">₦{parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                              </div>
-                              <div className="flex justify-between text-gray-500 border-b border-gray-200/50 pb-2">
-                                <span className="font-semibold">Transfer Fee</span>
-                                {isFeeLoading ? (
-                                  <span className="material-symbols-outlined text-[14px] animate-spin text-[#FC7A00]">progress_activity</span>
-                                ) : (
-                                  <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                          {parseFloat(trfAmount) > 0 && (() => {
+                            const activeMinTransfer = Number(config.minTransferAmount ?? (config as any).globalMinTransferAmount) || 100;
+                            const amt = parseFloat(trfAmount) || 0;
+                            const isBelowMin = amt < activeMinTransfer;
+
+                            return (
+                              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 font-hanken text-xs">
+                                <div className="flex justify-between text-gray-500">
+                                  <span className="font-semibold">Transfer Principal</span>
+                                  <span className="font-mono font-bold text-black">₦{amt.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between text-gray-500 border-b border-gray-200/50 pb-2">
+                                  <span className="font-semibold">Transfer Fee</span>
+                                  {isFeeLoading ? (
+                                    <span className="material-symbols-outlined text-[14px] animate-spin text-[#FC7A00]">progress_activity</span>
+                                  ) : (
+                                    <span className="font-mono font-bold text-black">₦{trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                                  )}
+                                </div>
+                                <div className="flex justify-between items-center text-sm font-black pt-1">
+                                  <span>Total Debit Amount</span>
+                                  {isFeeLoading ? (
+                                    <span className="material-symbols-outlined text-[14px] animate-spin text-[#FC7A00]">progress_activity</span>
+                                  ) : (
+                                    <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                                  )}
+                                </div>
+                                {isBelowMin && (
+                                  <p className="text-[9px] text-[#E11D48] font-bold uppercase leading-none pt-1">
+                                    ⚠️ Minimum required transfer limit is ₦{activeMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </p>
+                                )}
+                                {trfTotalDebit > balance && !isBelowMin && (
+                                  <p className="text-[9px] text-red-500 font-bold uppercase leading-none pt-1">
+                                    ⚠️ Total debit exceeds your wallet balance of ₦{balance.toLocaleString()}
+                                  </p>
                                 )}
                               </div>
-                              <div className="flex justify-between items-center text-sm font-black pt-1">
-                                <span>Total Debit Amount</span>
-                                {isFeeLoading ? (
-                                  <span className="material-symbols-outlined text-[14px] animate-spin text-[#FC7A00]">progress_activity</span>
-                                ) : (
-                                  <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
-                                )}
-                              </div>
-                              {trfTotalDebit > balance && (
-                                <p className="text-[9px] text-red-500 font-bold uppercase leading-none pt-1">
-                                  ⚠️ Total debit exceeds your wallet balance of ₦{balance.toLocaleString()}
-                                </p>
-                              )}
-                            </div>
-                          )}
+                            );
+                          })()}
                         </motion.div>
                       )}
 
                       {/* Continue Button (TASK 1) */}
-                      {trfAccountName && (
-                        <div className="pt-2">
-                          <button
-                            type="button"
-                            disabled={!trfAmount || isNaN(parseFloat(trfAmount)) || parseFloat(trfAmount) <= 0 || trfTotalDebit > balance || isFeeLoading}
-                            onClick={() => setTrfStep("confirm")}
-                            className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                          >
-                            Continue
-                          </button>
-                        </div>
-                      )}
+                      {trfAccountName && (() => {
+                        const activeMinTransfer = Number(config.minTransferAmount ?? (config as any).globalMinTransferAmount) || 100;
+                        const amt = parseFloat(trfAmount) || 0;
+                        const isInvalidAmount = !trfAmount || isNaN(amt) || amt < activeMinTransfer;
+
+                        return (
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              disabled={isInvalidAmount || trfTotalDebit > balance || isFeeLoading}
+                              onClick={() => setTrfStep("confirm")}
+                              className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                            >
+                              Continue
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     // --- BULK BATCH RECIPIENT ADDER FORM ---

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
+import { getGlobalMinTransferAmount, DEFAULT_GLOBAL_MIN_TRANSFER } from "@/lib/global-limits-util";
 
 export async function GET(req: Request) {
   try {
@@ -12,8 +13,15 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const searchQuery = (searchParams.get("search") || searchParams.get("q") || "").trim().toLowerCase();
 
+    // Fetch active global minimum transfer limit
+    const globalMinTransferAmount = await getGlobalMinTransferAmount();
+
     if (!searchQuery) {
-      return NextResponse.json({ success: true, users: [] });
+      return NextResponse.json({
+        success: true,
+        globalMinTransferAmount,
+        users: []
+      });
     }
 
     const usersSnap = await adminDb.collection("users").get();
@@ -49,6 +57,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
+      globalMinTransferAmount,
       users: results,
       count: results.length,
     });
@@ -67,6 +76,38 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
+
+    // Dedicated action for updating global minimum transfer amount
+    if (body.action === "update_global_min_transfer" || (body.globalMinTransferAmount !== undefined && !body.targetUid && !body.uid)) {
+      const newMin = Math.max(0, Number(body.globalMinTransferAmount ?? body.amount ?? DEFAULT_GLOBAL_MIN_TRANSFER));
+      if (isNaN(newMin)) {
+        return NextResponse.json({ error: "Invalid global minimum transfer amount. Must be a valid number." }, { status: 400 });
+      }
+
+      const nowIso = new Date().toISOString();
+      const limitsRef = adminDb.collection("config").doc("limits");
+      const appRef = adminDb.collection("config").doc("app");
+
+      await limitsRef.set({
+        globalMinTransferAmount: newMin,
+        minTransferAmount: newMin,
+        updatedAt: nowIso,
+      }, { merge: true });
+
+      await appRef.set({
+        globalMinTransferAmount: newMin,
+        minTransferAmount: newMin,
+        updatedAt: nowIso,
+      }, { merge: true });
+
+      return NextResponse.json({
+        success: true,
+        message: `Global Minimum Transfer Limit updated to ₦${newMin.toLocaleString(undefined, { minimumFractionDigits: 2 })} successfully!`,
+        globalMinTransferAmount: newMin,
+        updatedAt: nowIso,
+      });
+    }
+
     const {
       targetUid,
       uid,
@@ -111,6 +152,6 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Admin Limits POST Error]:", error.message);
-    return NextResponse.json({ error: "Failed to update user account limits", details: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update limits", details: error.message }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { NotificationService } from "@/services/notification-service";
 import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
+import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
 import bcrypt from "bcryptjs";
 
 interface BulkRecipient {
@@ -53,6 +54,17 @@ export async function POST(req: Request) {
     }
     if (!pin) {
       return NextResponse.json({ error: "Transaction PIN is required to authorize bulk transfers." }, { status: 400 });
+    }
+
+    const globalMinTransfer = await getGlobalMinTransferAmount();
+    for (let i = 0; i < trfRecipients.length; i++) {
+      const rec = trfRecipients[i];
+      const recAmt = Number(rec.amount);
+      if (isNaN(recAmt) || recAmt < globalMinTransfer) {
+        return NextResponse.json({
+          error: `Recipient #${i + 1} transfer amount (₦${isNaN(recAmt) ? "0" : recAmt.toLocaleString()}) is below the global minimum required transfer limit of ₦${globalMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`,
+        }, { status: 400 });
+      }
     }
 
     // Calculate total principal amount
