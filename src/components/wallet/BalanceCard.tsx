@@ -1183,22 +1183,42 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   // Status Polling Effect
   const startPolling = (txRef: string) => {
     stopPolling();
+    if (!user) {
+      console.warn("[Polling Cancelled] No authenticated user present.");
+      return;
+    }
     console.log(`[Polling Started] Checking status for txRef: ${txRef}`);
 
-    pollingRef.current = setInterval(async () => {
+    const pollOnce = async () => {
+      if (!user) return;
       try {
-        const res = await fetch(`/api/payments/status?txRef=${txRef}`);
+        const idToken = await user.getIdToken();
+        const res = await fetch(`/api/payments/status?txRef=${encodeURIComponent(txRef)}`, {
+          cache: "no-store",
+          headers: {
+            "Authorization": `Bearer ${idToken}`,
+          },
+        });
         const data = await res.json();
 
-        if (data.success) {
+        if (res.status === 401 || res.status === 403) {
+          console.warn(`[Polling Stopped] Authorization error ${res.status}`);
+          stopPolling();
+          return;
+        }
+
+        if (data.success || data.status) {
           if (data.status === "SUCCESS") {
             setPaymentStatus("PAID");
             stopPolling();
             if (timerRef.current) clearInterval(timerRef.current);
             setWizardStep("success");
             toast.success("Wallet credited successfully!");
-          } else if (data.status === "FAILED") {
-            setPaymentStatus("FAILED");
+            fetchWalletBalances();
+            fetchInvestmentBalance();
+            window.dispatchEvent(new Event("app-refresh"));
+          } else if (data.status === "FAILED" || data.status === "EXPIRED" || data.status === "CANCELED") {
+            setPaymentStatus(data.status);
             stopPolling();
             if (timerRef.current) clearInterval(timerRef.current);
           }
@@ -1206,7 +1226,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       } catch (err) {
         console.error("Polling Error:", err);
       }
-    }, 4000); // Poll every 4 seconds
+    };
+
+    // Immediate initial check
+    pollOnce();
+
+    pollingRef.current = setInterval(pollOnce, 4000); // Poll every 4 seconds
   };
 
   const stopPolling = () => {
@@ -2865,17 +2890,25 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   <div>
-                    <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">Payment Successful!</h4>
+                    <h4 className="font-hanken font-black text-lg text-gray-900 leading-tight">Wallet Credited Successfully!</h4>
                     <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed max-w-[280px]">
-                      Your wallet has been automatically credited and a receipt generated in your ledger.
+                      Your payment has been confirmed and credited to your available balance.
                     </p>
                   </div>
 
-                  <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150">
-                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Credited Amount</p>
-                    <p className="font-mono text-2xl font-black text-emerald-600 mt-0.5">
-                      +₦{parseFloat(addAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </p>
+                  <div className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-500 font-bold uppercase text-[10px]">Transferred Amount</span>
+                      <span className="font-mono font-bold text-gray-900">
+                        ₦{transferDetails?.transferAmount ? transferDetails.transferAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : parseFloat(addAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs border-t border-gray-200/60 pt-2">
+                      <span className="text-gray-500 font-bold uppercase text-[10px]">Credited Amount</span>
+                      <span className="font-mono text-xl font-black text-emerald-600">
+                        +₦{parseFloat(addAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
 
                   <button
