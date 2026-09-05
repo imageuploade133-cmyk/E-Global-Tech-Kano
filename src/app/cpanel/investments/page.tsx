@@ -103,7 +103,7 @@ function AdminFixedDepositsPageContent() {
   const [investments, setInvestments] = useState<FixedDeposit[]>([]);
   const [isLoadingInvestments, setIsLoadingInvestments] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterTab, setFilterTab] = useState<"ALL" | "ACTIVE" | "SETTLED">("ALL");
+  const [filterTab, setFilterTab] = useState<"ALL" | "ACTIVE" | "SETTLED" | "CANCELLED">("ALL");
 
   // Savings Plans Customizer States
   const [plans, setPlans] = useState<SavingsPlanData[]>([]);
@@ -356,12 +356,16 @@ function AdminFixedDepositsPageContent() {
   // Analytics & Filtering
   const activeDeposits = investments.filter((i) => i.status === "ACTIVE");
   const settledDeposits = investments.filter((i) => i.status === "SETTLED" || i.status === "CLAIMED");
+  const cancelledDeposits = investments.filter((i) => i.status === "CANCELLED" || i.status === "CANCELED");
+
   const totalActiveVolume = activeDeposits.reduce((sum, curr) => sum + (Number(curr.amount) || 0), 0);
   const totalSettledVolume = settledDeposits.reduce((sum, curr) => sum + (Number(curr.amount) || 0), 0);
+  const totalCancelledVolume = cancelledDeposits.reduce((sum, curr) => sum + (Number(curr.amount) || 0), 0);
 
   const filteredInvestments = investments.filter((inv) => {
     if (filterTab === "ACTIVE" && inv.status !== "ACTIVE") return false;
     if (filterTab === "SETTLED" && inv.status !== "SETTLED" && inv.status !== "CLAIMED") return false;
+    if (filterTab === "CANCELLED" && inv.status !== "CANCELLED" && inv.status !== "CANCELED") return false;
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
     return (
@@ -369,6 +373,7 @@ function AdminFixedDepositsPageContent() {
       inv.userEmail?.toLowerCase().includes(term) ||
       inv.userPhone?.includes(term) ||
       inv.status?.toLowerCase().includes(term) ||
+      inv.description?.toLowerCase().includes(term) ||
       String(inv.amount).includes(term)
     );
   });
@@ -628,72 +633,148 @@ function AdminFixedDepositsPageContent() {
         {activeTab === "AUDIT" && (
           <div className="space-y-6">
             {/* Metrics Overview grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Active Savings</p>
-                <p className="font-mono text-xl sm:text-2xl font-black text-emerald-500 mt-1 leading-none">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300 relative overflow-hidden", panelClass)}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Active Savings</p>
+                  <span className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black text-xs">
+                    {activeDeposits.length}
+                  </span>
+                </div>
+                <p className="font-mono text-xl sm:text-2xl font-black text-emerald-500 mt-2 leading-none">
                   ₦{totalActiveVolume.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
 
-              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Settled / Credited</p>
-                <p className="font-mono text-xl sm:text-2xl font-black text-blue-500 mt-1 leading-none">
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300 relative overflow-hidden", panelClass)}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Settled / Credited</p>
+                  <span className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center font-black text-xs">
+                    {settledDeposits.length}
+                  </span>
+                </div>
+                <p className="font-mono text-xl sm:text-2xl font-black text-blue-500 mt-2 leading-none">
                   ₦{totalSettledVolume.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
 
-              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Active Accounts</p>
-                <p className="font-mono text-xl sm:text-2xl font-black text-[#FC7A00] mt-1 leading-none">
-                  {activeDeposits.length}
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300 relative overflow-hidden", panelClass)}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Canceled Investments</p>
+                  <span className="w-8 h-8 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center font-black text-xs">
+                    {cancelledDeposits.length}
+                  </span>
+                </div>
+                <p className="font-mono text-xl sm:text-2xl font-black text-rose-500 mt-2 leading-none">
+                  ₦{totalCancelledVolume.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
 
-              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Ledger Audits</p>
-                <p className="font-mono text-xl sm:text-2xl font-black text-gray-400 mt-1 leading-none">
-                  {investments.length}
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300 relative overflow-hidden", panelClass)}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Audited Placements</p>
+                  <span className="w-8 h-8 rounded-full bg-orange-500/10 text-[#FC7A00] flex items-center justify-center font-black text-xs">
+                    {investments.length}
+                  </span>
+                </div>
+                <p className="font-mono text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2 leading-none">
+                  {investments.length} <span className="text-xs text-gray-400 font-semibold uppercase">Records</span>
                 </p>
               </div>
             </div>
 
-            {/* Audit Table */}
-            <div className={cn("rounded-2xl p-4 border transition-colors duration-300 space-y-4", panelClass)}>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap">
-                <div className="grid grid-cols-3 gap-1 bg-gray-150 dark:bg-gray-800 p-0.5 rounded-xl max-w-sm w-full">
-                  {(["ALL", "ACTIVE", "SETTLED"] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setFilterTab(tab)}
-                      className={cn(
-                        "py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center",
-                        filterTab === tab
-                          ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm"
-                          : "text-gray-400 hover:text-white"
-                      )}
-                    >
-                      {tab}
-                    </button>
-                  ))}
+            {/* Audit Table & Custom Filter Tab Selector */}
+            <div className={cn("rounded-2xl p-5 border transition-colors duration-300 space-y-5", panelClass)}>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* Modern Multi-Filter Pill Bar */}
+                <div className="flex items-center bg-gray-100 dark:bg-gray-900/80 p-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-800 gap-1.5 overflow-x-auto custom-scrollbar w-full lg:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("ALL")}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
+                      filterTab === "ALL"
+                        ? "bg-white dark:bg-gray-800 text-[#FC7A00] shadow-sm border border-gray-200/60 dark:border-gray-700"
+                        : "text-gray-500 hover:text-black dark:hover:text-white"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">apps</span>
+                    <span>ALL</span>
+                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold font-mono", filterTab === "ALL" ? "bg-orange-500/15 text-[#FC7A00]" : "bg-gray-200 dark:bg-gray-800 text-gray-500")}>
+                      {investments.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("ACTIVE")}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
+                      filterTab === "ACTIVE"
+                        ? "bg-white dark:bg-gray-800 text-emerald-500 shadow-sm border border-gray-200/60 dark:border-gray-700"
+                        : "text-gray-500 hover:text-black dark:hover:text-white"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">published_with_changes</span>
+                    <span>ACTIVE</span>
+                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold font-mono", filterTab === "ACTIVE" ? "bg-emerald-500/15 text-emerald-500" : "bg-gray-200 dark:bg-gray-800 text-gray-500")}>
+                      {activeDeposits.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("SETTLED")}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
+                      filterTab === "SETTLED"
+                        ? "bg-white dark:bg-gray-800 text-blue-500 shadow-sm border border-gray-200/60 dark:border-gray-700"
+                        : "text-gray-500 hover:text-black dark:hover:text-white"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">verified</span>
+                    <span>SETTLED</span>
+                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold font-mono", filterTab === "SETTLED" ? "bg-blue-500/15 text-blue-500" : "bg-gray-200 dark:bg-gray-800 text-gray-500")}>
+                      {settledDeposits.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("CANCELLED")}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
+                      filterTab === "CANCELLED"
+                        ? "bg-white dark:bg-gray-800 text-rose-500 shadow-sm border border-gray-200/60 dark:border-gray-700"
+                        : "text-gray-500 hover:text-black dark:hover:text-white"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">cancel</span>
+                    <span>CANCELED</span>
+                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold font-mono", filterTab === "CANCELLED" ? "bg-rose-500/15 text-rose-500" : "bg-gray-200 dark:bg-gray-800 text-gray-500")}>
+                      {cancelledDeposits.length}
+                    </span>
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search user email or phone..."
-                    className={inputClass}
-                  />
+                <div className="flex items-center gap-2 w-full lg:w-auto">
+                  <div className="relative flex-1 lg:w-64">
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Search user, email, phone or amount..."
+                      className={inputClass}
+                    />
+                  </div>
                   <button
                     type="button"
                     disabled={isLoadingInvestments}
                     onClick={fetchInvestments}
-                    className="px-4 py-2 bg-black text-white hover:bg-gray-900 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap"
+                    className="px-4 py-2.5 bg-black dark:bg-gray-800 text-white hover:bg-gray-900 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5"
                   >
-                    {isLoadingInvestments ? <ButtonSpinner /> : "Reload"}
+                    {isLoadingInvestments ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
+                    <span>Reload</span>
                   </button>
                 </div>
               </div>
@@ -723,36 +804,48 @@ function AdminFixedDepositsPageContent() {
                       {filteredInvestments.map((inv) => {
                         const estYield = inv.amount * (Number(inv.interestRate) / 100);
                         const isActive = inv.status === "ACTIVE";
+                        const isSettled = inv.status === "SETTLED" || inv.status === "CLAIMED";
+                        const isCancelled = inv.status === "CANCELLED" || inv.status === "CANCELED";
 
                         return (
-                          <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10">
+                          <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10 transition-colors">
                             <td className="py-3.5 pl-2">
-                              <p className="font-extrabold text-sm">{inv.userName || "System User"}</p>
+                              <p className="font-extrabold text-sm text-black dark:text-white">{inv.userName || "System User"}</p>
                               <p className="text-[10px] text-gray-400 mt-0.5">{inv.userEmail}</p>
                               <p className="text-[9px] font-mono text-gray-500">{inv.userPhone}</p>
                             </td>
-                            <td className="py-3.5 text-right font-mono font-bold text-sm">
+                            <td className="py-3.5 text-right font-mono font-bold text-sm text-black dark:text-white">
                               ₦{inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-3.5 text-center font-mono font-black text-[#FC7A00]">
                               {inv.interestRate}%
                             </td>
-                            <td className="py-3.5 text-right font-mono font-extrabold text-emerald-500">
-                              +₦{estYield.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            <td className={cn(
+                              "py-3.5 text-right font-mono font-extrabold",
+                              isCancelled ? "text-gray-400 line-through" : "text-emerald-500"
+                            )}>
+                              {isCancelled ? "₦0.00" : `+₦${estYield.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                             </td>
                             <td className="py-3.5 text-center">
                               <span className={cn(
-                                "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border inline-flex items-center gap-1",
                                 isActive
-                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse"
-                                  : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 animate-pulse"
+                                  : isSettled
+                                  ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                  : isCancelled
+                                  ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                  : "bg-gray-500/10 text-gray-400 border-gray-500/20"
                               )}>
-                                {inv.status}
+                                <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                <span>{inv.status}</span>
                               </span>
                             </td>
                             <td className="py-3.5 text-center">
                               <p className="text-[9px] font-semibold text-gray-400">Created: {new Date(inv.createdAt).toLocaleDateString()}</p>
-                              <p className="text-[9px] font-extrabold text-[#FC7A00] mt-0.5">Matures: {new Date(inv.maturesAt).toLocaleDateString()}</p>
+                              <p className="text-[9px] font-extrabold text-[#FC7A00] mt-0.5">
+                                {isCancelled ? "Canceled" : `Matures: ${new Date(inv.maturesAt).toLocaleDateString()}`}
+                              </p>
                             </td>
                           </tr>
                         );
