@@ -27,7 +27,36 @@ interface BillItem {
   is_fixed_amount: boolean;
 }
 
-const AIRTIME_PRESETS = [100, 200, 500, 1000, 2000, 5000];
+const BILLS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 Minutes Cache Expiration TTL
+
+function getBillsCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(`vtu_cache_${key}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.timestamp || !parsed.data) return null;
+    if (Date.now() - parsed.timestamp > BILLS_CACHE_TTL_MS) {
+      sessionStorage.removeItem(`vtu_cache_${key}`);
+      return null;
+    }
+    return parsed.data as T;
+  } catch {
+    return null;
+  }
+}
+
+function setBillsCache<T>(key: string, data: T): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      `vtu_cache_${key}`,
+      JSON.stringify({ timestamp: Date.now(), data })
+    );
+  } catch {
+    // Ignore storage quota errors
+  }
+}
 
 // Global flat micro spinner
 const ButtonSpinner = () => (
@@ -111,6 +140,17 @@ export default function GenericBillPage() {
     }
   };
 
+  const getReviewModalTitle = () => {
+    switch (pageCategory) {
+      case "AIRTIME": return "Review Airtime Purchase";
+      case "DATA": return "Review Data Purchase";
+      case "UTILITY": return "Review Electricity Purchase";
+      case "CABLE": return "Review Cable TV Subscription";
+      case "WAEC": return "Review WAEC Scratch Card Purchase";
+      default: return "Review Order Details";
+    }
+  };
+
   const getPageIcon = () => {
     switch (pageCategory) {
       case "AIRTIME": return "call";
@@ -150,7 +190,7 @@ export default function GenericBillPage() {
     };
   }, [isPinModalOpen, isCheckoutModalOpen]);
 
-  // Fetch billers and custom logo overrides when pageCategory changes
+  // Fetch billers and custom logo overrides when pageCategory changes (with 10-min cache)
   useEffect(() => {
     async function fetchBillers() {
       setIsBillersLoading(true);
@@ -160,6 +200,14 @@ export default function GenericBillPage() {
       setCustomerId("");
       setCustomAmount("");
       setValidatedName("");
+
+      const cacheKey = `billers_${pageCategory}`;
+      const cachedBillers = getBillsCache<Biller[]>(cacheKey);
+      if (cachedBillers && Array.isArray(cachedBillers) && cachedBillers.length > 0) {
+        setBillers(cachedBillers);
+        setIsBillersLoading(false);
+        return;
+      }
 
       try {
         // Fetch custom bill logo overrides from backend
@@ -202,6 +250,7 @@ export default function GenericBillPage() {
             ];
           }
           setBillers(list);
+          setBillsCache(cacheKey, list);
           setIsBillersLoading(false);
           return;
         }
@@ -216,11 +265,13 @@ export default function GenericBillPage() {
         }
         const authHeaders = { "Authorization": `Bearer ${idToken}` };
 
+        let finalBillersList: Biller[] = [];
+
         if (pageCategory === "AIRTIME" || pageCategory === "DATA") {
           const res = await fetch("/api/vtu/networks", { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load networks from gateway.");
           const data = await res.json();
-          const networkList = (data.networks || []).map((name: string, index: number) => {
+          finalBillersList = (data.networks || []).map((name: string, index: number) => {
             const codeKey = name.toLowerCase();
             return {
               id: index + 1,
@@ -229,10 +280,9 @@ export default function GenericBillPage() {
               logo: customLogos[codeKey] || "",
             };
           });
-          setBillers(networkList);
         } else if (pageCategory === "UTILITY") {
           const companies = ["IKEDC", "EKEDC", "AEDC", "KEDCO", "PHED", "JED", "EEDC", "IBEDC", "KAEDCO"];
-          const discoList = companies.map((name, index) => {
+          finalBillersList = companies.map((name, index) => {
             const codeKey = name.toLowerCase();
             return {
               id: index + 1,
@@ -241,10 +291,9 @@ export default function GenericBillPage() {
               logo: customLogos[codeKey] || "",
             };
           });
-          setBillers(discoList);
         } else if (pageCategory === "CABLE") {
           const providers = ["DStv", "GOtv", "StarTimes"];
-          const providerList = providers.map((name, index) => {
+          finalBillersList = providers.map((name, index) => {
             const codeKey = name.toLowerCase();
             return {
               id: index + 1,
@@ -253,26 +302,26 @@ export default function GenericBillPage() {
               logo: customLogos[codeKey] || "",
             };
           });
-          setBillers(providerList);
         } else if (pageCategory === "WAEC") {
-          const providerList = [{
+          finalBillersList = [{
             id: 1,
             name: "WAEC Council",
             biller_code: "waec",
             logo: customLogos["waec"] || "",
           }];
-          setBillers(providerList);
         } else {
           const apiCategory = pageCategory;
           const res = await fetch(`/api/bills/billers?category=${apiCategory}`);
           if (!res.ok) throw new Error("Failed to load billing providers.");
           const data = await res.json();
-          const loadedBillers = (data.data || []).map((b: Biller) => ({
+          finalBillersList = (data.data || []).map((b: Biller) => ({
             ...b,
             logo: customLogos[b.biller_code.toLowerCase()] || b.logo || "",
           }));
-          setBillers(loadedBillers);
         }
+
+        setBillers(finalBillersList);
+        setBillsCache(cacheKey, finalBillersList);
       } catch (err: unknown) {
         const error = err as Error;
         console.error("Error fetching billers:", error.message);
@@ -284,7 +333,7 @@ export default function GenericBillPage() {
     fetchBillers();
   }, [pageCategory, user]);
 
-  // Fetch items/packages when selectedBiller changes
+  // Fetch items/packages when selectedBiller changes (with 10-min cache)
   useEffect(() => {
     if (!selectedBiller) return;
 
@@ -298,34 +347,45 @@ export default function GenericBillPage() {
       setCustomAmount("");
       setValidatedName("");
 
+      const cacheKey = `items_${pageCategory}_${currentBiller.biller_code}`;
+      const cachedItems = getBillsCache<BillItem[]>(cacheKey);
+      if (cachedItems && Array.isArray(cachedItems) && cachedItems.length > 0) {
+        setItems(cachedItems);
+        setIsItemsLoading(false);
+        return;
+      }
+
       try {
         const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
         if (isMock) {
+          let list: BillItem[] = [];
           if (pageCategory === "DATA") {
-            setItems([
+            list = [
               { id: 1, biller_code: currentBiller.biller_code, name: "1 GB - 30 days (SME)", item_code: "sme_1gb", amount: 461, is_fixed_amount: true },
               { id: 2, biller_code: currentBiller.biller_code, name: "2 GB - 30 days (SME)", item_code: "sme_2gb", amount: 922, is_fixed_amount: true },
               { id: 3, biller_code: currentBiller.biller_code, name: "5 GB - 30 days (SME)", item_code: "sme_5gb", amount: 2306, is_fixed_amount: true },
               { id: 4, biller_code: currentBiller.biller_code, name: "125MB - 1 day (Awoof Data)", item_code: "awoof_125", amount: 97, is_fixed_amount: true },
               { id: 5, biller_code: currentBiller.biller_code, name: "2.5GB - Weekend Plan - [Sat & Sun]", item_code: "weekend_25", amount: 485, is_fixed_amount: true }
-            ]);
+            ];
           } else if (pageCategory === "AIRTIME") {
-            setItems([{ id: 1, biller_code: currentBiller.biller_code, name: `${currentBiller.name} Airtime topup`, item_code: "airtime", amount: 0, is_fixed_amount: false }]);
+            list = [{ id: 1, biller_code: currentBiller.biller_code, name: `${currentBiller.name} Airtime topup`, item_code: "airtime", amount: 0, is_fixed_amount: false }];
           } else if (pageCategory === "UTILITY") {
-            setItems([
+            list = [
               { id: 1, biller_code: currentBiller.biller_code, name: "Prepaid Meter Bill Payment", item_code: "prepaid", amount: 0, is_fixed_amount: false },
               { id: 2, biller_code: currentBiller.biller_code, name: "Postpaid Meter Bill Payment", item_code: "postpaid", amount: 0, is_fixed_amount: false }
-            ]);
+            ];
           } else if (pageCategory === "CABLE") {
-            setItems([
+            list = [
               { id: 1, biller_code: currentBiller.biller_code, name: "GOtv Max", item_code: "gotv_max", amount: 4850, is_fixed_amount: true },
               { id: 2, biller_code: currentBiller.biller_code, name: "GOtv Jolli", item_code: "gotv_jolli", amount: 3300, is_fixed_amount: true }
-            ]);
+            ];
           } else if (pageCategory === "WAEC") {
-            setItems([
+            list = [
               { id: 1, biller_code: currentBiller.biller_code, name: "WAEC Result Checker PIN", item_code: "waec_checker", amount: 3500, is_fixed_amount: true }
-            ]);
+            ];
           }
+          setItems(list);
+          setBillsCache(cacheKey, list);
           setIsItemsLoading(false);
           return;
         }
@@ -340,11 +400,13 @@ export default function GenericBillPage() {
         }
         const authHeaders = { "Authorization": `Bearer ${idToken}` };
 
+        let finalItemList: BillItem[] = [];
+
         if (pageCategory === "DATA") {
           const res = await fetch(`/api/vtu/data/plans?network=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load data plans from gateway.");
           const data = await res.json();
-          const planList = (data.data || []).map((plan: { item_code: string; name: string; amount: number; plan_code: string }, index: number) => ({
+          finalItemList = (data.data || []).map((plan: { item_code: string; name: string; amount: number; plan_code: string }, index: number) => ({
             id: index + 1,
             biller_code: currentBiller.biller_code,
             name: plan.name,
@@ -352,18 +414,17 @@ export default function GenericBillPage() {
             amount: plan.amount,
             is_fixed_amount: true,
           }));
-          setItems(planList);
         } else if (pageCategory === "AIRTIME") {
-          setItems([{
+          finalItemList = [{
             id: 1,
             biller_code: currentBiller.biller_code,
             name: `${currentBiller.name} Airtime topup`,
             item_code: "airtime",
             amount: 0,
             is_fixed_amount: false,
-          }]);
+          }];
         } else if (pageCategory === "UTILITY") {
-          setItems([
+          finalItemList = [
             {
               id: 1,
               biller_code: currentBiller.biller_code,
@@ -380,12 +441,12 @@ export default function GenericBillPage() {
               amount: 0,
               is_fixed_amount: false,
             }
-          ]);
+          ];
         } else if (pageCategory === "CABLE") {
           const res = await fetch(`/api/vtu/cable/packages?provider=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load bouquets from gateway.");
           const data = await res.json();
-          const packageList = (data.data || []).map((pkg: { item_code: string; name: string; amount: number; package_code: string }, index: number) => ({
+          finalItemList = (data.data || []).map((pkg: { item_code: string; name: string; amount: number; package_code: string }, index: number) => ({
             id: index + 1,
             biller_code: currentBiller.biller_code,
             name: pkg.name,
@@ -393,12 +454,11 @@ export default function GenericBillPage() {
             amount: pkg.amount,
             is_fixed_amount: true,
           }));
-          setItems(packageList);
         } else if (pageCategory === "WAEC") {
           const res = await fetch(`/api/vtu/waec/products`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load WAEC products.");
           const data = await res.json();
-          const productList = (data.data || []).map((prod: { item_code: string; name: string; amount: number; product_code: string }, index: number) => ({
+          finalItemList = (data.data || []).map((prod: { item_code: string; name: string; amount: number; product_code: string }, index: number) => ({
             id: index + 1,
             biller_code: currentBiller.biller_code,
             name: prod.name,
@@ -406,13 +466,15 @@ export default function GenericBillPage() {
             amount: prod.amount,
             is_fixed_amount: true,
           }));
-          setItems(productList);
         } else {
           const res = await fetch(`/api/bills/items?biller_code=${currentBiller.biller_code}`, { headers: authHeaders });
           if (!res.ok) throw new Error("Failed to load packages.");
           const data = await res.json();
-          setItems(data.data || []);
+          finalItemList = data.data || [];
         }
+
+        setItems(finalItemList);
+        setBillsCache(cacheKey, finalItemList);
       } catch (err: unknown) {
         const error = err as Error;
         console.error("Error fetching items:", error.message);
@@ -624,7 +686,7 @@ export default function GenericBillPage() {
         throw new Error(pinData.message || "Incorrect transaction PIN. Please try again.");
       }
 
-      toast.loading("Processing your VTU transaction with gateway...");
+      toast.loading("Processing your transaction with gateway...");
 
       const isData = pageCategory === "DATA";
       const isAirtime = pageCategory === "AIRTIME";
@@ -695,7 +757,7 @@ export default function GenericBillPage() {
         toast.dismiss();
 
         if (!res.ok || !data.success) {
-          throw new Error(data.message || data.error || "Failed to process VTU transaction.");
+          throw new Error(data.message || data.error || "Failed to process transaction.");
         }
 
         setSuccessReceipt({
@@ -704,7 +766,7 @@ export default function GenericBillPage() {
           amount: finalAmount,
           pins: data.pins || undefined,
         });
-        toast.success("VTU transaction completed successfully!");
+        toast.success("Transaction completed successfully!");
       } else {
         let res = await fetch("/api/bills/pay", {
           method: "POST",
@@ -762,7 +824,7 @@ export default function GenericBillPage() {
     } catch (err: unknown) {
       const error = err as Error;
       toast.dismiss();
-      toast.error(error.message || "Your VTU transaction failed. Your wallet balance is safe.");
+      toast.error(error.message || "Your transaction failed. Your wallet balance is safe.");
     } finally {
       setIsPaying(false);
     }
@@ -907,7 +969,14 @@ export default function GenericBillPage() {
                 <div className="w-full bg-white border border-gray-150 rounded-2xl p-4 space-y-3 text-left font-hanken text-xs mb-6 shadow-none">
                   <div className="flex justify-between border-b border-gray-100 pb-2.5 text-gray-500">
                     <span className="font-semibold">Provider</span>
-                    <span className="text-black font-extrabold">{selectedBiller?.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      {selectedBiller?.logo && (
+                        <div className="w-4 h-4 rounded border border-gray-200 bg-white flex items-center justify-center overflow-hidden p-0.5 shrink-0">
+                          <img src={selectedBiller.logo} alt={selectedBiller.name} className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <span className="text-black font-extrabold">{selectedBiller?.name}</span>
+                    </div>
                   </div>
 
                   <div className="flex justify-between border-b border-gray-100 pb-2.5 text-gray-500">
@@ -1271,7 +1340,7 @@ export default function GenericBillPage() {
 
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                   <h3 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
-                    Review VTU Order
+                    {getReviewModalTitle()}
                   </h3>
                   <button
                     type="button"
@@ -1287,7 +1356,21 @@ export default function GenericBillPage() {
                   <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 space-y-2">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-400 font-bold uppercase">Provider</span>
-                      <span className="font-black text-black">{selectedBiller.name}</span>
+                      <div className="flex items-center gap-2">
+                        {selectedBiller.logo && (
+                          <div className="w-5 h-5 rounded-md border border-gray-200 bg-white flex items-center justify-center overflow-hidden p-0.5 shrink-0">
+                            <img
+                              src={selectedBiller.logo}
+                              alt={selectedBiller.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                              }}
+                            />
+                          </div>
+                        )}
+                        <span className="font-black text-black">{selectedBiller.name}</span>
+                      </div>
                     </div>
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-400 font-bold uppercase">Plan Package</span>
