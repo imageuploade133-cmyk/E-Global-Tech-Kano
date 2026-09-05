@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
+import { SavingsPlanData } from "@/lib/savings-plans-types";
 
 interface FixedDeposit {
   id: string;
@@ -33,7 +34,7 @@ const ButtonSpinner = () => (
 );
 
 function AdminFixedDepositsPageContent() {
-  const { user, userData } = useAuth();
+  const { user } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
 
@@ -66,15 +67,16 @@ function AdminFixedDepositsPageContent() {
   const inputClass = isDark
     ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full"
     : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs max-w-full h-10 px-3 text-xs outline-none font-semibold truncate w-full";
-  const labelClass = isDark ? "text-gray-300" : "text-gray-900";
 
-  // Admin lock validation
+  // Navigation tab: AUDIT vs PLANS
+  const [activeTab, setActiveTab] = useState<"PLANS" | "AUDIT">("PLANS");
+
+  // Auth Session Check
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
-  // Check cookie-based admin session on mount
   useEffect(() => {
     const checkCPanelSession = async () => {
       try {
@@ -91,7 +93,6 @@ function AdminFixedDepositsPageContent() {
     checkCPanelSession();
   }, []);
 
-  // Pre-fill admin email when user loads as fallback
   useEffect(() => {
     if (user?.email && !adminEmail) {
       setAdminEmail(user.email);
@@ -100,40 +101,65 @@ function AdminFixedDepositsPageContent() {
 
   // Deposits Data States
   const [investments, setInvestments] = useState<FixedDeposit[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingInvestments, setIsLoadingInvestments] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTab, setFilterTab] = useState<"ALL" | "ACTIVE" | "SETTLED">("ALL");
 
-  const fetchInvestments = async () => {
-    setIsLoading(true);
+  // Savings Plans Customizer States
+  const [plans, setPlans] = useState<SavingsPlanData[]>([]);
+  const [isLoadingPlans, setIsLoadingLoadingPlans] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Partial<SavingsPlanData> | null>(null);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  // Month/Year Options String Helpers for editing
+  const [monthOptsStr, setMonthOptsStr] = useState("1, 3, 6, 9");
+  const [yearOptsStr, setYearOptsStr] = useState("1, 2, 3");
+
+  const fetchPlans = async () => {
+    setIsLoadingLoadingPlans(true);
     try {
-      const isMock = sessionStorage.getItem("mock") === "true";
+      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+      const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+      const res = await fetch("/api/admin/investments/plans", { headers });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.plans)) {
+        setPlans(data.plans);
+      }
+    } catch (err) {
+      console.warn("Failed to load savings plans:", err);
+    } finally {
+      setIsLoadingLoadingPlans(false);
+    }
+  };
+
+  const fetchInvestments = async () => {
+    setIsLoadingInvestments(true);
+    try {
+      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
       let idToken = "mock-admin-token";
       if (!isMock && user) {
         idToken = await user.getIdToken();
       }
 
       const res = await fetch("/api/admin/investments", {
-        headers: {
-          "Authorization": `Bearer ${idToken}`,
-        },
+        headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setInvestments(data.investments || []);
-      } else {
-        toast.error(data.error || "Failed to load system investments.");
       }
     } catch (err) {
       console.error("Error loading investments:", err);
-      toast.error("Network communication failure loading investments.");
     } finally {
-      setIsLoading(false);
+      setIsLoadingInvestments(false);
     }
   };
 
   useEffect(() => {
     if (isAdminUnlocked) {
+      fetchPlans();
       fetchInvestments();
     }
   }, [isAdminUnlocked, user]);
@@ -157,13 +183,8 @@ function AdminFixedDepositsPageContent() {
     try {
       const res = await fetch("/api/admin/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: adminEmail,
-          pin: adminPin,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, pin: adminPin }),
       });
 
       const data = await res.json();
@@ -173,27 +194,174 @@ function AdminFixedDepositsPageContent() {
       } else {
         toast.error(data.error || "Invalid Email or Access PIN!");
       }
-    } catch (err: any) {
+    } catch {
       toast.error("API connection error during verification.");
     } finally {
       setIsVerifyingPin(false);
     }
   };
 
-  // Calculations & Analytics
-  const activeDeposits = investments.filter(i => i.status === "ACTIVE");
-  const settledDeposits = investments.filter(i => i.status === "SETTLED" || i.status === "CLAIMED");
+  // Open Modal to Add/Edit Plan
+  const handleOpenModal = (planToEdit?: SavingsPlanData) => {
+    if (planToEdit) {
+      setEditingPlan({ ...planToEdit });
+      setMonthOptsStr(Array.isArray(planToEdit.monthOptions) ? planToEdit.monthOptions.join(", ") : "1, 3, 6, 9");
+      setYearOptsStr(Array.isArray(planToEdit.yearOptions) ? planToEdit.yearOptions.join(", ") : "1, 2, 3");
+    } else {
+      setEditingPlan({
+        id: "",
+        name: "",
+        description: "",
+        type: "SAVINGS",
+        logoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+        badgeTag: "POPULAR",
+        apr: 12.5,
+        interestType: "SIMPLE",
+        allowMonths: true,
+        allowYears: true,
+        allowCustom: true,
+        minCustomDays: 7,
+        maxCustomDays: 1095,
+        defaultDurationDays: 30,
+        isAmountRequired: true,
+        minInvestment: 1000,
+        maxInvestment: 10000000,
+        status: "ACTIVE",
+      });
+      setMonthOptsStr("1, 3, 6, 9");
+      setYearOptsStr("1, 2, 3");
+    }
+    setIsModalOpen(true);
+  };
 
+  // Handle Logo Upload via ImgBB
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    toast.loading("Uploading logo image...");
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch("/api/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.url) {
+        setEditingPlan((prev) => (prev ? { ...prev, logoUrl: data.url } : null));
+        toast.success("Logo uploaded successfully!");
+      } else {
+        toast.error(data.error || "Logo upload failed.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Failed to upload logo.");
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
+  // Save Plan
+  const handleSavePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlan || !editingPlan.name?.trim()) {
+      toast.warning("Plan Title/Name is required.");
+      return;
+    }
+
+    setIsSavingPlan(true);
+
+    const parsedMonths = monthOptsStr.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+    const parsedYears = yearOptsStr.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n) && n > 0);
+
+    const payload = {
+      action: "upsert",
+      plan: {
+        ...editingPlan,
+        monthOptions: parsedMonths.length > 0 ? parsedMonths : [1, 3, 6, 9],
+        yearOptions: parsedYears.length > 0 ? parsedYears : [1, 2, 3],
+      },
+    };
+
+    try {
+      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/investments/plans", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Savings Plan saved successfully!");
+        if (Array.isArray(data.plans)) {
+          setPlans(data.plans);
+        } else {
+          fetchPlans();
+        }
+        setIsModalOpen(false);
+      } else {
+        toast.error(data.error || "Failed to save savings plan.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error saving savings plan.");
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  // Delete Plan
+  const handleDeletePlan = async (planId: string) => {
+    if (!confirm("Are you sure you want to delete this savings plan?")) return;
+
+    try {
+      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/investments/plans", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ action: "delete", planId }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Savings plan deleted successfully!");
+        if (Array.isArray(data.plans)) {
+          setPlans(data.plans);
+        } else {
+          fetchPlans();
+        }
+      } else {
+        toast.error(data.error || "Failed to delete savings plan.");
+      }
+    } catch {
+      toast.error("Network error deleting savings plan.");
+    }
+  };
+
+  // Analytics & Filtering
+  const activeDeposits = investments.filter((i) => i.status === "ACTIVE");
+  const settledDeposits = investments.filter((i) => i.status === "SETTLED" || i.status === "CLAIMED");
   const totalActiveVolume = activeDeposits.reduce((sum, curr) => sum + (Number(curr.amount) || 0), 0);
   const totalSettledVolume = settledDeposits.reduce((sum, curr) => sum + (Number(curr.amount) || 0), 0);
 
-  // Search and Tab filtering
   const filteredInvestments = investments.filter((inv) => {
-    // 1. Tab filter
     if (filterTab === "ACTIVE" && inv.status !== "ACTIVE") return false;
     if (filterTab === "SETTLED" && inv.status !== "SETTLED" && inv.status !== "CLAIMED") return false;
-
-    // 2. Search filter
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
     return (
@@ -211,7 +379,7 @@ function AdminFixedDepositsPageContent() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6"
+          className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-200 flex flex-col items-center text-center space-y-6 shadow-sm"
         >
           <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00]">
             <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_maybe</span>
@@ -220,7 +388,7 @@ function AdminFixedDepositsPageContent() {
           <div>
             <h2 className="font-hanken font-extrabold text-2xl tracking-tight text-gray-900 leading-tight">Admin Gatekeeper</h2>
             <p className="font-hanken text-xs text-gray-500 mt-1.5 font-semibold leading-relaxed">
-              Enter your administrative email and access PIN to verify authorization for Fixed Deposit ledger auditing.
+              Enter your administrative email and access PIN to verify authorization for Investment & Savings Plans.
             </p>
           </div>
 
@@ -272,7 +440,7 @@ function AdminFixedDepositsPageContent() {
     >
       {/* Header Banner */}
       <div role="banner" className={cn(
-        "flex justify-between items-center px-8 py-5 border-b transition-colors duration-300",
+        "flex justify-between items-center px-6 md:px-8 py-5 border-b transition-colors duration-300",
         isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
       )}>
         <div className="flex items-center gap-4">
@@ -287,183 +455,617 @@ function AdminFixedDepositsPageContent() {
           </Link>
           <div>
             <h1 className={cn("font-hanken font-extrabold text-lg", isDark ? "text-white" : "text-gray-800")}>
-              Fixed Deposit Auditing
+              Savings Plans & Investment Manager
             </h1>
-            <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider font-hanken">Secure System Savings Ledger</p>
+            <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5 tracking-wider font-hanken">
+              Configure Savings Schemes, Logos, Unlock Durations & Audit Placements
+            </p>
           </div>
         </div>
 
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 duration-300",
-            isDark
-              ? "bg-gray-800 border-gray-700 text-yellow-400 hover:bg-gray-700"
-              : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-black"
-          )}
-        >
-          <span className="material-symbols-outlined text-[16px]">
-            {isDark ? "light_mode" : "dark_mode"}
-          </span>
-          <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleTheme}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 duration-300",
+              isDark
+                ? "bg-gray-800 border-gray-700 text-yellow-400 hover:bg-gray-700"
+                : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-black"
+            )}
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isDark ? "light_mode" : "dark_mode"}
+            </span>
+            <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
+          </button>
+        </div>
       </div>
 
-      <div className="p-4 md:p-8 overflow-y-auto flex-1 max-w-5xl w-full mx-auto space-y-6 pb-24 md:pb-8">
-        {/* Metrics Overview grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Active Volume */}
-          <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Active Savings</p>
-            <p className="font-mono text-xl sm:text-2xl font-black text-emerald-500 mt-1 leading-none">
-              ₦{totalActiveVolume.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-2.5">
-              Accumulating Yield
-            </p>
+      <div className="p-4 md:p-8 overflow-y-auto flex-1 max-w-6xl w-full mx-auto space-y-6 pb-24 md:pb-8">
+
+        {/* Top Tab Bar: Manage Savings Plans vs Audit Fixed Deposits */}
+        <div className={cn("p-2 rounded-2xl border flex items-center justify-between gap-2", panelClass)}>
+          <div className="grid grid-cols-2 gap-2 w-full max-w-md">
+            <button
+              type="button"
+              onClick={() => setActiveTab("PLANS")}
+              className={cn(
+                "py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2",
+                activeTab === "PLANS"
+                  ? "bg-[#FC7A00] text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">savings</span>
+              <span>Choose Savings Plans ({plans.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("AUDIT")}
+              className={cn(
+                "py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2",
+                activeTab === "AUDIT"
+                  ? "bg-[#FC7A00] text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">query_stats</span>
+              <span>Audit Placements ({investments.length})</span>
+            </button>
           </div>
 
-          {/* Settled Volume */}
-          <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Settled / Credited</p>
-            <p className="font-mono text-xl sm:text-2xl font-black text-blue-500 mt-1 leading-none">
-              ₦{totalSettledVolume.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-2.5">
-              Matured & Disbursed
-            </p>
-          </div>
-
-          {/* Active Depositors Count */}
-          <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Active Accounts</p>
-            <p className="font-mono text-xl sm:text-2xl font-black text-[#FC7A00] mt-1 leading-none">
-              {activeDeposits.length}
-            </p>
-            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-2.5">
-              Unique Active Placements
-            </p>
-          </div>
-
-          {/* Total Placements Count */}
-          <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
-            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Ledger Audits</p>
-            <p className="font-mono text-xl sm:text-2xl font-black text-gray-400 mt-1 leading-none">
-              {investments.length}
-            </p>
-            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-2.5">
-              Lifetime Savings Placements
-            </p>
-          </div>
+          {activeTab === "PLANS" && (
+            <button
+              type="button"
+              onClick={() => handleOpenModal()}
+              className="px-5 h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">add_circle</span>
+              <span>Add Savings Plan</span>
+            </button>
+          )}
         </div>
 
-        {/* Tab Selection Row & Filter Search Bar */}
-        <div className={cn("rounded-2xl p-4 border transition-colors duration-300 space-y-4", panelClass)}>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap">
-            <div className="grid grid-cols-3 gap-1 bg-gray-150 dark:bg-gray-800 p-0.5 rounded-xl max-w-sm w-full">
-              {(["ALL", "ACTIVE", "SETTLED"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setFilterTab(tab)}
-                  className={cn(
-                    "py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center",
-                    filterTab === tab
-                      ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm"
-                      : "text-gray-400 hover:text-white"
-                  )}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search user email or phone..."
-                className={inputClass}
-              />
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={fetchInvestments}
-                className="px-4 py-2 bg-black text-white hover:bg-gray-900 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap"
-              >
-                {isLoading ? <ButtonSpinner /> : "Reload"}
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto pr-1">
-            {isLoading ? (
+        {/* TAB 1: SAVINGS PLANS MANAGER */}
+        {activeTab === "PLANS" && (
+          <div className="space-y-6">
+            {isLoadingPlans ? (
               <div className="text-center py-20 text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">
-                <ButtonSpinner /> Auditing system savings records...
+                <ButtonSpinner /> Loading savings plans...
               </div>
-            ) : filteredInvestments.length === 0 ? (
-              <div className="text-center py-16 text-gray-500 uppercase font-black text-xs">
-                No matching Fixed Deposit records found.
+            ) : plans.length === 0 ? (
+              <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
+                <span className="material-symbols-outlined text-[48px] text-orange-500">savings</span>
+                <p className="text-xs font-black uppercase text-gray-400">No Savings Plans Configured</p>
+                <button
+                  type="button"
+                  onClick={() => handleOpenModal()}
+                  className="px-6 py-3 bg-[#FC7A00] text-white rounded-xl text-xs font-bold uppercase tracking-wider"
+                >
+                  Create First Savings Plan
+                </button>
               </div>
             ) : (
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-gray-250 dark:border-gray-800 text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                    <th className="pb-3 pl-2">User Details</th>
-                    <th className="pb-3 text-right">Principal</th>
-                    <th className="pb-3 text-center">Yield Rate</th>
-                    <th className="pb-3 text-right">Est. Accrued</th>
-                    <th className="pb-3 text-center">Status</th>
-                    <th className="pb-3 text-center">Placement / Maturity</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
-                  {filteredInvestments.map((inv) => {
-                    const estYield = inv.amount * (Number(inv.interestRate) / 100);
-                    const totalEstimatedPayout = inv.amount + estYield;
-                    const isActive = inv.status === "ACTIVE";
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {plans.map((p) => (
+                  <div key={p.id} className={cn("p-5 rounded-2xl border space-y-4 flex flex-col justify-between transition-all", panelClass)}>
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl border border-gray-200 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 relative shadow-2xs">
+                            <img
+                              src={p.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
+                              alt={p.name}
+                              className="w-full h-full object-contain p-0.5"
+                            />
+                          </div>
+                          <div>
+                            <h3 className="font-extrabold text-sm text-black dark:text-white leading-tight">{p.name}</h3>
+                            <span className="text-[9px] font-mono text-gray-400 font-bold uppercase">{p.type} • {p.interestType}</span>
+                          </div>
+                        </div>
 
-                    return (
-                      <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10">
-                        <td className="py-3.5 pl-2">
-                          <p className="font-extrabold text-sm">{inv.userName || "System User"}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{inv.userEmail}</p>
-                          <p className="text-[9px] font-mono text-gray-500">{inv.userPhone}</p>
-                        </td>
-                        <td className="py-3.5 text-right font-mono font-bold text-sm">
-                          ₦{inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3.5 text-center font-mono font-black text-[#FC7A00]">
-                          {inv.interestRate}%
-                        </td>
-                        <td className="py-3.5 text-right font-mono font-extrabold text-emerald-500">
-                          +₦{estYield.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3.5 text-center">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
-                            isActive
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse"
-                              : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                          )}>
-                            {inv.status}
+                        {p.badgeTag && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20 shrink-0">
+                            {p.badgeTag}
                           </span>
-                        </td>
-                        <td className="py-3.5 text-center">
-                          <p className="text-[9px] font-semibold text-gray-400">Created: {new Date(inv.createdAt).toLocaleDateString()}</p>
-                          <p className="text-[9px] font-extrabold text-[#FC7A00] mt-0.5">Matures: {new Date(inv.maturesAt).toLocaleDateString()}</p>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{p.description}</p>
+
+                      <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-2 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 font-bold uppercase text-[10px]">Annual Interest (APR)</span>
+                          <span className="font-mono font-black text-orange-500 text-sm">{p.apr}% p.a.</span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 font-bold uppercase text-[10px]">Unlock Options</span>
+                          <div className="flex gap-1 text-[9px] font-extrabold uppercase">
+                            {p.allowMonths && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">Months</span>}
+                            {p.allowYears && <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">Years</span>}
+                            {p.allowCustom && <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500">Custom</span>}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center border-t border-gray-200/40 pt-1.5">
+                          <span className="text-gray-400 font-bold uppercase text-[10px]">Investment Limits</span>
+                          <span className="font-mono font-bold text-black dark:text-white text-[10.5px]">
+                            ₦{p.minInvestment?.toLocaleString()} - ₦{p.maxInvestment?.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-200/40">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenModal(p)}
+                        className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-black dark:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePlan(p.id)}
+                        className="px-3 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        </div>
+        )}
+
+        {/* TAB 2: AUDIT PLACEMENTS */}
+        {activeTab === "AUDIT" && (
+          <div className="space-y-6">
+            {/* Metrics Overview grid */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Active Savings</p>
+                <p className="font-mono text-xl sm:text-2xl font-black text-emerald-500 mt-1 leading-none">
+                  ₦{totalActiveVolume.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Settled / Credited</p>
+                <p className="font-mono text-xl sm:text-2xl font-black text-blue-500 mt-1 leading-none">
+                  ₦{totalSettledVolume.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Active Accounts</p>
+                <p className="font-mono text-xl sm:text-2xl font-black text-[#FC7A00] mt-1 leading-none">
+                  {activeDeposits.length}
+                </p>
+              </div>
+
+              <div className={cn("p-5 rounded-2xl border transition-colors duration-300", panelClass)}>
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Ledger Audits</p>
+                <p className="font-mono text-xl sm:text-2xl font-black text-gray-400 mt-1 leading-none">
+                  {investments.length}
+                </p>
+              </div>
+            </div>
+
+            {/* Audit Table */}
+            <div className={cn("rounded-2xl p-4 border transition-colors duration-300 space-y-4", panelClass)}>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap">
+                <div className="grid grid-cols-3 gap-1 bg-gray-150 dark:bg-gray-800 p-0.5 rounded-xl max-w-sm w-full">
+                  {(["ALL", "ACTIVE", "SETTLED"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setFilterTab(tab)}
+                      className={cn(
+                        "py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center",
+                        filterTab === tab
+                          ? "bg-white dark:bg-gray-950 text-[#FC7A00] shadow-sm"
+                          : "text-gray-400 hover:text-white"
+                      )}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search user email or phone..."
+                    className={inputClass}
+                  />
+                  <button
+                    type="button"
+                    disabled={isLoadingInvestments}
+                    onClick={fetchInvestments}
+                    className="px-4 py-2 bg-black text-white hover:bg-gray-900 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    {isLoadingInvestments ? <ButtonSpinner /> : "Reload"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto pr-1">
+                {isLoadingInvestments ? (
+                  <div className="text-center py-20 text-gray-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+                    <ButtonSpinner /> Auditing system savings records...
+                  </div>
+                ) : filteredInvestments.length === 0 ? (
+                  <div className="text-center py-16 text-gray-500 uppercase font-black text-xs">
+                    No matching Fixed Deposit records found.
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-250 dark:border-gray-800 text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                        <th className="pb-3 pl-2">User Details</th>
+                        <th className="pb-3 text-right">Principal</th>
+                        <th className="pb-3 text-center">Yield Rate</th>
+                        <th className="pb-3 text-right">Est. Accrued</th>
+                        <th className="pb-3 text-center">Status</th>
+                        <th className="pb-3 text-center">Placement / Maturity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
+                      {filteredInvestments.map((inv) => {
+                        const estYield = inv.amount * (Number(inv.interestRate) / 100);
+                        const isActive = inv.status === "ACTIVE";
+
+                        return (
+                          <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10">
+                            <td className="py-3.5 pl-2">
+                              <p className="font-extrabold text-sm">{inv.userName || "System User"}</p>
+                              <p className="text-[10px] text-gray-400 mt-0.5">{inv.userEmail}</p>
+                              <p className="text-[9px] font-mono text-gray-500">{inv.userPhone}</p>
+                            </td>
+                            <td className="py-3.5 text-right font-mono font-bold text-sm">
+                              ₦{inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-3.5 text-center font-mono font-black text-[#FC7A00]">
+                              {inv.interestRate}%
+                            </td>
+                            <td className="py-3.5 text-right font-mono font-extrabold text-emerald-500">
+                              +₦{estYield.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-3.5 text-center">
+                              <span className={cn(
+                                "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider",
+                                isActive
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse"
+                                  : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                              )}>
+                                {inv.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 text-center">
+                              <p className="text-[9px] font-semibold text-gray-400">Created: {new Date(inv.createdAt).toLocaleDateString()}</p>
+                              <p className="text-[9px] font-extrabold text-[#FC7A00] mt-0.5">Matures: {new Date(inv.maturesAt).toLocaleDateString()}</p>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {/* CREATE / EDIT SAVINGS PLAN MODAL */}
+      <AnimatePresence>
+        {isModalOpen && editingPlan && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={cn("w-full max-w-2xl rounded-3xl p-6 border my-8 space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar", panelClass)}
+            >
+              <div className="flex items-center justify-between border-b border-gray-200/40 pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500 text-[24px]">savings</span>
+                  <h3 className="font-extrabold text-base uppercase tracking-tight">
+                    {editingPlan.id ? "Edit Savings Plan" : "Add New Savings Plan"}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleSavePlan} className="space-y-4">
+                {/* Title & Badge */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Plan Name / Title *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Target Savings Plan"
+                      value={editingPlan.name || ""}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Badge Tag (e.g. POPULAR, HIGH YIELD)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. POPULAR"
+                      value={editingPlan.badgeTag || ""}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, badgeTag: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                {/* Subtitle / Description */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Description / Subtitle</label>
+                  <input
+                    type="text"
+                    placeholder="Short summary of this plan..."
+                    value={editingPlan.description || ""}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, description: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+
+                {/* Logo URL & Upload Button */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Plan Logo / Icon</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="https://i.ibb.co/..."
+                      value={editingPlan.logoUrl || ""}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, logoUrl: e.target.value })}
+                      className={inputClass}
+                    />
+                    <label className="px-4 py-2 bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-orange-500/20 transition-all shrink-0 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">upload</span>
+                      <span>{isUploadingLogo ? "Uploading..." : "Upload Logo"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        disabled={isUploadingLogo}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* APR, Type & Interest compounding */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Annual Interest APR (%) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      placeholder="12.5"
+                      value={editingPlan.apr ?? 12.5}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, apr: parseFloat(e.target.value) || 0 })}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Plan Type</label>
+                    <select
+                      value={editingPlan.type || "SAVINGS"}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, type: e.target.value as any })}
+                      className={inputClass}
+                    >
+                      <option value="SAVINGS">SAVINGS</option>
+                      <option value="FIXED_DEPOSIT">FIXED DEPOSIT</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Interest Calculation</label>
+                    <select
+                      value={editingPlan.interestType || "SIMPLE"}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, interestType: e.target.value as any })}
+                      className={inputClass}
+                    >
+                      <option value="SIMPLE">SIMPLE INTEREST</option>
+                      <option value="COMPOUND">COMPOUND INTEREST</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* UNLOCK DURATION CONFIGURATION SECTION */}
+                <div className="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-orange-500 text-[18px]">lock_clock</span>
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-orange-500">
+                      "WHEN DO YOU WANT TO UNLOCK YOUR SAVINGS" CONFIGURATION
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                    {/* Month Options */}
+                    <div className="space-y-2 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingPlan.allowMonths !== false}
+                          onChange={(e) => setEditingPlan({ ...editingPlan, allowMonths: e.target.checked })}
+                          className="w-4 h-4 text-orange-500 rounded"
+                        />
+                        <span className="text-xs font-black uppercase">Allow Month Selection</span>
+                      </label>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400">Month Options (Comma Separated)</label>
+                        <input
+                          type="text"
+                          placeholder="1, 3, 6, 9"
+                          value={monthOptsStr}
+                          onChange={(e) => setMonthOptsStr(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Year Options */}
+                    <div className="space-y-2 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingPlan.allowYears !== false}
+                          onChange={(e) => setEditingPlan({ ...editingPlan, allowYears: e.target.checked })}
+                          className="w-4 h-4 text-orange-500 rounded"
+                        />
+                        <span className="text-xs font-black uppercase">Allow Year Selection</span>
+                      </label>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-gray-400">Year Options (Comma Separated)</label>
+                        <input
+                          type="text"
+                          placeholder="1, 2, 3"
+                          value={yearOptsStr}
+                          onChange={(e) => setYearOptsStr(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Custom Selection */}
+                    <div className="space-y-2 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingPlan.allowCustom !== false}
+                          onChange={(e) => setEditingPlan({ ...editingPlan, allowCustom: e.target.checked })}
+                          className="w-4 h-4 text-orange-500 rounded"
+                        />
+                        <span className="text-xs font-black uppercase">Allow Custom Date</span>
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-gray-400">Min Days</label>
+                          <input
+                            type="number"
+                            placeholder="7"
+                            value={editingPlan.minCustomDays ?? 7}
+                            onChange={(e) => setEditingPlan({ ...editingPlan, minCustomDays: parseInt(e.target.value, 10) || 1 })}
+                            className={inputClass}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black uppercase text-gray-400">Max Days</label>
+                          <input
+                            type="number"
+                            placeholder="1095"
+                            value={editingPlan.maxCustomDays ?? 1095}
+                            onChange={(e) => setEditingPlan({ ...editingPlan, maxCustomDays: parseInt(e.target.value, 10) || 30 })}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AMOUNT INVESTMENT REQUIREMENTS */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2 p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingPlan.isAmountRequired !== false}
+                        onChange={(e) => setEditingPlan({ ...editingPlan, isAmountRequired: e.target.checked })}
+                        className="w-4 h-4 text-orange-500 rounded"
+                      />
+                      <span className="text-xs font-black uppercase">Amount Required</span>
+                    </label>
+                    <p className="text-[9px] text-gray-400">If unchecked, entering amount is optional on initialization.</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Min Investment Amount (₦)</label>
+                    <input
+                      type="number"
+                      placeholder="1000"
+                      value={editingPlan.minInvestment ?? 1000}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, minInvestment: parseFloat(e.target.value) || 0 })}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Max Investment Amount (₦)</label>
+                    <input
+                      type="number"
+                      placeholder="10000000"
+                      value={editingPlan.maxInvestment ?? 10000000}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, maxInvestment: parseFloat(e.target.value) || 10000 })}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-gray-200/40">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.status === "ACTIVE"}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, status: e.target.checked ? "ACTIVE" : "INACTIVE" })}
+                      className="w-4 h-4 text-orange-500 rounded"
+                    />
+                    <span className="text-xs font-black uppercase">Plan Active & Visible to Users</span>
+                  </label>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="px-5 h-10 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingPlan}
+                      className="px-6 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
+                    >
+                      {isSavingPlan ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">save</span>}
+                      <span>Save Plan</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </main>
   );
 }
