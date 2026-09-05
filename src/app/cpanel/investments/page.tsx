@@ -19,7 +19,8 @@ interface FixedDeposit {
   userPhone: string;
   amount: number;
   interestRate: number;
-  status: "ACTIVE" | "SETTLED" | "CLAIMED" | "CANCELLED" | string;
+  totalValue?: number;
+  status: "ACTIVE" | "SETTLED" | "CLAIM_REQUESTED" | "CLAIMED" | "CANCELLED" | string;
   createdAt: string;
   maturesAt: string;
   claimedAt?: string;
@@ -415,8 +416,52 @@ function AdminFixedDepositsPageContent() {
     }
   };
 
+  // Claim approval handler
+  const [approvingId, setApprovingId] = useState<string>("");
+
+  const handleApproveClaim = async (invId: string) => {
+    if (!confirm("Are you sure you want to approve this matured investment payout and credit the user's wallet?")) return;
+
+    setApprovingId(invId);
+    toast.loading("Approving payout and crediting user wallet...");
+
+    try {
+      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch(`/api/admin/investments/${invId}/approve-claim`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || "Payout approved and user wallet credited successfully!");
+        await fetchInvestments();
+      } else {
+        toast.error(data.error || "Failed to approve payout claim.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network error during payout approval.");
+    } finally {
+      setApprovingId("");
+    }
+  };
+
   // Analytics & Filtering
+  const [filterTab, setFilterTab] = useState<"ALL" | "ACTIVE" | "CLAIM_REQUESTED" | "SETTLED" | "CANCELLED">("ALL");
+
   const activeDeposits = investments.filter((i) => i.status === "ACTIVE");
+  const claimRequestedDeposits = investments.filter((i) => i.status === "CLAIM_REQUESTED");
   const settledDeposits = investments.filter((i) => i.status === "SETTLED" || i.status === "CLAIMED");
   const cancelledDeposits = investments.filter((i) => i.status === "CANCELLED" || i.status === "CANCELED");
 
@@ -426,6 +471,7 @@ function AdminFixedDepositsPageContent() {
 
   const filteredInvestments = investments.filter((inv) => {
     if (filterTab === "ACTIVE" && inv.status !== "ACTIVE") return false;
+    if (filterTab === "CLAIM_REQUESTED" && inv.status !== "CLAIM_REQUESTED") return false;
     if (filterTab === "SETTLED" && inv.status !== "SETTLED" && inv.status !== "CLAIMED") return false;
     if (filterTab === "CANCELLED" && inv.status !== "CANCELLED" && inv.status !== "CANCELED") return false;
     if (!searchTerm.trim()) return true;
@@ -897,6 +943,23 @@ function AdminFixedDepositsPageContent() {
 
                   <button
                     type="button"
+                    onClick={() => setFilterTab("CLAIM_REQUESTED")}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
+                      filterTab === "CLAIM_REQUESTED"
+                        ? "bg-white dark:bg-gray-800 text-amber-500 shadow-sm border border-gray-200/60 dark:border-gray-700"
+                        : "text-gray-500 hover:text-black dark:hover:text-white"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">hourglass_empty</span>
+                    <span>PAYOUT REQUESTS</span>
+                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold font-mono", filterTab === "CLAIM_REQUESTED" ? "bg-amber-500/15 text-amber-500" : "bg-gray-200 dark:bg-gray-800 text-gray-500")}>
+                      {claimRequestedDeposits.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setFilterTab("SETTLED")}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
@@ -971,12 +1034,14 @@ function AdminFixedDepositsPageContent() {
                         <th className="pb-3 text-right">Est. Accrued</th>
                         <th className="pb-3 text-center">Status</th>
                         <th className="pb-3 text-center">Placement / Maturity</th>
+                        <th className="pb-3 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
                       {filteredInvestments.map((inv) => {
                         const estYield = inv.amount * (Number(inv.interestRate) / 100);
                         const isActive = inv.status === "ACTIVE";
+                        const isClaimRequested = inv.status === "CLAIM_REQUESTED";
                         const isSettled = inv.status === "SETTLED" || inv.status === "CLAIMED";
                         const isCancelled = inv.status === "CANCELLED" || inv.status === "CANCELED";
 
@@ -1002,8 +1067,10 @@ function AdminFixedDepositsPageContent() {
                             <td className="py-3.5 text-center">
                               <span className={cn(
                                 "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border inline-flex items-center gap-1",
-                                isActive
-                                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 animate-pulse"
+                                isClaimRequested
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse"
+                                  : isActive
+                                  ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                                   : isSettled
                                   ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
                                   : isCancelled
@@ -1011,7 +1078,7 @@ function AdminFixedDepositsPageContent() {
                                   : "bg-gray-500/10 text-gray-400 border-gray-500/20"
                               )}>
                                 <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                                <span>{inv.status}</span>
+                                <span>{isClaimRequested ? "CLAIM REQUESTED" : inv.status}</span>
                               </span>
                             </td>
                             <td className="py-3.5 text-center">
@@ -1019,6 +1086,27 @@ function AdminFixedDepositsPageContent() {
                               <p className="text-[9px] font-extrabold text-[#FC7A00] mt-0.5">
                                 {isCancelled ? "Canceled" : `Matures: ${new Date(inv.maturesAt).toLocaleDateString()}`}
                               </p>
+                            </td>
+                            <td className="py-3.5 text-center">
+                              {isClaimRequested ? (
+                                <button
+                                  type="button"
+                                  disabled={approvingId === inv.id}
+                                  onClick={() => handleApproveClaim(inv.id)}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1 mx-auto shadow-sm active:scale-95 transition-all cursor-pointer"
+                                >
+                                  {approvingId === inv.id ? (
+                                    <ButtonSpinner />
+                                  ) : (
+                                    <>
+                                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                      <span>Approve Payout</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-gray-400 font-semibold uppercase">N/A</span>
+                              )}
                             </td>
                           </tr>
                         );

@@ -32,9 +32,12 @@ export interface InvestmentRecord {
   interestType: "SIMPLE" | "COMPOUND";
   accumulatedInterest: number;
   totalValue: number;
-  status: "ACTIVE" | "MATURED" | "CLAIMED" | "CANCELLED";
+  status: "ACTIVE" | "MATURED" | "CLAIM_REQUESTED" | "CLAIMED" | "CANCELLED";
   optionId: string;
   optionName: string;
+  claimRequestedAt?: string;
+  claimApprovedAt?: string;
+  claimApprovedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -283,9 +286,9 @@ export class InvestmentService {
   }
 
   /**
-   * Securely claim / redeem matured savings locks inside a Transaction.
+   * Request payout for a matured investment. Transitions status to CLAIM_REQUESTED for admin approval.
    */
-  static async claimInvestment(userId: string, investmentId: string): Promise<{ record: InvestmentRecord; creditedAmount: number }> {
+  static async requestInvestmentClaim(userId: string, investmentId: string): Promise<{ record: InvestmentRecord; estimatedPayout: number }> {
     const investRef = adminDb.collection("investments").doc(investmentId);
 
     const result = await adminDb.runTransaction(async (transaction) => {
@@ -300,6 +303,9 @@ export class InvestmentService {
       }
       if (record.status === "CLAIMED") {
         throw new Error("This investment has already been claimed.");
+      }
+      if (record.status === "CLAIM_REQUESTED") {
+        throw new Error("A payout request has already been submitted for administrator approval.");
       }
       if (record.status === "CANCELLED") {
         throw new Error("This investment has already been cancelled.");
@@ -322,48 +328,122 @@ export class InvestmentService {
         record.interestType
       );
 
-      const payoutAmount = record.amount + earnedInterest;
+      const payoutAmount = Number((record.amount + earnedInterest).toFixed(2));
 
-      // Credit user's wallet atomically
-      await WalletService.creditWallet(transaction, {
-        userId,
-        amount: payoutAmount,
-        currency: record.currency,
-        reference: `claim-${investmentId}`,
-        description: `Matured Payout for ${record.optionName} (Principal: ₦${record.amount}, Interest: ₦${earnedInterest})`,
-        recipientName: "Self",
-        fee: 0,
-      });
-
-      // Update investment record
+      // Update investment status to CLAIM_REQUESTED
       const updatedRecord: Partial<InvestmentRecord> = {
-        status: "CLAIMED",
+        status: "CLAIM_REQUESTED",
         accumulatedInterest: earnedInterest,
         totalValue: payoutAmount,
+        claimRequestedAt: now.toISOString(),
         updatedAt: now.toISOString(),
       };
 
       transaction.update(investRef, updatedRecord);
 
-      // Save transaction log in investments subledger
-      const logRef = adminDb.collection("investmentTransactions").doc(`tx-claim-${investmentId}`);
+      // Save claim request log
+      const logRef = adminDb.collection("investmentTransactions").doc(`tx-claim-req-${investmentId}`);
       transaction.set(logRef, {
-        id: `tx-claim-${investmentId}`,
+        id: `tx-claim-req-${investmentId}`,
         userId,
         investmentId,
         amount: payoutAmount,
-        type: "CLAIM",
-        status: "SUCCESS",
-        description: `Claimed matured earnings from ${record.optionName}. Total Credited: ₦${payoutAmount.toLocaleString()}`,
+        type: "CLAIM_REQUEST",
+        status: "PENDING",
+        description: `Requested payout approval for ${record.optionName}. Total Expected: ₦${payoutAmount.toLocaleString()}`,
         createdAt: now.toISOString(),
       });
 
-      // Write audit log document
-      const auditRef = adminDb.collection("auditLogs").doc(`audit-claim-${investmentId}`);
+      return {
+        record: { ...record, ...updatedRecord } as InvestmentRecord,
+        estimatedPayout: payoutAmount,
+      };
+    });
+
+    return result;
+  }
+
+  /**
+   * Admin approves a pending payout claim and credits the user's wallet atomically inside a transaction.
+   */
+  static async approveInvestmentClaim(adminId: string, investmentId: string): Promise<{ record: InvestmentRecord; creditedAmount: number }> {
+    const investRef = adminDb.collection("investments").doc(investmentId);
+
+    const result = await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(investRef);
+      if (!doc.exists) {
+        throw new Error("The specified investment record was not found.");
+      }
+
+      const record = doc.data() as InvestmentRecord;
+      if (record.status === "CLAIMED") {
+        throw new Error("This investment payout has already been approved and credited.");
+      }
+      if (record.status === "CANCELLED") {
+        throw new Error("This investment was cancelled and cannot be claimed.");
+      }
+      if (record.status !== "CLAIM_REQUESTED") {
+        const isMatured = new Date() >= new Date(record.maturityDate);
+        if (!isMatured) {
+          throw new Error("Cannot approve payout for an investment that is not matured.");
+        }
+      }
+
+      const now = new Date();
+      const elapsedMs = now.getTime() - new Date(record.startDate).getTime();
+      const elapsedDays = Math.max(1, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+
+      const earnedInterest = this.calculateInterest(
+        record.amount,
+        record.interestRate,
+        elapsedDays,
+        record.interestType
+      );
+
+      const payoutAmount = Number((record.amount + earnedInterest).toFixed(2));
+
+      // Credit user's wallet atomically
+      await WalletService.creditWallet(transaction, {
+        userId: record.userId,
+        amount: payoutAmount,
+        currency: record.currency || "NGN",
+        reference: `claim-approved-${investmentId}`,
+        description: `Matured Investment Payout Approved: ${record.optionName} (Principal: ₦${record.amount}, Interest: ₦${earnedInterest})`,
+        recipientName: "Self",
+        fee: 0,
+      });
+
+      const updatedRecord: Partial<InvestmentRecord> = {
+        status: "CLAIMED",
+        accumulatedInterest: earnedInterest,
+        totalValue: payoutAmount,
+        claimApprovedAt: now.toISOString(),
+        claimApprovedBy: adminId,
+        updatedAt: now.toISOString(),
+      };
+
+      transaction.update(investRef, updatedRecord);
+
+      // Log claim approval in investment transactions
+      const logRef = adminDb.collection("investmentTransactions").doc(`tx-claim-appr-${investmentId}`);
+      transaction.set(logRef, {
+        id: `tx-claim-appr-${investmentId}`,
+        userId: record.userId,
+        investmentId,
+        amount: payoutAmount,
+        type: "CLAIM_APPROVED",
+        status: "SUCCESS",
+        description: `Administrator approved matured payout for ${record.optionName}. Credited ₦${payoutAmount.toLocaleString()}`,
+        createdAt: now.toISOString(),
+      });
+
+      // Write audit log
+      const auditRef = adminDb.collection("auditLogs").doc(`audit-approve-claim-${investmentId}`);
       transaction.set(auditRef, {
-        id: `audit-claim-${investmentId}`,
-        userId,
-        action: "INVESTMENT_CLAIMED",
+        id: `audit-approve-claim-${investmentId}`,
+        userId: record.userId,
+        adminId,
+        action: "INVESTMENT_CLAIM_APPROVED",
         metadata: {
           investmentId,
           earnedInterest,
