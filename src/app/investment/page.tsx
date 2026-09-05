@@ -415,14 +415,13 @@ export default function InvestmentPage() {
     setIsLiquidating(true);
 
     try {
-      let idToken = "mock-token";
-      if (user && typeof user.getIdToken === "function") {
-        try {
-          idToken = await user.getIdToken();
-        } catch {
-          // ignore
-        }
+      if (!user) {
+        toast.error("Authentication required.");
+        setIsLiquidating(false);
+        return;
       }
+
+      const idToken = await user.getIdToken();
 
       const res = await fetch(`/api/investments/${selectedCancelId}/cancel`, {
         method: "POST",
