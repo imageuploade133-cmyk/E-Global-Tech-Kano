@@ -5,6 +5,7 @@ import { WalletService } from "@/services/wallet-service";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { NotificationService } from "@/services/notification-service";
 import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
+import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
@@ -77,8 +78,11 @@ export async function POST(req: Request) {
     const trfReference = reference ? String(reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
 
     // Validations
-    if (!trfAmount || isNaN(trfAmount) || trfAmount <= 0) {
-      return NextResponse.json({ error: "Invalid transfer amount. Must be greater than zero." }, { status: 400 });
+    const globalMinTransfer = await getGlobalMinTransferAmount();
+    if (!trfAmount || isNaN(trfAmount) || trfAmount < globalMinTransfer) {
+      return NextResponse.json({
+        error: `Invalid transfer amount. The global minimum required transfer limit is ₦${globalMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`,
+      }, { status: 400 });
     }
     if (!trfAccount || !trfBank || !pin) {
       return NextResponse.json({ error: "Account number, bank, and transaction PIN are required." }, { status: 400 });
@@ -155,6 +159,13 @@ export async function POST(req: Request) {
       }
 
       // Server-side Account Transfer Limits Validation
+      if (trfAmount < globalMinTransfer) {
+        return {
+          success: false,
+          error: `Transfer amount (₦${trfAmount.toLocaleString()}) is below the global minimum required transfer limit of ₦${globalMinTransfer.toLocaleString()}.`,
+        };
+      }
+
       if (!userData.unlimitedTransfers) {
         const maxSingle = Number(userData.maxSingleTransferLimit) || 200000;
         if (trfAmount > maxSingle) {

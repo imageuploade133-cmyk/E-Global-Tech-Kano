@@ -1,8 +1,6 @@
 "use client";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
-
-
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,35 +36,87 @@ function CpanelLimitsPageContent() {
   const [hasSearched, setHasSearched] = useState(false);
   const [savingUid, setSavingUid] = useState<string | null>(null);
 
-  // Theme Syncing
+  // Global Minimum Transfer state
+  const [globalMinTransfer, setGlobalMinTransfer] = useState<number>(100);
+  const [isSavingGlobalMin, setIsSavingGlobalMin] = useState<boolean>(false);
+  const [isLoadingGlobalMin, setIsLoadingGlobalMin] = useState<boolean>(true);
 
-
-
-
-  // Auth & Session Check
+  // Auth & Initial Limits Fetch
   useEffect(() => {
-    async function checkSession() {
+    async function initPage() {
       const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      if (isMock) {
-        setIsLoadingSession(false);
-        return;
+      if (!isMock) {
+        try {
+          const sessionRes = await fetch("/api/admin/auth/session");
+          const sessionData = await sessionRes.json();
+          if (!sessionRes.ok || !sessionData.success) {
+            toast.error("Session expired. Please log in.");
+            router.push("/cpanel");
+            return;
+          }
+        } catch (err) {
+          console.error("Session check failed:", err);
+        }
       }
+      setIsLoadingSession(false);
+
+      // Fetch dynamic active Global Minimum Transfer Limit from API
       try {
-        const res = await fetch("/api/admin/auth/session");
+        const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+        const res = await fetch("/api/admin/limits", { headers });
         const data = await res.json();
-        if (!res.ok || !data.success) {
-          toast.error("Session expired. Please log in.");
-          router.push("/cpanel");
-          return;
+        if (data.success && typeof data.globalMinTransferAmount === "number") {
+          setGlobalMinTransfer(data.globalMinTransferAmount);
         }
       } catch (err) {
-        console.error("Session check failed:", err);
+        console.warn("Failed to load active global minimum transfer limit:", err);
       } finally {
-        setIsLoadingSession(false);
+        setIsLoadingGlobalMin(false);
       }
     }
-    checkSession();
+
+    initPage();
   }, [router]);
+
+  // Save Global Minimum Transfer Amount
+  const handleSaveGlobalMinTransfer = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isNaN(globalMinTransfer) || globalMinTransfer < 0) {
+      toast.warning("Please enter a valid non-negative global minimum transfer amount.");
+      return;
+    }
+
+    setIsSavingGlobalMin(true);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/limits", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "update_global_min_transfer",
+          globalMinTransferAmount: globalMinTransfer,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Global minimum transfer limit saved successfully!");
+        if (typeof data.globalMinTransferAmount === "number") {
+          setGlobalMinTransfer(data.globalMinTransferAmount);
+        }
+      } else {
+        toast.error(data.error || "Failed to update global minimum transfer limit.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error updating global minimum transfer limit.");
+    } finally {
+      setIsSavingGlobalMin(false);
+    }
+  };
 
   // Handle Search Users
   const handleSearch = async (e?: React.FormEvent) => {
@@ -173,7 +223,7 @@ function CpanelLimitsPageContent() {
                 <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Account Limits Manager</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Increase or grant Unlimited Transfer and Deposit thresholds for user accounts.
+                Configure Global Minimum Transfer limits and manage individual user deposit or transfer thresholds.
               </p>
             </div>
           </div>
@@ -197,8 +247,71 @@ function CpanelLimitsPageContent() {
           </div>
         </div>
 
+        {/* Global Minimum Transfer Panel */}
+        <div className={cn("p-6 rounded-2xl border space-y-4 relative overflow-hidden", panelClass)}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200/40 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-orange-500 text-[22px]">shield_lock</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-extrabold text-sm uppercase tracking-wider">Global Minimum Transfer Limit</h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20">
+                    Active Enforcement
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400 font-medium mt-0.5">
+                  100% Server-Enforced. Single and bulk transfer requests below this threshold will be blocked automatically.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-orange-500/5 px-3 py-1.5 rounded-xl border border-orange-500/20 shrink-0">
+              <span className="text-[10px] font-bold text-gray-400 uppercase">Active Threshold:</span>
+              <span className="font-mono font-black text-orange-500 text-sm">
+                ₦{globalMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveGlobalMinTransfer} className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+            <div className="space-y-1 w-full flex-1">
+              <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
+                Minimum Transfer Limit Amount (₦)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-mono font-bold text-xs">₦</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  disabled={isLoadingGlobalMin || isSavingGlobalMin}
+                  value={globalMinTransfer}
+                  onChange={(e) => setGlobalMinTransfer(Number(e.target.value))}
+                  placeholder="e.g. 100"
+                  className={cn(inputClass, "pl-8 pr-4 h-11 text-sm font-mono font-bold")}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoadingGlobalMin || isSavingGlobalMin}
+              className="w-full sm:w-auto px-6 h-11 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 shrink-0 self-end"
+            >
+              {isSavingGlobalMin ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">save</span>}
+              <span>Save Minimum Limit</span>
+            </button>
+          </form>
+        </div>
+
         {/* Search Panel */}
         <div className={cn("p-5 rounded-2xl border space-y-4", panelClass)}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="material-symbols-outlined text-orange-500 text-[18px]">manage_accounts</span>
+            <h3 className="font-extrabold text-xs uppercase tracking-wider">User Account Limitations Search</h3>
+          </div>
           <form onSubmit={handleSearch} className="flex flex-col md:flex-row items-center gap-3">
             <div className="relative flex-1 w-full">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[18px]">search</span>
@@ -232,7 +345,7 @@ function CpanelLimitsPageContent() {
             <span className="material-symbols-outlined text-[48px] text-orange-500">query_stats</span>
             <p className="text-xs font-black uppercase text-gray-400">Search User Account</p>
             <p className="text-[11px] text-gray-500 max-w-md mx-auto">
-              Enter an exact email or phone number above to inspect and configure deposit or transfer limits.
+              Enter an exact email or phone number above to inspect and configure individual deposit or transfer limits.
             </p>
           </div>
         ) : users.length === 0 ? (

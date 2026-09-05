@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
 
 export async function GET() {
   try {
+    const globalMinTransfer = await getGlobalMinTransferAmount();
     const docSnap = await adminDb.collection("config").doc("app").get();
     if (docSnap.exists) {
       const data = docSnap.data();
@@ -13,6 +15,8 @@ export async function GET() {
         supportPhone2: data?.supportPhone2 || "+234 901 234 5678",
         supportEmail: data?.supportEmail || "support@e-globaltechhub.com",
         appVersion: data?.appVersion || "1.0.0",
+        minTransferAmount: globalMinTransfer,
+        globalMinTransferAmount: globalMinTransfer,
         newDeviceDetectorEnabled: data?.newDeviceDetectorEnabled !== false,
         bannerOverlayFadeEnabled: data?.bannerOverlayFadeEnabled !== false,
         bannerSlideIntervalSeconds: data?.bannerSlideIntervalSeconds || 5,

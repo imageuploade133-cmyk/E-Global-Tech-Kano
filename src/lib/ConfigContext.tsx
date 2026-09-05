@@ -40,6 +40,8 @@ export interface AppConfig {
   bannerMarginBottom?: number;
   whatsappPollingEnabled?: boolean;
   whatsappPollingIntervalMinutes?: number;
+  minTransferAmount?: number;
+  globalMinTransferAmount?: number;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
