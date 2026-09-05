@@ -199,19 +199,61 @@ export class PaymentService {
       throw new Error(resData.message || "Failed to contact VM verification api.");
     }
 
-    if (resData.success) {
+    const flwStatusRaw = (resData.status || (resData.success ? "SUCCESSFUL" : "PENDING")).toString().toUpperCase();
+    const isSuccess = flwStatusRaw === "SUCCESS" || flwStatusRaw === "SUCCESSFUL" || resData.success === true;
+    const isFailed = flwStatusRaw === "FAILED" || (resData.error && resData.error.toLowerCase().includes("failed"));
+    const isExpired = flwStatusRaw === "EXPIRED" || (resData.error && resData.error.toLowerCase().includes("expired"));
+    const isCanceled = flwStatusRaw === "CANCELED" || flwStatusRaw === "CANCELLED" || (resData.error && resData.error.toLowerCase().includes("cancel"));
+
+    const confirmedAmount = Number(resData.totalCredited ?? resData.fundedAmount ?? resData.amount ?? 0);
+
+    if (isSuccess) {
       return {
+        success: true,
         status: "SUCCESS",
-        fundedAmount: resData.fundedAmount,
+        fundedAmount: confirmedAmount,
+        totalCredited: confirmedAmount,
+        amount: confirmedAmount,
+        credited: resData.credited ?? true,
         newBalance: resData.newBalance,
         duplicate: resData.duplicate,
         message: resData.message,
       };
-    } else {
-      if (resData.error && resData.error.toLowerCase().includes("failed")) {
-        return { status: "FAILED" };
-      }
-      return { status: "PENDING" };
+    } else if (isFailed) {
+      return {
+        success: false,
+        status: "FAILED",
+        fundedAmount: 0,
+        totalCredited: 0,
+        amount: 0,
+        credited: false,
+      };
+    } else if (isExpired) {
+      return {
+        success: false,
+        status: "EXPIRED",
+        fundedAmount: 0,
+        totalCredited: 0,
+        amount: 0,
+        credited: false,
+      };
+    } else if (isCanceled) {
+      return {
+        success: false,
+        status: "CANCELED",
+        fundedAmount: 0,
+        totalCredited: 0,
+        amount: 0,
+        credited: false,
+      };
     }
+
+    return {
+      success: true,
+      status: "PENDING",
+      fundedAmount: 0,
+      totalCredited: 0,
+      credited: false,
+    };
   }
 }
