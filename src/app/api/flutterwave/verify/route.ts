@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     // Fast-path Firestore check: If the webhook has already credited the transaction in Firestore, return immediately!
     try {
-      let candidateDocs: any[] = [];
+      const candidateDocs: any[] = [];
 
       if (txRef) {
         const docId = txRef.startsWith("tx-FUNDING-") ? txRef : `tx-FUNDING-${txRef}`;
