@@ -448,36 +448,46 @@ function AdminFixedDepositsPageContent() {
     }
   };
 
-  // Delete Plan
-  const handleDeletePlan = async (planId: string) => {
-    if (!confirm("Are you sure you want to delete this savings plan?")) return;
+  // Delete Plan with Custom Admin Confirmation Overlay
+  const handleDeletePlan = (planId: string, planName?: string) => {
+    promptAdminConfirmation({
+      title: "Confirm Savings Plan Deletion",
+      description: `Are you sure you want to permanently delete the savings plan "${planName || planId}"? Existing active savings contracts under this plan will remain untouched, but users will no longer be able to create new locks under this plan.`,
+      confirmText: "Delete Savings Plan",
+      isDanger: true,
+      onConfirm: async () => {
+        toast.loading("Deleting savings plan...");
+        try {
+          const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+          const headers: Record<string, string> = isMock
+            ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+            : { "Content-Type": "application/json" };
 
-    try {
-      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-      const headers: Record<string, string> = isMock
-        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-        : { "Content-Type": "application/json" };
+          const res = await fetch("/api/admin/investments/plans", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ action: "delete", planId }),
+          });
 
-      const res = await fetch("/api/admin/investments/plans", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ action: "delete", planId }),
-      });
+          const data = await res.json();
+          toast.dismiss();
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Savings plan deleted successfully!");
-        if (Array.isArray(data.plans)) {
-          setPlans(data.plans);
-        } else {
-          fetchPlans();
+          if (res.ok && data.success) {
+            toast.success("Savings plan deleted successfully!");
+            if (Array.isArray(data.plans)) {
+              setPlans(data.plans);
+            } else {
+              fetchPlans();
+            }
+          } else {
+            toast.error(data.error || "Failed to delete savings plan.");
+          }
+        } catch {
+          toast.dismiss();
+          toast.error("Network error deleting savings plan.");
         }
-      } else {
-        toast.error(data.error || "Failed to delete savings plan.");
-      }
-    } catch {
-      toast.error("Network error deleting savings plan.");
-    }
+      },
+    });
   };
 
   // Action Pending & Confirmation Overlay States
@@ -970,8 +980,9 @@ function AdminFixedDepositsPageContent() {
 
                       <button
                         type="button"
-                        onClick={() => handleDeletePlan(p.id)}
+                        onClick={() => handleDeletePlan(p.id, p.name)}
                         className="px-3 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                        title="Delete Savings Plan"
                       >
                         <span className="material-symbols-outlined text-[16px]">delete</span>
                       </button>
