@@ -206,8 +206,12 @@ export default function StorePage() {
     fetchStoreData(true);
   };
 
-  // Open Real Product Detail Page
+  // Product Navigation Loading State for instant user feedback
+  const [navigatingProductId, setNavigatingProductId] = useState<string | null>(null);
+
+  // Open Real Product Detail Page with Card Loading Feedback
   const handleOpenProductPage = (item: StoreItem) => {
+    setNavigatingProductId(item.id);
     router.push(`/store/product/${item.id}`);
   };
 
@@ -698,6 +702,8 @@ export default function StorePage() {
 
                 const itemInWishlist = wishlist.some((w) => w.id === item.id);
 
+                const isNavigatingThis = navigatingProductId === item.id;
+
                 return (
                   <motion.div
                     key={item.id}
@@ -717,6 +723,17 @@ export default function StorePage() {
                     }`}
                     onClick={() => handleOpenProductPage(item)}
                   >
+                    {/* Navigation Feedback Loading Overlay */}
+                    {isNavigatingThis && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-xs z-30 rounded-[inherit] flex flex-col items-center justify-center p-2 text-center animate-fade-in">
+                        <span className="material-symbols-outlined text-[24px] text-[#FC7A00] animate-spin mb-1">
+                          progress_activity
+                        </span>
+                        <span className="font-hanken text-[9.5px] font-black uppercase tracking-wider text-black">
+                          Opening Product...
+                        </span>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       {/* Product Image Thumbnail */}
                       <div className="w-full h-28 min-[375px]:h-32 rounded-xl bg-gray-50 border-0 overflow-hidden relative flex items-center justify-center p-1">

@@ -159,8 +159,11 @@ export const clearStoreCache = () => {
 };
 
 export const getCachedProductDetail = (id: string): StoreItem | null => {
-  if (memoryProductDetails.has(id)) {
-    return memoryProductDetails.get(id) || null;
+  // Validate memory cache freshness against TTL
+  if (memoryStoreCache && (Date.now() - memoryStoreCache.timestamp < CACHE_TTL_MS)) {
+    if (memoryProductDetails.has(id)) {
+      return memoryProductDetails.get(id) || null;
+    }
   }
 
   const cachedStore = getCachedStore();
@@ -172,6 +175,8 @@ export const getCachedProductDetail = (id: string): StoreItem | null => {
     }
   }
 
+  // Clear expired detail memory if TTL exceeded
+  memoryProductDetails.delete(id);
   return null;
 };
 
