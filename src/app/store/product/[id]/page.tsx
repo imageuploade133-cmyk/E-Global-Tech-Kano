@@ -603,21 +603,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Quantity Selector */}
-          <div className="bg-white rounded-2xl p-3 shadow-3xs flex items-center justify-between border-0">
-            <span className="font-hanken text-xs font-black uppercase text-gray-700">Quantity</span>
-            <div className="flex items-center gap-2.5 bg-gray-100 p-1 rounded-xl">
+          <div className="bg-white rounded-2xl p-3.5 shadow-3xs flex items-center justify-between border border-orange-100/60">
+            <span className="font-hanken text-xs font-black uppercase text-gray-800">Quantity</span>
+            <div className="flex items-center gap-3 bg-gray-50/90 p-1.5 rounded-2xl border border-gray-200/80">
               <button
                 type="button"
                 onClick={() => setProductQuantity((q) => Math.max(1, q - 1))}
-                className="w-7 h-7 rounded-lg bg-white text-black font-extrabold text-sm flex items-center justify-center active:scale-90 cursor-pointer border-0 shadow-2xs"
+                className="w-8 h-8 rounded-xl bg-white text-black font-black text-base flex items-center justify-center active:scale-90 cursor-pointer border border-gray-300 hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all shadow-2xs"
               >
                 -
               </button>
-              <span className="font-mono font-black text-xs w-5 text-center">{productQuantity}</span>
+              <span className="font-mono font-black text-sm w-6 text-center text-black">{productQuantity}</span>
               <button
                 type="button"
                 onClick={() => setProductQuantity((q) => q + 1)}
-                className="w-7 h-7 rounded-lg bg-white text-black font-extrabold text-sm flex items-center justify-center active:scale-90 cursor-pointer border-0 shadow-2xs"
+                className="w-8 h-8 rounded-xl bg-white text-black font-black text-base flex items-center justify-center active:scale-90 cursor-pointer border border-gray-300 hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all shadow-2xs"
               >
                 +
               </button>
