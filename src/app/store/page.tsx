@@ -688,6 +688,8 @@ export default function StorePage() {
                 const itemInWishlist = wishlist.some((w) => w.id === item.id);
 
                 const isNavigatingThis = navigatingProductId === item.id;
+                const displayCoverUrl = item.coverImageUrl || item.imageUrl || (item.images && item.images[0]) || "";
+                const imageCount = Array.isArray(item.images) && item.images.length > 0 ? item.images.length : (displayCoverUrl ? 1 : 0);
 
                 return (
                   <motion.div
@@ -722,9 +724,9 @@ export default function StorePage() {
                     <div className="space-y-2">
                       {/* Product Image Thumbnail */}
                       <div className="w-full h-28 min-[375px]:h-32 rounded-xl bg-gray-50 border-0 overflow-hidden relative flex items-center justify-center p-1">
-                        {item.imageUrl ? (
+                        {displayCoverUrl ? (
                           <Image
-                            src={item.imageUrl}
+                            src={displayCoverUrl}
                             alt={item.title}
                             fill
                             className="object-contain p-2 group-hover:scale-105 transition-transform duration-300"
@@ -748,6 +750,14 @@ export default function StorePage() {
                             favorite
                           </span>
                         </button>
+
+                        {/* Multiple Image Gallery Indicator Badge */}
+                        {imageCount > 1 && (
+                          <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs flex items-center gap-1 z-10">
+                            <span className="material-symbols-outlined text-[10px]">collections</span>
+                            <span>{imageCount}</span>
+                          </span>
+                        )}
 
                         <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
                           {item.category}
