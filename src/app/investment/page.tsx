@@ -1015,44 +1015,79 @@ export default function InvestmentPage() {
                               </div>
                             </div>
 
-                            <div className="mt-3 flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
-                              {inv.status === "CLAIM_REQUESTED" ? (
-                                <div className="w-full py-2 bg-amber-500/10 border border-amber-500/30 text-amber-600 rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5">
-                                  <span className="material-symbols-outlined text-[14px] animate-spin">hourglass_empty</span>
-                                  Payout Requested • Awaiting Admin Approval
-                                </div>
-                              ) : isMatured ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleClaim(inv.id)}
-                                  className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">payments</span>
-                                  Request Matured Payout
-                                </button>
-                              ) : (
-                                <>
-                                  <div className="flex-1 bg-gray-50 rounded-xl px-2 py-1.5 flex items-center gap-1 justify-center border border-gray-100">
-                                    <span className="material-symbols-outlined text-[11px] text-[#FC7A00] animate-spin">
-                                      progress_activity
+                            {/* Live Lock Completion Progress Bar & Daily Earnings */}
+                            {(() => {
+                              const startMs = new Date(inv.startDate).getTime();
+                              const matMs = new Date(inv.maturityDate).getTime();
+                              const nowMs = Date.now();
+                              const totalMs = Math.max(1, matMs - startMs);
+                              const elapsedMs = Math.max(0, Math.min(totalMs, nowMs - startMs));
+                              const progressPct = Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100)));
+
+                              const principal = Number(inv.amount) || 0;
+                              const apr = Number(inv.interestRate) || 0;
+                              const dailyReturn = (principal * apr) / 365;
+                              const totalEarnedSoFar = (principal * apr) * (elapsedMs / (365 * 24 * 60 * 60 * 1000));
+
+                              return (
+                                <div className="mt-3 pt-2.5 border-t border-gray-100 space-y-2">
+                                  <div className="flex items-center justify-between text-[10.5px] font-hanken">
+                                    <span className="font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                      <span className="material-symbols-outlined text-[13px] text-[#FC7A00]">
+                                        trending_up
+                                      </span>
+                                      Earned: <span className="text-emerald-600 font-extrabold font-mono">+₦{totalEarnedSoFar.toFixed(2)}</span>
                                     </span>
-                                    <p className="font-hanken text-[9px] text-gray-500 font-bold">
-                                      Growing yield...
-                                    </p>
+                                    <span className="font-extrabold text-emerald-600 font-mono bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                                      +₦{dailyReturn.toFixed(2)}/day
+                                    </span>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedCancelId(inv.id);
-                                      setShowCancelModal(true);
-                                    }}
-                                    className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-hanken text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
-                                  >
-                                    Liquidate Early
-                                  </button>
-                                </>
-                              )}
-                            </div>
+
+                                  {/* Progress Bar from 0% to 100% based on Unlock Date */}
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between items-center text-[9.5px] font-hanken font-bold">
+                                      <span className="text-gray-400 uppercase tracking-wider">Unlock Progress</span>
+                                      <span className="text-[#FC7A00] font-extrabold font-mono">{progressPct}% Full</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200/60 p-0.5">
+                                      <div
+                                        className="bg-gradient-to-r from-[#FC7A00] to-amber-400 h-full rounded-full transition-all duration-500 shadow-xs"
+                                        style={{ width: `${Math.max(3, progressPct)}%` }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                                    {inv.status === "CLAIM_REQUESTED" ? (
+                                      <div className="w-full py-2 bg-amber-500/10 border border-amber-500/30 text-amber-600 rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[14px] animate-spin">hourglass_empty</span>
+                                        Payout Requested • Awaiting Admin Approval
+                                      </div>
+                                    ) : isMatured ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleClaim(inv.id)}
+                                        className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                      >
+                                        <span className="material-symbols-outlined text-[14px]">payments</span>
+                                        Request Matured Payout
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedCancelId(inv.id);
+                                          setShowCancelModal(true);
+                                        }}
+                                        className="w-full py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                                      >
+                                        Liquidate Early
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })}
