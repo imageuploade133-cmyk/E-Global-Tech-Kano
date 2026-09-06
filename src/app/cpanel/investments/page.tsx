@@ -19,8 +19,11 @@ interface FixedDeposit {
   userEmail: string;
   userPhone: string;
   userCurrentBalance?: number;
+  userCurrentBonusBalance?: number;
   balanceBeforeInvestment?: number | null;
   balanceAfterInvestment?: number | null;
+  bonusBalanceBeforeInvestment?: number | null;
+  bonusBalanceAfterInvestment?: number | null;
   amount: number;
   interestRate: number;
   totalValue?: number;
@@ -93,6 +96,7 @@ function AdminFixedDepositsPageContent() {
   const [globalPolicyText, setGlobalPolicyText] = useState<string>("");
   const [globalMinInvest, setGlobalMinInvest] = useState<number>(1000);
   const [globalMaxInvest, setGlobalMaxInvest] = useState<number>(10000000);
+  const [allowBonusInvestment, setAllowBonusInvestment] = useState<boolean>(true);
   const [isLoadingSettings, setIsLoadingSettings] = useState<boolean>(false);
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
 
@@ -108,6 +112,7 @@ function AdminFixedDepositsPageContent() {
         setGlobalPolicyText(data.settings.penaltyPolicyText || "");
         setGlobalMinInvest(Number(data.settings.minInvestment) || 1000);
         setGlobalMaxInvest(Number(data.settings.maxInvestment) || 10000000);
+        setAllowBonusInvestment(data.settings.allowBonusInvestment !== undefined ? Boolean(data.settings.allowBonusInvestment) : true);
       }
     } catch (err) {
       console.warn("Failed to fetch global investment settings:", err);
@@ -133,6 +138,7 @@ function AdminFixedDepositsPageContent() {
           penaltyPolicyText: globalPolicyText,
           minInvestment: globalMinInvest,
           maxInvestment: globalMaxInvest,
+          allowBonusInvestment,
         }),
       });
 
@@ -884,6 +890,37 @@ function AdminFixedDepositsPageContent() {
                   </div>
                 </div>
 
+                {/* Bonus Wallet Investment ON/OFF Policy Toggle */}
+                <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">stars</span>
+                      <h4 className="font-extrabold text-xs uppercase text-black dark:text-white tracking-wider">
+                        Allow Users to Invest Using Bonus Wallet
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 font-semibold">
+                      When enabled, users who meet the minimum deposit threshold can use their bonus reward balance to invest.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setAllowBonusInvestment(!allowBonusInvestment)}
+                    className={cn(
+                      "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 shadow-xs",
+                      allowBonusInvestment
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      {allowBonusInvestment ? "toggle_on" : "toggle_off"}
+                    </span>
+                    <span>{allowBonusInvestment ? "BONUS INVEST: ON" : "BONUS INVEST: OFF"}</span>
+                  </button>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase text-gray-400 flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px]">description</span>
@@ -1320,34 +1357,63 @@ function AdminFixedDepositsPageContent() {
 
                 {/* Account Balances Audit: Before, After & Current Balance */}
                 <div className="p-3.5 rounded-2xl bg-orange-500/5 border border-orange-500/20 space-y-2">
-                  <span className="text-[9px] font-black uppercase tracking-wider text-[#FC7A00] flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
-                    Investor Wallet Balance Breakdown
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-[#FC7A00] flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
+                      Investor {selectedInvestmentModal.walletType === "BONUS" ? "Bonus Reward" : "Main Wallet"} Balance Breakdown
+                    </span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[8px] font-black uppercase font-mono border",
+                      selectedInvestmentModal.walletType === "BONUS"
+                        ? "bg-purple-500/10 text-purple-500 border-purple-500/20"
+                        : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                    )}>
+                      {selectedInvestmentModal.walletType === "BONUS" ? "BONUS WALLET LOCK" : "MAIN WALLET LOCK"}
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-3 gap-2 text-center pt-1">
                     <div className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
-                      <span className="text-[8.5px] font-bold uppercase text-gray-400 block">Balance Before</span>
+                      <span className="text-[8.5px] font-bold uppercase text-gray-400 block">
+                        {selectedInvestmentModal.walletType === "BONUS" ? "Bonus Before" : "Balance Before"}
+                      </span>
                       <p className="font-mono font-black text-xs text-black dark:text-white mt-0.5">
-                        {selectedInvestmentModal.balanceBeforeInvestment !== null && selectedInvestmentModal.balanceBeforeInvestment !== undefined
-                          ? `₦${Number(selectedInvestmentModal.balanceBeforeInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                          : "N/A"}
+                        {selectedInvestmentModal.walletType === "BONUS"
+                          ? (selectedInvestmentModal.bonusBalanceBeforeInvestment !== null && selectedInvestmentModal.bonusBalanceBeforeInvestment !== undefined
+                              ? `₦${Number(selectedInvestmentModal.bonusBalanceBeforeInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                              : "N/A")
+                          : (selectedInvestmentModal.balanceBeforeInvestment !== null && selectedInvestmentModal.balanceBeforeInvestment !== undefined
+                              ? `₦${Number(selectedInvestmentModal.balanceBeforeInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                              : "N/A")
+                        }
                       </p>
                     </div>
 
                     <div className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
-                      <span className="text-[8.5px] font-bold uppercase text-gray-400 block">Balance After</span>
+                      <span className="text-[8.5px] font-bold uppercase text-gray-400 block">
+                        {selectedInvestmentModal.walletType === "BONUS" ? "Bonus After" : "Balance After"}
+                      </span>
                       <p className="font-mono font-black text-xs text-black dark:text-white mt-0.5">
-                        {selectedInvestmentModal.balanceAfterInvestment !== null && selectedInvestmentModal.balanceAfterInvestment !== undefined
-                          ? `₦${Number(selectedInvestmentModal.balanceAfterInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                          : "N/A"}
+                        {selectedInvestmentModal.walletType === "BONUS"
+                          ? (selectedInvestmentModal.bonusBalanceAfterInvestment !== null && selectedInvestmentModal.bonusBalanceAfterInvestment !== undefined
+                              ? `₦${Number(selectedInvestmentModal.bonusBalanceAfterInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                              : "N/A")
+                          : (selectedInvestmentModal.balanceAfterInvestment !== null && selectedInvestmentModal.balanceAfterInvestment !== undefined
+                              ? `₦${Number(selectedInvestmentModal.balanceAfterInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                              : "N/A")
+                        }
                       </p>
                     </div>
 
                     <div className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-orange-500/30">
-                      <span className="text-[8.5px] font-bold uppercase text-[#FC7A00] block">Current Balance</span>
+                      <span className="text-[8.5px] font-bold uppercase text-[#FC7A00] block">
+                        {selectedInvestmentModal.walletType === "BONUS" ? "Current Bonus" : "Current Balance"}
+                      </span>
                       <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
-                        ₦{(selectedInvestmentModal.userCurrentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₦{(selectedInvestmentModal.walletType === "BONUS"
+                            ? (selectedInvestmentModal.userCurrentBonusBalance || 0)
+                            : (selectedInvestmentModal.userCurrentBalance || 0)
+                          ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>

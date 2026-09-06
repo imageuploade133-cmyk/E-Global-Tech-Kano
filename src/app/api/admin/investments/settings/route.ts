@@ -26,13 +26,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { penaltyRate, penaltyPolicyText, minInvestment, maxInvestment } = body;
+    const { penaltyRate, penaltyPolicyText, minInvestment, maxInvestment, allowBonusInvestment } = body;
 
     const updated = await InvestmentService.updateSettings({
       penaltyRate: penaltyRate !== undefined ? Number(penaltyRate) : undefined,
       penaltyPolicyText: penaltyPolicyText !== undefined ? String(penaltyPolicyText).trim() : undefined,
       minInvestment: minInvestment !== undefined ? Number(minInvestment) : undefined,
       maxInvestment: maxInvestment !== undefined ? Number(maxInvestment) : undefined,
+      allowBonusInvestment: allowBonusInvestment !== undefined ? Boolean(allowBonusInvestment) : undefined,
     });
 
     return NextResponse.json({

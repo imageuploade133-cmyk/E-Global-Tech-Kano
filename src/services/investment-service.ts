@@ -7,6 +7,7 @@ export interface InvestmentSettings {
   penaltyRate: number; // e.g. 0.10 for 10% early withdrawal penalty on principal
   penaltyPolicyText?: string; // Custom policy disclosure text set by admin
   savingsRate: number; // e.g. 0.08 for 8%
+  allowBonusInvestment?: boolean; // Admin toggle to enable/disable bonus wallet usage for investments
   updatedAt: string;
 }
 
@@ -27,8 +28,11 @@ export interface InvestmentRecord {
   userName?: string;
   userEmail?: string;
   userPhone?: string;
+  walletType?: "MAIN" | "BONUS";
   balanceBeforeInvestment?: number;
   balanceAfterInvestment?: number;
+  bonusBalanceBeforeInvestment?: number;
+  bonusBalanceAfterInvestment?: number;
   type: "SAVINGS" | "FIXED_DEPOSIT";
   amount: number;
   currency: string;
@@ -99,6 +103,7 @@ export class InvestmentService {
         penaltyRate: 0.10, // 10% penalty on early withdrawal of principal
         penaltyPolicyText: "Early liquidation of locked savings before the target unlock date incurs a 10% penalty on principal. The remaining 90% balance will be instantly refunded to your wallet.",
         savingsRate: 0.08,
+        allowBonusInvestment: true,
         updatedAt: new Date().toISOString(),
       };
       await settingsRef.set(defaultSettings);
@@ -153,6 +158,7 @@ export class InvestmentService {
       penaltyRate: data.penaltyRate !== undefined ? Number(data.penaltyRate) : 0.10,
       penaltyPolicyText: data.penaltyPolicyText || "Early liquidation of locked savings before the target unlock date incurs a 10% penalty on principal. The remaining 90% balance will be instantly refunded to your wallet.",
       savingsRate: Number(data.savingsRate) || 0.08,
+      allowBonusInvestment: data.allowBonusInvestment !== undefined ? Boolean(data.allowBonusInvestment) : true,
       updatedAt: data.updatedAt || new Date().toISOString(),
     };
   }
@@ -317,8 +323,11 @@ export class InvestmentService {
       ? Math.max(1, Math.min(1095, Math.floor(Number(params.durationDays))))
       : resolvedProduct.defaultDurationDays;
 
-    // Secure requirement: User can invest using BONUS wallet ONLY if they have funded their own account with a minimum of 3000 NGN.
+    // Secure requirement: Server-side check for admin policy ON/OFF and funding requirement
     if (walletType === "BONUS") {
+      if (settings.allowBonusInvestment === false) {
+        throw new Error("Bonus wallet investment is currently disabled by the system administrator.");
+      }
       const { ReferralService } = await import("./referral-service");
       const hasCompleted = await ReferralService.hasCompletedRequirement(userId);
       if (!hasCompleted) {
@@ -401,8 +410,11 @@ export class InvestmentService {
         userName: userInfo.name || undefined,
         userEmail: userInfo.email || undefined,
         userPhone: userInfo.phone || undefined,
-        balanceBeforeInvestment: previousBalance,
-        balanceAfterInvestment: newBalance,
+        walletType,
+        balanceBeforeInvestment: walletType === "MAIN" ? previousBalance : undefined,
+        balanceAfterInvestment: walletType === "MAIN" ? newBalance : undefined,
+        bonusBalanceBeforeInvestment: walletType === "BONUS" ? previousBalance : undefined,
+        bonusBalanceAfterInvestment: walletType === "BONUS" ? newBalance : undefined,
         type,
         amount,
         currency,
