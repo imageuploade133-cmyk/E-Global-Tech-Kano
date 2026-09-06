@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { SavingsPlanData, DEFAULT_SAVINGS_PLANS } from "@/lib/savings-plans-types";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface ActiveInvestment {
   id: string;
@@ -74,6 +75,12 @@ export default function InvestmentPage() {
 
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
+
+  // Lock body scroll & intercept hardware back button across investment modals
+  useModalBackHandler(showConfirmModal, () => setShowConfirmModal(false), "investment-confirm-modal");
+  useModalBackHandler(showCancelModal, () => setShowCancelModal(false), "investment-cancel-modal");
+  useModalBackHandler(showCalendarModal, () => setShowCalendarModal(false), "investment-calendar-modal");
+  useModalBackHandler(Boolean(selectedDetailInv), () => setSelectedDetailInv(null), "investment-detail-modal");
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || DEFAULT_SAVINGS_PLANS[0];
 

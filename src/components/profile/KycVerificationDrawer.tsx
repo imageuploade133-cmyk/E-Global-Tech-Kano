@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface KycVerificationDrawerProps {
   isOpen: boolean;
@@ -48,16 +49,12 @@ export function KycVerificationDrawer({
   // Determine if the user has an active pending KYC status
   const isUserKycPending = ["PENDING", "PENDING_REVIEW", "VERIFYING", "PROCESSING", "PROVISIONING", "IDENTITY_VERIFIED", "PROVISIONING_FAILED"].includes((userData?.kycStatus as string) || "");
 
-  // Handle body scroll locking & state resets on open
+  // Intercept hardware/browser back button & lock body scroll
+  useModalBackHandler(isOpen, onClose, "kyc-drawer");
+
+  // Handle state resets on open
   useEffect(() => {
     if (isOpen) {
-      // Lock background scrolling completely on HTML/Body
-      document.documentElement.style.overflow = "hidden";
-      document.body.style.overflow = "hidden";
-      document.body.style.height = "100%";
-      document.body.style.position = "fixed";
-      document.body.style.width = "100%";
-
       setIsOverrideActive(false);
 
       // If the user's KYC is currently pending in review, immediately default to the "review" state
@@ -75,20 +72,9 @@ export function KycVerificationDrawer({
       setCameraStream(null);
       setStatusMessage("");
     } else {
-      // Restore background scrolling on close
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-      document.body.style.height = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
       stopCamera();
     }
     return () => {
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-      document.body.style.height = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
       stopCamera();
     };
   }, [isOpen, isUserKycPending]);

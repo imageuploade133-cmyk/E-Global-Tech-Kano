@@ -19,6 +19,7 @@ import {
   isInWishlist,
   toggleWishlist,
 } from "@/lib/store-cache";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface ProductReview {
   id: string;
@@ -75,6 +76,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [customerDeliveryAddress, setCustomerDeliveryAddress] = useState<string>("");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
+
+  // Lock body scroll & mobile hardware back button handling across modals
+  useModalBackHandler(isCartOpen, () => setIsCartOpen(false), "product-cart-modal");
+  useModalBackHandler(Boolean(confirmedOrder), () => setConfirmedOrder(null), "product-confirmed-modal");
 
   // Load saved cart and wishlist on mount
   useEffect(() => {

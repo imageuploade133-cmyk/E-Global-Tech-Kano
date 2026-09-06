@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface Biller {
   id: number;
@@ -126,6 +127,11 @@ export default function GenericBillPage() {
 
   // Payment Success Screen States
   const [successReceipt, setSuccessReceipt] = useState<{ reference?: string; tx_ref?: string; amount?: number; pins?: Array<{ pin: string; serial?: string }> } | null>(null);
+
+  // Mute background scrolling & intercept mobile hardware back button across bills drawers
+  useModalBackHandler(isCheckoutModalOpen, () => setIsCheckoutModalOpen(false), "bills-checkout-modal");
+  useModalBackHandler(isPinModalOpen, () => setIsPinModalOpen(false), "bills-pin-modal");
+  useModalBackHandler(Boolean(successReceipt), () => setSuccessReceipt(null), "bills-receipt-modal");
 
   const getPageTitle = () => {
     switch (pageCategory) {

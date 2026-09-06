@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import BannerSlideshow from "@/components/BannerSlideshow";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface BalanceCardProps {
   balance: number;
@@ -481,23 +482,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [listTab, setListTab] = useState<"recents" | "beneficiaries">("recents");
   const [showSaveBeneficiaryPrompt, setShowSaveBeneficiaryPrompt] = useState(false);
 
-  // Mute background body scrolling when any full screen bottom drawer is open
-  useEffect(() => {
-    if (isTransferOpen || isAddMoneyOpen) {
-      document.body.style.overflow = "hidden";
-      document.body.style.position = "fixed";
-      document.body.style.width = "100%";
-    } else {
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.width = "";
-    };
-  }, [isTransferOpen, isAddMoneyOpen]);
+  // Intercept hardware / mobile back button & lock body scroll across drawers
+  useModalBackHandler(isAddMoneyOpen, () => handleCloseModal(), "add-money-modal");
+  useModalBackHandler(isTransferOpen, () => handleCloseTransferModal(), "transfer-modal");
+  useModalBackHandler(isSwapOpen, () => setIsSwapOpen(false), "swap-modal");
+  useModalBackHandler(isUsdFundingOpen, () => setIsUsdFundingOpen(false), "usd-funding-modal");
+  useModalBackHandler(showTrfBankSelector, () => setShowTrfBankSelector(false), "bank-selector-modal");
 
   const loadRecentsAndBeneficiaries = async () => {
     if (!user) return;
