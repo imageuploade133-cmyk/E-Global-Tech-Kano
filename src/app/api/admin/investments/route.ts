@@ -200,6 +200,7 @@ export async function GET(req: Request) {
           inv.userEmail?.toLowerCase().includes(searchQuery) ||
           inv.userPhone?.includes(searchQuery) ||
           inv.id?.toLowerCase().includes(searchQuery) ||
+          inv.investmentReference?.toLowerCase().includes(searchQuery) ||
           inv.optionName?.toLowerCase().includes(searchQuery) ||
           String(inv.amount).includes(searchQuery)
       );
