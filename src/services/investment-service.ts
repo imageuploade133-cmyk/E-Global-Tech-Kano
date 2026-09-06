@@ -581,11 +581,8 @@ export class InvestmentService {
       if (record.userId !== userId) {
         throw new Error("Forbidden: You do not own this investment lock.");
       }
-      if (record.status === "CLAIMED") {
-        throw new Error("Cannot cancel an investment that has already been claimed.");
-      }
-      if (record.status === "CANCELLED") {
-        throw new Error("This investment has already been cancelled.");
+      if (record.status !== "ACTIVE") {
+        throw new Error(`Cannot cancel an investment with status '${record.status}'. Only ACTIVE investments can be liquidated early.`);
       }
 
       const now = new Date();
