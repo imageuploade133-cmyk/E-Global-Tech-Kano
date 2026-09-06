@@ -59,46 +59,42 @@ export async function GET(req: Request) {
       rawInvestments.push({ id: doc.id, ...doc.data() });
     });
 
-    // Filter to only display fixed deposits
-    const fdInvestments = rawInvestments.filter(
-      (inv) => inv.type === "fixed_deposit" || inv.planType === "fixed_deposit"
+    // Batch fetch unique user profiles to minimize Firestore reads (0 N+1 reads)
+    const uniqueUserIds = Array.from(
+      new Set(rawInvestments.map((inv) => inv.userId).filter(Boolean))
     );
 
-    // Enrich investments with user profiles (names and emails) safely using local caching
     const usersCache: Record<string, { name: string; email: string; phone: string }> = {};
-    const enrichedInvestments: any[] = [];
 
-    for (const inv of fdInvestments) {
-      const targetUid = inv.userId;
-      if (!targetUid) continue;
+    if (uniqueUserIds.length > 0) {
+      const userDocRefs = uniqueUserIds.map((uid) => adminDb.collection("users").doc(uid));
+      const userDocs = await adminDb.getAll(...userDocRefs);
 
-      if (!usersCache[targetUid]) {
-        try {
-          const userDoc = await adminDb.collection("users").doc(targetUid).get();
-          if (userDoc.exists) {
-            const uData = userDoc.data() || {};
-            usersCache[targetUid] = {
-              name: uData.name || uData.displayName || `${uData.firstName || ""} ${uData.lastName || ""}`.trim() || "Unknown User",
-              email: uData.email || "No Email",
-              phone: uData.phoneNumber || "No Phone"
-            };
-          } else {
-            usersCache[targetUid] = { name: "Deleted Profile", email: "No Email", phone: "No Phone" };
-          }
-        } catch {
-          usersCache[targetUid] = { name: "System User", email: "No Email", phone: "No Phone" };
+      userDocs.forEach((doc) => {
+        if (doc.exists) {
+          const uData = doc.data() || {};
+          usersCache[doc.id] = {
+            name: uData.name || uData.displayName || `${uData.firstName || ""} ${uData.lastName || ""}`.trim() || "Unknown User",
+            email: uData.email || "No Email",
+            phone: uData.phoneNumber || "No Phone",
+          };
+        } else {
+          usersCache[doc.id] = { name: "Deleted Profile", email: "No Email", phone: "No Phone" };
         }
-      }
+      });
+    }
 
-      const meta = usersCache[targetUid];
-      enrichedInvestments.push({
+    const enrichedInvestments = rawInvestments.map((inv) => {
+      const meta = usersCache[inv.userId] || { name: "System User", email: "No Email", phone: "No Phone" };
+      return {
         ...inv,
         userName: meta.name,
         userEmail: meta.email,
         userPhone: meta.phone,
-        description: inv.description || "Fixed Deposit Savings Plan"
-      });
-    }
+        description: inv.description || inv.optionName || "Savings / Fixed Deposit Plan",
+        maturesAt: inv.maturityDate || inv.maturesAt || inv.createdAt,
+      };
+    });
 
     return NextResponse.json({
       success: true,
