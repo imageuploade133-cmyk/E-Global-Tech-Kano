@@ -121,34 +121,9 @@ export default function InvestmentPage() {
 
   // Load plans and records
   const loadInvestmentData = async () => {
-    const isMock = sessionStorage.getItem("mock") === "true";
-
-    if (isMock) {
-      setIsLoadingPlans(false);
-      setIsLoadingHistory(false);
-      const saved = sessionStorage.getItem("active_investments");
-      if (saved) {
-        try {
-          setInvestments(JSON.parse(saved));
-        } catch (err) {
-          console.error("Failed to parse investments from storage", err);
-        }
-      }
-      return;
-    }
-
     try {
       setIsLoadingPlans(true);
       setIsLoadingHistory(true);
-
-      let idToken = "mock-token";
-      if (user && typeof user.getIdToken === "function") {
-        try {
-          idToken = await user.getIdToken();
-        } catch {
-          // ignore
-        }
-      }
 
       // Fetch dynamic savings plans and global penalty policy
       const [plansRes, settingsRes] = await Promise.all([
@@ -178,6 +153,7 @@ export default function InvestmentPage() {
       setIsLoadingPlans(false);
 
       if (user) {
+        const idToken = await user.getIdToken();
         // Fetch user holdings
         const holdingsRes = await fetch("/api/investments", {
           headers: { Authorization: `Bearer ${idToken}` }
@@ -288,76 +264,43 @@ export default function InvestmentPage() {
   const handleConfirmInvestment = async () => {
     setIsSubmitting(true);
     const amt = parseFloat(amountStr) || 0;
-    const estimatedReward = getEstimatedReward();
 
     try {
-      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!user) {
+        toast.error("Authentication required.");
+        setIsSubmitting(false);
+        return;
+      }
 
-      if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+      const idToken = await user.getIdToken();
+      const endpoint = selectedPlan.type === "SAVINGS" ? "/api/investments/savings" : "/api/investments/fixed-deposit";
+      const idempotencyKey = `inv-${user.uid}-${Date.now()}`;
 
-        const nextBalance = userBalance - amt;
-        await updateUserData({ balance: nextBalance });
-
-        const newInvest: ActiveInvestment = {
-          id: "INV-" + Math.floor(100000 + Math.random() * 900000),
-          userId: user?.uid || "mock-user",
-          type: selectedPlan.type,
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+          "Idempotency-Key": idempotencyKey
+        },
+        body: JSON.stringify({
           amount: amt,
           currency: "NGN",
-          startDate: new Date().toISOString(),
-          maturityDate: calculatedMaturityDateObj.toISOString(),
-          interestRate: (selectedPlan.apr || 10) / 100,
-          interestType: selectedPlan.interestType,
-          accumulatedInterest: estimatedReward,
-          totalValue: amt + estimatedReward,
-          status: "ACTIVE",
-          optionId: selectedPlan.id,
-          optionName: selectedPlan.name,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+          productId: selectedPlan.id,
+          walletType: walletTypeSelected,
+          durationDays: calculatedLockDays,
+          idempotencyKey,
+        })
+      });
 
-        const updatedList = [newInvest, ...investments];
-        setInvestments(updatedList);
-        sessionStorage.setItem("active_investments", JSON.stringify(updatedList));
-
-        toast.success(`Savings locked successfully under ${selectedPlan.name}!`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || `Savings locked successfully under ${selectedPlan.name}!`);
+        await loadInvestmentData();
       } else {
-        if (!user) {
-          toast.error("Authentication required.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        const idToken = await user.getIdToken();
-        const endpoint = selectedPlan.type === "SAVINGS" ? "/api/investments/savings" : "/api/investments/fixed-deposit";
-
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`
-          },
-          body: JSON.stringify({
-            amount: amt,
-            currency: "NGN",
-            productId: selectedPlan.id,
-            walletType: walletTypeSelected,
-            durationDays: calculatedLockDays,
-            maturityDate: calculatedMaturityDateStr,
-          })
-        });
-
-        const data = await res.json();
-        if (res.ok && data.success) {
-          toast.success(data.message || `Savings locked successfully under ${selectedPlan.name}!`);
-          await loadInvestmentData();
-        } else {
-          toast.error(data.error || "Failed to establish savings lock.");
-          setIsSubmitting(false);
-          return;
-        }
+        toast.error(data.error || "Failed to establish savings lock.");
+        setIsSubmitting(false);
+        return;
       }
 
       setAmountStr("");
@@ -370,53 +313,26 @@ export default function InvestmentPage() {
     }
   };
 
-  // Claim Earnings
+  // Claim Earnings Request
   const handleClaim = async (invId: string) => {
-    const isMock = sessionStorage.getItem("mock") === "true";
-    toast.loading("Processing your payout claim on ledger...");
+    toast.loading("Submitting payout claim request...");
 
     try {
-      if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        const matched = investments.find(inv => inv.id === invId);
-        if (!matched) {
-          toast.dismiss();
-          toast.error("Savings lock not found.");
-          return;
-        }
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/investments/${invId}/claim`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
 
-        const payout = matched.amount + matched.accumulatedInterest;
-        await updateUserData({ balance: userBalance + payout });
+      const data = await res.json();
+      toast.dismiss();
 
-        const updated = investments.map(inv => {
-          if (inv.id === invId) {
-            return { ...inv, status: "CLAIMED" as const };
-          }
-          return inv;
-        });
-
-        setInvestments(updated);
-        sessionStorage.setItem("active_investments", JSON.stringify(updated));
-
-        toast.dismiss();
-        toast.success(`Claim successful! ₦${payout.toLocaleString()} credited to wallet.`);
+      if (res.ok && data.success) {
+        toast.success(data.message);
+        await loadInvestmentData();
       } else {
-        if (!user) return;
-        const idToken = await user.getIdToken();
-        const res = await fetch(`/api/investments/${invId}/claim`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${idToken}` }
-        });
-
-        const data = await res.json();
-        toast.dismiss();
-
-        if (res.ok && data.success) {
-          toast.success(data.message);
-          await loadInvestmentData();
-        } else {
-          toast.error(data.error || "Claim processing failed.");
-        }
+        toast.error(data.error || "Claim request submission failed.");
       }
     } catch {
       toast.dismiss();
