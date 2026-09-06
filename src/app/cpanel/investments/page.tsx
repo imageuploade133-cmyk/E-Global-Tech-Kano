@@ -13,6 +13,7 @@ import { SavingsPlanData } from "@/lib/savings-plans-types";
 
 interface FixedDeposit {
   id: string;
+  investmentReference?: string;
   userId: string;
   userName: string;
   userEmail: string;
@@ -542,6 +543,8 @@ function AdminFixedDepositsPageContent() {
       inv.userPhone?.includes(term) ||
       inv.status?.toLowerCase().includes(term) ||
       inv.description?.toLowerCase().includes(term) ||
+      inv.id?.toLowerCase().includes(term) ||
+      inv.investmentReference?.toLowerCase().includes(term) ||
       String(inv.amount).includes(term)
     );
   });
@@ -1131,7 +1134,7 @@ function AdminFixedDepositsPageContent() {
                         const isCancelled = inv.status === "CANCELLED" || inv.status === "CANCELED";
 
                         const displayTitle = inv.optionName || inv.description || "Savings Plan";
-                        const displayRef = inv.id ? inv.id : "N/A";
+                        const publicRef = inv.investmentReference || (inv.id ? `INV-${inv.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}` : "INV-LEGACY");
 
                         return (
                           <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10 transition-colors">
@@ -1142,11 +1145,11 @@ function AdminFixedDepositsPageContent() {
                                     {inv.userName || "System User"}
                                   </p>
                                   <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="font-mono text-[10px] font-bold text-orange-500 truncate max-w-[140px]" title={displayTitle}>
-                                      {displayTitle}
+                                    <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-500 border border-orange-500/20 font-mono text-[10px] font-black uppercase tracking-wider">
+                                      {publicRef}
                                     </span>
-                                    <span className="text-[9px] font-mono text-gray-400 font-semibold truncate max-w-[100px]" title={displayRef}>
-                                      • ID: {displayRef.length > 12 ? `${displayRef.slice(0, 12)}...` : displayRef}
+                                    <span className="font-mono text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate max-w-[130px]" title={displayTitle}>
+                                      • {displayTitle}
                                     </span>
                                   </div>
                                   <p className="text-[10px] text-gray-400 mt-0.5">{inv.userEmail !== "No Email" ? inv.userEmail : inv.userPhone}</p>
@@ -1286,13 +1289,15 @@ function AdminFixedDepositsPageContent() {
                   <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">receipt_long</span>
                   <div>
                     <h3 className="font-extrabold text-base uppercase tracking-tight">Investment Contract Audit</h3>
-                    <p className="text-[10px] text-gray-400 font-mono">Ref ID: {selectedInvestmentModal.id}</p>
+                    <p className="text-[10px] text-[#FC7A00] font-mono font-bold">
+                      REF: {selectedInvestmentModal.investmentReference || `INV-${selectedInvestmentModal.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}`}
+                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedInvestmentModal(null)}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white"
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">close</span>
                 </button>
