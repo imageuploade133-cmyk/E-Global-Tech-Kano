@@ -177,6 +177,11 @@ function CpanelStorePageContent() {
     }
   };
 
+  const getDefaultCategoryName = () => {
+    const validCat = categories.find((c) => c && c.name && c.name !== "ALL");
+    return validCat ? validCat.name : "Electronics";
+  };
+
   const resetItemForm = () => {
     setEditingItemId(null);
     setItemTitle("");
@@ -184,7 +189,7 @@ function CpanelStorePageContent() {
     setItemCostPrice("");
     setItemPrice("");
     setItemDiscountPrice("");
-    setItemCategory("Hardware");
+    setItemCategory(getDefaultCategoryName());
     setItemImages([]);
     setItemCoverUrl("");
     setItemVideoUrl("");
@@ -202,7 +207,7 @@ function CpanelStorePageContent() {
     setItemCostPrice(item.costPrice !== null && item.costPrice !== undefined ? item.costPrice.toString() : "");
     setItemPrice(item.price ? item.price.toString() : "");
     setItemDiscountPrice(item.discountPrice !== null && item.discountPrice !== undefined ? item.discountPrice.toString() : "");
-    setItemCategory(item.category || "Hardware");
+    setItemCategory(item.category || getDefaultCategoryName());
     const existingImgs = Array.isArray(item.images) && item.images.length > 0 ? item.images : (item.imageUrl ? [item.imageUrl] : []);
     setItemImages(existingImgs);
     setItemCoverUrl(item.coverImageUrl || item.imageUrl || existingImgs[0] || "");

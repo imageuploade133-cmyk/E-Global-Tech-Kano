@@ -334,15 +334,17 @@ export default function StorePage() {
     }
   };
 
-  // Search & Category Filtered Products
+  // Search & Category Filtered Products (Handles case-insensitive and whitespace-safe category matching)
   const filteredItems = items.filter((item) => {
-    const matchesCategory = activeCategory === "ALL" || item.category.toLowerCase() === activeCategory.toLowerCase();
+    const itemCat = (item.category || "").trim().toLowerCase();
+    const targetCat = (activeCategory || "ALL").trim().toLowerCase();
+    const matchesCategory = targetCat === "all" || itemCat === targetCat;
     const query = searchQuery.toLowerCase().trim();
     const matchesQuery =
       !query ||
       item.title.toLowerCase().includes(query) ||
       item.description.toLowerCase().includes(query) ||
-      item.category.toLowerCase().includes(query);
+      itemCat.includes(query);
 
     return matchesCategory && matchesQuery;
   });
