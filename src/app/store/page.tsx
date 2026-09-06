@@ -24,6 +24,7 @@ import {
   isInWishlist,
   toggleWishlist,
 } from "@/lib/store-cache";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 // Convert hex color + opacity fraction (0 to 1) to rgba string strictly for product borders
 const hexToRgba = (hex: string = "#FC7A00", opacity: number = 1): string => {
@@ -114,31 +115,13 @@ export default function StorePage() {
   const [myOrders, setMyOrders] = useState<any[]>([]);
   const [isLoadingMyOrders, setIsLoadingMyOrders] = useState(false);
 
-  // Prevent background body scrolling while any store drawer is open
-  useEffect(() => {
-    if (
-      isCartOpen ||
-      isMyOrdersOpen ||
-      confirmedOrder ||
-      isSearchModalOpen ||
-      isAllRecentlyViewedOpen ||
-      isWishlistModalOpen
-    ) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [
-    isCartOpen,
-    isMyOrdersOpen,
-    confirmedOrder,
-    isSearchModalOpen,
-    isAllRecentlyViewedOpen,
-    isWishlistModalOpen,
-  ]);
+  // Lock body scroll and handle hardware back button across all store drawers
+  useModalBackHandler(isCartOpen, () => setIsCartOpen(false), "store-cart-modal");
+  useModalBackHandler(isMyOrdersOpen, () => setIsMyOrdersOpen(false), "store-myorders-modal");
+  useModalBackHandler(isSearchModalOpen, () => setIsSearchModalOpen(false), "store-search-modal");
+  useModalBackHandler(isWishlistModalOpen, () => setIsWishlistModalOpen(false), "store-wishlist-modal");
+  useModalBackHandler(isAllRecentlyViewedOpen, () => setIsAllRecentlyViewedOpen(false), "store-recentlyviewed-modal");
+  useModalBackHandler(Boolean(confirmedOrder), () => setConfirmedOrder(null), "store-confirmed-modal");
 
   // Load Cart from localStorage on mount
   useEffect(() => {
