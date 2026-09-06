@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
+// Server-side in-memory query cache with 2-minute TTL for low Firestore reads
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+const investmentsCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
 export async function GET(req: Request) {
   try {
     const perm = await requireAdminPermission(req, "investments.manage");
@@ -48,20 +56,58 @@ export async function GET(req: Request) {
       });
     }
 
-    // Query all investments in the system
-    const snapshot = await adminDb
-      .collection("investments")
-      .orderBy("createdAt", "desc")
-      .get();
+    const { searchParams } = new URL(req.url);
+    const statusParam = searchParams.get("status") || "ALL";
+    const limitParam = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+    const startAfterId = searchParams.get("startAfter") || "";
+    const searchQuery = (searchParams.get("search") || "").trim().toLowerCase();
 
-    const rawInvestments: any[] = [];
+    const cacheKey = `investments_${statusParam}_${limitParam}_${startAfterId}_${searchQuery}`;
+    const now = Date.now();
+    const cached = investmentsCache.get(cacheKey);
+
+    if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+      return NextResponse.json(cached.data);
+    }
+
+    // Query investments with index-backed filtering
+    let query: FirebaseFirestore.Query = adminDb.collection("investments");
+
+    if (statusParam === "SETTLED") {
+      query = query.where("status", "in", ["SETTLED", "CLAIMED"]);
+    } else if (statusParam === "CANCELLED") {
+      query = query.where("status", "in", ["CANCELLED", "CANCELED"]);
+    } else if (statusParam !== "ALL") {
+      query = query.where("status", "==", statusParam);
+    }
+
+    query = query.orderBy("createdAt", "desc");
+
+    if (startAfterId) {
+      const startAfterDoc = await adminDb.collection("investments").doc(startAfterId).get();
+      if (startAfterDoc.exists) {
+        query = query.startAfter(startAfterDoc);
+      }
+    }
+
+    // Fetch +1 to determine if there is a next page
+    const snapshot = await query.limit(limitParam + 1).get();
+
+    const rawDocs: any[] = [];
     snapshot.forEach((doc) => {
-      rawInvestments.push({ id: doc.id, ...doc.data() });
+      rawDocs.push({ id: doc.id, ...doc.data() });
     });
 
-    // Batch fetch unique user profiles to minimize Firestore reads (0 N+1 reads)
+    const hasNextPage = rawDocs.length > limitParam;
+    if (hasNextPage) {
+      rawDocs.pop(); // Remove extra record used for page detection
+    }
+
+    const lastDocId = rawDocs.length > 0 ? rawDocs[rawDocs.length - 1].id : null;
+
+    // Batch fetch unique user profiles for low reads (0 N+1 reads)
     const uniqueUserIds = Array.from(
-      new Set(rawInvestments.map((inv) => inv.userId).filter(Boolean))
+      new Set(rawDocs.map((inv) => inv.userId).filter(Boolean))
     );
 
     const usersCache: Record<string, { name: string; email: string; phone: string }> = {};
@@ -84,7 +130,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const enrichedInvestments = rawInvestments.map((inv) => {
+    let enrichedInvestments = rawDocs.map((inv) => {
       const meta = usersCache[inv.userId] || { name: "System User", email: "No Email", phone: "No Phone" };
       return {
         ...inv,
@@ -96,10 +142,32 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({
+    // In-memory search filter for client search term
+    if (searchQuery) {
+      enrichedInvestments = enrichedInvestments.filter(
+        (inv) =>
+          inv.userName?.toLowerCase().includes(searchQuery) ||
+          inv.userEmail?.toLowerCase().includes(searchQuery) ||
+          inv.userPhone?.includes(searchQuery) ||
+          inv.id?.toLowerCase().includes(searchQuery) ||
+          inv.optionName?.toLowerCase().includes(searchQuery) ||
+          String(inv.amount).includes(searchQuery)
+      );
+    }
+
+    const responsePayload = {
       success: true,
-      investments: enrichedInvestments
-    });
+      investments: enrichedInvestments,
+      pagination: {
+        hasNextPage,
+        lastDocId,
+        limit: limitParam,
+      },
+    };
+
+    investmentsCache.set(cacheKey, { data: responsePayload, timestamp: now });
+
+    return NextResponse.json(responsePayload);
 
   } catch (err: any) {
     console.error("[Admin Investments GET Exception]:", err.message);
