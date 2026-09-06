@@ -18,15 +18,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { amount, currency, productId, walletType } = body;
+    const idempotencyHeader = req.headers.get("x-idempotency-key") || req.headers.get("idempotency-key") || "";
+    const body = await req.json().catch(() => ({}));
+    const { amount, currency, productId, walletType, durationDays, idempotencyKey } = body;
 
     const investAmount = Number(amount);
-    if (!amount || isNaN(investAmount) || investAmount <= 0) {
-      return NextResponse.json({ error: "Invalid investment amount." }, { status: 400 });
+    if (!amount || isNaN(investAmount) || !isFinite(investAmount) || investAmount <= 0) {
+      return NextResponse.json({ error: "Invalid investment amount. Amount must be a positive number." }, { status: 400 });
     }
 
-    if (!productId) {
+    if (!productId || typeof productId !== "string") {
       return NextResponse.json({ error: "Product specification (productId) is required." }, { status: 400 });
     }
 
@@ -36,6 +37,8 @@ export async function POST(req: Request) {
       productId,
       type: "FIXED_DEPOSIT",
       walletType: walletType || "MAIN",
+      durationDays: durationDays ? Number(durationDays) : undefined,
+      idempotencyKey: idempotencyKey || idempotencyHeader || undefined,
     });
 
     return NextResponse.json({

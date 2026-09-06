@@ -22,9 +22,11 @@ interface ActiveInvestment {
   interestType: "SIMPLE" | "COMPOUND";
   accumulatedInterest: number;
   totalValue: number;
-  status: "ACTIVE" | "MATURED" | "CLAIMED" | "CANCELLED";
+  status: "ACTIVE" | "MATURED" | "CLAIM_REQUESTED" | "CLAIMED" | "CANCELLED";
   optionId: string;
   optionName: string;
+  claimRequestedAt?: string;
+  claimApprovedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,34 +121,9 @@ export default function InvestmentPage() {
 
   // Load plans and records
   const loadInvestmentData = async () => {
-    const isMock = sessionStorage.getItem("mock") === "true";
-
-    if (isMock) {
-      setIsLoadingPlans(false);
-      setIsLoadingHistory(false);
-      const saved = sessionStorage.getItem("active_investments");
-      if (saved) {
-        try {
-          setInvestments(JSON.parse(saved));
-        } catch (err) {
-          console.error("Failed to parse investments from storage", err);
-        }
-      }
-      return;
-    }
-
     try {
       setIsLoadingPlans(true);
       setIsLoadingHistory(true);
-
-      let idToken = "mock-token";
-      if (user && typeof user.getIdToken === "function") {
-        try {
-          idToken = await user.getIdToken();
-        } catch {
-          // ignore
-        }
-      }
 
       // Fetch dynamic savings plans and global penalty policy
       const [plansRes, settingsRes] = await Promise.all([
@@ -176,6 +153,7 @@ export default function InvestmentPage() {
       setIsLoadingPlans(false);
 
       if (user) {
+        const idToken = await user.getIdToken();
         // Fetch user holdings
         const holdingsRes = await fetch("/api/investments", {
           headers: { Authorization: `Bearer ${idToken}` }
@@ -203,6 +181,19 @@ export default function InvestmentPage() {
   const mainBalance = (userData?.balance as number) ?? 0;
   const bonusBalance = (userData?.bonusBalance as number) ?? 0;
   const userBalance = walletTypeSelected === "BONUS" ? bonusBalance : mainBalance;
+
+  // Calculate active investments balance & daily yield income
+  const activeInvestmentsList = investments.filter((i) => i.status === "ACTIVE");
+  const totalActiveInvestmentBalance = activeInvestmentsList.reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+
+  // Calculate daily income generated across all active savings locks
+  const totalDailyIncome = activeInvestmentsList.reduce((sum, inv) => {
+    const principal = Number(inv.amount) || 0;
+    const rate = Number(inv.interestRate) || 0;
+    // Daily return = Principal * APR / 365
+    const dailyReturn = (principal * rate) / 365;
+    return sum + dailyReturn;
+  }, 0);
 
   // Real-time server-side reward calculation
   const getEstimatedReward = () => {
@@ -273,76 +264,43 @@ export default function InvestmentPage() {
   const handleConfirmInvestment = async () => {
     setIsSubmitting(true);
     const amt = parseFloat(amountStr) || 0;
-    const estimatedReward = getEstimatedReward();
 
     try {
-      const isMock = sessionStorage.getItem("mock") === "true";
+      if (!user) {
+        toast.error("Authentication required.");
+        setIsSubmitting(false);
+        return;
+      }
 
-      if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+      const idToken = await user.getIdToken();
+      const endpoint = selectedPlan.type === "SAVINGS" ? "/api/investments/savings" : "/api/investments/fixed-deposit";
+      const idempotencyKey = `inv-${user.uid}-${Date.now()}`;
 
-        const nextBalance = userBalance - amt;
-        await updateUserData({ balance: nextBalance });
-
-        const newInvest: ActiveInvestment = {
-          id: "INV-" + Math.floor(100000 + Math.random() * 900000),
-          userId: user?.uid || "mock-user",
-          type: selectedPlan.type,
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+          "Idempotency-Key": idempotencyKey
+        },
+        body: JSON.stringify({
           amount: amt,
           currency: "NGN",
-          startDate: new Date().toISOString(),
-          maturityDate: calculatedMaturityDateObj.toISOString(),
-          interestRate: (selectedPlan.apr || 10) / 100,
-          interestType: selectedPlan.interestType,
-          accumulatedInterest: estimatedReward,
-          totalValue: amt + estimatedReward,
-          status: "ACTIVE",
-          optionId: selectedPlan.id,
-          optionName: selectedPlan.name,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+          productId: selectedPlan.id,
+          walletType: walletTypeSelected,
+          durationDays: calculatedLockDays,
+          idempotencyKey,
+        })
+      });
 
-        const updatedList = [newInvest, ...investments];
-        setInvestments(updatedList);
-        sessionStorage.setItem("active_investments", JSON.stringify(updatedList));
-
-        toast.success(`Savings locked successfully under ${selectedPlan.name}!`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || `Savings locked successfully under ${selectedPlan.name}!`);
+        await loadInvestmentData();
       } else {
-        if (!user) {
-          toast.error("Authentication required.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        const idToken = await user.getIdToken();
-        const endpoint = selectedPlan.type === "SAVINGS" ? "/api/investments/savings" : "/api/investments/fixed-deposit";
-
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`
-          },
-          body: JSON.stringify({
-            amount: amt,
-            currency: "NGN",
-            productId: selectedPlan.id,
-            walletType: walletTypeSelected,
-            durationDays: calculatedLockDays,
-            maturityDate: calculatedMaturityDateStr,
-          })
-        });
-
-        const data = await res.json();
-        if (res.ok && data.success) {
-          toast.success(data.message || `Savings locked successfully under ${selectedPlan.name}!`);
-          await loadInvestmentData();
-        } else {
-          toast.error(data.error || "Failed to establish savings lock.");
-          setIsSubmitting(false);
-          return;
-        }
+        toast.error(data.error || "Failed to establish savings lock.");
+        setIsSubmitting(false);
+        return;
       }
 
       setAmountStr("");
@@ -355,53 +313,26 @@ export default function InvestmentPage() {
     }
   };
 
-  // Claim Earnings
+  // Claim Earnings Request
   const handleClaim = async (invId: string) => {
-    const isMock = sessionStorage.getItem("mock") === "true";
-    toast.loading("Processing your payout claim on ledger...");
+    toast.loading("Submitting payout claim request...");
 
     try {
-      if (isMock) {
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        const matched = investments.find(inv => inv.id === invId);
-        if (!matched) {
-          toast.dismiss();
-          toast.error("Savings lock not found.");
-          return;
-        }
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/investments/${invId}/claim`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
 
-        const payout = matched.amount + matched.accumulatedInterest;
-        await updateUserData({ balance: userBalance + payout });
+      const data = await res.json();
+      toast.dismiss();
 
-        const updated = investments.map(inv => {
-          if (inv.id === invId) {
-            return { ...inv, status: "CLAIMED" as const };
-          }
-          return inv;
-        });
-
-        setInvestments(updated);
-        sessionStorage.setItem("active_investments", JSON.stringify(updated));
-
-        toast.dismiss();
-        toast.success(`Claim successful! ₦${payout.toLocaleString()} credited to wallet.`);
+      if (res.ok && data.success) {
+        toast.success(data.message);
+        await loadInvestmentData();
       } else {
-        if (!user) return;
-        const idToken = await user.getIdToken();
-        const res = await fetch(`/api/investments/${invId}/claim`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${idToken}` }
-        });
-
-        const data = await res.json();
-        toast.dismiss();
-
-        if (res.ok && data.success) {
-          toast.success(data.message);
-          await loadInvestmentData();
-        } else {
-          toast.error(data.error || "Claim processing failed.");
-        }
+        toast.error(data.error || "Claim request submission failed.");
       }
     } catch {
       toast.dismiss();
@@ -613,21 +544,48 @@ export default function InvestmentPage() {
 
           <BannerSlideshow page="investment" />
 
-          {/* Current Available Balance */}
-          <div className="bg-gradient-to-br from-[#111] to-[#222] rounded-[24px] p-5 text-white mb-6 border border-white/5 shadow-md animate-fade-in">
-            <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-              Your Available {walletTypeSelected === "BONUS" ? "Bonus" : "Main"} Wallet Balance
-            </p>
-            <p className="font-bodoni text-[26px] font-bold mt-1 text-[#FC7A00]">
-              ₦{userBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <div className="flex items-center gap-1.5 mt-2 bg-white/5 rounded-lg px-2 py-1 w-fit">
-              <span className="material-symbols-outlined text-[13px] text-green-400">
-                lock
-              </span>
-              <p className="font-hanken text-[9px] text-gray-300 font-semibold">
-                Your savings are 100% secured with guaranteed interest.
-              </p>
+          {/* Current Available Balance & Active Investment Portfolio Card */}
+          <div className="bg-gradient-to-br from-[#111] to-[#222] rounded-[24px] p-5 text-white mb-6 border border-white/5 shadow-md animate-fade-in space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                  Available {walletTypeSelected === "BONUS" ? "Bonus" : "Main"} Wallet Balance
+                </p>
+                <p className="font-bodoni text-[22px] font-bold mt-0.5 text-[#FC7A00]">
+                  ₦{userBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                  Active Investment Balance
+                </p>
+                <p className="font-bodoni text-[22px] font-bold mt-0.5 text-emerald-400 font-mono">
+                  ₦{totalActiveInvestmentBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/20 text-[#FC7A00] flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[18px]">trending_up</span>
+                </div>
+                <div>
+                  <p className="font-hanken text-[10px] text-gray-300 font-bold uppercase">Estimated Daily Income</p>
+                  <p className="font-hanken text-[13px] font-extrabold text-green-400 font-mono">
+                    +₦{totalDailyIncome.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / day
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-green-500/10 px-2.5 py-1 rounded-lg border border-green-500/20">
+                <span className="material-symbols-outlined text-[13px] text-green-400">
+                  lock
+                </span>
+                <p className="font-hanken text-[9px] text-green-300 font-bold uppercase tracking-wider">
+                  100% Secured
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1048,14 +1006,19 @@ export default function InvestmentPage() {
                             </div>
 
                             <div className="mt-3 flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
-                              {isMatured ? (
+                              {inv.status === "CLAIM_REQUESTED" ? (
+                                <div className="w-full py-2 bg-amber-500/10 border border-amber-500/30 text-amber-600 rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[14px] animate-spin">hourglass_empty</span>
+                                  Payout Requested • Awaiting Admin Approval
+                                </div>
+                              ) : isMatured ? (
                                 <button
                                   type="button"
                                   onClick={() => handleClaim(inv.id)}
                                   className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
                                 >
                                   <span className="material-symbols-outlined text-[14px]">payments</span>
-                                  Claim Matured Payout
+                                  Request Matured Payout
                                 </button>
                               ) : (
                                 <>

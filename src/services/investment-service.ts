@@ -28,13 +28,21 @@ export interface InvestmentRecord {
   currency: string;
   startDate: string;
   maturityDate: string;
+  durationDays: number;
   interestRate: number;
   interestType: "SIMPLE" | "COMPOUND";
+  earlyWithdrawalPenaltyRateSnapshot: number;
   accumulatedInterest: number;
   totalValue: number;
-  status: "ACTIVE" | "MATURED" | "CLAIMED" | "CANCELLED";
+  status: "ACTIVE" | "MATURED" | "CLAIM_REQUESTED" | "CLAIMED" | "CANCELLED";
   optionId: string;
   optionName: string;
+  idempotencyKey?: string;
+  productVersion?: number;
+  contractVersion?: string;
+  claimRequestedAt?: string;
+  claimApprovedAt?: string;
+  claimApprovedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,53 +156,131 @@ export class InvestmentService {
 
   /**
    * Calculates dynamic server-side interest accrued for a given amount, duration and rate.
+   * Caps interest accumulation at maturity duration.
    */
-  static calculateInterest(amount: number, apr: number, elapsedDays: number, interestType: "SIMPLE" | "COMPOUND"): number {
-    if (elapsedDays <= 0) return 0;
+  static calculateInterest(
+    amount: number,
+    apr: number,
+    elapsedDays: number,
+    interestType: "SIMPLE" | "COMPOUND",
+    maxDurationDays?: number
+  ): number {
+    if (elapsedDays <= 0 || isNaN(amount) || amount <= 0 || isNaN(apr) || apr <= 0) return 0;
+
+    const effectiveDays = maxDurationDays ? Math.min(elapsedDays, maxDurationDays) : elapsedDays;
+    if (effectiveDays <= 0) return 0;
 
     if (interestType === "SIMPLE") {
       // Simple Interest: P * R * (t / 365)
-      const interest = amount * apr * (elapsedDays / 365);
+      const interest = amount * apr * (effectiveDays / 365);
       return Number(interest.toFixed(2));
     } else {
       // Daily Compounding Interest: P * ((1 + R/365)^t - 1)
-      const interest = amount * (Math.pow(1 + apr / 365, elapsedDays) - 1);
+      const interest = amount * (Math.pow(1 + apr / 365, effectiveDays) - 1);
       return Number(interest.toFixed(2));
     }
   }
 
   /**
    * Atomic lock creation of Savings / Fixed Deposits inside a transaction.
+   * Snapshots contractual terms and enforces idempotency.
    */
   static async createInvestment(
     userId: string,
     params: {
       amount: number;
-      currency: string;
+      currency?: string;
       productId: string;
       type: "SAVINGS" | "FIXED_DEPOSIT";
       walletType?: "MAIN" | "BONUS";
+      durationDays?: number;
+      idempotencyKey?: string;
     }
   ): Promise<InvestmentRecord> {
-    const { amount, currency, productId, type, walletType = "MAIN" } = params;
+    const { amount, productId, type, walletType = "MAIN", idempotencyKey } = params;
+    const currency = (params.currency || "NGN").toUpperCase();
+
+    // Input Validation
+    if (!amount || typeof amount !== "number" || isNaN(amount) || !isFinite(amount) || amount <= 0) {
+      throw new Error("Invalid investment amount. Amount must be a positive number.");
+    }
+
+    if (currency !== "NGN") {
+      throw new Error("Unsupported investment currency. Only NGN investments are accepted.");
+    }
 
     await this.seedDatabaseIfNeeded();
 
-    // 1. Load active settings and rate specs from Firestore
+    // 1. Load authoritative settings and product configuration from Firestore
     const settings = await this.getSettings();
-    const productDoc = await adminDb.collection("interestRates").doc(productId).get();
-    if (!productDoc.exists) {
-      throw new Error(`The selected product model was not found: ${productId}`);
-    }
-    const product = productDoc.data() as InterestRateProduct;
 
-    // Validate global settings bounds
-    if (amount < settings.minInvestment) {
-      throw new Error(`Investment amount is too low. Minimum required: ₦${settings.minInvestment.toLocaleString()}`);
+    // Resolve product from config/investment_plans array or interestRates collection
+    let resolvedProduct: {
+      id: string;
+      name: string;
+      apr: number;
+      interestType: "SIMPLE" | "COMPOUND";
+      defaultDurationDays: number;
+      minInvestment?: number;
+      maxInvestment?: number;
+      isAmountRequired?: boolean;
+      status?: string;
+    } | null = null;
+
+    const plansSnap = await adminDb.collection("config").doc("investment_plans").get();
+    if (plansSnap.exists) {
+      const plansData = plansSnap.data();
+      if (Array.isArray(plansData?.plans)) {
+        const found = plansData.plans.find((p: any) => p.id === productId);
+        if (found) {
+          resolvedProduct = {
+            id: found.id,
+            name: found.name,
+            apr: Number(found.apr) / 100, // convert percentage (e.g. 12.5) to decimal (0.125)
+            interestType: found.interestType || "SIMPLE",
+            defaultDurationDays: Number(found.defaultDurationDays) || 30,
+            minInvestment: Number(found.minInvestment) || settings.minInvestment,
+            maxInvestment: Number(found.maxInvestment) || settings.maxInvestment,
+            status: found.status || "ACTIVE",
+          };
+        }
+      }
     }
-    if (amount > settings.maxInvestment) {
-      throw new Error(`Investment amount exceeds the limit. Maximum allowed: ₦${settings.maxInvestment.toLocaleString()}`);
+
+    if (!resolvedProduct) {
+      const productDoc = await adminDb.collection("interestRates").doc(productId).get();
+      if (productDoc.exists) {
+        const prodData = productDoc.data() as InterestRateProduct;
+        resolvedProduct = {
+          id: prodData.id,
+          name: prodData.name,
+          apr: Number(prodData.apr),
+          interestType: prodData.interestType || "SIMPLE",
+          defaultDurationDays: Number(prodData.durationDays) || 30,
+          status: prodData.status || "ACTIVE",
+        };
+      }
     }
+
+    if (!resolvedProduct || resolvedProduct.status === "INACTIVE") {
+      throw new Error(`The selected investment product model is either inactive or not found: ${productId}`);
+    }
+
+    // Validate global & product limits
+    const minLimit = Math.max(settings.minInvestment, resolvedProduct.minInvestment || 0);
+    const maxLimit = Math.min(settings.maxInvestment, resolvedProduct.maxInvestment || Infinity);
+
+    if (amount < minLimit) {
+      throw new Error(`Investment amount is too low. Minimum required: ₦${minLimit.toLocaleString()}`);
+    }
+    if (amount > maxLimit) {
+      throw new Error(`Investment amount exceeds the limit. Maximum allowed: ₦${maxLimit.toLocaleString()}`);
+    }
+
+    // Determine contractual duration
+    const finalDurationDays = params.durationDays && Number(params.durationDays) > 0
+      ? Math.max(1, Math.min(1095, Math.floor(Number(params.durationDays))))
+      : resolvedProduct.defaultDurationDays;
 
     // Secure requirement: User can invest using BONUS wallet ONLY if they have funded their own account with a minimum of 3000 NGN.
     if (walletType === "BONUS") {
@@ -205,13 +291,34 @@ export class InvestmentService {
       }
     }
 
-    const refId = `inv-${userId}-${Date.now()}`;
+    // Generate deterministic refId if idempotencyKey is provided to prevent double-investment
+    const cleanIdempotencyKey = idempotencyKey ? idempotencyKey.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) : "";
+    const refId = cleanIdempotencyKey
+      ? `inv-${userId}-${cleanIdempotencyKey}`
+      : `inv-${userId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
     const startDate = new Date();
-    const maturityDate = new Date();
-    maturityDate.setDate(startDate.getDate() + product.durationDays);
+    const maturityDate = new Date(startDate.getTime() + finalDurationDays * 24 * 60 * 60 * 1000);
 
     // 2. Perform Atomic Write via Firestore Transaction
     const record = await adminDb.runTransaction(async (transaction) => {
+      const investRef = adminDb.collection("investments").doc(refId);
+      const existingDoc = await transaction.get(investRef);
+
+      // Idempotency Check: if request was already processed with matching parameters, return existing contract
+      if (existingDoc.exists) {
+        const existingData = existingDoc.data() as InvestmentRecord;
+        if (
+          existingData.amount !== amount ||
+          existingData.optionId !== resolvedProduct!.id ||
+          existingData.currency !== currency
+        ) {
+          throw new Error("Idempotency Key Conflict: Cannot reuse the same Idempotency-Key with different investment parameters.");
+        }
+        console.log(`[InvestmentService] Idempotent request verified for key ${refId}, returning original investment contract.`);
+        return existingData;
+      }
+
       // Verify wallet balance and debit wallet atomically
       await WalletService.debitWallet(transaction, {
         userId,
@@ -219,13 +326,12 @@ export class InvestmentService {
         currency,
         reference: refId,
         type: "INVESTMENT",
-        description: `Created Locked ${type === "SAVINGS" ? "Savings" : "Fixed Deposit"}: ${product.name} (${product.durationDays} Days)`,
-        recipientName: product.name,
+        description: `Created Locked ${type === "SAVINGS" ? "Savings" : "Fixed Deposit"}: ${resolvedProduct!.name} (${finalDurationDays} Days)`,
+        recipientName: resolvedProduct!.name,
         fee: 0,
         walletType,
       });
 
-      const investRef = adminDb.collection("investments").doc(refId);
       const investRecord: InvestmentRecord = {
         id: refId,
         userId,
@@ -234,15 +340,20 @@ export class InvestmentService {
         currency,
         startDate: startDate.toISOString(),
         maturityDate: maturityDate.toISOString(),
-        interestRate: product.apr,
-        interestType: product.interestType,
+        durationDays: finalDurationDays,
+        interestRate: resolvedProduct!.apr,
+        interestType: resolvedProduct!.interestType,
+        earlyWithdrawalPenaltyRateSnapshot: settings.penaltyRate,
         accumulatedInterest: 0,
         totalValue: amount,
         status: "ACTIVE",
-        optionId: product.id,
-        optionName: product.name,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        optionId: resolvedProduct!.id,
+        optionName: resolvedProduct!.name,
+        idempotencyKey: cleanIdempotencyKey || undefined,
+        productVersion: 1,
+        contractVersion: "1.0",
+        createdAt: startDate.toISOString(),
+        updatedAt: startDate.toISOString(),
       };
 
       transaction.set(investRef, investRecord);
@@ -256,8 +367,8 @@ export class InvestmentService {
         amount,
         type: "DEPOSIT",
         status: "SUCCESS",
-        description: `Locked capital of ₦${amount.toLocaleString()} into ${product.name}`,
-        createdAt: new Date().toISOString(),
+        description: `Locked capital of ₦${amount.toLocaleString()} into ${resolvedProduct!.name}`,
+        createdAt: startDate.toISOString(),
       });
 
       // Write audit log document
@@ -271,9 +382,11 @@ export class InvestmentService {
           amount,
           type,
           refId,
+          durationDays: finalDurationDays,
+          penaltyRateSnapshot: settings.penaltyRate,
         },
         version: "1.0",
-        createdAt: new Date().toISOString(),
+        createdAt: startDate.toISOString(),
       });
 
       return investRecord;
@@ -283,9 +396,9 @@ export class InvestmentService {
   }
 
   /**
-   * Securely claim / redeem matured savings locks inside a Transaction.
+   * Request payout for a matured investment. Transitions status to CLAIM_REQUESTED for admin approval.
    */
-  static async claimInvestment(userId: string, investmentId: string): Promise<{ record: InvestmentRecord; creditedAmount: number }> {
+  static async requestInvestmentClaim(userId: string, investmentId: string): Promise<{ record: InvestmentRecord; estimatedPayout: number }> {
     const investRef = adminDb.collection("investments").doc(investmentId);
 
     const result = await adminDb.runTransaction(async (transaction) => {
@@ -300,6 +413,9 @@ export class InvestmentService {
       }
       if (record.status === "CLAIMED") {
         throw new Error("This investment has already been claimed.");
+      }
+      if (record.status === "CLAIM_REQUESTED") {
+        throw new Error("A payout request has already been submitted for administrator approval.");
       }
       if (record.status === "CANCELLED") {
         throw new Error("This investment has already been cancelled.");
@@ -322,48 +438,122 @@ export class InvestmentService {
         record.interestType
       );
 
-      const payoutAmount = record.amount + earnedInterest;
+      const payoutAmount = Number((record.amount + earnedInterest).toFixed(2));
 
-      // Credit user's wallet atomically
-      await WalletService.creditWallet(transaction, {
-        userId,
-        amount: payoutAmount,
-        currency: record.currency,
-        reference: `claim-${investmentId}`,
-        description: `Matured Payout for ${record.optionName} (Principal: ₦${record.amount}, Interest: ₦${earnedInterest})`,
-        recipientName: "Self",
-        fee: 0,
-      });
-
-      // Update investment record
+      // Update investment status to CLAIM_REQUESTED
       const updatedRecord: Partial<InvestmentRecord> = {
-        status: "CLAIMED",
+        status: "CLAIM_REQUESTED",
         accumulatedInterest: earnedInterest,
         totalValue: payoutAmount,
+        claimRequestedAt: now.toISOString(),
         updatedAt: now.toISOString(),
       };
 
       transaction.update(investRef, updatedRecord);
 
-      // Save transaction log in investments subledger
-      const logRef = adminDb.collection("investmentTransactions").doc(`tx-claim-${investmentId}`);
+      // Save claim request log
+      const logRef = adminDb.collection("investmentTransactions").doc(`tx-claim-req-${investmentId}`);
       transaction.set(logRef, {
-        id: `tx-claim-${investmentId}`,
+        id: `tx-claim-req-${investmentId}`,
         userId,
         investmentId,
         amount: payoutAmount,
-        type: "CLAIM",
-        status: "SUCCESS",
-        description: `Claimed matured earnings from ${record.optionName}. Total Credited: ₦${payoutAmount.toLocaleString()}`,
+        type: "CLAIM_REQUEST",
+        status: "PENDING",
+        description: `Requested payout approval for ${record.optionName}. Total Expected: ₦${payoutAmount.toLocaleString()}`,
         createdAt: now.toISOString(),
       });
 
-      // Write audit log document
-      const auditRef = adminDb.collection("auditLogs").doc(`audit-claim-${investmentId}`);
+      return {
+        record: { ...record, ...updatedRecord } as InvestmentRecord,
+        estimatedPayout: payoutAmount,
+      };
+    });
+
+    return result;
+  }
+
+  /**
+   * Admin approves a pending payout claim and credits the user's wallet atomically inside a transaction.
+   */
+  static async approveInvestmentClaim(adminId: string, investmentId: string): Promise<{ record: InvestmentRecord; creditedAmount: number }> {
+    const investRef = adminDb.collection("investments").doc(investmentId);
+
+    const result = await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(investRef);
+      if (!doc.exists) {
+        throw new Error("The specified investment record was not found.");
+      }
+
+      const record = doc.data() as InvestmentRecord;
+      if (record.status === "CLAIMED") {
+        throw new Error("This investment payout has already been approved and credited.");
+      }
+      if (record.status === "CANCELLED") {
+        throw new Error("This investment was cancelled and cannot be claimed.");
+      }
+      if (record.status !== "CLAIM_REQUESTED") {
+        const isMatured = new Date() >= new Date(record.maturityDate);
+        if (!isMatured) {
+          throw new Error("Cannot approve payout for an investment that is not matured.");
+        }
+      }
+
+      const now = new Date();
+      const elapsedMs = now.getTime() - new Date(record.startDate).getTime();
+      const elapsedDays = Math.max(1, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+
+      const earnedInterest = this.calculateInterest(
+        record.amount,
+        record.interestRate,
+        elapsedDays,
+        record.interestType
+      );
+
+      const payoutAmount = Number((record.amount + earnedInterest).toFixed(2));
+
+      // Credit user's wallet atomically
+      await WalletService.creditWallet(transaction, {
+        userId: record.userId,
+        amount: payoutAmount,
+        currency: record.currency || "NGN",
+        reference: `claim-approved-${investmentId}`,
+        description: `Matured Investment Payout Approved: ${record.optionName} (Principal: ₦${record.amount}, Interest: ₦${earnedInterest})`,
+        recipientName: "Self",
+        fee: 0,
+      });
+
+      const updatedRecord: Partial<InvestmentRecord> = {
+        status: "CLAIMED",
+        accumulatedInterest: earnedInterest,
+        totalValue: payoutAmount,
+        claimApprovedAt: now.toISOString(),
+        claimApprovedBy: adminId,
+        updatedAt: now.toISOString(),
+      };
+
+      transaction.update(investRef, updatedRecord);
+
+      // Log claim approval in investment transactions
+      const logRef = adminDb.collection("investmentTransactions").doc(`tx-claim-appr-${investmentId}`);
+      transaction.set(logRef, {
+        id: `tx-claim-appr-${investmentId}`,
+        userId: record.userId,
+        investmentId,
+        amount: payoutAmount,
+        type: "CLAIM_APPROVED",
+        status: "SUCCESS",
+        description: `Administrator approved matured payout for ${record.optionName}. Credited ₦${payoutAmount.toLocaleString()}`,
+        createdAt: now.toISOString(),
+      });
+
+      // Write audit log
+      const auditRef = adminDb.collection("auditLogs").doc(`audit-approve-claim-${investmentId}`);
       transaction.set(auditRef, {
-        id: `audit-claim-${investmentId}`,
-        userId,
-        action: "INVESTMENT_CLAIMED",
+        id: `audit-approve-claim-${investmentId}`,
+        userId: record.userId,
+        adminId,
+        action: "INVESTMENT_CLAIM_APPROVED",
         metadata: {
           investmentId,
           earnedInterest,
@@ -383,11 +573,11 @@ export class InvestmentService {
   }
 
   /**
-   * Cancel an active savings lock early with a configurable penalty.
+   * Cancel an active savings lock early with contractual penalty snapshot.
    */
   static async cancelInvestment(userId: string, investmentId: string): Promise<{ record: InvestmentRecord; refundAmount: number; penaltyDeducted: number }> {
     const investRef = adminDb.collection("investments").doc(investmentId);
-    const settings = await this.getSettings();
+    const globalSettings = await this.getSettings();
 
     const result = await adminDb.runTransaction(async (transaction) => {
       const doc = await transaction.get(investRef);
@@ -399,28 +589,30 @@ export class InvestmentService {
       if (record.userId !== userId) {
         throw new Error("Forbidden: You do not own this investment lock.");
       }
-      if (record.status === "CLAIMED") {
-        throw new Error("Cannot cancel an investment that has already been claimed.");
-      }
-      if (record.status === "CANCELLED") {
-        throw new Error("This investment has already been cancelled.");
+      if (record.status !== "ACTIVE") {
+        throw new Error(`Cannot cancel an investment with status '${record.status}'. Only ACTIVE investments can be liquidated early.`);
       }
 
       const now = new Date();
 
-      // Calculate accrued interest up to cancellation time
+      // Calculate accrued interest up to cancellation time (capped at durationDays)
       const elapsedMs = now.getTime() - new Date(record.startDate).getTime();
-      const elapsedDays = Math.max(1, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+      const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
 
       const earnedInterest = this.calculateInterest(
         record.amount,
         record.interestRate,
         elapsedDays,
-        record.interestType
+        record.interestType,
+        record.durationDays
       );
 
-      // Apply penalty rate to principal or earned interest
-      const penaltyDeducted = Number((record.amount * settings.penaltyRate).toFixed(2));
+      // Use snapshotted contractual penalty rate (falling back to global settings for legacy documents)
+      const penaltyRateToApply = record.earlyWithdrawalPenaltyRateSnapshot !== undefined
+        ? Number(record.earlyWithdrawalPenaltyRateSnapshot)
+        : globalSettings.penaltyRate;
+
+      const penaltyDeducted = Number((record.amount * penaltyRateToApply).toFixed(2));
       const grossAmount = record.amount + earnedInterest;
       const refundAmount = Math.max(0, Number((grossAmount - penaltyDeducted).toFixed(2)));
 
@@ -428,14 +620,14 @@ export class InvestmentService {
       await WalletService.creditWallet(transaction, {
         userId,
         amount: refundAmount,
-        currency: record.currency,
+        currency: record.currency || "NGN",
         reference: `cancel-${investmentId}`,
         description: `Early Liquidation for ${record.optionName} (Refund: ₦${refundAmount}, Penalty: ₦${penaltyDeducted})`,
         recipientName: "Self",
         fee: 0,
       });
 
-      // Update investment record
+      // Update investment record state
       const updatedRecord: Partial<InvestmentRecord> = {
         status: "CANCELLED",
         accumulatedInterest: earnedInterest,
@@ -469,6 +661,7 @@ export class InvestmentService {
           earnedInterest,
           penaltyDeducted,
           refundAmount,
+          penaltyRateApplied: penaltyRateToApply,
         },
         version: "1.0",
         createdAt: now.toISOString(),

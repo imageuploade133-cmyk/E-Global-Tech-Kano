@@ -22,13 +22,13 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { record, creditedAmount } = await InvestmentService.claimInvestment(userId, id);
+    const { record, estimatedPayout } = await InvestmentService.requestInvestmentClaim(userId, id);
 
     return NextResponse.json({
       success: true,
-      message: `Successfully claimed matured lock! Your wallet was credited with ₦${creditedAmount.toLocaleString()}`,
+      message: `Payout request submitted! Administrator approval is required before funds are credited to your wallet (Expected Payout: ₦${estimatedPayout.toLocaleString()}).`,
       investment: record,
-      creditedAmount,
+      estimatedPayout,
     });
   } catch (err: unknown) {
     console.error("[Claim Investment API Error]", (err as Error).message);
