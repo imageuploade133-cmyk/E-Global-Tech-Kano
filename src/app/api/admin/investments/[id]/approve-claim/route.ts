@@ -13,7 +13,7 @@ export async function POST(
     }
 
     const { id } = await params;
-    const adminId = perm.user?.uid || "admin";
+    const adminId = perm.auth?.uid || "admin";
 
     const { record, creditedAmount } = await InvestmentService.approveInvestmentClaim(adminId, id);
 
