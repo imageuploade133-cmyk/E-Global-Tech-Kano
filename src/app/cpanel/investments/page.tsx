@@ -18,6 +18,9 @@ interface FixedDeposit {
   userName: string;
   userEmail: string;
   userPhone: string;
+  userCurrentBalance?: number;
+  balanceBeforeInvestment?: number | null;
+  balanceAfterInvestment?: number | null;
   amount: number;
   interestRate: number;
   totalValue?: number;
@@ -1309,9 +1312,44 @@ function AdminFixedDepositsPageContent() {
                   <span className="text-[9px] font-black uppercase tracking-wider text-gray-400">Investor Account</span>
                   <p className="font-extrabold text-sm text-black dark:text-white">{selectedInvestmentModal.userName || "System User"}</p>
                   <div className="flex flex-wrap gap-x-4 text-[10.5px] text-gray-500 font-semibold pt-0.5">
-                    <p>Email: {selectedInvestmentModal.userEmail}</p>
-                    <p>Phone: {selectedInvestmentModal.userPhone}</p>
-                    <p>User ID: <span className="font-mono text-[9.5px]">{selectedInvestmentModal.userId}</span></p>
+                    <p><strong className="text-gray-400 uppercase text-[9.5px]">Email:</strong> {selectedInvestmentModal.userEmail}</p>
+                    <p><strong className="text-gray-400 uppercase text-[9.5px]">Phone:</strong> {selectedInvestmentModal.userPhone}</p>
+                    <p><strong className="text-gray-400 uppercase text-[9.5px]">User ID:</strong> <span className="font-mono text-[9.5px]">{selectedInvestmentModal.userId}</span></p>
+                  </div>
+                </div>
+
+                {/* Account Balances Audit: Before, After & Current Balance */}
+                <div className="p-3.5 rounded-2xl bg-orange-500/5 border border-orange-500/20 space-y-2">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-[#FC7A00] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
+                    Investor Wallet Balance Breakdown
+                  </span>
+
+                  <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                    <div className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                      <span className="text-[8.5px] font-bold uppercase text-gray-400 block">Balance Before</span>
+                      <p className="font-mono font-black text-xs text-black dark:text-white mt-0.5">
+                        {selectedInvestmentModal.balanceBeforeInvestment !== null && selectedInvestmentModal.balanceBeforeInvestment !== undefined
+                          ? `₦${Number(selectedInvestmentModal.balanceBeforeInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                          : "N/A"}
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800">
+                      <span className="text-[8.5px] font-bold uppercase text-gray-400 block">Balance After</span>
+                      <p className="font-mono font-black text-xs text-black dark:text-white mt-0.5">
+                        {selectedInvestmentModal.balanceAfterInvestment !== null && selectedInvestmentModal.balanceAfterInvestment !== undefined
+                          ? `₦${Number(selectedInvestmentModal.balanceAfterInvestment).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                          : "N/A"}
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-orange-500/30">
+                      <span className="text-[8.5px] font-bold uppercase text-[#FC7A00] block">Current Balance</span>
+                      <p className="font-mono font-black text-xs text-[#FC7A00] mt-0.5">
+                        ₦{(selectedInvestmentModal.userCurrentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
                   </div>
                 </div>
 

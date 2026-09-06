@@ -237,6 +237,43 @@ export async function getFirebaseAuthUserByEmail(email: string): Promise<{ uid: 
 }
 
 /**
+ * Lookup Firebase Auth User by UID using Google's Identity Toolkit v1 REST API.
+ */
+export async function getFirebaseAuthUserByUid(uid: string): Promise<{ uid: string; email?: string; displayName?: string; phoneNumber?: string } | null> {
+  if (!uid) return null;
+  try {
+    const token = await getGoogleOAuth2AccessToken();
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
+
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:lookup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        localId: [uid],
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && Array.isArray(data.users) && data.users.length > 0) {
+      const u = data.users[0];
+      return {
+        uid: u.localId,
+        email: u.email,
+        displayName: u.displayName,
+        phoneNumber: u.phoneNumber,
+      };
+    }
+  } catch (err: any) {
+    console.warn(`[getFirebaseAuthUserByUid] Error looking up uid ${uid}:`, err.message);
+  }
+
+  return null;
+}
+
+/**
  * Deletes a user account in Firebase Authentication using Google's Identity Toolkit v1 REST API.
  */
 export async function deleteFirebaseAuthUser(uid: string): Promise<void> {

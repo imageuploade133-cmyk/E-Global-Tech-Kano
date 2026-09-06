@@ -111,38 +111,55 @@ export async function GET(req: Request) {
       new Set(rawDocs.map((inv) => inv.userId).filter(Boolean))
     );
 
-    const usersCache: Record<string, { name: string; email: string; phone: string }> = {};
+    const { getFirebaseAuthUserByUid } = await import("@/lib/firebase-auth-rest");
+
+    const usersCache: Record<string, { name: string; email: string; phone: string; balance: number }> = {};
 
     if (uniqueUserIds.length > 0) {
       const userDocRefs = uniqueUserIds.map((uid) => adminDb.collection("users").doc(uid));
       const userDocs = await adminDb.getAll(...userDocRefs);
 
-      userDocs.forEach((doc) => {
+      for (const doc of userDocs) {
         if (doc.exists) {
           const uData = doc.data() || {};
-          const computedEmail = uData.email || uData.emailAddress || "";
-          const computedPhone = uData.phoneNumber || uData.phone || uData.mobile || "";
-          const computedName =
+          let computedEmail = uData.email || uData.emailAddress || "";
+          let computedPhone = uData.phoneNumber || uData.phone || uData.mobile || "";
+          let computedName =
             uData.name ||
             uData.displayName ||
-            `${uData.firstName || ""} ${uData.lastName || ""}`.trim() ||
-            (computedEmail ? computedEmail.split("@")[0] : "") ||
-            computedPhone ||
-            `User (${doc.id.slice(0, 8)})`;
+            `${uData.firstName || ""} ${uData.lastName || ""}`.trim();
+
+          // Fallback lookup to Firebase Auth REST API if email is missing from Firestore user doc
+          if (!computedEmail) {
+            const fbUser = await getFirebaseAuthUserByUid(doc.id);
+            if (fbUser) {
+              computedEmail = fbUser.email || "";
+              computedPhone = computedPhone || fbUser.phoneNumber || "";
+              computedName = computedName || fbUser.displayName || "";
+            }
+          }
+
+          if (!computedName) {
+            computedName = (computedEmail ? computedEmail.split("@")[0].toUpperCase() : "") || computedPhone || `User (${doc.id.slice(0, 8)})`;
+          }
 
           usersCache[doc.id] = {
             name: computedName,
             email: computedEmail || "No Email",
             phone: computedPhone || "No Phone",
+            balance: Number(uData.balance) || 0,
           };
         } else {
+          // If Firestore doc missing, attempt Firebase Auth REST lookup
+          const fbUser = await getFirebaseAuthUserByUid(doc.id);
           usersCache[doc.id] = {
-            name: `User (${doc.id.slice(0, 8)})`,
-            email: "No Email",
-            phone: "No Phone",
+            name: fbUser?.displayName || (fbUser?.email ? fbUser.email.split("@")[0].toUpperCase() : `User (${doc.id.slice(0, 8)})`),
+            email: fbUser?.email || "No Email",
+            phone: fbUser?.phoneNumber || "No Phone",
+            balance: 0,
           };
         }
-      });
+      }
     }
 
     let enrichedInvestments = rawDocs.map((inv) => {
@@ -179,12 +196,17 @@ export async function GET(req: Request) {
       // Resolve public investment reference
       const publicRef = inv.investmentReference || (inv.id ? `INV-${inv.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}` : "INV-LEGACY");
 
+      const currentBalance = meta?.balance !== undefined ? meta.balance : (Number(inv.balanceAfterInvestment) || 0);
+
       return {
         ...inv,
         investmentReference: publicRef,
         userName: resolvedName,
         userEmail: resolvedEmail,
         userPhone: resolvedPhone,
+        userCurrentBalance: currentBalance,
+        balanceBeforeInvestment: inv.balanceBeforeInvestment !== undefined ? Number(inv.balanceBeforeInvestment) : null,
+        balanceAfterInvestment: inv.balanceAfterInvestment !== undefined ? Number(inv.balanceAfterInvestment) : null,
         interestRate: normalizedInterestRate,
         description: inv.description || inv.optionName || "Savings / Fixed Deposit Plan",
         optionName: inv.optionName || inv.description || "Savings / Fixed Deposit Plan",
