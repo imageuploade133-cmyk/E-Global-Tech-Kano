@@ -305,10 +305,18 @@ export class InvestmentService {
       const investRef = adminDb.collection("investments").doc(refId);
       const existingDoc = await transaction.get(investRef);
 
-      // Idempotency Check: if request was already processed, return existing contract
+      // Idempotency Check: if request was already processed with matching parameters, return existing contract
       if (existingDoc.exists) {
-        console.log(`[InvestmentService] Idempotent request detected for key ${refId}, returning original investment contract.`);
-        return existingDoc.data() as InvestmentRecord;
+        const existingData = existingDoc.data() as InvestmentRecord;
+        if (
+          existingData.amount !== amount ||
+          existingData.optionId !== resolvedProduct!.id ||
+          existingData.currency !== currency
+        ) {
+          throw new Error("Idempotency Key Conflict: Cannot reuse the same Idempotency-Key with different investment parameters.");
+        }
+        console.log(`[InvestmentService] Idempotent request verified for key ${refId}, returning original investment contract.`);
+        return existingData;
       }
 
       // Verify wallet balance and debit wallet atomically
