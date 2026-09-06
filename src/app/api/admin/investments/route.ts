@@ -61,12 +61,13 @@ export async function GET(req: Request) {
     const limitParam = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const startAfterId = searchParams.get("startAfter") || "";
     const searchQuery = (searchParams.get("search") || "").trim().toLowerCase();
+    const noCacheParam = searchParams.get("nocache") === "true";
 
     const cacheKey = `investments_${statusParam}_${limitParam}_${startAfterId}_${searchQuery}`;
     const now = Date.now();
     const cached = investmentsCache.get(cacheKey);
 
-    if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    if (!noCacheParam && cached && now - cached.timestamp < CACHE_TTL_MS) {
       return NextResponse.json(cached.data);
     }
 
@@ -119,25 +120,58 @@ export async function GET(req: Request) {
       userDocs.forEach((doc) => {
         if (doc.exists) {
           const uData = doc.data() || {};
+          const computedName =
+            uData.name ||
+            uData.displayName ||
+            `${uData.firstName || ""} ${uData.lastName || ""}`.trim() ||
+            (uData.email ? uData.email.split("@")[0] : "") ||
+            uData.phoneNumber ||
+            `User (${doc.id.slice(0, 8)})`;
+
           usersCache[doc.id] = {
-            name: uData.name || uData.displayName || `${uData.firstName || ""} ${uData.lastName || ""}`.trim() || "Unknown User",
+            name: computedName,
             email: uData.email || "No Email",
             phone: uData.phoneNumber || "No Phone",
           };
         } else {
-          usersCache[doc.id] = { name: "Deleted Profile", email: "No Email", phone: "No Phone" };
+          usersCache[doc.id] = {
+            name: `User (${doc.id.slice(0, 8)})`,
+            email: "No Email",
+            phone: "No Phone",
+          };
         }
       });
     }
 
     let enrichedInvestments = rawDocs.map((inv) => {
-      const meta = usersCache[inv.userId] || { name: "System User", email: "No Email", phone: "No Phone" };
+      const meta = usersCache[inv.userId];
+
+      // Normalize interestRate: if rate is <= 1 (e.g., 0.125 or 0.08), convert to percentage (12.5 or 8)
+      let rawRate = Number(inv.interestRate);
+      if (isNaN(rawRate) || rawRate <= 0) {
+        rawRate = Number(inv.apr) || 0;
+      }
+      const normalizedInterestRate = rawRate > 0 && rawRate <= 1 ? Number((rawRate * 100).toFixed(2)) : Number(rawRate.toFixed(2));
+
+      // Resolve user name with multi-tier fallback
+      const resolvedName =
+        inv.userName ||
+        meta?.name ||
+        inv.userEmail ||
+        meta?.email ||
+        (inv.userId ? `User (${inv.userId.slice(0, 8)})` : "System User");
+
+      const resolvedEmail = inv.userEmail || meta?.email || "No Email";
+      const resolvedPhone = inv.userPhone || meta?.phone || "No Phone";
+
       return {
         ...inv,
-        userName: meta.name,
-        userEmail: meta.email,
-        userPhone: meta.phone,
+        userName: resolvedName,
+        userEmail: resolvedEmail,
+        userPhone: resolvedPhone,
+        interestRate: normalizedInterestRate,
         description: inv.description || inv.optionName || "Savings / Fixed Deposit Plan",
+        optionName: inv.optionName || inv.description || "Savings / Fixed Deposit Plan",
         maturesAt: inv.maturityDate || inv.maturesAt || inv.createdAt,
       };
     });
