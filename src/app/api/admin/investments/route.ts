@@ -120,18 +120,20 @@ export async function GET(req: Request) {
       userDocs.forEach((doc) => {
         if (doc.exists) {
           const uData = doc.data() || {};
+          const computedEmail = uData.email || uData.emailAddress || "";
+          const computedPhone = uData.phoneNumber || uData.phone || uData.mobile || "";
           const computedName =
             uData.name ||
             uData.displayName ||
             `${uData.firstName || ""} ${uData.lastName || ""}`.trim() ||
-            (uData.email ? uData.email.split("@")[0] : "") ||
-            uData.phoneNumber ||
+            (computedEmail ? computedEmail.split("@")[0] : "") ||
+            computedPhone ||
             `User (${doc.id.slice(0, 8)})`;
 
           usersCache[doc.id] = {
             name: computedName,
-            email: uData.email || "No Email",
-            phone: uData.phoneNumber || "No Phone",
+            email: computedEmail || "No Email",
+            phone: computedPhone || "No Phone",
           };
         } else {
           usersCache[doc.id] = {
@@ -153,16 +155,26 @@ export async function GET(req: Request) {
       }
       const normalizedInterestRate = rawRate > 0 && rawRate <= 1 ? Number((rawRate * 100).toFixed(2)) : Number(rawRate.toFixed(2));
 
+      // Resolve email with multi-tier fallback across stored inv fields and user profile meta
+      const resolvedEmail =
+        (inv.userEmail && inv.userEmail !== "No Email" ? inv.userEmail : null) ||
+        (inv.email && inv.email !== "No Email" ? inv.email : null) ||
+        (meta?.email && meta?.email !== "No Email" ? meta?.email : null) ||
+        "No Email";
+
+      // Resolve phone with multi-tier fallback across stored inv fields and user profile meta
+      const resolvedPhone =
+        (inv.userPhone && inv.userPhone !== "No Phone" ? inv.userPhone : null) ||
+        (inv.phoneNumber || inv.phone || null) ||
+        (meta?.phone && meta?.phone !== "No Phone" ? meta?.phone : null) ||
+        "No Phone";
+
       // Resolve user name with multi-tier fallback
       const resolvedName =
-        inv.userName ||
+        (inv.userName && inv.userName !== "Unknown User" && inv.userName !== "System User" ? inv.userName : null) ||
         meta?.name ||
-        inv.userEmail ||
-        meta?.email ||
+        (resolvedEmail !== "No Email" ? resolvedEmail.split("@")[0].toUpperCase() : null) ||
         (inv.userId ? `User (${inv.userId.slice(0, 8)})` : "System User");
-
-      const resolvedEmail = inv.userEmail || meta?.email || "No Email";
-      const resolvedPhone = inv.userPhone || meta?.phone || "No Phone";
 
       return {
         ...inv,

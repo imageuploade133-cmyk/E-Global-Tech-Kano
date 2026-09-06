@@ -23,6 +23,9 @@ export interface InterestRateProduct {
 export interface InvestmentRecord {
   id: string;
   userId: string;
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
   type: "SAVINGS" | "FIXED_DEPOSIT";
   amount: number;
   currency: string;
@@ -300,6 +303,22 @@ export class InvestmentService {
     const startDate = new Date();
     const maturityDate = new Date(startDate.getTime() + finalDurationDays * 24 * 60 * 60 * 1000);
 
+    // Fetch user profile info before transaction to persist contract contact details
+    let userInfo: { name?: string; email?: string; phone?: string } = {};
+    try {
+      const userDoc = await adminDb.collection("users").doc(userId).get();
+      if (userDoc.exists) {
+        const uData = userDoc.data() || {};
+        userInfo = {
+          name: uData.name || uData.displayName || `${uData.firstName || ""} ${uData.lastName || ""}`.trim(),
+          email: uData.email || uData.emailAddress,
+          phone: uData.phoneNumber || uData.phone,
+        };
+      }
+    } catch (e) {
+      console.warn(`[InvestmentService] Non-blocking user info lookup error for uid ${userId}:`, e);
+    }
+
     // 2. Perform Atomic Write via Firestore Transaction
     const record = await adminDb.runTransaction(async (transaction) => {
       const investRef = adminDb.collection("investments").doc(refId);
@@ -335,6 +354,9 @@ export class InvestmentService {
       const investRecord: InvestmentRecord = {
         id: refId,
         userId,
+        userName: userInfo.name || undefined,
+        userEmail: userInfo.email || undefined,
+        userPhone: userInfo.phone || undefined,
         type,
         amount,
         currency,
