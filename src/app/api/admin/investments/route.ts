@@ -176,8 +176,12 @@ export async function GET(req: Request) {
         (resolvedEmail !== "No Email" ? resolvedEmail.split("@")[0].toUpperCase() : null) ||
         (inv.userId ? `User (${inv.userId.slice(0, 8)})` : "System User");
 
+      // Resolve public investment reference
+      const publicRef = inv.investmentReference || (inv.id ? `INV-${inv.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}` : "INV-LEGACY");
+
       return {
         ...inv,
+        investmentReference: publicRef,
         userName: resolvedName,
         userEmail: resolvedEmail,
         userPhone: resolvedPhone,

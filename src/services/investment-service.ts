@@ -22,6 +22,7 @@ export interface InterestRateProduct {
 
 export interface InvestmentRecord {
   id: string;
+  investmentReference?: string;
   userId: string;
   userName?: string;
   userEmail?: string;
@@ -51,6 +52,35 @@ export interface InvestmentRecord {
 }
 
 export class InvestmentService {
+  /**
+   * Generates a stable, non-sequential, customer-facing reference (e.g. INV-7K4M92X8).
+   */
+  static generateInvestmentReference(): string {
+    const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // exclude easily confused chars (0,1,O,I)
+    let randomPart = "";
+    for (let i = 0; i < 8; i++) {
+      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `INV-${randomPart}`;
+  }
+
+  /**
+   * Safe backward-compatible helper for legacy investment records without an investmentReference.
+   */
+  static resolvePublicReference(record: Partial<InvestmentRecord>): string {
+    if (record.investmentReference && record.investmentReference.trim()) {
+      return record.investmentReference;
+    }
+    const cleanId = record.id || "";
+    if (cleanId.startsWith("inv-") || cleanId.length > 20) {
+      // Derive a short deterministic prefix/suffix hash string for display
+      const cleanHash = cleanId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      const shortCode = cleanHash.slice(-8) || "88888888";
+      return `INV-${shortCode}`;
+    }
+    return `INV-${cleanId.toUpperCase()}`;
+  }
+
   /**
    * Safe and self-healing DB seeder for settings and rates.
    */
@@ -351,8 +381,11 @@ export class InvestmentService {
         walletType,
       });
 
+      const publicRef = this.generateInvestmentReference();
+
       const investRecord: InvestmentRecord = {
         id: refId,
+        investmentReference: publicRef,
         userId,
         userName: userInfo.name || undefined,
         userEmail: userInfo.email || undefined,
