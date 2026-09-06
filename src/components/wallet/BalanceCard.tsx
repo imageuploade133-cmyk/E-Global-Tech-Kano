@@ -2411,18 +2411,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
           />
 
-          {/* Bottom Sheet form container */}
+          {/* Full-Screen Immersive Overlay Container */}
           <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto max-h-[85vh] no-scrollbar animate-fade-in"
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
+            transition={{ type: "spring", damping: 32, stiffness: 350 }}
+            className="fixed inset-0 w-full h-full bg-white z-[99999] flex flex-col justify-between overflow-hidden text-black font-hanken will-change-transform max-w-md mx-auto"
           >
-            {/* Drag handle */}
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-5 mx-auto cursor-grab" />
-
-            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+            {/* Top Fixed Header Bar */}
+            <div className="w-full px-5 py-3.5 flex items-center justify-between border-b border-gray-100 bg-white/95 backdrop-blur-md flex-shrink-0">
               {wizardStep !== "amount" && wizardStep !== "success" ? (
                 <button
                   type="button"
@@ -2437,24 +2435,34 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       setWizardStep("methods");
                     }
                   }}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                  title="Back"
                 >
-                  <span className="material-symbols-outlined text-[16px] font-bold">arrow_back</span>
+                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
                 </button>
               ) : (
-                <div className="w-8" />
+                <div className="w-9" />
               )}
-              <h3 className="font-hanken font-bold text-base text-black text-center">
-                Fund Wallet (Direct Checkout)
-              </h3>
+              <div className="text-center">
+                <h3 className="font-hanken font-extrabold text-base text-black leading-tight">
+                  Fund Wallet (Direct Checkout)
+                </h3>
+                <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                  Fast • Secured • Instant Crediting
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                title="Close"
               >
-                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                <span className="material-symbols-outlined text-[18px] font-bold">close</span>
               </button>
             </div>
+
+            {/* Scrollable Modal Body Container */}
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-24">
 
             <AnimatePresence mode="wait">
               {/* STEP 1: Enter Amount */}
@@ -2583,7 +2591,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   <div className="flex flex-col gap-2.5 pt-3">
                     <button
                       type="submit"
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-xs"
                     >
                       Choose Payment Method
                     </button>
@@ -2958,6 +2966,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
             </AnimatePresence>
+            </div>
           </motion.div>
         </>
       )}
