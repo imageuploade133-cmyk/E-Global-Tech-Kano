@@ -1115,7 +1115,7 @@ export default function StorePage() {
                             <span className="material-symbols-outlined text-[18px] text-emerald-600">
                               credit_card
                             </span>
-                            <span className="text-[10px] uppercase truncate">Card / Direct Link</span>
+                                <span className="text-[10px] uppercase truncate">Pay with Card</span>
                           </div>
                           {selectedPaymentMethod === "CARD_CHECKOUT" && (
                             <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
@@ -1167,7 +1167,7 @@ export default function StorePage() {
                         {/* Prominent Payment Method Selector at Top of Checkout Form */}
                         <div className="space-y-1.5 bg-gray-50 p-3 rounded-2xl border border-gray-200">
                           <label className="text-[10px] font-black uppercase text-gray-500 block">
-                            Select Payment Method / Direct Checkout Link *
+                            Select Payment Method *
                           </label>
 
                           <div className="grid grid-cols-2 gap-2">
@@ -1212,7 +1212,7 @@ export default function StorePage() {
                                 )}
                               </div>
                               <div className="mt-2">
-                                <span className="font-extrabold text-[11px] uppercase block text-black">Card / Direct Link</span>
+                                <span className="font-extrabold text-[11px] uppercase block text-black">Pay with Card</span>
                                 <span className="text-[9px] text-gray-400 font-semibold block">Direct checkout element</span>
                               </div>
                             </button>

@@ -412,8 +412,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const gallery = getProductGallery(product);
   const activeImgUrl = gallery[selectedGalleryIndex] || gallery[0] || product.imageUrl;
 
-  const listPrice = product.originalPrice || Math.round(product.price * 1.25);
-  const discountPercent = Math.round(((listPrice - product.price) / listPrice) * 100);
+  const promoPrice = product.promoPrice || (product.originalPrice && product.originalPrice > product.price ? product.price : undefined);
+  const listPrice = product.originalPrice || (promoPrice ? Math.round(product.price * 1.25) : undefined);
+  const discountPercent = listPrice && listPrice > product.price
+    ? Math.round(((listPrice - product.price) / listPrice) * 100)
+    : 0;
 
   const recommendedProducts = allItems.filter(
     (i) => i.id !== product.id && i.category.toLowerCase() === product.category.toLowerCase()
@@ -558,13 +561,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           {/* Pricing & Title Block */}
           <div className="bg-white rounded-2xl p-3.5 shadow-3xs space-y-2 border-0">
             <div className="flex items-baseline justify-between gap-2">
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="font-mono text-2xl font-black text-[#FC7A00]">
                   ₦{product.price.toLocaleString()}
                 </span>
-                {listPrice > product.price && (
+                {listPrice && listPrice > product.price && (
                   <span className="font-mono text-xs text-gray-400 line-through">
                     ₦{listPrice.toLocaleString()}
+                  </span>
+                )}
+                {product.discountBadge && (
+                  <span className="px-2 py-0.5 rounded text-[8.5px] font-black uppercase bg-red-600 text-white shadow-2xs">
+                    {product.discountBadge}
                   </span>
                 )}
               </div>
