@@ -161,10 +161,17 @@ function AdminFixedDepositsPageContent() {
     }
   }, [user, adminEmail]);
 
-  // Deposits Data States
+  // Deposits Data States & Pagination
   const [investments, setInvestments] = useState<FixedDeposit[]>([]);
   const [isLoadingInvestments, setIsLoadingInvestments] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [paginationInfo, setPaginationInfo] = useState<{ hasNextPage: boolean; lastDocId: string | null; limit: number }>({
+    hasNextPage: false,
+    lastDocId: null,
+    limit: 20,
+  });
+  const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([null]);
+  const [currentPageIndex, setCurrentPageIndex] = useState<number>(0);
 
   // Savings Plans Customizer States
   const [plans, setPlans] = useState<SavingsPlanData[]>([]);
@@ -195,7 +202,7 @@ function AdminFixedDepositsPageContent() {
     }
   };
 
-  const fetchInvestments = async () => {
+  const fetchInvestments = async (startAfterId: string | null = null, currentSearch: string = searchTerm, currentStatus: string = filterTab) => {
     setIsLoadingInvestments(true);
     try {
       const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
@@ -204,12 +211,21 @@ function AdminFixedDepositsPageContent() {
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/admin/investments", {
+      const params = new URLSearchParams();
+      params.set("status", currentStatus);
+      params.set("limit", "20");
+      if (startAfterId) params.set("startAfter", startAfterId);
+      if (currentSearch.trim()) params.set("search", currentSearch.trim());
+
+      const res = await fetch(`/api/admin/investments?${params.toString()}`, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setInvestments(data.investments || []);
+        if (data.pagination) {
+          setPaginationInfo(data.pagination);
+        }
       }
     } catch (err) {
       console.error("Error loading investments:", err);
@@ -218,10 +234,29 @@ function AdminFixedDepositsPageContent() {
     }
   };
 
+  const handleNextPage = () => {
+    if (paginationInfo.hasNextPage && paginationInfo.lastDocId) {
+      const nextIndex = currentPageIndex + 1;
+      const updatedHistory = [...cursorHistory];
+      updatedHistory[nextIndex] = paginationInfo.lastDocId;
+      setCursorHistory(updatedHistory);
+      setCurrentPageIndex(nextIndex);
+      fetchInvestments(paginationInfo.lastDocId, searchTerm, filterTab);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPageIndex > 0) {
+      const prevIndex = currentPageIndex - 1;
+      setCurrentPageIndex(prevIndex);
+      fetchInvestments(cursorHistory[prevIndex], searchTerm, filterTab);
+    }
+  };
+
   useEffect(() => {
     if (isAdminUnlocked) {
       fetchPlans();
-      fetchInvestments();
+      fetchInvestments(null, "", "ALL");
       fetchGlobalSettings();
     }
   }, [isAdminUnlocked, user]);
@@ -997,7 +1032,12 @@ function AdminFixedDepositsPageContent() {
                     <input
                       type="text"
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCursorHistory([null]);
+                        setCurrentPageIndex(0);
+                        fetchInvestments(null, e.target.value, filterTab);
+                      }}
                       placeholder="Search user, email, phone or amount..."
                       className={inputClass}
                     />
@@ -1005,7 +1045,11 @@ function AdminFixedDepositsPageContent() {
                   <button
                     type="button"
                     disabled={isLoadingInvestments}
-                    onClick={fetchInvestments}
+                    onClick={() => {
+                      setCursorHistory([null]);
+                      setCurrentPageIndex(0);
+                      fetchInvestments(null, searchTerm, filterTab);
+                    }}
                     className="px-4 py-2.5 bg-black dark:bg-gray-800 text-white hover:bg-gray-900 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5"
                   >
                     {isLoadingInvestments ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
@@ -1113,6 +1157,34 @@ function AdminFixedDepositsPageContent() {
                     </tbody>
                   </table>
                 )}
+              </div>
+
+              {/* Server-Side Pagination Controls */}
+              <div className="flex items-center justify-between border-t border-gray-200/40 pt-4 text-xs">
+                <span className="text-gray-400 font-bold uppercase text-[10px]">
+                  Page {currentPageIndex + 1} • Showing up to {paginationInfo.limit} records per page
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPageIndex === 0 || isLoadingInvestments}
+                    onClick={handlePrevPage}
+                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 text-black dark:text-white rounded-xl font-extrabold uppercase text-[10px] tracking-wider transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">chevron_left</span>
+                    <span>Previous</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!paginationInfo.hasNextPage || isLoadingInvestments}
+                    onClick={handleNextPage}
+                    className="px-4 py-2 bg-black dark:bg-gray-800 hover:bg-gray-900 text-white disabled:opacity-40 rounded-xl font-extrabold uppercase text-[10px] tracking-wider transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Next</span>
+                    <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
