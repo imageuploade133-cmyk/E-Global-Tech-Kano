@@ -165,7 +165,6 @@ function AdminFixedDepositsPageContent() {
   const [investments, setInvestments] = useState<FixedDeposit[]>([]);
   const [isLoadingInvestments, setIsLoadingInvestments] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterTab, setFilterTab] = useState<"ALL" | "ACTIVE" | "SETTLED" | "CANCELLED">("ALL");
 
   // Savings Plans Customizer States
   const [plans, setPlans] = useState<SavingsPlanData[]>([]);
