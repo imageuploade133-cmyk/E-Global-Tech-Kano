@@ -630,7 +630,7 @@ function CpanelStoreOrdersPageContent() {
                   <span className="text-gray-400 block text-[10px]">Payment Channel & Verification:</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="px-2 py-0.5 rounded text-[9.5px] font-black uppercase bg-purple-500/10 text-purple-600 border border-purple-500/20">
-                      {activeOrder.paymentChannel || (activeOrder.paymentMethod === "CARD_CHECKOUT" ? "Card / Direct Checkout Link" : "Main NGN Wallet")}
+                      {activeOrder.paymentChannel || (activeOrder.paymentMethod === "CARD_CHECKOUT" ? "Checkout with Card Payment" : "Main NGN Wallet")}
                     </span>
                     <span className="px-2 py-0.5 rounded text-[9.5px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
                       <span className="material-symbols-outlined text-[12px]">verified</span>
