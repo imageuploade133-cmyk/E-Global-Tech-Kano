@@ -43,6 +43,7 @@ export default function InvestmentPage() {
   const [penaltyPolicyText, setPenaltyPolicyText] = useState<string>(
     "Early liquidation of locked savings before the target unlock date incurs a 10% penalty on principal. The remaining 90% balance will be instantly refunded to your wallet."
   );
+  const [allowBonusInvestment, setAllowBonusInvestment] = useState<boolean>(true);
 
   const [isLoadingPlans, setIsLoadingPlans] = useState<boolean>(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(true);
@@ -148,6 +149,9 @@ export default function InvestmentPage() {
           }
           if (settingsData.settings.penaltyPolicyText) {
             setPenaltyPolicyText(settingsData.settings.penaltyPolicyText);
+          }
+          if (settingsData.settings.allowBonusInvestment !== undefined) {
+            setAllowBonusInvestment(Boolean(settingsData.settings.allowBonusInvestment));
           }
         }
       }
@@ -608,7 +612,7 @@ export default function InvestmentPage() {
                 <button
                   type="button"
                   onClick={() => setWalletTypeSelected("MAIN")}
-                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all ${
+                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all cursor-pointer ${
                     walletTypeSelected === "MAIN"
                       ? "bg-black text-white shadow-md"
                       : "text-gray-500 hover:text-black"
@@ -618,14 +622,25 @@ export default function InvestmentPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setWalletTypeSelected("BONUS")}
-                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all ${
+                  onClick={() => {
+                    if (!allowBonusInvestment) {
+                      toast.error("Bonus wallet investment is currently disabled by administrator.");
+                      return;
+                    }
+                    setWalletTypeSelected("BONUS");
+                  }}
+                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all cursor-pointer relative ${
                     walletTypeSelected === "BONUS"
                       ? "bg-black text-white shadow-md"
-                      : "text-gray-500 hover:text-black"
+                      : allowBonusInvestment
+                      ? "text-gray-500 hover:text-black"
+                      : "text-gray-300 opacity-60 cursor-not-allowed"
                   }`}
                 >
-                  Bonus (₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                  <span>Bonus (₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})</span>
+                  {!allowBonusInvestment && (
+                    <span className="block text-[8px] font-black uppercase text-red-500">Disabled</span>
+                  )}
                 </button>
               </div>
             </div>

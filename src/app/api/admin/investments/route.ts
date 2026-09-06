@@ -113,7 +113,7 @@ export async function GET(req: Request) {
 
     const { getFirebaseAuthUserByUid } = await import("@/lib/firebase-auth-rest");
 
-    const usersCache: Record<string, { name: string; email: string; phone: string; balance: number }> = {};
+    const usersCache: Record<string, { name: string; email: string; phone: string; balance: number; bonusBalance: number }> = {};
 
     if (uniqueUserIds.length > 0) {
       const userDocRefs = uniqueUserIds.map((uid) => adminDb.collection("users").doc(uid));
@@ -148,6 +148,7 @@ export async function GET(req: Request) {
             email: computedEmail || "No Email",
             phone: computedPhone || "No Phone",
             balance: Number(uData.balance) || 0,
+            bonusBalance: Number(uData.bonusBalance) || 0,
           };
         } else {
           // If Firestore doc missing, attempt Firebase Auth REST lookup
@@ -157,6 +158,7 @@ export async function GET(req: Request) {
             email: fbUser?.email || "No Email",
             phone: fbUser?.phoneNumber || "No Phone",
             balance: 0,
+            bonusBalance: 0,
           };
         }
       }
@@ -197,6 +199,7 @@ export async function GET(req: Request) {
       const publicRef = inv.investmentReference || (inv.id ? `INV-${inv.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}` : "INV-LEGACY");
 
       const currentBalance = meta?.balance !== undefined ? meta.balance : (Number(inv.balanceAfterInvestment) || 0);
+      const currentBonusBalance = meta?.bonusBalance !== undefined ? meta.bonusBalance : (Number(inv.bonusBalanceAfterInvestment) || 0);
 
       return {
         ...inv,
@@ -204,9 +207,13 @@ export async function GET(req: Request) {
         userName: resolvedName,
         userEmail: resolvedEmail,
         userPhone: resolvedPhone,
+        walletType: inv.walletType || "MAIN",
         userCurrentBalance: currentBalance,
+        userCurrentBonusBalance: currentBonusBalance,
         balanceBeforeInvestment: inv.balanceBeforeInvestment !== undefined ? Number(inv.balanceBeforeInvestment) : null,
         balanceAfterInvestment: inv.balanceAfterInvestment !== undefined ? Number(inv.balanceAfterInvestment) : null,
+        bonusBalanceBeforeInvestment: inv.bonusBalanceBeforeInvestment !== undefined ? Number(inv.bonusBalanceBeforeInvestment) : null,
+        bonusBalanceAfterInvestment: inv.bonusBalanceAfterInvestment !== undefined ? Number(inv.bonusBalanceAfterInvestment) : null,
         interestRate: normalizedInterestRate,
         description: inv.description || inv.optionName || "Savings / Fixed Deposit Plan",
         optionName: inv.optionName || inv.description || "Savings / Fixed Deposit Plan",
