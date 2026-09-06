@@ -1213,7 +1213,7 @@ export default function StorePage() {
                               </div>
                               <div className="mt-2">
                                 <span className="font-extrabold text-[11px] uppercase block text-black">Pay with Card</span>
-                                <span className="text-[9px] text-gray-400 font-semibold block">Direct checkout element</span>
+                                <span className="text-[9px] text-gray-400 font-semibold block">Pay securely using Flutterwave card</span>
                               </div>
                             </button>
                           </div>
@@ -1265,7 +1265,7 @@ export default function StorePage() {
                           <div className="flex items-center justify-between text-xs font-bold text-gray-800">
                             <span>Selected Channel:</span>
                             <span className="text-emerald-600 font-black">
-                              {selectedPaymentMethod === "CARD_CHECKOUT" ? "Card / Direct Checkout Link" : "Main NGN Wallet"}
+                              {selectedPaymentMethod === "CARD_CHECKOUT" ? "Checkout with Card Payment" : "Main NGN Wallet"}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-xs font-black">

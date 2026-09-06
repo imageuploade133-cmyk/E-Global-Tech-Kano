@@ -525,7 +525,8 @@ export class InvestmentService {
         record.amount,
         record.interestRate,
         elapsedDays,
-        record.interestType
+        record.interestType,
+        record.durationDays
       );
 
       const payoutAmount = Number((record.amount + earnedInterest).toFixed(2));
@@ -597,7 +598,8 @@ export class InvestmentService {
         record.amount,
         record.interestRate,
         elapsedDays,
-        record.interestType
+        record.interestType,
+        record.durationDays
       );
 
       const payoutAmount = Number((record.amount + earnedInterest).toFixed(2));

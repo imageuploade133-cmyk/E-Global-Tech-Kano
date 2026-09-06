@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
     const isCardCheckout = paymentMethod === "CARD_CHECKOUT";
 
-    const paymentChannel = isCardCheckout ? "Card / Direct Checkout Link" : "Main NGN Wallet";
+    const paymentChannel = isCardCheckout ? "Checkout with Card Payment" : "Main NGN Wallet";
     const initialPaymentStatus = isCardCheckout ? "PENDING_PAYMENT" : "PAID";
     const initialOrderStatus = isCardCheckout ? "Pending Payment" : "Pending";
     const paymentVerificationRef = isCardCheckout
@@ -213,7 +213,7 @@ export async function POST(req: Request) {
 
       if (currentBalance < totalAmount) {
         return NextResponse.json({
-          error: `Insufficient wallet balance. Total is ₦${totalAmount.toLocaleString()}, but balance is ₦${currentBalance.toLocaleString()}. You can switch to 'Fund with Card / Checkout Link' to complete your order.`,
+          error: `Insufficient wallet balance. Total is ₦${totalAmount.toLocaleString()}, but balance is ₦${currentBalance.toLocaleString()}. You can switch to 'Checkout with Card Payment' to complete your order.`,
         }, { status: 400 });
       }
 
