@@ -1053,35 +1053,50 @@ function AdminFixedDepositsPageContent() {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 w-full lg:w-auto">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setCursorHistory([null]);
+                    setCurrentPageIndex(0);
+                    fetchInvestments(null, searchTerm, filterTab, true);
+                  }}
+                  className="flex items-center gap-2 w-full lg:w-auto"
+                >
                   <div className="relative flex-1 lg:w-64">
                     <input
                       type="text"
                       value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setCursorHistory([null]);
-                        setCurrentPageIndex(0);
-                        fetchInvestments(null, e.target.value, filterTab);
-                      }}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Search user, email, phone or amount..."
                       className={inputClass}
                     />
                   </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoadingInvestments}
+                    className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 shadow-sm active:scale-95"
+                  >
+                    {isLoadingInvestments ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">search</span>}
+                    <span>Search</span>
+                  </button>
+
                   <button
                     type="button"
                     disabled={isLoadingInvestments}
                     onClick={() => {
+                      setSearchTerm("");
                       setCursorHistory([null]);
                       setCurrentPageIndex(0);
-                      fetchInvestments(null, searchTerm, filterTab);
+                      fetchInvestments(null, "", filterTab, true);
                     }}
-                    className="px-4 py-2.5 bg-black dark:bg-gray-800 text-white hover:bg-gray-900 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5"
+                    className="px-3.5 py-2.5 bg-black dark:bg-gray-800 text-white hover:bg-gray-900 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5"
+                    title="Reload and Reset Search"
                   >
-                    {isLoadingInvestments ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
-                    <span>Reload</span>
+                    <span className="material-symbols-outlined text-[16px]">refresh</span>
+                    <span className="hidden sm:inline">Reload</span>
                   </button>
-                </div>
+                </form>
               </div>
 
               <div className="overflow-x-auto pr-1">

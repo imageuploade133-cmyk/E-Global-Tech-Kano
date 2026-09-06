@@ -12,6 +12,7 @@ import { SavingsPlanData, DEFAULT_SAVINGS_PLANS } from "@/lib/savings-plans-type
 
 interface ActiveInvestment {
   id: string;
+  investmentReference?: string;
   userId: string;
   type: "SAVINGS" | "FIXED_DEPOSIT";
   amount: number;
@@ -972,9 +973,6 @@ export default function InvestmentPage() {
                                 <h3 className="font-hanken text-[13px] font-extrabold text-black leading-snug">
                                   {inv.optionName}
                                 </h3>
-                                <span className="font-hanken text-[9px] text-gray-400 font-mono">
-                                  {inv.id}
-                                </span>
                               </div>
                               <div className="text-right">
                                 <span className="block font-hanken text-[14px] font-extrabold text-black font-mono">
@@ -1131,9 +1129,6 @@ export default function InvestmentPage() {
                                 <h3 className="font-hanken text-[13px] font-extrabold text-black leading-snug">
                                   {inv.optionName}
                                 </h3>
-                                <span className="font-hanken text-[9px] text-gray-400 font-mono">
-                                  {inv.id}
-                                </span>
                               </div>
                               <div className="text-right">
                                 <span className="block font-hanken text-[14px] font-extrabold text-black font-mono">
@@ -1388,9 +1383,48 @@ export default function InvestmentPage() {
                 </div>
 
                 <div className="space-y-2 text-xs font-hanken">
+                  {/* Public Customer-Facing Reference */}
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-400 font-semibold uppercase text-[10px]">Investment Reference</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-black text-black text-sm">
+                        {selectedDetailInv.investmentReference || `INV-${selectedDetailInv.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const refToCopy = selectedDetailInv.investmentReference || `INV-${selectedDetailInv.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}`;
+                          navigator.clipboard.writeText(refToCopy);
+                          toast.success("Reference copied to clipboard!");
+                        }}
+                        className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-[9px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[12px]">content_copy</span>
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Masked Customer Support ID */}
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-400 font-semibold uppercase text-[10px]">Transaction ID</span>
+                    <span className="font-mono font-semibold text-gray-500 text-[10.5px]">
+                      {selectedDetailInv.id.length > 20
+                        ? `${selectedDetailInv.id.slice(0, 8)}...${selectedDetailInv.id.slice(-6)}`
+                        : selectedDetailInv.id}
+                    </span>
+                  </div>
+
+                  {/* Principal Capital / Settled Value depending on status */}
                   <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-400 font-semibold uppercase text-[10px]">Transaction Ref / ID</span>
-                    <span className="font-mono font-bold text-black">{selectedDetailInv.id}</span>
+                    <span className="text-gray-400 font-semibold uppercase text-[10px]">
+                      {selectedDetailInv.status === "CLAIMED"
+                        ? "Payout Amount / Settled Value"
+                        : "Principal Amount"}
+                    </span>
+                    <span className="font-mono font-bold text-black text-sm">
+                      ₦{selectedDetailInv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
 
                   <div className="flex justify-between py-2 border-b border-gray-100">
@@ -1419,9 +1453,9 @@ export default function InvestmentPage() {
                         <span className="font-mono text-emerald-600">₦{selectedDetailInv.totalValue?.toLocaleString() || (selectedDetailInv.amount * (1 - penaltyRate)).toLocaleString()}</span>
                       </div>
                     </div>
-                  ) : (
+                  ) : selectedDetailInv.status === "CLAIMED" && (
                     <div className="flex justify-between py-2 border-b border-gray-100">
-                      <span className="text-gray-400 font-semibold uppercase text-[10px]">Payout / Settled Value</span>
+                      <span className="text-gray-400 font-semibold uppercase text-[10px]">Total Settled Value</span>
                       <span className="font-mono font-bold text-emerald-600">₦{selectedDetailInv.totalValue?.toLocaleString() || selectedDetailInv.amount.toLocaleString()}</span>
                     </div>
                   )}

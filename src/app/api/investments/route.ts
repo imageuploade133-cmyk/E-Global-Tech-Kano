@@ -16,9 +16,16 @@ export async function GET(req: Request) {
       .orderBy("createdAt", "desc")
       .get();
 
+    const { InvestmentService } = await import("@/services/investment-service");
+
     const list: unknown[] = [];
     snapshot.forEach((doc) => {
-      list.push(doc.data());
+      const data = doc.data();
+      const publicRef = InvestmentService.resolvePublicReference(data);
+      list.push({
+        ...data,
+        investmentReference: publicRef,
+      });
     });
 
     return NextResponse.json({ success: true, investments: list });
