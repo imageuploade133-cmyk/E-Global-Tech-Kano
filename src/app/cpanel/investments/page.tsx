@@ -20,11 +20,23 @@ interface FixedDeposit {
   amount: number;
   interestRate: number;
   totalValue?: number;
+  accumulatedInterest?: number;
   status: "ACTIVE" | "SETTLED" | "CLAIM_REQUESTED" | "CLAIMED" | "CANCELLED" | string;
   createdAt: string;
+  startDate?: string;
   maturesAt: string;
   claimedAt?: string;
+  claimRequestedAt?: string;
+  claimApprovedAt?: string;
+  claimApprovedBy?: string;
   description: string;
+  optionName?: string;
+  type?: "SAVINGS" | "FIXED_DEPOSIT" | string;
+  interestType?: "SIMPLE" | "COMPOUND" | string;
+  durationDays?: number;
+  walletType?: "MAIN" | "BONUS" | string;
+  currency?: string;
+  earlyWithdrawalPenaltyRateSnapshot?: number;
 }
 
 const ButtonSpinner = () => (
@@ -165,6 +177,7 @@ function AdminFixedDepositsPageContent() {
   const [investments, setInvestments] = useState<FixedDeposit[]>([]);
   const [isLoadingInvestments, setIsLoadingInvestments] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedInvestmentModal, setSelectedInvestmentModal] = useState<FixedDeposit | null>(null);
   const [paginationInfo, setPaginationInfo] = useState<{ hasNextPage: boolean; lastDocId: string | null; limit: number }>({
     hasNextPage: false,
     lastDocId: null,
@@ -202,7 +215,12 @@ function AdminFixedDepositsPageContent() {
     }
   };
 
-  const fetchInvestments = async (startAfterId: string | null = null, currentSearch: string = searchTerm, currentStatus: string = filterTab) => {
+  const fetchInvestments = async (
+    startAfterId: string | null = null,
+    currentSearch: string = searchTerm,
+    currentStatus: string = filterTab,
+    bypassCache: boolean = false
+  ) => {
     setIsLoadingInvestments(true);
     try {
       const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
@@ -216,6 +234,7 @@ function AdminFixedDepositsPageContent() {
       params.set("limit", "20");
       if (startAfterId) params.set("startAfter", startAfterId);
       if (currentSearch.trim()) params.set("search", currentSearch.trim());
+      if (bypassCache) params.set("nocache", "true");
 
       const res = await fetch(`/api/admin/investments?${params.toString()}`, {
         headers: { Authorization: `Bearer ${idToken}` },
@@ -479,7 +498,7 @@ function AdminFixedDepositsPageContent() {
 
       if (res.ok && data.success) {
         toast.success(data.message || "Payout approved and user wallet credited successfully!");
-        await fetchInvestments();
+        await fetchInvestments(null, searchTerm, filterTab, true);
       } else {
         toast.error(data.error || "Failed to approve payout claim.");
       }
@@ -493,6 +512,13 @@ function AdminFixedDepositsPageContent() {
 
   // Analytics & Filtering
   const [filterTab, setFilterTab] = useState<"ALL" | "ACTIVE" | "CLAIM_REQUESTED" | "SETTLED" | "CANCELLED">("ALL");
+
+  const handleFilterTabChange = (newTab: "ALL" | "ACTIVE" | "CLAIM_REQUESTED" | "SETTLED" | "CANCELLED") => {
+    setFilterTab(newTab);
+    setCursorHistory([null]);
+    setCurrentPageIndex(0);
+    fetchInvestments(null, searchTerm, newTab, true);
+  };
 
   const activeDeposits = investments.filter((i) => i.status === "ACTIVE");
   const claimRequestedDeposits = investments.filter((i) => i.status === "CLAIM_REQUESTED");
@@ -943,7 +969,7 @@ function AdminFixedDepositsPageContent() {
                 <div className="flex items-center bg-gray-100 dark:bg-gray-900/80 p-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-800 gap-1.5 overflow-x-auto custom-scrollbar w-full lg:w-auto">
                   <button
                     type="button"
-                    onClick={() => setFilterTab("ALL")}
+                    onClick={() => handleFilterTabChange("ALL")}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
                       filterTab === "ALL"
@@ -960,7 +986,7 @@ function AdminFixedDepositsPageContent() {
 
                   <button
                     type="button"
-                    onClick={() => setFilterTab("ACTIVE")}
+                    onClick={() => handleFilterTabChange("ACTIVE")}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
                       filterTab === "ACTIVE"
@@ -977,7 +1003,7 @@ function AdminFixedDepositsPageContent() {
 
                   <button
                     type="button"
-                    onClick={() => setFilterTab("CLAIM_REQUESTED")}
+                    onClick={() => handleFilterTabChange("CLAIM_REQUESTED")}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
                       filterTab === "CLAIM_REQUESTED"
@@ -994,7 +1020,7 @@ function AdminFixedDepositsPageContent() {
 
                   <button
                     type="button"
-                    onClick={() => setFilterTab("SETTLED")}
+                    onClick={() => handleFilterTabChange("SETTLED")}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
                       filterTab === "SETTLED"
@@ -1011,7 +1037,7 @@ function AdminFixedDepositsPageContent() {
 
                   <button
                     type="button"
-                    onClick={() => setFilterTab("CANCELLED")}
+                    onClick={() => handleFilterTabChange("CANCELLED")}
                     className={cn(
                       "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer",
                       filterTab === "CANCELLED"
@@ -1071,10 +1097,10 @@ function AdminFixedDepositsPageContent() {
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-gray-250 dark:border-gray-800 text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                        <th className="pb-3 pl-2">User Details</th>
+                        <th className="pb-3 pl-2">User & Plan Contract</th>
                         <th className="pb-3 text-right">Principal</th>
-                        <th className="pb-3 text-center">Yield Rate</th>
-                        <th className="pb-3 text-right">Est. Accrued</th>
+                        <th className="pb-3 text-center">Yield Rate & Type</th>
+                        <th className="pb-3 text-right">Est. Yield / Payout</th>
                         <th className="pb-3 text-center">Status</th>
                         <th className="pb-3 text-center">Placement / Maturity</th>
                         <th className="pb-3 text-center">Action</th>
@@ -1082,30 +1108,59 @@ function AdminFixedDepositsPageContent() {
                     </thead>
                     <tbody className="divide-y divide-gray-150 dark:divide-gray-850">
                       {filteredInvestments.map((inv) => {
-                        const estYield = inv.amount * (Number(inv.interestRate) / 100);
+                        const numericRate = Number(inv.interestRate) || 0;
+                        const estYield = inv.amount * (numericRate / 100);
                         const isActive = inv.status === "ACTIVE";
                         const isClaimRequested = inv.status === "CLAIM_REQUESTED";
                         const isSettled = inv.status === "SETTLED" || inv.status === "CLAIMED";
                         const isCancelled = inv.status === "CANCELLED" || inv.status === "CANCELED";
 
+                        const displayTitle = inv.optionName || inv.description || "Savings Plan";
+                        const displayRef = inv.id ? inv.id : "N/A";
+
                         return (
                           <tr key={inv.id} className="hover:bg-gray-50/40 dark:hover:bg-gray-900/10 transition-colors">
                             <td className="py-3.5 pl-2">
-                              <p className="font-extrabold text-sm text-black dark:text-white">{inv.userName || "System User"}</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5">{inv.userEmail}</p>
-                              <p className="text-[9px] font-mono text-gray-500">{inv.userPhone}</p>
+                              <div className="flex items-start gap-2">
+                                <div>
+                                  <p className="font-extrabold text-sm text-black dark:text-white leading-tight">
+                                    {inv.userName || "System User"}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono text-[10px] font-bold text-orange-500 truncate max-w-[140px]" title={displayTitle}>
+                                      {displayTitle}
+                                    </span>
+                                    <span className="text-[9px] font-mono text-gray-400 font-semibold truncate max-w-[100px]" title={displayRef}>
+                                      • ID: {displayRef.length > 12 ? `${displayRef.slice(0, 12)}...` : displayRef}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">{inv.userEmail !== "No Email" ? inv.userEmail : inv.userPhone}</p>
+                                </div>
+                              </div>
                             </td>
                             <td className="py-3.5 text-right font-mono font-bold text-sm text-black dark:text-white">
                               ₦{inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </td>
-                            <td className="py-3.5 text-center font-mono font-black text-[#FC7A00]">
-                              {inv.interestRate}%
+                            <td className="py-3.5 text-center">
+                              <p className="font-mono font-black text-[#FC7A00] text-sm">{numericRate > 0 ? `${numericRate}%` : "0%"}</p>
+                              <p className="text-[9px] font-mono font-bold text-gray-400 uppercase mt-0.5">
+                                {inv.interestType || "SIMPLE"}
+                              </p>
                             </td>
                             <td className={cn(
                               "py-3.5 text-right font-mono font-extrabold",
                               isCancelled ? "text-gray-400 line-through" : "text-emerald-500"
                             )}>
-                              {isCancelled ? "₦0.00" : `+₦${estYield.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                              {isCancelled ? (
+                                "₦0.00"
+                              ) : (
+                                <>
+                                  <p className="text-xs">+₦{estYield.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                  <p className="text-[9px] text-gray-400 font-semibold font-sans mt-0.5">
+                                    Total: ₦{(inv.totalValue || inv.amount + estYield).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </p>
+                                </>
+                              )}
                             </td>
                             <td className="py-3.5 text-center">
                               <span className={cn(
@@ -1131,25 +1186,34 @@ function AdminFixedDepositsPageContent() {
                               </p>
                             </td>
                             <td className="py-3.5 text-center">
-                              {isClaimRequested ? (
+                              <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
-                                  disabled={approvingId === inv.id}
-                                  onClick={() => handleApproveClaim(inv.id)}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1 mx-auto shadow-sm active:scale-95 transition-all cursor-pointer"
+                                  onClick={() => setSelectedInvestmentModal(inv)}
+                                  className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-all cursor-pointer"
+                                  title="View Investment Details"
                                 >
-                                  {approvingId === inv.id ? (
-                                    <ButtonSpinner />
-                                  ) : (
-                                    <>
-                                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                                      <span>Approve Payout</span>
-                                    </>
-                                  )}
+                                  <span className="material-symbols-outlined text-[16px]">visibility</span>
                                 </button>
-                              ) : (
-                                <span className="text-[10px] text-gray-400 font-semibold uppercase">N/A</span>
-                              )}
+
+                                {isClaimRequested && (
+                                  <button
+                                    type="button"
+                                    disabled={approvingId === inv.id}
+                                    onClick={() => handleApproveClaim(inv.id)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                  >
+                                    {approvingId === inv.id ? (
+                                      <ButtonSpinner />
+                                    ) : (
+                                      <>
+                                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                        <span>Approve</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1191,6 +1255,128 @@ function AdminFixedDepositsPageContent() {
         )}
 
       </div>
+
+      {/* INVESTMENT CONTRACT AUDIT MODAL DRAWER */}
+      <AnimatePresence>
+        {selectedInvestmentModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={cn("w-full max-w-lg rounded-3xl p-6 border my-8 space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar", panelClass)}
+            >
+              <div className="flex items-center justify-between border-b border-gray-200/40 pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">receipt_long</span>
+                  <div>
+                    <h3 className="font-extrabold text-base uppercase tracking-tight">Investment Contract Audit</h3>
+                    <p className="text-[10px] text-gray-400 font-mono">Ref ID: {selectedInvestmentModal.id}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvestmentModal(null)}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                {/* User Profile Block */}
+                <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-1">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-400">Investor Account</span>
+                  <p className="font-extrabold text-sm text-black dark:text-white">{selectedInvestmentModal.userName || "System User"}</p>
+                  <div className="flex flex-wrap gap-x-4 text-[10.5px] text-gray-500 font-semibold pt-0.5">
+                    <p>Email: {selectedInvestmentModal.userEmail}</p>
+                    <p>Phone: {selectedInvestmentModal.userPhone}</p>
+                    <p>User ID: <span className="font-mono text-[9.5px]">{selectedInvestmentModal.userId}</span></p>
+                  </div>
+                </div>
+
+                {/* Contract Financial Breakdown */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-0.5">
+                    <span className="text-[9px] font-black uppercase text-gray-400">Principal Capital</span>
+                    <p className="font-mono font-black text-sm text-black dark:text-white">
+                      ₦{selectedInvestmentModal.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-0.5">
+                    <span className="text-[9px] font-black uppercase text-gray-400">Yield Rate (APR)</span>
+                    <p className="font-mono font-black text-sm text-[#FC7A00]">
+                      {selectedInvestmentModal.interestRate}% p.a.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-0.5">
+                    <span className="text-[9px] font-black uppercase text-gray-400">Plan Model</span>
+                    <p className="font-bold text-xs text-black dark:text-white">
+                      {selectedInvestmentModal.optionName || selectedInvestmentModal.description || "Savings Plan"}
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-0.5">
+                    <span className="text-[9px] font-black uppercase text-gray-400">Calculation Type</span>
+                    <p className="font-bold text-xs text-black dark:text-white uppercase">
+                      {selectedInvestmentModal.interestType || "SIMPLE"} INTEREST
+                    </p>
+                  </div>
+                </div>
+
+                {/* Duration and Timeline */}
+                <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-2">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-400">Lock Timeline</span>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-gray-400 text-[9px] font-bold block uppercase">Created Date</span>
+                      <span className="font-semibold text-black dark:text-white">
+                        {new Date(selectedInvestmentModal.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-400 text-[9px] font-bold block uppercase">Target Maturity</span>
+                      <span className="font-extrabold text-[#FC7A00]">
+                        {new Date(selectedInvestmentModal.maturesAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Wallet & Status details */}
+                <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 flex items-center justify-between">
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 block">Source Wallet</span>
+                    <span className="font-mono font-bold text-xs text-black dark:text-white uppercase">
+                      {selectedInvestmentModal.walletType || "MAIN"} WALLET
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 block">Current Status</span>
+                    <span className="font-extrabold text-xs text-[#FC7A00] uppercase">
+                      {selectedInvestmentModal.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-gray-200/40 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvestmentModal(null)}
+                  className="px-6 h-10 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-black dark:hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Close Audit
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* CREATE / EDIT SAVINGS PLAN MODAL */}
       <AnimatePresence>
