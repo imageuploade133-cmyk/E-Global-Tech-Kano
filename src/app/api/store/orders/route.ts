@@ -122,13 +122,14 @@ export async function POST(req: Request) {
     };
 
     if (isCardCheckout) {
-      // Resolve Flutterwave Secret Key from Env or AppConfig
-      let flutterwaveSecretKey = process.env.FLUTTERWAVE_SECRET_KEY || "";
+      // Resolve Flutterwave Secret Key from FLW_SECRET_KEY, FLUTTERWAVE_SECRET_KEY, or Firestore app_config
+      let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
       try {
         if (!flutterwaveSecretKey) {
           const configDoc = await adminDb.collection("config").doc("app_config").get();
           if (configDoc.exists) {
-            flutterwaveSecretKey = configDoc.data()?.flutterwaveSecretKey || "";
+            const cfg = configDoc.data() || {};
+            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || "";
           }
         }
       } catch (err: any) {
@@ -136,10 +137,14 @@ export async function POST(req: Request) {
       }
 
       const txRef = `TX-STORE-${orderId}`;
-      const originUrl = req.headers.get("origin") || req.headers.get("referer") || "https://e-tech-store.com";
-      const redirectUrl = `${originUrl}/api/store/orders/verify?orderId=${orderId}&tx_ref=${txRef}`;
+      const requestHost = req.headers.get("host") || "";
+      const protocol = req.headers.get("x-forwarded-proto") || (requestHost.includes("localhost") ? "http" : "https");
+      const defaultOrigin = requestHost ? `${protocol}://${requestHost}` : "https://e-global-197077.vercel.app";
+      const originUrl = req.headers.get("origin") || req.headers.get("referer") || defaultOrigin;
+      const redirectUrl = `${originUrl.replace(/\/$/, "")}/api/store/orders/verify?orderId=${orderId}&tx_ref=${txRef}`;
 
       let paymentUrl = "";
+      let flwErrorMessage = "";
 
       if (flutterwaveSecretKey) {
         try {
@@ -167,7 +172,7 @@ export async function POST(req: Request) {
               customizations: {
                 title: "E-Tech Store Order Payment",
                 description: `Payment for Order ${orderId}`,
-                logo: "https://e-tech-store.com/logo.png",
+                logo: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
               },
             }),
           });
@@ -176,11 +181,22 @@ export async function POST(req: Request) {
           if (flwRes.ok && flwData.status === "success" && flwData.data?.link) {
             paymentUrl = flwData.data.link;
           } else {
+            flwErrorMessage = flwData.message || flwData.error || "Flutterwave payment gateway rejected payment initialization.";
             console.error("[Store Order POST] Flutterwave payment creation failed:", flwData);
           }
         } catch (flwErr: any) {
+          flwErrorMessage = flwErr.message || "Failed to reach Flutterwave payment gateway server.";
           console.error("[Store Order POST] Flutterwave API call exception:", flwErr.message);
         }
+      } else {
+        flwErrorMessage = "Flutterwave secret key is not configured on the server.";
+        console.error("[Store Order POST] Cannot initialize hosted payment: FLW_SECRET_KEY is missing.");
+      }
+
+      if (!paymentUrl) {
+        return NextResponse.json({
+          error: flwErrorMessage || "Unable to generate card payment checkout link. Please try again or pay with Main Wallet.",
+        }, { status: 502 });
       }
 
       // Save order record as Pending Payment
@@ -193,10 +209,10 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: paymentUrl ? "Card checkout link generated! Please complete payment." : "Order created. Please present payment reference.",
+        message: "Card checkout link generated! Redirecting to Flutterwave...",
         order: newOrder,
         paymentUrl,
-        requiresPaymentRedirect: Boolean(paymentUrl),
+        requiresPaymentRedirect: true,
       });
 
     } else {

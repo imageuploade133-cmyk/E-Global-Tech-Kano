@@ -27,12 +27,13 @@ export async function GET(req: Request) {
     }
 
     // Resolve Flutterwave Secret Key
-    let flutterwaveSecretKey = process.env.FLUTTERWAVE_SECRET_KEY || "";
+    let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
     if (!flutterwaveSecretKey) {
       try {
         const configDoc = await adminDb.collection("config").doc("app_config").get();
         if (configDoc.exists) {
-          flutterwaveSecretKey = configDoc.data()?.flutterwaveSecretKey || "";
+          const cfg = configDoc.data() || {};
+          flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || "";
         }
       } catch (err: any) {
         console.warn("[Store Order Verify] Flutterwave config lookup warning:", err.message);
