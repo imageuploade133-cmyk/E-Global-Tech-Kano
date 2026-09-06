@@ -649,6 +649,23 @@ function AdminFixedDepositsPageContent() {
 
           if (res.ok && data.success) {
             toast.success(data.message || `User access ${nextState ? "blocked" : "unblocked"} successfully!`);
+
+            // Real-time optimistic update for table records
+            setInvestments((prev) =>
+              prev.map((item) =>
+                item.userId === targetUserId
+                  ? { ...item, isUserInvestmentBlocked: nextState }
+                  : item
+              )
+            );
+
+            // Real-time optimistic update for open audit modal
+            if (selectedInvestmentModal && selectedInvestmentModal.userId === targetUserId) {
+              setSelectedInvestmentModal((prev) =>
+                prev ? { ...prev, isUserInvestmentBlocked: nextState } : null
+              );
+            }
+
             await fetchInvestments(null, searchTerm, filterTab, true);
           } else {
             toast.error(data.error || "Failed to update user investment block state.");
@@ -1324,10 +1341,18 @@ function AdminFixedDepositsPageContent() {
                             <td className="py-3.5 pl-2">
                               <div className="flex items-start gap-2">
                                 <div>
-                                  <p className="font-extrabold text-sm text-black dark:text-white leading-tight">
-                                    {inv.userName || "System User"}
-                                  </p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="font-extrabold text-sm text-black dark:text-white leading-tight">
+                                      {inv.userName || "System User"}
+                                    </p>
+                                    {inv.isUserInvestmentBlocked && (
+                                      <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 border border-rose-500/30 flex items-center gap-0.5 animate-pulse">
+                                        <span className="material-symbols-outlined text-[10px]">block</span>
+                                        BLOCKED / FROZEN
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-1">
                                     <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-500 border border-orange-500/20 font-mono text-[10px] font-black uppercase tracking-wider">
                                       {publicRef}
                                     </span>
