@@ -27,6 +27,8 @@ export interface InvestmentRecord {
   userName?: string;
   userEmail?: string;
   userPhone?: string;
+  balanceBeforeInvestment?: number;
+  balanceAfterInvestment?: number;
   type: "SAVINGS" | "FIXED_DEPOSIT";
   amount: number;
   currency: string;
@@ -345,6 +347,15 @@ export class InvestmentService {
           phone: uData.phoneNumber || uData.phone,
         };
       }
+      if (!userInfo.email) {
+        const { getFirebaseAuthUserByUid } = await import("@/lib/firebase-auth-rest");
+        const fbUser = await getFirebaseAuthUserByUid(userId);
+        if (fbUser) {
+          userInfo.email = userInfo.email || fbUser.email;
+          userInfo.phone = userInfo.phone || fbUser.phoneNumber;
+          userInfo.name = userInfo.name || fbUser.displayName;
+        }
+      }
     } catch (e) {
       console.warn(`[InvestmentService] Non-blocking user info lookup error for uid ${userId}:`, e);
     }
@@ -369,7 +380,7 @@ export class InvestmentService {
       }
 
       // Verify wallet balance and debit wallet atomically
-      await WalletService.debitWallet(transaction, {
+      const { previousBalance, newBalance } = await WalletService.debitWallet(transaction, {
         userId,
         amount,
         currency,
@@ -390,6 +401,8 @@ export class InvestmentService {
         userName: userInfo.name || undefined,
         userEmail: userInfo.email || undefined,
         userPhone: userInfo.phone || undefined,
+        balanceBeforeInvestment: previousBalance,
+        balanceAfterInvestment: newBalance,
         type,
         amount,
         currency,
