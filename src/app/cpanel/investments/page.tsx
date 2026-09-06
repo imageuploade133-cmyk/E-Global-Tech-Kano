@@ -20,6 +20,7 @@ interface FixedDeposit {
   userPhone: string;
   userCurrentBalance?: number;
   userCurrentBonusBalance?: number;
+  isUserInvestmentBlocked?: boolean;
   balanceBeforeInvestment?: number | null;
   balanceAfterInvestment?: number | null;
   bonusBalanceBeforeInvestment?: number | null;
@@ -479,45 +480,187 @@ function AdminFixedDepositsPageContent() {
     }
   };
 
-  // Claim approval handler
+  // Action Pending & Confirmation Overlay States
   const [approvingId, setApprovingId] = useState<string>("");
+  const [cancellingId, setCancellingId] = useState<string>("");
+  const [blockingUserId, setBlockingUserId] = useState<string>("");
 
-  const handleApproveClaim = async (invId: string) => {
-    if (!confirm("Are you sure you want to approve this matured investment payout and credit the user's wallet?")) return;
+  const [confirmModalData, setConfirmModalData] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmText: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => Promise<void> | void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmText: "Confirm",
+    isDanger: false,
+    onConfirm: () => {},
+  });
 
-    setApprovingId(invId);
-    toast.loading("Approving payout and crediting user wallet...");
+  const promptAdminConfirmation = (opts: {
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => Promise<void> | void;
+  }) => {
+    setConfirmModalData({
+      isOpen: true,
+      title: opts.title,
+      description: opts.description,
+      confirmText: opts.confirmText || "Confirm Action",
+      cancelText: opts.cancelText || "Cancel",
+      isDanger: opts.isDanger || false,
+      onConfirm: opts.onConfirm,
+    });
+  };
 
-    try {
-      const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-      let idToken = "mock-admin-token";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
-      }
+  const handleApproveClaim = (invId: string, refOrTitle?: string) => {
+    promptAdminConfirmation({
+      title: "Confirm Payout Approval",
+      description: `Are you sure you want to approve the matured investment payout for ${refOrTitle || "this contract"} and credit the user's wallet? This action will immediately credit the user's balance and finalize the payout contract.`,
+      confirmText: "Approve & Credit Wallet",
+      isDanger: false,
+      onConfirm: async () => {
+        setApprovingId(invId);
+        toast.loading("Approving payout and crediting user wallet...");
 
-      const res = await fetch(`/api/admin/investments/${invId}/approve-claim`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-      });
+        try {
+          const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+          let idToken = "mock-admin-token";
+          if (!isMock && user) {
+            idToken = await user.getIdToken();
+          }
 
-      const data = await res.json();
-      toast.dismiss();
+          const res = await fetch(`/api/admin/investments/${invId}/approve-claim`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              "Content-Type": "application/json",
+            },
+          });
 
-      if (res.ok && data.success) {
-        toast.success(data.message || "Payout approved and user wallet credited successfully!");
-        await fetchInvestments(null, searchTerm, filterTab, true);
-      } else {
-        toast.error(data.error || "Failed to approve payout claim.");
-      }
-    } catch {
-      toast.dismiss();
-      toast.error("Network error during payout approval.");
-    } finally {
-      setApprovingId("");
-    }
+          const data = await res.json();
+          toast.dismiss();
+
+          if (res.ok && data.success) {
+            toast.success(data.message || "Payout approved and user wallet credited successfully!");
+            if (selectedInvestmentModal?.id === invId) {
+              setSelectedInvestmentModal(null);
+            }
+            await fetchInvestments(null, searchTerm, filterTab, true);
+          } else {
+            toast.error(data.error || "Failed to approve payout claim.");
+          }
+        } catch {
+          toast.dismiss();
+          toast.error("Network error during payout approval.");
+        } finally {
+          setApprovingId("");
+        }
+      },
+    });
+  };
+
+  const handleAdminCancelInvestment = (invId: string, refOrTitle?: string) => {
+    promptAdminConfirmation({
+      title: "Confirm Admin Investment Cancellation",
+      description: `Are you sure you want to cancel investment ${refOrTitle || invId}? This will liquidate the contract early, apply early cancellation penalty rules, and credit the remaining net principal directly back to the user's wallet.`,
+      confirmText: "Liquidate & Cancel Contract",
+      isDanger: true,
+      onConfirm: async () => {
+        setCancellingId(invId);
+        toast.loading("Cancelling investment and executing wallet refund...");
+
+        try {
+          const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+          let idToken = "mock-admin-token";
+          if (!isMock && user) {
+            idToken = await user.getIdToken();
+          }
+
+          const res = await fetch(`/api/admin/investments/${invId}/cancel`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await res.json();
+          toast.dismiss();
+
+          if (res.ok && data.success) {
+            toast.success(data.message || "Investment cancelled successfully!");
+            if (selectedInvestmentModal?.id === invId) {
+              setSelectedInvestmentModal(null);
+            }
+            await fetchInvestments(null, searchTerm, filterTab, true);
+          } else {
+            toast.error(data.error || "Failed to cancel investment.");
+          }
+        } catch {
+          toast.dismiss();
+          toast.error("Network error during investment cancellation.");
+        } finally {
+          setCancellingId("");
+        }
+      },
+    });
+  };
+
+  const handleToggleBlockUser = (targetUserId: string, userName: string, currentBlocked: boolean) => {
+    const nextState = !currentBlocked;
+    promptAdminConfirmation({
+      title: nextState ? "Block User Investment Access" : "Unblock User Investment Access",
+      description: nextState
+        ? `Are you sure you want to BLOCK ${userName} from creating new investment locks? The user will be unable to open new savings or fixed deposit locks until unblocked.`
+        : `Are you sure you want to UNBLOCK ${userName}? The user will regain normal access to create savings and fixed deposit locks.`,
+      confirmText: nextState ? "Block User Access" : "Unblock User Access",
+      isDanger: nextState,
+      onConfirm: async () => {
+        setBlockingUserId(targetUserId);
+        toast.loading(nextState ? "Blocking user investment access..." : "Unblocking user investment access...");
+
+        try {
+          const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
+          let idToken = "mock-admin-token";
+          if (!isMock && user) {
+            idToken = await user.getIdToken();
+          }
+
+          const res = await fetch(`/api/admin/investments/block-user`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ userId: targetUserId, blocked: nextState }),
+          });
+
+          const data = await res.json();
+          toast.dismiss();
+
+          if (res.ok && data.success) {
+            toast.success(data.message || `User access ${nextState ? "blocked" : "unblocked"} successfully!`);
+            await fetchInvestments(null, searchTerm, filterTab, true);
+          } else {
+            toast.error(data.error || "Failed to update user investment block state.");
+          }
+        } catch {
+          toast.dismiss();
+          toast.error("Network error updating user block state.");
+        } finally {
+          setBlockingUserId("");
+        }
+      },
+    });
   };
 
   // Analytics & Filtering
@@ -1258,8 +1401,9 @@ function AdminFixedDepositsPageContent() {
                                   <button
                                     type="button"
                                     disabled={approvingId === inv.id}
-                                    onClick={() => handleApproveClaim(inv.id)}
+                                    onClick={() => handleApproveClaim(inv.id, publicRef)}
                                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                    title="Approve Matured Payout"
                                   >
                                     {approvingId === inv.id ? (
                                       <ButtonSpinner />
@@ -1269,6 +1413,18 @@ function AdminFixedDepositsPageContent() {
                                         <span>Approve</span>
                                       </>
                                     )}
+                                  </button>
+                                )}
+
+                                {(isActive || isClaimRequested) && (
+                                  <button
+                                    type="button"
+                                    disabled={cancellingId === inv.id}
+                                    onClick={() => handleAdminCancelInvestment(inv.id, publicRef)}
+                                    className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all cursor-pointer"
+                                    title="Admin Cancel Investment"
+                                  >
+                                    {cancellingId === inv.id ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">cancel</span>}
                                   </button>
                                 )}
                               </div>
@@ -1345,8 +1501,32 @@ function AdminFixedDepositsPageContent() {
 
               <div className="space-y-4 text-xs">
                 {/* User Profile Block */}
-                <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-1">
-                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-400">Investor Account</span>
+                <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200/60 dark:border-gray-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-gray-400">Investor Account</span>
+                    <button
+                      type="button"
+                      disabled={blockingUserId === selectedInvestmentModal.userId}
+                      onClick={() => handleToggleBlockUser(
+                        selectedInvestmentModal.userId,
+                        selectedInvestmentModal.userName,
+                        Boolean(selectedInvestmentModal.isUserInvestmentBlocked)
+                      )}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider flex items-center gap-1 border transition-all cursor-pointer",
+                        selectedInvestmentModal.isUserInvestmentBlocked
+                          ? "bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20"
+                          : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[12px]">
+                        {selectedInvestmentModal.isUserInvestmentBlocked ? "block" : "verified_user"}
+                      </span>
+                      <span>
+                        {selectedInvestmentModal.isUserInvestmentBlocked ? "Access Blocked (Unblock)" : "Access Active (Block)"}
+                      </span>
+                    </button>
+                  </div>
                   <p className="font-extrabold text-sm text-black dark:text-white">{selectedInvestmentModal.userName || "System User"}</p>
                   <div className="flex flex-wrap gap-x-4 text-[10.5px] text-gray-500 font-semibold pt-0.5">
                     <p><strong className="text-gray-400 uppercase text-[9.5px]">Email:</strong> {selectedInvestmentModal.userEmail}</p>
@@ -1488,13 +1668,98 @@ function AdminFixedDepositsPageContent() {
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-gray-200/40 flex justify-end">
+              <div className="pt-2 border-t border-gray-200/40 flex items-center justify-between gap-2">
+                <div>
+                  {(selectedInvestmentModal.status === "ACTIVE" || selectedInvestmentModal.status === "CLAIM_REQUESTED") && (
+                    <button
+                      type="button"
+                      disabled={cancellingId === selectedInvestmentModal.id}
+                      onClick={() => handleAdminCancelInvestment(
+                        selectedInvestmentModal.id,
+                        selectedInvestmentModal.investmentReference || `INV-${selectedInvestmentModal.id.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(-8)}`
+                      )}
+                      className="px-4 h-10 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider cursor-pointer flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">cancel</span>
+                      <span>Cancel Contract</span>
+                    </button>
+                  )}
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setSelectedInvestmentModal(null)}
                   className="px-6 h-10 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-black dark:hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer"
                 >
                   Close Audit
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ADMIN CONFIRMATION DIALOG MODAL */}
+      <AnimatePresence>
+        {confirmModalData.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={cn("w-full max-w-md rounded-3xl p-6 border space-y-5 shadow-2xl", panelClass)}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0",
+                  confirmModalData.isDanger
+                    ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                    : "bg-orange-500/10 text-[#FC7A00] border-orange-500/20"
+                )}>
+                  <span className="material-symbols-outlined text-[24px]">
+                    {confirmModalData.isDanger ? "warning" : "error"}
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="font-extrabold text-base text-black dark:text-white uppercase tracking-tight">
+                    {confirmModalData.title}
+                  </h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                    Administrator Confirmation Required
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed font-semibold">
+                {confirmModalData.description}
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200/40">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModalData((prev) => ({ ...prev, isOpen: false }))}
+                  className="px-5 h-11 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  {confirmModalData.cancelText || "Cancel"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const fn = confirmModalData.onConfirm;
+                    setConfirmModalData((prev) => ({ ...prev, isOpen: false }));
+                    await fn();
+                  }}
+                  className={cn(
+                    "px-6 h-11 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1.5",
+                    confirmModalData.isDanger
+                      ? "bg-rose-600 hover:bg-rose-700"
+                      : "bg-[#FC7A00] hover:bg-[#e06600]"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                  <span>{confirmModalData.confirmText}</span>
                 </button>
               </div>
             </motion.div>
