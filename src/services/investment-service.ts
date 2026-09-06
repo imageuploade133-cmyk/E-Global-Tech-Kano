@@ -323,6 +323,16 @@ export class InvestmentService {
       ? Math.max(1, Math.min(1095, Math.floor(Number(params.durationDays))))
       : resolvedProduct.defaultDurationDays;
 
+    // Security check: Check if user is blocked from placing investments
+    const userDocRef = adminDb.collection("users").doc(userId);
+    const userDocSnap = await userDocRef.get();
+    if (userDocSnap.exists) {
+      const uData = userDocSnap.data() || {};
+      if (uData.isInvestmentBlocked === true) {
+        throw new Error("Your account is currently restricted from creating new investments. Please contact support.");
+      }
+    }
+
     // Secure requirement: Server-side check for admin policy ON/OFF and funding requirement
     if (walletType === "BONUS") {
       if (settings.allowBonusInvestment === false) {
@@ -650,6 +660,136 @@ export class InvestmentService {
     });
 
     return result;
+  }
+
+  /**
+   * Admin cancels an active investment on behalf of a user with full audit trail and atomic refund.
+   */
+  static async adminCancelInvestment(adminId: string, investmentId: string): Promise<{ record: InvestmentRecord; refundAmount: number; penaltyDeducted: number }> {
+    const investRef = adminDb.collection("investments").doc(investmentId);
+    const globalSettings = await this.getSettings();
+
+    const result = await adminDb.runTransaction(async (transaction) => {
+      const doc = await transaction.get(investRef);
+      if (!doc.exists) {
+        throw new Error("The specified investment record was not found.");
+      }
+
+      const record = doc.data() as InvestmentRecord;
+      if (record.status !== "ACTIVE" && record.status !== "CLAIM_REQUESTED") {
+        throw new Error(`Cannot cancel investment with status '${record.status}'. Only ACTIVE or CLAIM_REQUESTED investments can be cancelled.`);
+      }
+
+      const now = new Date();
+      const elapsedMs = now.getTime() - new Date(record.startDate).getTime();
+      const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+
+      const earnedInterest = this.calculateInterest(
+        record.amount,
+        record.interestRate,
+        elapsedDays,
+        record.interestType,
+        record.durationDays
+      );
+
+      const penaltyRateToApply = record.earlyWithdrawalPenaltyRateSnapshot !== undefined
+        ? Number(record.earlyWithdrawalPenaltyRateSnapshot)
+        : globalSettings.penaltyRate;
+
+      const penaltyDeducted = Number((record.amount * penaltyRateToApply).toFixed(2));
+      const grossAmount = record.amount + earnedInterest;
+      const refundAmount = Math.max(0, Number((grossAmount - penaltyDeducted).toFixed(2)));
+
+      // Credit user's wallet with remaining net refund
+      await WalletService.creditWallet(transaction, {
+        userId: record.userId,
+        amount: refundAmount,
+        currency: record.currency || "NGN",
+        reference: `admin-cancel-${investmentId}`,
+        description: `Administrator Cancelled ${record.optionName} (Refund: ₦${refundAmount}, Penalty: ₦${penaltyDeducted})`,
+        recipientName: "Self",
+        fee: 0,
+        walletType: record.walletType || "MAIN",
+      });
+
+      const updatedRecord: Partial<InvestmentRecord> = {
+        status: "CANCELLED",
+        accumulatedInterest: earnedInterest,
+        totalValue: refundAmount,
+        updatedAt: now.toISOString(),
+      };
+
+      transaction.update(investRef, updatedRecord);
+
+      // Save transaction log in investments subledger
+      const logRef = adminDb.collection("investmentTransactions").doc(`tx-admin-cancel-${investmentId}`);
+      transaction.set(logRef, {
+        id: `tx-admin-cancel-${investmentId}`,
+        userId: record.userId,
+        adminId,
+        investmentId,
+        amount: refundAmount,
+        type: "ADMIN_CANCEL_INVESTMENT",
+        status: "SUCCESS",
+        description: `Administrator ${adminId} cancelled investment. Penalty ₦${penaltyDeducted.toLocaleString()} applied. Refunded ₦${refundAmount.toLocaleString()}`,
+        createdAt: now.toISOString(),
+      });
+
+      // Write audit log
+      const auditRef = adminDb.collection("auditLogs").doc(`audit-admin-cancel-${investmentId}`);
+      transaction.set(auditRef, {
+        id: `audit-admin-cancel-${investmentId}`,
+        userId: record.userId,
+        adminId,
+        action: "ADMIN_INVESTMENT_CANCELLED",
+        metadata: {
+          investmentId,
+          earnedInterest,
+          penaltyDeducted,
+          refundAmount,
+          penaltyRateApplied: penaltyRateToApply,
+        },
+        version: "1.0",
+        createdAt: now.toISOString(),
+      });
+
+      return {
+        record: { ...record, ...updatedRecord } as InvestmentRecord,
+        refundAmount,
+        penaltyDeducted,
+      };
+    });
+
+    return result;
+  }
+
+  /**
+   * Admin blocks or unblocks a user from placing new investments.
+   */
+  static async setUserInvestmentBlock(adminId: string, userId: string, blocked: boolean): Promise<void> {
+    if (!userId) throw new Error("User ID is required.");
+    const userRef = adminDb.collection("users").doc(userId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      throw new Error(`User document not found for ID: ${userId}`);
+    }
+
+    const now = new Date().toISOString();
+    await userRef.update({
+      isInvestmentBlocked: blocked,
+      investmentBlockedAt: blocked ? now : null,
+      investmentBlockedBy: blocked ? adminId : null,
+      updatedAt: now,
+    });
+
+    await adminDb.collection("auditLogs").doc(`audit-block-invest-${userId}-${Date.now()}`).set({
+      id: `audit-block-invest-${userId}-${Date.now()}`,
+      userId,
+      adminId,
+      action: blocked ? "USER_INVESTMENT_BLOCKED" : "USER_INVESTMENT_UNBLOCKED",
+      metadata: { userId, blocked },
+      createdAt: now,
+    });
   }
 
   /**
