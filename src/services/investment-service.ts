@@ -326,7 +326,7 @@ export class InvestmentService {
     // Secure requirement: Server-side check for admin policy ON/OFF and funding requirement
     if (walletType === "BONUS") {
       if (settings.allowBonusInvestment === false) {
-        throw new Error("Bonus wallet investment is currently disabled by the system administrator.");
+        throw new Error("Bonus wallet investment is currently Unavailable at this time");
       }
       const { ReferralService } = await import("./referral-service");
       const hasCompleted = await ReferralService.hasCompletedRequirement(userId);

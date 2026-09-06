@@ -604,46 +604,43 @@ export default function InvestmentPage() {
             </h2>
 
             {/* Sourcing Wallet */}
-            <div className="mb-5">
-              <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                Select Sourcing Wallet
-              </label>
-              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-2xl border border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setWalletTypeSelected("MAIN")}
-                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all cursor-pointer ${
-                    walletTypeSelected === "MAIN"
-                      ? "bg-black text-white shadow-md"
-                      : "text-gray-500 hover:text-black"
-                  }`}
-                >
-                  Main (₦{mainBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!allowBonusInvestment) {
-                      toast.error("Bonus wallet investment is currently disabled by administrator.");
-                      return;
-                    }
-                    setWalletTypeSelected("BONUS");
-                  }}
-                  className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all cursor-pointer relative ${
-                    walletTypeSelected === "BONUS"
-                      ? "bg-black text-white shadow-md"
-                      : allowBonusInvestment
-                      ? "text-gray-500 hover:text-black"
-                      : "text-gray-300 opacity-60 cursor-not-allowed"
-                  }`}
-                >
-                  <span>Bonus (₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})</span>
-                  {!allowBonusInvestment && (
-                    <span className="block text-[8px] font-black uppercase text-red-500">Disabled</span>
-                  )}
-                </button>
+            {allowBonusInvestment && (
+              <div className="mb-5">
+                <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Select Sourcing Wallet
+                </label>
+                <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-2xl border border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setWalletTypeSelected("MAIN")}
+                    className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all cursor-pointer ${
+                      walletTypeSelected === "MAIN"
+                        ? "bg-black text-white shadow-md"
+                        : "text-gray-500 hover:text-black"
+                    }`}
+                  >
+                    Main (₦{mainBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!allowBonusInvestment) {
+                        toast.error("Bonus wallet investment is currently Unavailable at this time");
+                        return;
+                      }
+                      setWalletTypeSelected("BONUS");
+                    }}
+                    className={`py-3 rounded-xl font-hanken text-[11px] font-bold transition-all cursor-pointer ${
+                      walletTypeSelected === "BONUS"
+                        ? "bg-black text-white shadow-md"
+                        : "text-gray-500 hover:text-black"
+                    }`}
+                  >
+                    Bonus (₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Dynamic Plans Grid */}
             <label className="block font-hanken text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2.5">
