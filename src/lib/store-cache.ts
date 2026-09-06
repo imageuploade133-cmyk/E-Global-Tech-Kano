@@ -17,6 +17,8 @@ export interface StoreItem {
   rating?: number;
   soldCount?: number;
   originalPrice?: number;
+  costPrice?: number | null;
+  discountPrice?: number | null;
   promoPrice?: number;
   discountBadge?: string;
 }

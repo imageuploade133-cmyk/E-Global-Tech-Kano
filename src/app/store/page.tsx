@@ -775,10 +775,35 @@ export default function StorePage() {
                     </div>
 
                     <div className="pt-2 border-t border-gray-100 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-black text-xs min-[375px]:text-sm text-[#FC7A00]">
-                          ₦{item.price.toLocaleString()}
-                        </span>
+                      <div className="flex items-baseline justify-between gap-1 flex-wrap">
+                        {(() => {
+                          const effectivePromoPrice = item.discountPrice || item.promoPrice;
+                          const hasPromo = typeof effectivePromoPrice === "number" && effectivePromoPrice > 0 && effectivePromoPrice < item.price;
+                          const displayPrice = hasPromo ? effectivePromoPrice : item.price;
+                          const listPrice = hasPromo ? item.price : item.originalPrice;
+                          const discountPct = listPrice && listPrice > displayPrice
+                            ? Math.round(((listPrice - displayPrice) / listPrice) * 100)
+                            : 0;
+
+                          return (
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="font-mono font-black text-xs min-[375px]:text-sm text-[#FC7A00]">
+                                ₦{displayPrice.toLocaleString()}
+                              </span>
+                              {listPrice && listPrice > displayPrice && (
+                                <span className="font-mono text-[10px] text-gray-400 line-through">
+                                  ₦{listPrice.toLocaleString()}
+                                </span>
+                              )}
+                              {discountPct > 0 && (
+                                <span className="px-1.5 py-0.2 rounded text-[7.5px] font-black uppercase bg-red-600 text-white shadow-2xs">
+                                  -{discountPct}%
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         <span className={`text-[8px] font-black uppercase ${item.inStock ? "text-emerald-600" : "text-red-500"}`}>
                           {item.inStock ? "In Stock" : "Out of Stock"}
                         </span>
