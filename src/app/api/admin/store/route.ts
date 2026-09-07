@@ -41,6 +41,8 @@ const DEFAULT_SETTINGS = {
   bannerMarginBottom: 20,
   bannerHeightMobile: 176,
   bannerHeightDesktop: 220,
+  productPageHeaderAlignment: "left" as const,
+  enableProductVideo: true,
 };
 
 export async function GET(req: Request) {
@@ -267,6 +269,8 @@ export async function POST(req: Request) {
         bannerMarginBottom: typeof settings.bannerMarginBottom === "number" ? settings.bannerMarginBottom : currentSettings.bannerMarginBottom,
         bannerHeightMobile: typeof settings.bannerHeightMobile === "number" ? settings.bannerHeightMobile : currentSettings.bannerHeightMobile,
         bannerHeightDesktop: typeof settings.bannerHeightDesktop === "number" ? settings.bannerHeightDesktop : currentSettings.bannerHeightDesktop,
+        productPageHeaderAlignment: settings.productPageHeaderAlignment === "center" ? "center" : settings.productPageHeaderAlignment === "right" ? "right" : "left",
+        enableProductVideo: settings.enableProductVideo !== undefined ? Boolean(settings.enableProductVideo) : currentSettings.enableProductVideo,
       };
     } else {
       return NextResponse.json({ error: "Invalid action specified." }, { status: 400 });

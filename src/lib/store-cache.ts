@@ -93,6 +93,8 @@ export interface StoreSettings {
   bannerMarginBottom?: number;
   bannerHeightMobile?: number;
   bannerHeightDesktop?: number;
+  productPageHeaderAlignment?: "left" | "center" | "right";
+  enableProductVideo?: boolean;
 }
 
 export interface CartItem {

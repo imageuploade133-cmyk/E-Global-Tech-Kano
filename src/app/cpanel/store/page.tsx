@@ -1135,6 +1135,20 @@ function CpanelStorePageContent() {
                 />
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 flex items-center gap-1 block">
+                  <span className="material-symbols-outlined text-[15px]">smart_display</span>
+                  <span>Product Video URL (Optional - YouTube, TikTok, Vimeo, or MP4)</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://www.youtube.com/watch?v=... or https://www.tiktok.com/@user/video/..."
+                  value={itemVideoUrl}
+                  onChange={(e) => setItemVideoUrl(e.target.value)}
+                  className={cn("h-10 px-3 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+                />
+              </div>
+
               <div className="flex justify-end gap-3 pt-3 border-t border-gray-200/40">
                 <button
                   type="button"

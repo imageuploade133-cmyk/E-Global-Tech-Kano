@@ -80,6 +80,8 @@ function CpanelStoreSettingsPageContent() {
   const [topBarHistoryIconColor, setTopBarHistoryIconColor] = useState("#FC7A00");
   const [topBarCartIconColor, setTopBarCartIconColor] = useState("#1F2937");
   const [enableProductSharing, setEnableProductSharing] = useState(true);
+  const [productPageHeaderAlignment, setProductPageHeaderAlignment] = useState<"left" | "center" | "right">("left");
+  const [enableProductVideo, setEnableProductVideo] = useState(true);
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [borderOpacity, setBorderOpacity] = useState(100);
@@ -173,6 +175,14 @@ function CpanelStoreSettingsPageContent() {
         setTopBarHistoryIconColor(data.settings.topBarHistoryIconColor || "#FC7A00");
         setTopBarCartIconColor(data.settings.topBarCartIconColor || "#1F2937");
         setEnableProductSharing(data.settings.enableProductSharing !== false);
+        setProductPageHeaderAlignment(
+          data.settings.productPageHeaderAlignment === "center"
+            ? "center"
+            : data.settings.productPageHeaderAlignment === "right"
+            ? "right"
+            : "left"
+        );
+        setEnableProductVideo(data.settings.enableProductVideo !== false);
         setBorderColor(data.settings.borderColor || "#FC7A00");
         setBorderOpacity(data.settings.borderOpacity ?? 100);
         setHideBorders(Boolean(data.settings.hideBorders));
@@ -250,6 +260,8 @@ function CpanelStoreSettingsPageContent() {
               topBarHistoryIconColor,
               topBarCartIconColor,
             enableProductSharing,
+            productPageHeaderAlignment,
+            enableProductVideo,
             borderColor,
             borderOpacity,
             hideBorders,
@@ -354,6 +366,85 @@ function CpanelStoreSettingsPageContent() {
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-4">
+
+              {/* Product Page Header Title Alignment Control */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">format_align_left</span>
+                      Product Page Header Title Alignment
+                    </label>
+                    <span className="text-[10px] text-gray-400 block">
+                      Align top header title & category on product detail page (Left, Center, Right)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => promptResetConfirmation("Header Alignment", () => setProductPageHeaderAlignment("left"))}
+                    className="text-[9.5px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider cursor-pointer border-0"
+                  >
+                    Reset Default
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {(["left", "center", "right"] as const).map((align) => (
+                    <button
+                      key={align}
+                      type="button"
+                      onClick={() => setProductPageHeaderAlignment(align)}
+                      className={cn(
+                        "py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all flex items-center justify-center gap-1.5",
+                        productPageHeaderAlignment === align
+                          ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-2xs"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        {align === "left" ? "format_align_left" : align === "center" ? "format_align_center" : "format_align_right"}
+                      </span>
+                      <span>{align}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Product Embedded Video ON/OFF Toggle */}
+              <div className="p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">smart_display</span>
+                      Product Embedded Video Display
+                    </label>
+                    <span className="text-[10px] text-gray-500 font-medium block mt-0.5">
+                      Enable or disable embedded video player cards (YouTube, TikTok, Vimeo, MP4) on public product pages
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEnableProductVideo(true)}
+                      className="text-[9.5px] font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider cursor-pointer border-0"
+                    >
+                      Reset Default
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnableProductVideo(!enableProductVideo)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
+                        enableProductVideo
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-red-500/10 text-red-500 border-red-500/30"
+                      )}
+                    >
+                      {enableProductVideo ? "VIDEO ON" : "VIDEO OFF"}
+                    </button>
+                  </div>
+                </div>
+              </div>
 
               {/* Product Sharing ON/OFF Toggle */}
               <div className="p-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 space-y-2">

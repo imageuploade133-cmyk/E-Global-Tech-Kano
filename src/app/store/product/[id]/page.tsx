@@ -227,6 +227,32 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  // Format embedded video URL for YouTube, TikTok, Vimeo, or direct MP4
+  const formatEmbedVideoUrl = (url: string): string => {
+    if (!url) return "";
+    const trimmed = url.trim();
+
+    // YouTube: watch?v=ID or youtu.be/ID
+    const ytMatch = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/i);
+    if (ytMatch && ytMatch[1]) {
+      return `https://www.youtube.com/embed/${ytMatch[1]}`;
+    }
+
+    // Vimeo: vimeo.com/ID
+    const vimeoMatch = trimmed.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+    if (vimeoMatch && vimeoMatch[1]) {
+      return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    }
+
+    // TikTok: tiktok.com/@user/video/ID
+    const ttMatch = trimmed.match(/tiktok\.com\/@[\w.-]+\/video\/(\d+)/i);
+    if (ttMatch && ttMatch[1]) {
+      return `https://www.tiktok.com/embed/v2/${ttMatch[1]}`;
+    }
+
+    return trimmed;
+  };
+
   // Gallery slider helper
   const getProductGallery = (item: StoreItem): string[] => {
     if (Array.isArray(item.images) && item.images.length > 0) {
@@ -491,7 +517,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <span className="material-symbols-outlined text-[18px] font-bold">arrow_back</span>
             </button>
 
-            <div className="text-center min-w-0 flex-1 px-1">
+            <div className={`min-w-0 flex-1 px-1 ${
+              settings.productPageHeaderAlignment === "center"
+                ? "text-center"
+                : settings.productPageHeaderAlignment === "right"
+                ? "text-right"
+                : "text-left"
+            }`}>
               <h1 className="font-hanken font-black text-xs uppercase tracking-wide text-black truncate">
                 {product.title}
               </h1>
@@ -754,6 +786,36 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.description || "Premium quality product built with high reliability and genuine components."}
             </p>
           </div>
+
+          {/* Embedded Product Video (Optional - Controlled by Admin Setting) */}
+          {Boolean(product.videoUrl && settings.enableProductVideo !== false) && (
+            <div className="bg-white rounded-2xl p-3.5 shadow-3xs space-y-2 border-0">
+              <div className="flex items-center gap-1.5 text-black mb-1">
+                <span className="material-symbols-outlined text-blue-600 text-[18px]">smart_display</span>
+                <h3 className="font-hanken font-extrabold text-xs uppercase tracking-wider text-black">
+                  Product Video Preview
+                </h3>
+              </div>
+
+              <div className="w-full h-52 sm:h-64 rounded-xl bg-black overflow-hidden relative border-0 shadow-inner flex items-center justify-center">
+                {product.videoUrl?.match(/\.(mp4|webm|ogg)($|\?)/i) ? (
+                  <video
+                    controls
+                    src={product.videoUrl}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <iframe
+                    src={formatEmbedVideoUrl(product.videoUrl || "")}
+                    title={`${product.title} Video Preview`}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Customer Reviews & Feedback Section */}
           <div className="bg-white rounded-2xl p-3.5 shadow-3xs space-y-3 border-0">
