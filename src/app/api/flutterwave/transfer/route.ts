@@ -115,7 +115,7 @@ export async function POST(req: Request) {
     }
     console.log(`STEP 3 - Base provider fee fetched: ${providerFee}`);
 
-    const description = narration || `Direct transfer to ${trfName} (${trfAccount})`;
+    const description = narration || `Transfer To ${trfName}`;
 
     // 3. Atomically verify PIN and debit user balance inside Firestore transaction
     console.log("STEP 4 - Starting Firestore transaction");
@@ -254,7 +254,7 @@ export async function POST(req: Request) {
         category: "TRANSFER",
         direction: "DEBIT",
         description,
-        narration: narration || `Direct transfer to ${trfName} (${trfAccount})`,
+        narration: narration || `Transfer To ${trfName}`,
         recipientName: trfName,
         fee: combinedFee,
         vat: 0,

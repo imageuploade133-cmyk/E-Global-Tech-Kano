@@ -1635,7 +1635,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         account_name: trfAccountName,
         accountName: trfAccountName,
         currency: "NGN",
-        narration: trfNarration || `Direct outward transfer to ${trfAccountName}`,
+        narration: trfNarration || `Transfer To ${trfAccountName}`,
         recipientName: trfAccountName,
         recipientAccount: trfAccount,
         reference: transferReference,
@@ -3708,7 +3708,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       <div className="border-b border-gray-200/50 pb-2">
                         <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Narration Note</span>
                         <p className="font-hanken text-xs font-semibold text-gray-800 mt-0.5 leading-tight italic truncate">
-                          &quot;{trfNarration || `Direct outward transfer to ${trfAccountName}`}&quot;
+                          &quot;{trfNarration || `Transfer To ${trfAccountName}`}&quot;
                         </p>
                       </div>
 
