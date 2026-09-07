@@ -90,6 +90,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid total order amount." }, { status: 400 });
     }
 
+    // Validate server-side stock availability against config/store_data
+    const storeDataRef = adminDb.collection("config").doc("store_data");
+    const storeDataSnap = await storeDataRef.get();
+    let currentStoreItems: any[] = [];
+
+    if (storeDataSnap.exists) {
+      currentStoreItems = Array.isArray(storeDataSnap.data()?.items) ? [...(storeDataSnap.data()?.items)] : [];
+      for (const oItem of orderItems) {
+        const targetStoreItem = currentStoreItems.find((i: any) => i.id === oItem.id);
+        if (targetStoreItem) {
+          if (targetStoreItem.inStock === false) {
+            return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
+          }
+          if (!targetStoreItem.unlimitedStock && typeof targetStoreItem.stockQuantity === "number") {
+            if (targetStoreItem.stockQuantity <= 0) {
+              return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
+            }
+            if (oItem.quantity > targetStoreItem.stockQuantity) {
+              return NextResponse.json({
+                error: `Insufficient stock for "${targetStoreItem.title}". Only ${targetStoreItem.stockQuantity} unit(s) available.`,
+              }, { status: 400 });
+            }
+          }
+        }
+      }
+    }
+
     const orderId = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
     const now = new Date().toISOString();
     const isCardCheckout = paymentMethod === "CARD_CHECKOUT";
@@ -199,13 +226,36 @@ export async function POST(req: Request) {
         }, { status: 502 });
       }
 
-      // Save order record as Pending Payment
+      // Save order record as Pending Payment and decrement stock
       const orderRef = adminDb.collection("store_orders").doc(orderId);
       await orderRef.set({
         ...newOrder,
         txRef,
         paymentUrl,
       });
+
+      // Deduct stock for items with limited stock quantity
+      if (currentStoreItems.length > 0) {
+        let stockUpdated = false;
+        for (const oItem of orderItems) {
+          const idx = currentStoreItems.findIndex((i: any) => i.id === oItem.id);
+          if (idx > -1) {
+            const itemObj = currentStoreItems[idx];
+            if (!itemObj.unlimitedStock && typeof itemObj.stockQuantity === "number") {
+              const newQty = Math.max(0, itemObj.stockQuantity - oItem.quantity);
+              currentStoreItems[idx] = {
+                ...itemObj,
+                stockQuantity: newQty,
+                inStock: newQty > 0,
+              };
+              stockUpdated = true;
+            }
+          }
+        }
+        if (stockUpdated) {
+          await storeDataRef.update({ items: currentStoreItems, updatedAt: now });
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -270,6 +320,29 @@ export async function POST(req: Request) {
         // Write store order
         const orderRef = adminDb.collection("store_orders").doc(orderId);
         transaction.set(orderRef, newOrder);
+
+        // Deduct stock inside transaction
+        if (currentStoreItems.length > 0) {
+          let stockUpdated = false;
+          for (const oItem of orderItems) {
+            const idx = currentStoreItems.findIndex((i: any) => i.id === oItem.id);
+            if (idx > -1) {
+              const itemObj = currentStoreItems[idx];
+              if (!itemObj.unlimitedStock && typeof itemObj.stockQuantity === "number") {
+                const newQty = Math.max(0, itemObj.stockQuantity - oItem.quantity);
+                currentStoreItems[idx] = {
+                  ...itemObj,
+                  stockQuantity: newQty,
+                  inStock: newQty > 0,
+                };
+                stockUpdated = true;
+              }
+            }
+          }
+          if (stockUpdated) {
+            transaction.update(storeDataRef, { items: currentStoreItems, updatedAt: now });
+          }
+        }
       });
 
       return NextResponse.json({
