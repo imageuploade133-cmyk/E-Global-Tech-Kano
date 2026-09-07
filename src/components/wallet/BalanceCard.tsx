@@ -2107,9 +2107,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 <div className="relative w-5 h-5 flex-shrink-0 flex items-center justify-center animate-fade-in">
                   <AppLogo logoUrl={config.logoUrl} size={20} />
                 </div>
-                <span className="font-label-sm text-[8px] min-[360px]:text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF] font-bold truncate">
-                  E-TECH GLOBAL HUB
-                </span>
                 {/* Account Tier Level Badge */}
                 <span className="ml-1 px-1.5 py-0.5 text-[7px] min-[360px]:text-[8px] font-black uppercase tracking-wider bg-white/15 text-white rounded-md border border-white/20 backdrop-blur-xs flex-shrink-0">
                   {userData?.kycStatus === "VERIFIED" ? "Tier 3 VIP" : "Tier 1"}
@@ -2222,13 +2219,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       ) : (
                         "2209 4183 74"
                       )
-                    )}
-                  </span>
-                  <span className="font-hanken text-[7.5px] uppercase tracking-wider text-[#FFFFFF]/70 font-bold truncate max-w-[120px]" title={selectedCurrency === "NGN" ? (permanentAccount ? permanentAccount.bankName : "Wema Bank") : (usdAccountData ? usdAccountData.bankName : "Silicon Valley Bank")}>
-                    {selectedCurrency === "NGN" ? (
-                      permanentAccount ? permanentAccount.bankName : "Wema Bank"
-                    ) : (
-                      usdAccountData ? usdAccountData.bankName : "Silicon Valley Bank"
                     )}
                   </span>
                 </div>
