@@ -162,6 +162,12 @@ export const clearStoreCache = () => {
   }
 };
 
+export const cacheProductDetail = (item: StoreItem) => {
+  if (item && item.id) {
+    memoryProductDetails.set(item.id, item);
+  }
+};
+
 export const getCachedProductDetail = (id: string): StoreItem | null => {
   // Validate memory cache freshness against TTL
   if (memoryStoreCache && (Date.now() - memoryStoreCache.timestamp < CACHE_TTL_MS)) {
