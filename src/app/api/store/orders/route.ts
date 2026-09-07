@@ -70,51 +70,79 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required customer delivery information (name, phone, address)." }, { status: 400 });
     }
 
-    // Calculate total order amount
+    // Fetch database single source of truth from config/store_data for 100% server-side price & stock verification
+    const storeDataRef = adminDb.collection("config").doc("store_data");
+    const storeDataSnap = await storeDataRef.get();
+
+    if (!storeDataSnap.exists) {
+      return NextResponse.json({ error: "Store catalog database is unavailable." }, { status: 500 });
+    }
+
+    const currentStoreItems: any[] = Array.isArray(storeDataSnap.data()?.items)
+      ? [...(storeDataSnap.data()?.items)]
+      : [];
+
     let totalAmount = 0;
-    const orderItems = items.map((i: any) => {
-      const price = Number(i.price) || 0;
-      const quantity = Math.max(1, Number(i.quantity) || 1);
-      totalAmount += price * quantity;
-      return {
-        id: i.id || `item_${Date.now()}`,
-        title: String(i.title || "Store Item").trim(),
-        price,
+    const orderItems: any[] = [];
+
+    // Process each ordered item and enforce server-authoritative promotional prices & stock limits
+    for (const reqItem of items) {
+      const targetStoreItem = currentStoreItems.find((i: any) => i.id === reqItem.id);
+      if (!targetStoreItem) {
+        return NextResponse.json({ error: `Invalid item "${reqItem.title || reqItem.id}": Item does not exist in store catalog.` }, { status: 400 });
+      }
+
+      if (targetStoreItem.isHidden === true) {
+        return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is no longer available.` }, { status: 400 });
+      }
+
+      if (targetStoreItem.inStock === false) {
+        return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
+      }
+
+      const quantity = Math.max(1, Number(reqItem.quantity) || 1);
+
+      if (!targetStoreItem.unlimitedStock && typeof targetStoreItem.stockQuantity === "number") {
+        if (targetStoreItem.stockQuantity <= 0) {
+          return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
+        }
+        if (quantity > targetStoreItem.stockQuantity) {
+          return NextResponse.json({
+            error: `Insufficient stock for "${targetStoreItem.title}". Only ${targetStoreItem.stockQuantity} unit(s) available.`,
+          }, { status: 400 });
+        }
+      }
+
+      // Calculate server-authoritative effective selling price (honoring discounts/promos)
+      const basePrice = Number(targetStoreItem.price) || 0;
+      const promoPrice = typeof targetStoreItem.discountPrice === "number" && targetStoreItem.discountPrice > 0
+        ? targetStoreItem.discountPrice
+        : typeof targetStoreItem.promoPrice === "number" && targetStoreItem.promoPrice > 0
+        ? targetStoreItem.promoPrice
+        : null;
+
+      const serverEffectivePrice = promoPrice !== null && promoPrice < basePrice ? promoPrice : basePrice;
+
+      if (serverEffectivePrice <= 0) {
+        return NextResponse.json({ error: `Invalid server price for "${targetStoreItem.title}".` }, { status: 400 });
+      }
+
+      const itemTotal = serverEffectivePrice * quantity;
+      totalAmount += itemTotal;
+
+      orderItems.push({
+        id: targetStoreItem.id,
+        title: String(targetStoreItem.title).trim(),
+        price: serverEffectivePrice,
+        originalListPrice: basePrice,
         quantity,
-        imageUrl: String(i.imageUrl || "").trim(),
-        category: String(i.category || "General").trim(),
-      };
-    });
+        imageUrl: String(targetStoreItem.coverImageUrl || targetStoreItem.imageUrl || "").trim(),
+        category: String(targetStoreItem.category || "General").trim(),
+      });
+    }
 
     if (totalAmount <= 0) {
       return NextResponse.json({ error: "Invalid total order amount." }, { status: 400 });
-    }
-
-    // Validate server-side stock availability against config/store_data
-    const storeDataRef = adminDb.collection("config").doc("store_data");
-    const storeDataSnap = await storeDataRef.get();
-    let currentStoreItems: any[] = [];
-
-    if (storeDataSnap.exists) {
-      currentStoreItems = Array.isArray(storeDataSnap.data()?.items) ? [...(storeDataSnap.data()?.items)] : [];
-      for (const oItem of orderItems) {
-        const targetStoreItem = currentStoreItems.find((i: any) => i.id === oItem.id);
-        if (targetStoreItem) {
-          if (targetStoreItem.inStock === false) {
-            return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
-          }
-          if (!targetStoreItem.unlimitedStock && typeof targetStoreItem.stockQuantity === "number") {
-            if (targetStoreItem.stockQuantity <= 0) {
-              return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
-            }
-            if (oItem.quantity > targetStoreItem.stockQuantity) {
-              return NextResponse.json({
-                error: `Insufficient stock for "${targetStoreItem.title}". Only ${targetStoreItem.stockQuantity} unit(s) available.`,
-              }, { status: 400 });
-            }
-          }
-        }
-      }
     }
 
     const orderId = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;

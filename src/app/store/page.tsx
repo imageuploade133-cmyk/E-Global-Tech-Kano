@@ -198,21 +198,47 @@ export default function StorePage() {
     router.push(`/store/product/${item.id}`);
   };
 
+  // Helper to resolve effective promo selling price
+  const getEffectivePrice = (item: StoreItem): number => {
+    const promo = item.discountPrice || item.promoPrice;
+    if (typeof promo === "number" && promo > 0 && promo < item.price) {
+      return promo;
+    }
+    return item.price;
+  };
+
   // Cart operations
   const handleAddToCart = (product: StoreItem, qty: number = 1) => {
-    if (!product.inStock) {
+    const maxStockAllowed = !product.unlimitedStock && typeof product.stockQuantity === "number" ? product.stockQuantity : Infinity;
+    const isAvailableInStock = product.inStock && maxStockAllowed > 0;
+
+    if (!isAvailableInStock) {
       toast.error("Sorry, this item is currently out of stock!");
       return;
     }
 
     const existingIndex = cart.findIndex((c) => c.product.id === product.id);
-    let updatedCart: CartItem[];
+    const existingQty = existingIndex > -1 ? cart[existingIndex].quantity : 0;
+    const targetTotalQty = existingQty + qty;
 
+    if (targetTotalQty > maxStockAllowed) {
+      toast.error(`Only ${maxStockAllowed} unit${maxStockAllowed === 1 ? "" : "s"} available in stock!`);
+      return;
+    }
+
+    const effectivePrice = getEffectivePrice(product);
+    const productWithEffectivePrice = {
+      ...product,
+      price: effectivePrice,
+    };
+
+    let updatedCart: CartItem[];
     if (existingIndex > -1) {
       updatedCart = [...cart];
-      updatedCart[existingIndex].quantity += qty;
+      updatedCart[existingIndex].product = productWithEffectivePrice;
+      updatedCart[existingIndex].quantity = targetTotalQty;
     } else {
-      updatedCart = [...cart, { product, quantity: qty }];
+      updatedCart = [...cart, { product: productWithEffectivePrice, quantity: qty }];
     }
 
     updateCart(updatedCart);
@@ -970,9 +996,22 @@ export default function StorePage() {
                               <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
                                 {item.title}
                               </h4>
-                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-1">
-                                ₦{item.price.toLocaleString()}
-                              </p>
+                              {(() => {
+                                const effPrice = getEffectivePrice(item);
+                                const hasPromo = effPrice < item.price;
+                                return (
+                                  <div className="flex items-baseline gap-1 mt-1 flex-wrap">
+                                    <span className="font-mono font-black text-xs text-[#FC7A00]">
+                                      ₦{effPrice.toLocaleString()}
+                                    </span>
+                                    {hasPromo && (
+                                      <span className="font-mono text-[9.5px] text-gray-400 line-through">
+                                        ₦{item.price.toLocaleString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             <button
