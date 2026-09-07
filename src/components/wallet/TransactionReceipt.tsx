@@ -11,6 +11,7 @@ import { useAppConfig } from "@/lib/ConfigContext";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { resolveBankName } from "@/lib/bank-resolver";
 import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 export interface Transaction {
   id: string;
@@ -114,6 +115,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const [generating, setGenerating] = useState(false);
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
+
+  useModalBackHandler(Boolean(transaction), onClose, "transaction-receipt-modal");
 
   // Prevent background scrolling while modal is open
   useEffect(() => {

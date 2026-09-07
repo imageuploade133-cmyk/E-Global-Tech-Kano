@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -12,6 +13,8 @@ interface VerificationRequiredDrawerProps {
 
 export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
+
+  useModalBackHandler(isOpen, onClose, "verification-required-drawer");
 
   // Verification states
   const [idType, setIdType] = useState<"bvn" | "nin">("bvn");

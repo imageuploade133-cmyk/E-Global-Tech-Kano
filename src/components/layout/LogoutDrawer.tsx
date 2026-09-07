@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface LogoutDrawerProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface LogoutDrawerProps {
 
 export const LogoutDrawer: React.FC<LogoutDrawerProps> = ({ isOpen, onClose, onConfirm }) => {
   const controls = useAnimation();
+
+  useModalBackHandler(isOpen, onClose, "logout-drawer");
 
   // Prevent background body scroll when drawer is open
   useEffect(() => {

@@ -2435,7 +2435,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               )}
               <div className="text-center">
                 <h3 className="font-hanken font-extrabold text-base text-black leading-tight">
-                  Fund Wallet (Direct Checkout)
+                  Fund Wallet
                 </h3>
                 <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
                   Fast • Secured • Instant Crediting
@@ -3014,7 +3014,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 <div className="w-8" />
               )}
               <h3 className="font-hanken font-bold text-base text-black text-center">
-                Secure Outward Transfer
+                Bank Transfer
               </h3>
               <button
                 type="button"
@@ -4156,7 +4156,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               )}
               <div>
                 <h3 className="font-extrabold text-base text-black leading-tight">
-                  {swapStep === "pin" ? "Authorize Swap PIN" : "Multi-Currency Swap"}
+                  {swapStep === "pin" ? "Authorize PIN" : "Currency Swap"}
                 </h3>
                 <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
                   {swapStep === "pin" ? "Confirm details to complete swap" : `${swapFromCurrency} → ${swapToCurrency}`}
