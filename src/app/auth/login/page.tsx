@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { AppLogo } from "@/components/AppLogo";
 import { formatFirebaseError } from "@/lib/utils";
 import { ForgotPasswordDrawer } from "@/components/layout/ForgotPasswordDrawer";
 
@@ -65,14 +66,8 @@ export default function LoginPage() {
         className="w-full max-w-md mx-auto"
       >
         <div className="mb-10 flex flex-col items-center text-center">
-          <div className="relative w-20 h-20 mb-4">
-            <Image
-              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-              alt="E-Tech Logo"
-              fill
-              className="object-contain"
-              priority
-            />
+          <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
+            <AppLogo size={64} />
           </div>
           <h1 className="font-hanken font-bold text-2xl tracking-tight text-black">E-Global Pay</h1>
           <p className="text-gray-500 font-hanken mt-1 text-xs font-semibold">Welcome back to your secure hub</p>

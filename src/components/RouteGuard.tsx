@@ -7,6 +7,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { handleAppSignOut } from "@/lib/logout-util";
+import { AppLogo } from "@/components/AppLogo";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -579,15 +580,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                className="relative w-7 h-7 bg-white rounded-full p-0.5 flex items-center justify-center overflow-hidden"
+                className="relative w-7 h-7 bg-white rounded-full flex items-center justify-center overflow-hidden"
               >
-                <Image
-                  src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-                  alt="E-Tech Logo"
-                  width={24}
-                  height={24}
-                  className="object-contain"
-                />
+                <AppLogo size={24} />
               </motion.div>
             </div>
 

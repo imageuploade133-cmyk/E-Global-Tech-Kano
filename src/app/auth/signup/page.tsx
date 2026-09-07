@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import Image from "next/image";
+import { AppLogo } from "@/components/AppLogo";
 import { cn, formatFirebaseError } from "@/lib/utils";
 
 export default function SignUpPage() {
@@ -468,14 +469,8 @@ export default function SignUpPage() {
         className="w-full max-w-xl mx-auto"
       >
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="relative w-14 h-14 mb-2">
-            <Image
-              src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-              alt="E-Tech Logo"
-              fill
-              className="object-contain"
-              priority
-            />
+          <div className="relative w-14 h-14 mb-2 flex items-center justify-center">
+            <AppLogo size={48} />
           </div>
           <h1 className="font-hanken font-bold text-xl tracking-tight text-black">E-Global Pay</h1>
           <p className="text-gray-500 font-hanken mt-1 text-[11px] font-semibold">Stage-by-Stage Premium Account Setup</p>
@@ -965,14 +960,8 @@ export default function SignUpPage() {
             >
               <div className="max-w-md w-full flex flex-col items-center text-center space-y-6">
                 {/* Brand Logo */}
-                <div className="relative w-16 h-14 mb-2">
-                  <Image
-                    src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-                    alt="E-Tech Logo"
-                    fill
-                    className="object-contain"
-                    priority
-                  />
+                <div className="relative w-16 h-14 mb-2 flex items-center justify-center">
+                  <AppLogo size={52} />
                 </div>
 
                 {/* Warning Icon */}
