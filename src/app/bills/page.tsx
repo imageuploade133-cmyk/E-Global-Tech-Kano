@@ -11,6 +11,7 @@ import BannerSlideshow from "@/components/BannerSlideshow";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { AppLogo } from "@/components/AppLogo";
 
 interface Biller {
   id: number;
@@ -875,15 +876,9 @@ export default function GenericBillPage() {
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                className="relative w-7 h-7 bg-white rounded-full p-0.5 shadow-sm flex items-center justify-center overflow-hidden"
+                className="relative w-7 h-7 bg-white rounded-full flex items-center justify-center overflow-hidden"
               >
-                <Image
-                  src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-                  alt="E-Tech Logo"
-                  width={24}
-                  height={24}
-                  className="object-contain"
-                />
+                <AppLogo size={24} />
               </motion.div>
             </div>
             <motion.p
