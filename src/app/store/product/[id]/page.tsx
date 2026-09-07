@@ -506,7 +506,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     <RouteGuard>
       <div id="store-page-root" className="min-h-dvh bg-[#F4F5F7] text-black pb-28">
         {/* Sticky Top Header Bar - Minimal Space */}
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-3.5 py-2 border-0 shadow-none">
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-3.5 pt-3.5 pb-2.5 border-0 shadow-none">
           <div className="max-w-md mx-auto flex items-center justify-between gap-2">
             <button
               type="button"
@@ -915,12 +915,31 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </h3>
 
               <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1 select-none">
-                {displayRecs.slice(0, 8).map((rec) => (
-                  <div
-                    key={rec.id}
-                    onClick={() => router.push(`/store/product/${rec.id}`)}
-                    className="w-32 flex-shrink-0 bg-white shadow-3xs rounded-xl p-2 space-y-1.5 cursor-pointer hover:shadow-xs transition-all border-0"
-                  >
+                {displayRecs.slice(0, 8).map((rec) => {
+                  const recBorderColor = settings.hideBorders
+                    ? "transparent"
+                    : settings.enableGradientBorder
+                    ? settings.gradientColorStart || "#FC7A00"
+                    : settings.borderColor || "#FC7A00";
+
+                  return (
+                    <div
+                      key={rec.id}
+                      onClick={() => router.push(`/store/product/${rec.id}`)}
+                      style={{
+                        borderColor: recBorderColor,
+                        borderRadius: `${settings.cardBorderRadius ?? 16}px`,
+                        borderWidth: `${settings.borderWidth ?? 1}px`,
+                        ...(settings.enableGradientBorder && !settings.hideBorders
+                          ? {
+                              borderImage: `linear-gradient(135deg, ${settings.gradientColorStart || "#FC7A00"}, ${settings.gradientColorEnd || "#E06600"}) 1`,
+                            }
+                          : {}),
+                      }}
+                      className={`w-32 flex-shrink-0 bg-white shadow-3xs p-2 space-y-1.5 cursor-pointer hover:shadow-xs transition-all ${
+                        settings.hideBorders ? "border-0" : "border"
+                      }`}
+                    >
                     <div className="w-full h-20 rounded-lg bg-gray-50 relative overflow-hidden flex items-center justify-center p-1">
                       {rec.imageUrl ? (
                         <img src={rec.imageUrl} alt={rec.title} className="w-full h-full object-contain p-0.5" />
@@ -936,8 +955,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         ₦{rec.price.toLocaleString()}
                       </p>
                     </div>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

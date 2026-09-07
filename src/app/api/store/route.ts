@@ -14,12 +14,44 @@ export async function GET() {
     const rawItems = Array.isArray(data.items) ? data.items : [];
     const visibleItems = rawItems.filter((i: any) => !i.isHidden);
 
+    const defaultSettings = {
+      storeName: "E-Tech Store",
+      storeSubtitle: "Hardware & Premium Gear",
+      storeNameColor: "#000000",
+      storeSubtitleColor: "#9CA3AF",
+      storeLogoUrl: "",
+      storeIconColor: "#FC7A00",
+      storeIconSize: 20,
+      storeButtonColor: "#FC7A00",
+      storeButtonTextColor: "#FFFFFF",
+      storeButtonIcon: "bolt",
+      hideClearCacheButton: false,
+      topBarIconColor: "#374151",
+      topBarWishlistIconColor: "#EF4444",
+      topBarHistoryIconColor: "#FC7A00",
+      topBarCartIconColor: "#1F2937",
+      enableProductSharing: true,
+      borderColor: "#FC7A00",
+      borderOpacity: 100,
+      cardBorderRadius: 16,
+      borderWidth: 1,
+      hideBorders: false,
+      enableGradientBorder: false,
+      gradientColorStart: "#FC7A00",
+      gradientColorEnd: "#0b513d",
+      recentlyViewedBorderEnabled: true,
+      recentlyViewedBorderColor: "#FC7A00",
+      recentlyViewedBorderOpacity: 20,
+      productPageHeaderAlignment: "left" as const,
+      enableProductVideo: true,
+    };
+
     return NextResponse.json({
       success: true,
       items: visibleItems,
       slides: Array.isArray(data.slides) ? data.slides : [],
       categories,
-      settings: data.settings || { storeName: "E-Tech Store", storeLogoUrl: "", borderColor: "#FC7A00", hideBorders: false },
+      settings: data.settings ? { ...defaultSettings, ...data.settings } : defaultSettings,
     });
   } catch (err: unknown) {
     const error = err as Error;

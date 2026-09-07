@@ -198,29 +198,19 @@ export default function StorePage() {
     router.push(`/store/product/${item.id}`);
   };
 
-  // Cart operations with Inventory & Stock Enforcement
+  // Cart operations
   const handleAddToCart = (product: StoreItem, qty: number = 1) => {
-    const maxStockAllowed = !product.unlimitedStock && typeof product.stockQuantity === "number" ? product.stockQuantity : Infinity;
-    const isAvailableInStock = product.inStock && maxStockAllowed > 0;
-
-    if (!isAvailableInStock) {
+    if (!product.inStock) {
       toast.error("Sorry, this item is currently out of stock!");
       return;
     }
 
     const existingIndex = cart.findIndex((c) => c.product.id === product.id);
-    const existingQty = existingIndex > -1 ? cart[existingIndex].quantity : 0;
-    const targetTotalQty = existingQty + qty;
-
-    if (targetTotalQty > maxStockAllowed) {
-      toast.error(`Only ${maxStockAllowed} unit${maxStockAllowed === 1 ? "" : "s"} available in stock!`);
-      return;
-    }
-
     let updatedCart: CartItem[];
+
     if (existingIndex > -1) {
       updatedCart = [...cart];
-      updatedCart[existingIndex].quantity = targetTotalQty;
+      updatedCart[existingIndex].quantity += qty;
     } else {
       updatedCart = [...cart, { product, quantity: qty }];
     }
@@ -230,23 +220,10 @@ export default function StorePage() {
   };
 
   const handleUpdateCartQuantity = (productId: string, delta: number) => {
-    const targetItem = cart.find((c) => c.product.id === productId);
-    if (!targetItem) return;
-
-    const maxAllowed = !targetItem.product.unlimitedStock && typeof targetItem.product.stockQuantity === "number"
-      ? targetItem.product.stockQuantity
-      : Infinity;
-
-    const newQty = targetItem.quantity + delta;
-
-    if (delta > 0 && newQty > maxAllowed) {
-      toast.error(`Only ${maxAllowed} unit${maxAllowed === 1 ? "" : "s"} available in stock!`);
-      return;
-    }
-
     const updatedCart = cart
       .map((item) => {
         if (item.product.id === productId) {
+          const newQty = item.quantity + delta;
           return newQty > 0 ? { ...item, quantity: newQty } : null;
         }
         return item;
@@ -378,7 +355,7 @@ export default function StorePage() {
     <RouteGuard>
       <div id="store-page-root" className="min-h-dvh bg-background text-on-background pb-32">
         {/* Sticky App Top Bar - Clean Wallet-Style Top Bar UI */}
-        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md py-2.5 px-margin-mobile border-0 shadow-none">
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md pt-3.5 pb-2.5 px-margin-mobile border-0 shadow-none">
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               {settings.storeLogoUrl && (
@@ -514,9 +491,9 @@ export default function StorePage() {
             }))}
           />
 
-          {/* Robust Search Input with Gradient Border - Opens Full Screen Search Drawer */}
+          {/* Robust Search Input - Opens Full Screen Search Drawer */}
           <div
-            className="w-full mb-4 transition-all duration-300 cursor-pointer p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] shadow-2xs hover:shadow-xs"
+            className="relative w-full mb-4 transition-all duration-300 cursor-pointer"
             style={{
               marginTop: `${settings.searchBarMarginTop || 0}px`,
             }}
@@ -527,30 +504,28 @@ export default function StorePage() {
               setIsSearchModalOpen(true);
             }}
           >
-            <div className="relative w-full bg-white rounded-[14px] flex items-center overflow-hidden">
-              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#FC7A00] text-[20px]">
-                search
-              </span>
-              <input
-                type="text"
-                readOnly
-                value={searchQuery}
-                placeholder="Search store hardware, memberships, gear..."
-                className="w-full bg-white rounded-[14px] pl-11 pr-10 py-3 text-xs font-bold text-black placeholder-gray-400 outline-none border-0 shadow-none cursor-pointer"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSearchQuery("");
-                  }}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors border-0"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              )}
-            </div>
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
+              search
+            </span>
+            <input
+              type="text"
+              readOnly
+              value={searchQuery}
+              placeholder="Search store hardware, memberships, gear..."
+              className="w-full bg-gray-100/90 hover:bg-gray-150 rounded-2xl pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none transition-all cursor-pointer"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchQuery("");
+                }}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
           </div>
 
           {/* Visual Category Filter Chips with Custom Logos */}
@@ -829,15 +804,9 @@ export default function StorePage() {
                           );
                         })()}
 
-                        {(() => {
-                          const maxStock = !item.unlimitedStock && typeof item.stockQuantity === "number" ? item.stockQuantity : Infinity;
-                          const isAvailable = item.inStock && maxStock > 0;
-                          return (
-                            <span className={`text-[8px] font-black uppercase ${isAvailable ? "text-emerald-600" : "text-red-500"}`}>
-                              {isAvailable ? (item.unlimitedStock ? "In Stock" : `${item.stockQuantity} Left`) : "Out of Stock"}
-                            </span>
-                          );
-                        })()}
+                        <span className={`text-[8px] font-black uppercase ${item.inStock ? "text-emerald-600" : "text-red-500"}`}>
+                          {item.inStock ? "In Stock" : "Out of Stock"}
+                        </span>
                       </div>
 
                       <div className="flex gap-1.5">
@@ -923,33 +892,28 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
                 {/* Full Screen Header */}
-                <div className="px-4 md:px-8 py-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
-                  <div className="flex items-center gap-2.5">
+                <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setIsWishlistModalOpen(false)}
-                      className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
                       title="Back"
                     >
                       <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                     </button>
-                    <span className="material-symbols-outlined text-red-500 text-[24px]">favorite</span>
-                    <div>
-                      <h2 className="font-hanken font-black text-base md:text-lg text-black uppercase tracking-wide">
-                        My Saved Wishlist
-                      </h2>
-                      <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                        {wishlist.length} {wishlist.length === 1 ? "Saved Item" : "Saved Items"}
-                      </p>
-                    </div>
+                    <span className="material-symbols-outlined text-red-500 text-[22px]">favorite</span>
+                    <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
+                      My Saved Wishlist
+                    </h2>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsWishlistModalOpen(false)}
-                    className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
                     title="Close"
                   >
                     <span className="material-symbols-outlined text-[18px]">close</span>
@@ -957,8 +921,7 @@ export default function StorePage() {
                 </div>
 
                 {/* Scrollable Wishlist Content */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 custom-scrollbar">
-                  <div className="max-w-6xl mx-auto w-full">
+                <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
                   {wishlist.length === 0 ? (
                     <div className="py-20 flex flex-col items-center text-center space-y-3">
                       <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-400">
@@ -975,7 +938,7 @@ export default function StorePage() {
                         Saved Items ({wishlist.length})
                       </p>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+                      <div className="grid grid-cols-2 gap-3.5">
                         {wishlist.map((item) => (
                           <div
                             key={item.id}
@@ -1028,7 +991,6 @@ export default function StorePage() {
                       </div>
                     </div>
                   )}
-                  </div>
                 </div>
               </motion.div>
             </div>
@@ -1044,7 +1006,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
                 {/* Header */}
                 <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1382,7 +1344,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
                 {/* Header */}
                 <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1466,7 +1428,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
                 {/* Header */}
                 <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1580,7 +1542,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
                 {/* Header with Search Input & Back Button */}
                 <div className="px-4 py-2.5 flex items-center justify-between gap-2.5 flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1597,35 +1559,33 @@ export default function StorePage() {
                     <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                   </button>
 
-                  <div className="relative flex-1 p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] shadow-2xs">
-                    <div className="relative w-full bg-white rounded-[14px] flex items-center overflow-hidden">
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#FC7A00] text-[18px]">
-                        search
-                      </span>
-                      <input
-                        type="text"
-                        autoFocus
-                        value={searchModalQuery}
-                        onChange={(e) => {
-                          setSearchModalQuery(e.target.value);
+                  <div className="relative flex-1">
+                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={searchModalQuery}
+                      onChange={(e) => {
+                        setSearchModalQuery(e.target.value);
+                        setVisibleSearchLimit(20);
+                      }}
+                      placeholder="Search store products, gear, hardware..."
+                      className="w-full bg-gray-100 focus:bg-gray-150 rounded-2xl pl-10 pr-9 py-2.5 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none"
+                    />
+                    {searchModalQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchModalQuery("");
                           setVisibleSearchLimit(20);
                         }}
-                        placeholder="Search store products, gear, hardware..."
-                        className="w-full bg-white rounded-[14px] pl-9 pr-9 py-2 text-xs font-bold text-black placeholder-gray-400 outline-none border-0 shadow-none"
-                      />
-                      {searchModalQuery && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSearchModalQuery("");
-                            setVisibleSearchLimit(20);
-                          }}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black border-0"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">close</span>
-                        </button>
-                      )}
-                    </div>
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black border-0"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    )}
                   </div>
 
                   <button
