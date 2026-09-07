@@ -9,6 +9,7 @@ import { motion, AnimatePresence, PanInfo } from "framer-motion";
 
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { handleAppSignOut } from "@/lib/logout-util";
+import { AppLogo } from "@/components/AppLogo";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 function maskEmail(email?: string | null): string {
@@ -432,16 +433,9 @@ export default function PinPage() {
                 <motion.div
                   animate={{ scale: [1, 1.03, 1] }}
                   transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
-                  className="relative w-9 h-9 bg-white rounded-full p-1.5 shadow-sm flex items-center justify-center"
+                  className="relative w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-sm"
                 >
-                  <Image
-                    src="https://e-global-tech-kano.vercel.app/_next/image?url=https%3A%2F%2Fi.ibb.co%2FWWjZrtC7%2FE-Tech.png&w=640&q=75"
-                    alt="E-Tech Logo"
-                    width={24}
-                    height={24}
-                    className="object-contain"
-                    priority
-                  />
+                  <AppLogo size={28} />
                 </motion.div>
               </div>
 
@@ -465,13 +459,8 @@ export default function PinPage() {
         )}
       </AnimatePresence>
       <div className="w-full flex flex-col items-center text-center mt-6 min-[375px]:mt-10">
-        <div className="relative w-14 h-14 min-[375px]:w-16 min-[375px]:h-16 mb-3">
-          <Image
-            src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-            alt="E-Tech Logo"
-            fill
-            className="object-contain"
-          />
+        <div className="relative w-14 h-14 min-[375px]:w-16 min-[375px]:h-16 mb-3 flex items-center justify-center">
+          <AppLogo size={56} />
         </div>
         <h1 className="font-hanken font-bold text-lg min-[375px]:text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
         <p className="text-gray-500 font-hanken tracking-widest uppercase text-[10px] min-[375px]:text-xs">Enter Access PIN</p>

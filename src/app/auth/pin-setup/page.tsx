@@ -7,6 +7,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import Image from "next/image";
+import { AppLogo } from "@/components/AppLogo";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -113,13 +114,8 @@ export default function PinSetupPage() {
   return (
     <div className="flex flex-col min-h-screen bg-white p-8 items-center justify-between">
       <div className="w-full flex flex-col items-center text-center mt-10">
-        <div className="relative w-16 h-16 mb-4">
-          <Image
-            src="https://i.ibb.co/WWjZrtC7/E-Tech.png"
-            alt="E-Tech Logo"
-            fill
-            className="object-contain"
-          />
+        <div className="relative w-16 h-16 mb-4 flex items-center justify-center">
+          <AppLogo size={56} />
         </div>
         <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
         <p className={cn(

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { useRouter } from "next/navigation";
 import { handleAppSignOut } from "@/lib/logout-util";
+import { AppLogo } from "@/components/AppLogo";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, limit } from "firebase/firestore";
 import { useEffect } from "react";
@@ -263,15 +264,8 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
               <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] font-bold">person</span>
             </div>
           )}
-          <div className="relative w-6 h-6 min-[375px]:w-7 min-[375px]:h-7 flex-shrink-0 bg-black/5 rounded p-0.5 overflow-hidden animate-fade-in" style={{ width: "28px", height: "28px" }}>
-            <Image
-              src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
-              alt="E-Tech Logo"
-              fill
-              sizes="28px"
-              className="object-contain"
-              priority
-            />
+          <div className="relative w-7 h-7 flex-shrink-0 flex items-center justify-center animate-fade-in">
+            <AppLogo logoUrl={config.logoUrl} size={28} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-label-sm text-[8px] min-[375px]:text-[9px] text-on-surface-variant uppercase tracking-tighter font-bold leading-none truncate">
