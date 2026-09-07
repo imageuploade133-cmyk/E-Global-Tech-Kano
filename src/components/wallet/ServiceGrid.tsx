@@ -152,7 +152,7 @@ export const ServiceGrid: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setActiveModal(null)}
-              className="fixed inset-0 bg-black/55 z-[99998]"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
             />
 
             {/* 90% Height Bottom Sheet Modal */}
@@ -160,7 +160,7 @@ export const ServiceGrid: React.FC = () => {
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
               className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[99999] p-6 pb-8 shadow-none text-black h-[90vh] max-h-[90vh] flex flex-col justify-between"
             >
               {/* Grab handle */}
