@@ -222,19 +222,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     saveCart(newCart);
   };
 
+  const maxStockAllowed = !product?.unlimitedStock && typeof product?.stockQuantity === "number" ? product.stockQuantity : Infinity;
+  const isAvailableInStock = product?.inStock && maxStockAllowed > 0;
+
   const handleAddToCart = (qty: number = 1, showToast: boolean = true) => {
     if (!product) return;
-    if (!product.inStock) {
+    if (!isAvailableInStock) {
       toast.error("Sorry, this item is currently out of stock!");
       return;
     }
 
     const existingIndex = cart.findIndex((c) => c.product.id === product.id);
-    let updatedCart: CartItem[];
+    const existingQty = existingIndex > -1 ? cart[existingIndex].quantity : 0;
+    const targetTotalQty = existingQty + qty;
 
+    if (targetTotalQty > maxStockAllowed) {
+      toast.error(`Only ${maxStockAllowed} unit${maxStockAllowed === 1 ? "" : "s"} available in stock!`);
+      return;
+    }
+
+    let updatedCart: CartItem[];
     if (existingIndex > -1) {
       updatedCart = [...cart];
-      updatedCart[existingIndex].quantity += qty;
+      updatedCart[existingIndex].quantity = targetTotalQty;
     } else {
       updatedCart = [...cart, { product, quantity: qty }];
     }
@@ -590,11 +600,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
-              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                product.inStock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-              }`}>
-                {product.inStock ? "In Stock" : "Out of Stock"}
-              </span>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                  isAvailableInStock ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                }`}>
+                  {isAvailableInStock ? "In Stock" : "Out of Stock"}
+                </span>
+                {!product.unlimitedStock && typeof product.stockQuantity === "number" && (
+                  <span className="text-[9px] font-extrabold uppercase text-gray-500">
+                    {product.stockQuantity > 0 ? `${product.stockQuantity} Available` : "0 Available"}
+                  </span>
+                )}
+              </div>
             </div>
 
             <h2 className="font-hanken font-extrabold text-sm min-[375px]:text-base text-black leading-snug">
@@ -627,20 +644,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Quantity Selector */}
           <div className="bg-white rounded-2xl p-3.5 shadow-3xs flex items-center justify-between border border-orange-100/60">
-            <span className="font-hanken text-xs font-black uppercase text-gray-800">Quantity</span>
+            <div className="space-y-0.5">
+              <span className="font-hanken text-xs font-black uppercase text-gray-800 block">Quantity</span>
+              {!product.unlimitedStock && typeof product.stockQuantity === "number" && (
+                <span className="text-[9.5px] font-bold text-gray-500 uppercase block">
+                  {product.stockQuantity > 0 ? `${product.stockQuantity} Left in Stock` : "Stock Depleted"}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3 bg-gray-50/90 p-1.5 rounded-2xl border border-gray-200/80">
               <button
                 type="button"
+                disabled={!isAvailableInStock || productQuantity <= 1}
                 onClick={() => setProductQuantity((q) => Math.max(1, q - 1))}
-                className="w-8 h-8 rounded-xl bg-white text-black font-black text-base flex items-center justify-center active:scale-90 cursor-pointer border border-gray-300 hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all shadow-2xs"
+                className="w-8 h-8 rounded-xl bg-white text-black font-black text-base flex items-center justify-center active:scale-90 cursor-pointer border border-gray-300 hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all shadow-2xs disabled:opacity-40"
               >
                 -
               </button>
               <span className="font-mono font-black text-sm w-6 text-center text-black">{productQuantity}</span>
               <button
                 type="button"
-                onClick={() => setProductQuantity((q) => q + 1)}
-                className="w-8 h-8 rounded-xl bg-white text-black font-black text-base flex items-center justify-center active:scale-90 cursor-pointer border border-gray-300 hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all shadow-2xs"
+                disabled={!isAvailableInStock || productQuantity >= maxStockAllowed}
+                onClick={() => setProductQuantity((q) => Math.min(maxStockAllowed, q + 1))}
+                className="w-8 h-8 rounded-xl bg-white text-black font-black text-base flex items-center justify-center active:scale-90 cursor-pointer border border-gray-300 hover:border-[#FC7A00] hover:text-[#FC7A00] transition-all shadow-2xs disabled:opacity-40"
               >
                 +
               </button>
@@ -807,29 +833,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           <button
             type="button"
-            disabled={!product.inStock}
+            disabled={!isAvailableInStock}
             onClick={() => handleAddToCart(productQuantity)}
-            className="flex-1 py-3 bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 border-0"
+            className="flex-1 py-3 bg-gray-900 hover:bg-black disabled:bg-gray-300 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 border-0 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[16px] text-orange-400">add_shopping_cart</span>
-            <span>Add to Cart</span>
+            <span>{isAvailableInStock ? "Add to Cart" : "Out of Stock"}</span>
           </button>
 
           <button
             type="button"
-            disabled={!product.inStock}
+            disabled={!isAvailableInStock}
             onClick={() => {
               handleAddToCart(productQuantity, false);
               setIsCartOpen(true);
             }}
             style={{
-              backgroundColor: settings.storeButtonColor || "#FC7A00",
+              backgroundColor: isAvailableInStock ? (settings.storeButtonColor || "#FC7A00") : "#9CA3AF",
               color: settings.storeButtonTextColor || "#FFFFFF",
             }}
-            className="flex-1 py-3 hover:opacity-90 disabled:from-gray-300 disabled:to-gray-400 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-md border-0"
+            className="flex-1 py-3 hover:opacity-90 disabled:bg-gray-300 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-1 shadow-md border-0 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[16px]">{settings.storeButtonIcon || "bolt"}</span>
-            <span>Buy Now</span>
+            <span>{isAvailableInStock ? "Buy Now" : "Out of Stock"}</span>
           </button>
         </div>
 

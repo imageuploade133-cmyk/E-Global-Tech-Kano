@@ -742,43 +742,44 @@ function CpanelStorePageContent() {
                 </div>
 
                 {itemImages.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 pt-1">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-1">
                     {itemImages.map((imgUrl, idx) => {
                       const isCover = itemCoverUrl === imgUrl || (!itemCoverUrl && idx === 0);
                       return (
                         <div
                           key={idx}
                           className={cn(
-                            "relative h-16 rounded-xl border overflow-hidden group bg-white flex items-center justify-center",
-                            isCover ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/40" : "border-gray-200"
+                            "relative h-20 rounded-2xl border overflow-hidden bg-white shadow-2xs flex items-center justify-center p-1 transition-all",
+                            isCover ? "border-[#FC7A00] ring-2 ring-[#FC7A00]/30 bg-orange-50/20" : "border-gray-200"
                           )}
                         >
-                          <img src={imgUrl} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
-                          {isCover && (
-                            <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase bg-[#FC7A00] text-white">
+                          <img src={imgUrl} alt={`Thumbnail ${idx}`} className="w-full h-full object-contain rounded-xl" />
+
+                          {/* Cover Badge or Set Cover Button */}
+                          {isCover ? (
+                            <span className="absolute top-1 left-1 px-2 py-0.5 rounded-lg text-[7.5px] font-black uppercase bg-[#FC7A00] text-white shadow-2xs z-10">
                               COVER
                             </span>
-                          )}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                            {!isCover && (
-                              <button
-                                type="button"
-                                onClick={() => setItemCoverUrl(imgUrl)}
-                                className="p-1 bg-[#FC7A00] text-white rounded text-[8px] font-bold uppercase cursor-pointer"
-                                title="Set Cover Image"
-                              >
-                                Cover
-                              </button>
-                            )}
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => handleRemoveImageFromProduct(idx)}
-                              className="p-1 bg-red-600 text-white rounded text-[8px] font-bold cursor-pointer"
-                              title="Remove Image"
+                              onClick={() => setItemCoverUrl(imgUrl)}
+                              className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-lg text-[7.5px] font-extrabold uppercase bg-black/75 hover:bg-[#FC7A00] text-white backdrop-blur-xs transition-colors cursor-pointer z-10 border-0"
+                              title="Set as Cover Image"
                             >
-                              ×
+                              Make Cover
                             </button>
-                          </div>
+                          )}
+
+                          {/* Always Visible Remove Button (Windows & iOS Touch Native) */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImageFromProduct(idx)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-md cursor-pointer transition-transform active:scale-90 z-20 border-0"
+                            title="Remove Image"
+                          >
+                            <span className="material-symbols-outlined text-[13px] font-bold">close</span>
+                          </button>
                         </div>
                       );
                     })}

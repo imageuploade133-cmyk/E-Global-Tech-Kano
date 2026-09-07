@@ -198,19 +198,29 @@ export default function StorePage() {
     router.push(`/store/product/${item.id}`);
   };
 
-  // Cart operations
+  // Cart operations with Inventory & Stock Enforcement
   const handleAddToCart = (product: StoreItem, qty: number = 1) => {
-    if (!product.inStock) {
+    const maxStockAllowed = !product.unlimitedStock && typeof product.stockQuantity === "number" ? product.stockQuantity : Infinity;
+    const isAvailableInStock = product.inStock && maxStockAllowed > 0;
+
+    if (!isAvailableInStock) {
       toast.error("Sorry, this item is currently out of stock!");
       return;
     }
 
     const existingIndex = cart.findIndex((c) => c.product.id === product.id);
-    let updatedCart: CartItem[];
+    const existingQty = existingIndex > -1 ? cart[existingIndex].quantity : 0;
+    const targetTotalQty = existingQty + qty;
 
+    if (targetTotalQty > maxStockAllowed) {
+      toast.error(`Only ${maxStockAllowed} unit${maxStockAllowed === 1 ? "" : "s"} available in stock!`);
+      return;
+    }
+
+    let updatedCart: CartItem[];
     if (existingIndex > -1) {
       updatedCart = [...cart];
-      updatedCart[existingIndex].quantity += qty;
+      updatedCart[existingIndex].quantity = targetTotalQty;
     } else {
       updatedCart = [...cart, { product, quantity: qty }];
     }
@@ -220,10 +230,23 @@ export default function StorePage() {
   };
 
   const handleUpdateCartQuantity = (productId: string, delta: number) => {
+    const targetItem = cart.find((c) => c.product.id === productId);
+    if (!targetItem) return;
+
+    const maxAllowed = !targetItem.product.unlimitedStock && typeof targetItem.product.stockQuantity === "number"
+      ? targetItem.product.stockQuantity
+      : Infinity;
+
+    const newQty = targetItem.quantity + delta;
+
+    if (delta > 0 && newQty > maxAllowed) {
+      toast.error(`Only ${maxAllowed} unit${maxAllowed === 1 ? "" : "s"} available in stock!`);
+      return;
+    }
+
     const updatedCart = cart
       .map((item) => {
         if (item.product.id === productId) {
-          const newQty = item.quantity + delta;
           return newQty > 0 ? { ...item, quantity: newQty } : null;
         }
         return item;
@@ -804,9 +827,15 @@ export default function StorePage() {
                           );
                         })()}
 
-                        <span className={`text-[8px] font-black uppercase ${item.inStock ? "text-emerald-600" : "text-red-500"}`}>
-                          {item.inStock ? "In Stock" : "Out of Stock"}
-                        </span>
+                        {(() => {
+                          const maxStock = !item.unlimitedStock && typeof item.stockQuantity === "number" ? item.stockQuantity : Infinity;
+                          const isAvailable = item.inStock && maxStock > 0;
+                          return (
+                            <span className={`text-[8px] font-black uppercase ${isAvailable ? "text-emerald-600" : "text-red-500"}`}>
+                              {isAvailable ? (item.unlimitedStock ? "In Stock" : `${item.stockQuantity} Left`) : "Out of Stock"}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex gap-1.5">
