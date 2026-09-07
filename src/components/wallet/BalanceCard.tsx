@@ -3750,97 +3750,105 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
 
-              {/* STAGE 2.5: Fullscreen PIN Verification Screen (Separated PIN model) */}
+              {/* STAGE 2.5: Fullscreen PIN Verification Screen (Standardized PIN Pad Design) */}
               {trfStep === "pin" && (
                 <motion.div
                   key="trf-pin"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
-                  className="space-y-4 text-left flex-1 flex flex-col justify-between"
+                  className="space-y-4 flex-1 flex flex-col justify-between items-center text-center w-full max-w-md mx-auto"
                 >
-                  <div className="space-y-4 pr-1">
+                  <div className="space-y-4 w-full">
                     <div className="text-center space-y-1">
-                      <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-primary mx-auto">
+                      <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-[#FC7A00] mx-auto">
                         <span className="material-symbols-outlined text-[24px] font-black">lock</span>
                       </div>
                       <h4 className="font-hanken font-extrabold text-base text-black mt-2">Enter Transaction PIN</h4>
                       <p className="font-hanken text-[11px] text-gray-400">Authorize your transfer securely using your 4-digit PIN.</p>
                     </div>
 
-                    {/* Displaying user Balance and amount user wants to Transfer inside nice UI card */}
-                    <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-5 space-y-3 font-hanken">
-                      <div className="text-center space-y-1">
-                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Amount to Transfer</span>
-                        <h2 className="text-2xl font-mono font-black text-[#E11D48] leading-none">
+                    {/* Displaying user Balance and amount user wants to Transfer inside UI card */}
+                    <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-2 font-hanken text-left">
+                      <div className="flex justify-between text-xs font-bold text-gray-700">
+                        <span>Amount to Transfer:</span>
+                        <span className="font-mono font-black text-[#E11D48]">
                           ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </h2>
+                        </span>
                       </div>
-                      <div className="flex items-center justify-center gap-1.5 pt-1 text-xs text-gray-500 font-bold border-t border-gray-200/40">
-                        <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
-                        <span>My Wallet Balance: ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                      <div className="flex justify-between text-xs font-semibold text-gray-500 border-t border-gray-200/60 pt-2">
+                        <span>My Wallet Balance:</span>
+                        <span className="font-mono text-black font-extrabold">
+                          ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
                     </div>
 
-                    {/* PIN Input dots */}
-                    <div className="text-center space-y-2 pt-2">
-                      <div className="flex justify-center gap-3">
-                        {[0, 1, 2, 3].map((i) => (
+                    {/* 4 Box PIN Indicators */}
+                    <div className="space-y-2 text-center py-1">
+                      <div className="flex justify-center gap-2 pt-1">
+                        {[0, 1, 2, 3].map((idx) => (
                           <div
-                            key={i}
-                            className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
-                              trfPin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
+                            key={idx}
+                            className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
+                              trfPin.length > idx
+                                ? "border-[#FC7A00] bg-orange-50/40 text-black"
+                                : "border-gray-200 bg-white"
                             }`}
-                          />
+                          >
+                            {trfPin[idx] ? "•" : ""}
+                          </div>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Shuffled PIN Pad Grid Keypad */}
-                  <div className="w-full max-w-[280px] mx-auto grid grid-cols-3 gap-3.5 flex-shrink-0 mb-2">
-                    {trfKeypadNumbers.slice(0, 9).map((num) => (
-                      <motion.button
-                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
-                        whileHover={{ scale: 1.05 }}
+                  {/* Standardized Transaction Keypad Grid */}
+                  <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                      <button
                         key={num}
                         type="button"
-                        onClick={() => handleTrfPinPress(num)}
-                        className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors mx-auto"
+                        onClick={() => {
+                          if (trfPin.length < 4) setTrfPin((prev) => prev + num);
+                        }}
+                        className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
                       >
                         {num}
-                      </motion.button>
+                      </button>
                     ))}
-                    <div className="w-16 h-16" />
-                    {trfKeypadNumbers[9] !== undefined && (
-                      <motion.button
-                        whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
-                        whileHover={{ scale: 1.05 }}
-                        type="button"
-                        onClick={() => handleTrfPinPress(trfKeypadNumbers[9])}
-                        className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors mx-auto"
-                      >
-                        {trfKeypadNumbers[9]}
-                      </motion.button>
-                    )}
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      whileHover={{ scale: 1.05 }}
+                    <button
                       type="button"
-                      onClick={handleTrfPinDelete}
-                      className="w-16 h-16 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer mx-auto"
+                      onClick={() => setTrfPin("")}
+                      className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
                     >
-                      <span className="material-symbols-outlined text-[24px]">backspace</span>
-                    </motion.button>
+                      CLEAR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (trfPin.length < 4) setTrfPin((prev) => prev + "0");
+                      }}
+                      className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTrfPinDelete()}
+                      className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">backspace</span>
+                    </button>
                   </div>
 
-                  {/* Standalone Authorize Transfer button */}
-                  <div className="w-full px-4 mt-1 pb-2">
+                  {/* Authorize Transfer button */}
+                  <div className="w-full max-w-xs mx-auto pt-1 pb-2">
                     <button
                       type="button"
                       disabled={trfPin.length < 4}
                       onClick={() => executeOutwardTransfer(trfPin)}
-                      className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98"
+                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98"
                     >
                       Authorize Transfer
                     </button>

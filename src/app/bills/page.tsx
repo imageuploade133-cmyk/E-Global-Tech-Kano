@@ -1553,51 +1553,56 @@ export default function GenericBillPage() {
                     Provide your highly secure 4-digit Access PIN to approve this debit transaction.
                   </p>
 
-                  {/* Dot indicator indicators */}
-                  <div className="flex justify-center gap-4 py-2">
-                    {[0, 1, 2, 3].map((i) => (
+                  {/* 4 Box PIN Indicators */}
+                  <div className="flex justify-center gap-2 pt-1">
+                    {[0, 1, 2, 3].map((idx) => (
                       <div
-                        key={i}
-                        className={`w-4.5 h-4.5 rounded-full border-2 transition-all duration-300 ${
-                          enteredPin.length > i ? "bg-black border-black scale-110 shadow-sm" : "bg-transparent border-gray-200"
+                        key={idx}
+                        className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
+                          enteredPin.length > idx
+                            ? "border-[#FC7A00] bg-orange-50/40 text-black"
+                            : "border-gray-200 bg-white"
                         }`}
-                      />
+                      >
+                        {enteredPin[idx] ? "•" : ""}
+                      </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Shuffled PIN keypad */}
-                <div className="grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-5 w-full max-w-[260px] min-[360px]:max-w-[290px] justify-items-center">
-                  {keypadNumbers.slice(0, 9).map((num) => (
-                    <motion.button
-                      whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+                {/* Standardized Transaction Keypad Grid */}
+                <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                    <button
                       key={num}
                       type="button"
-                      onClick={() => handlePinPress(num)}
-                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all hover:border-black"
+                      onClick={() => handlePinPress(num.toString())}
+                      className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
                     >
                       {num}
-                    </motion.button>
+                    </button>
                   ))}
-                  <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18" />
-                  {keypadNumbers[9] !== undefined && (
-                    <motion.button
-                      whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
-                      onClick={() => handlePinPress(keypadNumbers[9])}
-                      type="button"
-                      className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-xl font-hanken border border-gray-200 text-black cursor-pointer transition-all hover:border-black"
-                    >
-                      {keypadNumbers[9]}
-                    </motion.button>
-                  )}
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={handlePinDelete}
+                  <button
                     type="button"
-                    className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 rounded-full flex items-center justify-center text-black cursor-pointer active:text-rose-500 transition-all"
+                    onClick={() => setEnteredPin("")}
+                    className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
                   >
-                    <span className="material-symbols-outlined text-[22px] min-[360px]:text-[24px]">backspace</span>
-                  </motion.button>
+                    CLEAR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePinPress("0")}
+                    className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                  >
+                    0
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePinDelete}
+                    className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">backspace</span>
+                  </button>
                 </div>
               </div>
 
