@@ -301,7 +301,15 @@ export default function PinPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || `Failed to send ${resetOption === "email" ? "Email" : "WhatsApp"} OTP.`);
+        let errStr = data.error || `Failed to send ${resetOption === "email" ? "Email" : "WhatsApp"} OTP.`;
+        if (
+          errStr.includes("WhatsApp instance") ||
+          errStr.includes("not active or connected") ||
+          errStr.includes("WhatsApp Dispatch Failed")
+        ) {
+          errStr = "WhatsApp OTP is not available at this time.";
+        }
+        toast.error(errStr);
       } else {
         toast.success(data.message || (resetOption === "email" ? "A 6-digit OTP has been sent to your registered email address." : "Verification code sent to registered WhatsApp number!"));
         setResetStage(2); // Transition to Stage 2: OTP Entry
@@ -533,7 +541,7 @@ export default function PinPage() {
         onConfirm={handleLogOutFromPin}
       />
 
-      {/* 90% Height Bottom Drawer for Forgot PIN recovery */}
+      {/* Full-Screen Hardware-Accelerated Overlay for Forgot PIN recovery */}
       <AnimatePresence>
         {showForgotPin && (
           <>
@@ -542,32 +550,25 @@ export default function PinPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.15 }}
               onClick={() => setShowForgotPin(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
             />
 
-            {/* Bottom Sheet Drawer */}
+            {/* Full Screen Overlay Container */}
             <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 32, stiffness: 380, mass: 0.7 }}
-              drag="y"
-              dragDirectionLock
-              dragConstraints={{ top: 0, bottom: 450 }}
-              dragElastic={0.1}
-              onDragEnd={handleForgotPinDragEnd}
-              style={{ willChange: "transform" }}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] p-6 pb-8 z-[99999] flex flex-col items-center shadow-none"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 15 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              style={{ willChange: "transform, opacity" }}
+              className="fixed inset-0 w-full h-full bg-white z-[100000+] flex flex-col justify-between overflow-hidden p-6 pb-8"
             >
-              {/* Grab handle */}
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-2 mb-4 shrink-0" />
-
+              <div className="w-full max-w-md mx-auto flex flex-col h-full items-center">
               {/* Header */}
               <div className="w-full flex justify-between items-center border-b border-gray-100 pb-4 mb-6 shrink-0">
                 <div className="w-8" />
-                <h3 className="font-hanken font-bold text-base text-black text-center">Reset Access PIN</h3>
+                <h3 className="font-hanken font-bold text-base text-black text-center">Reset PIN</h3>
                 <button
                   type="button"
                   onClick={() => setShowForgotPin(false)}
@@ -830,6 +831,7 @@ export default function PinPage() {
                 >
                   Cancel
                 </button>
+              </div>
               </div>
             </motion.div>
           </>

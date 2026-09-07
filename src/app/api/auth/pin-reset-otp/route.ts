@@ -55,8 +55,17 @@ export async function POST(req: Request) {
     }
 
     if (!response.ok) {
+      let rawErr = String(result.error || result.message || "Failed to dispatch PIN reset OTP.");
+      if (
+        rawErr.includes("WhatsApp instance") ||
+        rawErr.includes("not active or connected") ||
+        rawErr.includes("WhatsApp Dispatch Failed") ||
+        rawErr.includes("WHATSAPP_API")
+      ) {
+        rawErr = "WhatsApp OTP is not available at this time.";
+      }
       return NextResponse.json(
-        { error: result.error || result.message || "Failed to dispatch PIN reset OTP." },
+        { error: rawErr },
         { status: response.status }
       );
     }

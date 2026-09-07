@@ -58,7 +58,16 @@ export async function POST(req: Request) {
     }
 
     if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Failed to send WhatsApp OTP." }, { status: response.status });
+      let rawErr = String(result.message || result.error || "Failed to send WhatsApp OTP.");
+      if (
+        rawErr.includes("WhatsApp instance") ||
+        rawErr.includes("not active or connected") ||
+        rawErr.includes("WhatsApp Dispatch Failed") ||
+        rawErr.includes("WHATSAPP_API")
+      ) {
+        rawErr = "WhatsApp OTP is not available at this time.";
+      }
+      return NextResponse.json({ error: rawErr }, { status: response.status });
     }
 
     // Set server-side OTP request cooldown lock
