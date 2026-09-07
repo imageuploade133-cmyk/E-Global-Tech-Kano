@@ -544,26 +544,14 @@ export default function PinPage() {
       {/* Full-Screen Hardware-Accelerated Overlay for Forgot PIN recovery */}
       <AnimatePresence>
         {showForgotPin && (
-          <>
-            {/* Backdrop Overlay */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              onClick={() => setShowForgotPin(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99998]"
-            />
-
-            {/* Full Screen Overlay Container */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 15 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              style={{ willChange: "transform, opacity" }}
-              className="fixed inset-0 w-full h-full bg-white z-[100000+] flex flex-col justify-between overflow-hidden p-6 pb-8"
-            >
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 15 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            style={{ willChange: "transform, opacity" }}
+            className="fixed inset-0 w-full h-full bg-white z-[100000+] flex flex-col justify-between overflow-hidden p-6 pb-8"
+          >
               <div className="w-full max-w-md mx-auto flex flex-col h-full items-center">
               {/* Header */}
               <div className="w-full flex justify-between items-center border-b border-gray-100 pb-4 mb-6 shrink-0">
@@ -833,8 +821,7 @@ export default function PinPage() {
                 </button>
               </div>
               </div>
-            </motion.div>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
