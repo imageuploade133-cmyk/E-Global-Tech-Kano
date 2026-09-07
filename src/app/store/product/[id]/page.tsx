@@ -587,7 +587,35 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
-              <div className="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-black/75 text-white backdrop-blur-md flex items-center gap-1">
+              {gallery.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedGalleryIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+                    }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-xs z-10 transition-transform active:scale-90 border-0"
+                    title="Previous Image"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedGalleryIndex((prev) => (prev + 1) % gallery.length);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-xs z-10 transition-transform active:scale-90 border-0"
+                    title="Next Image"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                  </button>
+                </>
+              )}
+
+              <div className="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-black/75 text-white backdrop-blur-md flex items-center gap-1 z-10">
                 <span className="material-symbols-outlined text-[12px]">zoom_in</span>
                 <span>{selectedGalleryIndex + 1} / {gallery.length}</span>
               </div>
