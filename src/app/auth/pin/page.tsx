@@ -832,6 +832,7 @@ export default function PinPage() {
                   Cancel
                 </button>
               </div>
+              </div>
             </motion.div>
           </>
         )}
