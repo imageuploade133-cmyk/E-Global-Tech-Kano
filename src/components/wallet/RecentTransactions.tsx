@@ -51,7 +51,6 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
       return;
     }
 
-    // Check low-read session cache first unless explicit refresh is requested
     if (!forceRefresh && typeof window !== "undefined") {
       try {
         const raw = sessionStorage.getItem(`${RECENT_TX_CACHE_KEY}_${user.uid}`);
@@ -64,7 +63,7 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           }
         }
       } catch {
-        // Fall back to getDocs query on cache read error
+        // Fall back to getDocs query
       }
     }
 
@@ -98,13 +97,12 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
           vat: Number(data.vat) || 0,
           markup: Number(data.markup) || 0,
           totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
-            totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
+          totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
         } as Transaction);
       });
 
       setTransactions(list);
 
-      // Save in low-read session cache
       if (typeof window !== "undefined") {
         try {
           sessionStorage.setItem(
@@ -135,7 +133,6 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
     };
   }, [user]);
 
-  // Sync state with browser back history for swipe-to-dismiss behavior
   React.useEffect(() => {
     if (selectedTx) {
       window.history.pushState({ receiptOpen: true }, "");
@@ -160,27 +157,28 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
   }, [selectedTx]);
 
   return (
-    <section className="mb-stack-lg p-4 bg-white/95 border border-gray-200/90 rounded-[24px] shadow-3xs space-y-3.5 transition-all">
-      {/* Premium Header section */}
-      <div className="flex justify-between items-end px-0.5">
+    <section className="mb-stack-lg p-3 min-[360px]:p-3.5 bg-white/95 border border-gray-200/90 rounded-[20px] min-[360px]:rounded-[24px] shadow-3xs space-y-2.5 transition-all">
+      {/* Premium Compact Header section */}
+      <div className="flex justify-between items-center px-0.5">
         <div>
-          <h3 className="font-headline-md text-[16px] min-[360px]:text-[18px] text-gray-900 font-bold tracking-tight">
+          <h3 className="font-headline-md text-[13px] min-[360px]:text-[14px] min-[390px]:text-[15px] text-gray-900 font-bold tracking-tight">
             Quick Activity
           </h3>
-          <p className="font-hanken text-[9.5px] text-gray-400 font-extrabold uppercase tracking-widest mt-0.5">Real-time ledger feeds</p>
+          <p className="font-hanken text-[8px] min-[360px]:text-[8.5px] text-gray-400 font-extrabold uppercase tracking-wider mt-0.5">
+            Real-time ledger feeds
+          </p>
         </div>
         {isBalanceVisible && (
           <Link
             href="/history"
-            className="font-label-sm text-[11px] min-[360px]:text-xs text-[#FC7A00] font-black hover:brightness-110 flex items-center gap-0.5 transition-all"
+            className="font-label-sm text-[10px] min-[360px]:text-[11px] text-[#FC7A00] font-black hover:brightness-110 flex items-center gap-0.5 transition-all"
           >
             See All
-            <span className="material-symbols-outlined text-[15px] font-bold">arrow_forward</span>
+            <span className="material-symbols-outlined text-[13px] min-[360px]:text-[14px] font-bold">arrow_forward</span>
           </Link>
         )}
       </div>
 
-      {/* Glossy Tri-Gradient Transaction Cards or Hidden State Indicator */}
       <AnimatePresence mode="wait">
         {!isBalanceVisible ? (
           <motion.div
@@ -188,13 +186,13 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="p-5 bg-gray-50/80 border border-dashed border-gray-200 rounded-[20px] text-center space-y-2 select-none"
+            className="p-3.5 bg-gray-50/80 border border-dashed border-gray-200 rounded-[16px] text-center space-y-1.5 select-none"
           >
-            <div className="w-10 h-10 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00] mx-auto">
-              <span className="material-symbols-outlined text-[20px]">visibility_off</span>
+            <div className="w-8 h-8 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00] mx-auto">
+              <span className="material-symbols-outlined text-[16px]">visibility_off</span>
             </div>
-            <p className="font-hanken font-bold text-xs text-gray-700">Quick Activity Hidden</p>
-            <p className="font-hanken text-[10.5px] text-gray-400 max-w-xs mx-auto">
+            <p className="font-hanken font-bold text-[11px] text-gray-700">Quick Activity Hidden</p>
+            <p className="font-hanken text-[9.5px] text-gray-400 max-w-xs mx-auto">
               Click the eye icon on your balance card above to reveal your real-time ledger feed.
             </p>
           </motion.div>
@@ -204,121 +202,119 @@ export const RecentTransactions: React.FC<RecentTransactionsProps> = ({ isLoadin
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="space-y-3"
+            className="space-y-2"
           >
-        {(propIsLoading || loading) ? (
-          // Shimmer placeholders for transactions - exact layout matching live rows
-          [1, 2].map((i) => (
-            <div
-              key={i}
-              className="w-full relative overflow-hidden rounded-[20px] p-4.5 flex items-center justify-between gap-3 bg-gray-50/50 border border-gray-100 shadow-xs"
-            >
-              <div className="absolute left-0 top-0 bottom-0 w-[4.5px] bg-gray-200 skeleton-shimmer" />
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="w-11 h-11 rounded-full skeleton-shimmer flex-shrink-0" />
-                <div className="min-w-0 space-y-1.5">
-                  <div className="h-4 bg-gray-200 rounded skeleton-shimmer w-36" />
-                  <div className="h-3 bg-gray-100 rounded skeleton-shimmer w-20" />
-                </div>
-              </div>
-              <div className="text-right flex-shrink-0 space-y-2">
-                <div className="h-4 bg-gray-200 rounded skeleton-shimmer w-16 ml-auto" />
-                <div className="h-4.5 bg-gray-100 rounded-full skeleton-shimmer w-12 ml-auto" />
-              </div>
-            </div>
-          ))
-        ) : (
-          transactions.filter((tx) => {
-            const isPendingFunding = (tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT") && (tx.status === "PENDING" || tx.status === "pending");
-            return !isPendingFunding;
-          }).slice(0, 3).map((tx) => {
-            const isCredit = isCreditTransaction(tx);
-            const displayAmount = getTransactionDisplayAmount(tx);
-
-            return (
-              <motion.button
-                key={tx.id}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedTx(tx)}
-                className={cn(
-                  "w-full text-left relative overflow-hidden rounded-[20px] p-4.5 flex items-center justify-between gap-3 premium-gradient-border transition-all cursor-pointer shadow-xs",
-                  isCredit
-                    ? "bg-gradient-to-r from-emerald-500/[0.04] via-emerald-500/[0.01] to-white border-emerald-500/15 hover:border-emerald-500/35 hover:shadow-sm"
-                    : "bg-gradient-to-r from-[#FC7A00]/[0.04] via-[#FC7A00]/[0.01] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35 hover:shadow-sm"
-                )}
-              >
-                {/* Premium Multi-Color Side Accent Gradient Strip */}
+            {(propIsLoading || loading) ? (
+              [1, 2].map((i) => (
                 <div
-                  className={cn(
-                    "absolute left-0 top-0 bottom-0 w-[4.5px]",
-                    isCredit
-                      ? "bg-gradient-to-b from-[#07B038] via-emerald-500 to-[#034A17]"
-                      : "bg-gradient-to-b from-[#FC7A00] via-[#FF9E40] to-[#B35200]"
-                  )}
-                />
-
-                <div className="flex items-center gap-4 min-w-0">
-                  <TransactionIcon
-                    type={tx.type}
-                    description={tx.description}
-                    recipientName={tx.recipientName}
-                    bankName={tx.bankName}
-                    className="w-11 h-11"
-                  />
-
-                  <div className="min-w-0">
-                    <p className="font-hanken font-extrabold text-[13px] text-gray-900 leading-tight truncate">
-                      {tx.description}
-                    </p>
-                    {(() => {
-                      const dt = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
-                      return (
-                        <p className="font-hanken text-[9.5px] text-gray-400 mt-1 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                          <span>{dt.date}</span>
-                          <span className="w-1 h-1 rounded-full bg-gray-300" />
-                          <span>{dt.time}</span>
-                        </p>
-                      );
-                    })()}
+                  key={i}
+                  className="w-full relative overflow-hidden rounded-[16px] p-2.5 min-[360px]:p-3 flex items-center justify-between gap-2 bg-gray-50/50 border border-gray-100 shadow-xs"
+                >
+                  <div className="absolute left-0 top-0 bottom-0 w-[3.5px] bg-gray-200 skeleton-shimmer" />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8.5 h-8.5 rounded-full skeleton-shimmer flex-shrink-0" />
+                    <div className="min-w-0 space-y-1">
+                      <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-28" />
+                      <div className="h-2.5 bg-gray-100 rounded skeleton-shimmer w-16" />
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 space-y-1.5">
+                    <div className="h-3 bg-gray-200 rounded skeleton-shimmer w-14 ml-auto" />
+                    <div className="h-3.5 bg-gray-100 rounded-full skeleton-shimmer w-10 ml-auto" />
                   </div>
                 </div>
+              ))
+            ) : (
+              transactions
+                .filter((tx) => {
+                  const isPendingFunding = (tx.type === "WALLET_FUNDING" || tx.type === "DEPOSIT") && (tx.status === "PENDING" || tx.status === "pending");
+                  return !isPendingFunding;
+                })
+                .slice(0, 3)
+                .map((tx) => {
+                  const isCredit = isCreditTransaction(tx);
+                  const displayAmount = getTransactionDisplayAmount(tx);
 
-                {/* Amount and Status Pill layout */}
-                <div className="text-right flex-shrink-0">
-                  <p
-                    className={cn(
-                      "font-mono text-[14px] min-[360px]:text-[15px] font-black tracking-tight",
-                      isCredit ? "text-emerald-600" : "text-gray-950"
-                    )}
-                  >
-                    {isCredit ? "+" : "-"}
-                    ₦{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
+                  return (
+                    <motion.button
+                      key={tx.id}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setSelectedTx(tx)}
+                      className={cn(
+                        "w-full text-left relative overflow-hidden rounded-[16px] p-2.5 min-[360px]:p-3 flex items-center justify-between gap-2 premium-gradient-border transition-all cursor-pointer shadow-xs",
+                        isCredit
+                          ? "bg-gradient-to-r from-emerald-500/[0.04] via-emerald-500/[0.01] to-white border-emerald-500/15 hover:border-emerald-500/35 hover:shadow-sm"
+                          : "bg-gradient-to-r from-[#FC7A00]/[0.04] via-[#FC7A00]/[0.01] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35 hover:shadow-sm"
+                      )}
+                    >
+                      {/* Compact Side Accent Strip */}
+                      <div
+                        className={cn(
+                          "absolute left-0 top-0 bottom-0 w-[3.5px]",
+                          isCredit
+                            ? "bg-gradient-to-b from-[#07B038] via-emerald-500 to-[#034A17]"
+                            : "bg-gradient-to-b from-[#FC7A00] via-[#FF9E40] to-[#B35200]"
+                        )}
+                      />
 
-                  {(() => {
-                    const ledgerStatus = getTransactionLedgerStatus(tx);
-                    return (
-                      <div className="inline-flex items-center gap-1 bg-gray-50 border border-gray-150 rounded-full px-2 py-0.5 mt-1.5 shadow-3xs">
-                        <span className={cn(
-                          "w-1.5 h-1.5 rounded-full animate-pulse",
-                          ledgerStatus.dotBg
-                        )} />
-                        <span className="font-hanken text-[8px] font-black uppercase tracking-widest text-gray-500">
-                          {ledgerStatus.label}
-                        </span>
+                      <div className="flex items-center gap-2 min-[360px]:gap-2.5 min-w-0 flex-1">
+                        <TransactionIcon
+                          type={tx.type}
+                          description={tx.description}
+                          recipientName={tx.recipientName}
+                          bankName={tx.bankName}
+                          className="w-8.5 h-8.5 min-[360px]:w-9.5 min-[360px]:h-9.5 flex-shrink-0"
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <p className="font-hanken font-extrabold text-[11px] min-[360px]:text-[12px] text-gray-900 leading-tight truncate max-w-[130px] min-[360px]:max-w-[170px] min-[390px]:max-w-none">
+                            {tx.description}
+                          </p>
+                          {(() => {
+                            const dt = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
+                            return (
+                              <p className="font-hanken text-[8.5px] min-[360px]:text-[9px] text-gray-400 mt-0.5 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
+                                <span>{dt.date}</span>
+                                <span className="w-0.5 h-0.5 rounded-full bg-gray-300 flex-shrink-0" />
+                                <span>{dt.time}</span>
+                              </p>
+                            );
+                          })()}
+                        </div>
                       </div>
-                    );
-                  })()}
-                </div>
-              </motion.button>
-            );
-          })
-        )}
+
+                      {/* Amount and Status Pill layout */}
+                      <div className="text-right flex-shrink-0">
+                        <p
+                          className={cn(
+                            "font-mono text-[11.5px] min-[360px]:text-[12.5px] min-[390px]:text-[13.5px] font-black tracking-tight",
+                            isCredit ? "text-emerald-600" : "text-gray-950"
+                          )}
+                        >
+                          {isCredit ? "+" : "-"}
+                          ₦{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+
+                        {(() => {
+                          const ledgerStatus = getTransactionLedgerStatus(tx);
+                          return (
+                            <div className="inline-flex items-center gap-1 bg-gray-50 border border-gray-150 rounded-full px-1.5 py-0.2 mt-0.5 shadow-3xs">
+                              <span className={cn("w-1 h-1 rounded-full animate-pulse", ledgerStatus.dotBg)} />
+                              <span className="font-hanken text-[7px] min-[360px]:text-[7.5px] font-black uppercase tracking-wider text-gray-500">
+                                {ledgerStatus.label}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </motion.button>
+                  );
+                })
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Shared Transaction Receipt details Drawer modal wrapped in AnimatePresence for smooth exit transition */}
       <AnimatePresence>
         {selectedTx && (
           <TransactionReceipt transaction={selectedTx} onClose={() => setSelectedTx(null)} />
