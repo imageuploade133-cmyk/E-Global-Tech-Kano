@@ -18,6 +18,7 @@ import {
   getCachedStore,
   setCachedStore,
   clearStoreCache,
+  cacheProductDetail,
   getSavedCart,
   saveCart,
   getSavedWishlist,
@@ -194,6 +195,7 @@ export default function StorePage() {
 
   // Open Real Product Detail Page with Card Loading Feedback
   const handleOpenProductPage = (item: StoreItem) => {
+    cacheProductDetail(item);
     setNavigatingProductId(item.id);
     router.push(`/store/product/${item.id}`);
   };
@@ -1521,36 +1523,68 @@ export default function StorePage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3.5">
-                        {recentlyViewed.slice(0, visibleRecentlyViewedLimit).map((item) => (
-                          <div
-                            key={item.id}
-                            onClick={() => {
-                              setIsAllRecentlyViewedOpen(false);
-                              handleOpenProductPage(item);
-                            }}
-                            className="bg-gray-50 rounded-2xl p-3.5 flex flex-col justify-between space-y-3 cursor-pointer hover:bg-gray-100 transition-all border-0 shadow-xs"
-                          >
-                            <div className="w-full h-28 rounded-xl bg-white relative overflow-hidden flex items-center justify-center p-1 border-0">
-                              {item.imageUrl ? (
-                                <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
-                              ) : (
-                                <span className="material-symbols-outlined text-[32px] text-gray-300">storefront</span>
-                              )}
-                              <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
-                                {item.category}
-                              </span>
-                            </div>
+                        {recentlyViewed.slice(0, visibleRecentlyViewedLimit).map((item) => {
+                          const rvBorderColor = settings.hideBorders
+                            ? "transparent"
+                            : settings.enableGradientBorder
+                            ? settings.gradientColorStart || "#FC7A00"
+                            : settings.recentlyViewedBorderEnabled
+                            ? hexToRgba(settings.recentlyViewedBorderColor || "#FC7A00", settings.recentlyViewedBorderOpacity ?? 1)
+                            : hexToRgba(settings.borderColor || "#FC7A00", settings.borderOpacity ?? 1);
 
-                            <div>
-                              <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
-                                {item.title}
-                              </h4>
-                              <p className="font-mono font-black text-xs text-[#FC7A00] mt-1">
-                                ₦{item.price.toLocaleString()}
-                              </p>
+                          const effPrice = getEffectivePrice(item);
+                          const hasPromo = effPrice < item.price;
+
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => {
+                                setIsAllRecentlyViewedOpen(false);
+                                handleOpenProductPage(item);
+                              }}
+                              style={{
+                                borderColor: rvBorderColor,
+                                borderRadius: `${settings.cardBorderRadius ?? 16}px`,
+                                borderWidth: `${settings.borderWidth ?? 1}px`,
+                                ...(settings.enableGradientBorder && !settings.hideBorders
+                                  ? {
+                                      borderImage: `linear-gradient(135deg, ${settings.gradientColorStart || "#FC7A00"}, ${settings.gradientColorEnd || "#E06600"}) 1`,
+                                    }
+                                  : {}),
+                              }}
+                              className={`bg-white p-3.5 flex flex-col justify-between space-y-3 cursor-pointer hover:bg-gray-50 transition-all shadow-3xs ${
+                                settings.hideBorders ? "border-0" : "border"
+                              }`}
+                            >
+                              <div className="w-full h-28 rounded-xl bg-gray-50 relative overflow-hidden flex items-center justify-center p-1 border-0">
+                                {item.imageUrl ? (
+                                  <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-1" />
+                                ) : (
+                                  <span className="material-symbols-outlined text-[32px] text-gray-300">storefront</span>
+                                )}
+                                <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
+                                  {item.category}
+                                </span>
+                              </div>
+
+                              <div>
+                                <h4 className="font-hanken font-extrabold text-xs uppercase text-black line-clamp-1 leading-tight">
+                                  {item.title}
+                                </h4>
+                                <div className="flex items-baseline gap-1 mt-1 flex-wrap">
+                                  <span className="font-mono font-black text-xs text-[#FC7A00]">
+                                    ₦{effPrice.toLocaleString()}
+                                  </span>
+                                  {hasPromo && (
+                                    <span className="font-mono text-[9.5px] text-gray-400 line-through">
+                                      ₦{item.price.toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {recentlyViewed.length > visibleRecentlyViewedLimit && (
