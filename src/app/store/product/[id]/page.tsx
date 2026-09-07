@@ -430,6 +430,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const isSharingEnabled = settings.enableProductSharing !== false;
 
+  const avgRating = reviews.length > 0
+    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+    : product.rating
+    ? Number(product.rating).toFixed(1)
+    : null;
+
   return (
     <RouteGuard>
       <div id="store-page-root" className="min-h-dvh bg-[#F4F5F7] text-black pb-28">
@@ -488,7 +494,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer border-0"
+                className="relative w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center active:scale-95 transition-all cursor-pointer border-0"
                 title="Shopping Cart"
               >
                 <span
@@ -543,7 +549,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
             {/* Gallery Thumbnails */}
             {gallery.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5 select-none">
+              <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-2 px-0.5 select-none">
                 {gallery.map((img, idx) => {
                   const isSelected = selectedGalleryIndex === idx;
                   return (
@@ -551,11 +557,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       key={idx}
                       type="button"
                       onClick={() => setSelectedGalleryIndex(idx)}
-                      className={`w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-gray-50 border-0 ${
-                        isSelected ? "ring-2 ring-[#FC7A00] scale-105" : "opacity-60 hover:opacity-100"
+                      className={`w-14 h-14 rounded-2xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-gray-50 p-1 ${
+                        isSelected
+                          ? "border-2 border-[#FC7A00] bg-orange-50/40 shadow-xs"
+                          : "border border-gray-200/80 opacity-70 hover:opacity-100 hover:border-gray-300"
                       }`}
                     >
-                      <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-contain p-0.5" />
+                      <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-contain" />
                     </button>
                   );
                 })}
@@ -593,17 +601,27 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {product.title}
             </h2>
 
-            <div className="flex items-center gap-2.5 pt-1 text-[11px] text-gray-600">
-              <div className="flex items-center gap-1 text-amber-500 font-bold">
-                <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: '"FILL" 1' }}>
-                  star
-                </span>
-                <span>{product.rating || "4.9"}</span>
-              </div>
-              <span className="text-gray-300">•</span>
-              <span className="font-medium text-gray-500">{reviews.length} Customer Reviews</span>
-              <span className="text-gray-300">•</span>
-              <span className="font-bold text-gray-700">{product.soldCount || "250+"} Sold</span>
+            <div className="flex items-center gap-2.5 pt-1 text-[11px] text-gray-600 flex-wrap">
+              {avgRating && (
+                <>
+                  <div className="flex items-center gap-1 text-amber-500 font-bold">
+                    <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                      star
+                    </span>
+                    <span>{avgRating}</span>
+                  </div>
+                  <span className="text-gray-300">•</span>
+                </>
+              )}
+              <span className="font-medium text-gray-500">
+                {reviews.length} {reviews.length === 1 ? "Customer Review" : "Customer Reviews"}
+              </span>
+              {Boolean(product.soldCount && product.soldCount > 0) && (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <span className="font-bold text-gray-700">{product.soldCount} Sold</span>
+                </>
+              )}
             </div>
           </div>
 
