@@ -12,6 +12,7 @@ import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { AppLogo } from "@/components/AppLogo";
 
 interface BalanceCardProps {
   balance: number;
@@ -2103,15 +2104,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           <div className="flex justify-between items-start gap-2 w-full overflow-hidden flex-shrink-0">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 overflow-hidden">
-                <div className="relative w-4.5 h-4.5 min-[360px]:w-5 min-[360px]:h-5 flex-shrink-0 bg-white/10 rounded-sm p-0.5 overflow-hidden animate-fade-in" style={{ width: "20px", height: "20px" }}>
-                  <Image
-                    src={config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png"}
-                    alt="E-Tech Logo"
-                    fill
-                    sizes="20px"
-                    className="object-contain"
-                    priority
-                  />
+                <div className="relative w-5 h-5 flex-shrink-0 flex items-center justify-center animate-fade-in">
+                  <AppLogo logoUrl={config.logoUrl} size={20} />
                 </div>
                 <span className="font-label-sm text-[8px] min-[360px]:text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF] font-bold truncate">
                   E-TECH GLOBAL HUB
@@ -4328,8 +4322,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </form>
             ) : (
               /* PIN Authorization Step */
-              <div className="space-y-5 text-left">
-                <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-3 font-hanken shadow-xs">
+              <div className="space-y-5 flex flex-col items-center text-center w-full max-w-md mx-auto">
+                <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-3 font-hanken shadow-xs w-full text-left">
                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap Summary Breakdown</p>
 
                   <div className="flex justify-between text-xs font-bold text-gray-700">
@@ -4393,7 +4387,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </div>
 
                 {/* Custom Keypad for PIN input */}
-                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                     <button
                       key={num}
