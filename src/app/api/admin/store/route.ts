@@ -121,6 +121,7 @@ export async function POST(req: Request) {
               inStock: item.inStock !== false,
               stockQuantity: typeof item.stockQuantity === "number" ? item.stockQuantity : (item.stockQuantity ? Number(item.stockQuantity) : null),
               unlimitedStock: Boolean(item.unlimitedStock),
+              isHidden: Boolean(item.isHidden),
               updatedAt: now,
             };
           }
@@ -143,11 +144,26 @@ export async function POST(req: Request) {
           inStock: item.inStock !== false,
           stockQuantity: typeof item.stockQuantity === "number" ? item.stockQuantity : (item.stockQuantity ? Number(item.stockQuantity) : null),
           unlimitedStock: Boolean(item.unlimitedStock),
+          isHidden: Boolean(item.isHidden),
           createdAt: now,
           updatedAt: now,
         };
         items.unshift(newItem);
       }
+    } else if (action === "toggle_item_visibility") {
+      if (!itemId) {
+        return NextResponse.json({ error: "itemId is required to toggle visibility." }, { status: 400 });
+      }
+      items = items.map((i: any) => {
+        if (i.id === itemId) {
+          return {
+            ...i,
+            isHidden: !i.isHidden,
+            updatedAt: now,
+          };
+        }
+        return i;
+      });
     } else if (action === "delete_item") {
       if (!itemId) {
         return NextResponse.json({ error: "itemId is required for deletion." }, { status: 400 });

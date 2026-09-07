@@ -43,6 +43,16 @@ function CpanelStorePageContent() {
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Search & Filter state for CPanel
+  const [adminSearchQuery, setAdminSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "IN_STOCK" | "OUT_OF_STOCK" | "HIDDEN">("ALL");
+
+  // Interactive Card Image Carousel Indexes
+  const [cardImageIndexes, setCardImageIndexes] = useState<Record<string, number>>({});
+
+  // Visibility Toggling ID
+  const [isTogglingVisibilityId, setIsTogglingVisibilityId] = useState<string | null>(null);
+
   // Item Form & Edit Modal state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -59,6 +69,7 @@ function CpanelStorePageContent() {
   const [itemInStock, setItemInStock] = useState(true);
   const [itemStockQuantity, setItemStockQuantity] = useState<string>("");
   const [itemUnlimitedStock, setItemUnlimitedStock] = useState(true);
+  const [itemIsHidden, setItemIsHidden] = useState(false);
   const [newImageInput, setNewImageInput] = useState("");
   const [isUploadingItemImage, setIsUploadingItemImage] = useState(false);
   const [isSavingItem, setIsSavingItem] = useState(false);
@@ -197,6 +208,7 @@ function CpanelStorePageContent() {
     setItemInStock(true);
     setItemStockQuantity("");
     setItemUnlimitedStock(true);
+    setItemIsHidden(false);
     setNewImageInput("");
   };
 
@@ -218,6 +230,37 @@ function CpanelStorePageContent() {
     setItemUnlimitedStock(item.unlimitedStock !== false && (item.stockQuantity === null || item.stockQuantity === undefined));
     setNewImageInput("");
     setIsProductModalOpen(true);
+  };
+
+  const handleToggleVisibility = async (itemId: string) => {
+    setIsTogglingVisibilityId(itemId);
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "toggle_item_visibility",
+          itemId,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Product visibility updated!");
+        setItems(data.items || []);
+      } else {
+        toast.error(data.error || "Failed to update product visibility.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error updating visibility.");
+    } finally {
+      setIsTogglingVisibilityId(null);
+    }
   };
 
   const handleOpenAddModal = () => {
@@ -287,6 +330,7 @@ function CpanelStorePageContent() {
             inStock: itemInStock,
             stockQuantity: itemUnlimitedStock ? null : (itemStockQuantity !== "" ? parseInt(itemStockQuantity) : null),
             unlimitedStock: itemUnlimitedStock,
+            isHidden: itemIsHidden,
           },
         }),
       });
@@ -412,106 +456,384 @@ function CpanelStorePageContent() {
           </div>
         </div>
 
-        {/* Store Items Grid */}
+        {/* Top Metrics Summary Bar: Total Products, Catalog Value, Potential Profit if Sold */}
+        {(() => {
+          const totalProductsCount = items.length;
+          const totalValue = items.reduce((sum, i) => {
+            const price = i.discountPrice || i.price || 0;
+            const qty = i.unlimitedStock ? 1 : (i.stockQuantity || 1);
+            return sum + (price * qty);
+          }, 0);
+
+          const totalCost = items.reduce((sum, i) => {
+            const cost = i.costPrice || 0;
+            const qty = i.unlimitedStock ? 1 : (i.stockQuantity || 1);
+            return sum + (cost * qty);
+          }, 0);
+
+          const totalPotentialProfit = Math.max(0, totalValue - totalCost);
+
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+              <div className={cn("p-4 rounded-2xl border space-y-1", panelClass)}>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Total Products</span>
+                  <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">inventory_2</span>
+                </div>
+                <p className="font-mono text-xl font-black">{totalProductsCount}</p>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border space-y-1", panelClass)}>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Catalog Selling Value</span>
+                  <span className="material-symbols-outlined text-[18px] text-emerald-500">payments</span>
+                </div>
+                <p className="font-mono text-xl font-black text-emerald-600">₦{totalValue.toLocaleString()}</p>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border space-y-1", panelClass)}>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Wholesale Cost Value</span>
+                  <span className="material-symbols-outlined text-[18px] text-amber-500">shopping_bag</span>
+                </div>
+                <p className="font-mono text-xl font-black text-amber-600">₦{totalCost.toLocaleString()}</p>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border space-y-1 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5", panelClass)}>
+                <div className="flex items-center justify-between text-emerald-600">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Potential Profit If Sold</span>
+                  <span className="material-symbols-outlined text-[18px]">trending_up</span>
+                </div>
+                <p className="font-mono text-xl font-black text-emerald-600">+₦{totalPotentialProfit.toLocaleString()}</p>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Store Items Grid & Powerful Search + Filters */}
         <div className="space-y-4">
-          <div className={cn("p-4 rounded-2xl border flex items-center justify-between gap-4", panelClass)}>
+          <div className={cn("p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">inventory_2</span>
               <h3 className="font-extrabold text-sm uppercase">Products Directory ({items.length})</h3>
             </div>
 
+            {/* Powerful Search Bar */}
+            <div className="relative flex-1 max-w-md">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+                search
+              </span>
+              <input
+                type="text"
+                placeholder="Search products by title, category, description, ID..."
+                value={adminSearchQuery}
+                onChange={(e) => setAdminSearchQuery(e.target.value)}
+                className={cn("pl-9 pr-8 h-10 rounded-xl text-xs font-semibold outline-none border transition-all w-full", inputClass)}
+              />
+              {adminSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setAdminSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black border-0"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={handleOpenAddModal}
-              className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm flex-shrink-0"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               <span>Add Product</span>
             </button>
           </div>
 
-          <div className="w-full">
-            {isLoading ? (
-              <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
-                <ButtonSpinner />
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Storefront Products...</p>
-              </div>
-            ) : items.length === 0 ? (
-              <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
-                <span className="material-symbols-outlined text-[48px] text-gray-400">inventory_2</span>
-                <p className="text-xs font-black uppercase text-gray-400">No Store Products Added</p>
-                <p className="text-[11px] text-gray-500 max-w-md mx-auto">Click &quot;Add Product&quot; above to create and display items for end-users on the Store page.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {items.map((item) => {
-                  const isDeleting = deletingId === item.id;
-                  return (
-                    <div key={item.id} className={cn("p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition-all", panelClass)}>
-                      <div className="space-y-3">
-                        <div className="w-full h-36 rounded-xl border border-gray-200/50 bg-white overflow-hidden relative flex items-center justify-center">
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="material-symbols-outlined text-[48px] text-gray-300">storefront</span>
-                          )}
-                          <span className="absolute top-2 right-2 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-black/70 text-white backdrop-blur-xs">
-                            {item.category}
-                          </span>
-                        </div>
+          {/* Status Filter Tabs (ALL, IN STOCK, OUT OF STOCK, HIDDEN) */}
+          {(() => {
+            const inStockCount = items.filter((i: any) => i.inStock && !i.isHidden).length;
+            const outOfStockCount = items.filter((i: any) => !i.inStock && !i.isHidden).length;
+            const hiddenCount = items.filter((i: any) => Boolean(i.isHidden)).length;
 
-                        <div>
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{item.title}</h4>
-                            <div className="text-right">
-                              {item.discountPrice ? (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-mono text-[10px] text-gray-400 line-through">₦{item.price.toLocaleString()}</span>
-                                  <span className="font-mono font-black text-sm text-emerald-600">₦{item.discountPrice.toLocaleString()}</span>
+            return (
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("ALL")}
+                  className={cn(
+                    "px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border",
+                    statusFilter === "ALL"
+                      ? "bg-[#FC7A00] text-white border-[#FC7A00] shadow-2xs"
+                      : isDark ? "bg-gray-900 border-gray-800 text-gray-400" : "bg-white border-gray-200 text-gray-600"
+                  )}
+                >
+                  All Products ({items.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("IN_STOCK")}
+                  className={cn(
+                    "px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border",
+                    statusFilter === "IN_STOCK"
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                      : isDark ? "bg-gray-900 border-gray-800 text-emerald-500" : "bg-white border-gray-200 text-emerald-600"
+                  )}
+                >
+                  In Stock ({inStockCount})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("OUT_OF_STOCK")}
+                  className={cn(
+                    "px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border",
+                    statusFilter === "OUT_OF_STOCK"
+                      ? "bg-red-600 text-white border-red-600 shadow-2xs"
+                      : isDark ? "bg-gray-900 border-gray-800 text-red-500" : "bg-white border-gray-200 text-red-600"
+                  )}
+                >
+                  Out of Stock ({outOfStockCount})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("HIDDEN")}
+                  className={cn(
+                    "px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border",
+                    statusFilter === "HIDDEN"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
+                      : isDark ? "bg-gray-900 border-gray-800 text-purple-400" : "bg-white border-gray-200 text-purple-700"
+                  )}
+                >
+                  Hidden ({hiddenCount})
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* Filtered Items Grid */}
+          <div className="w-full">
+            {(() => {
+              const q = adminSearchQuery.toLowerCase().trim();
+              const filteredList = items.filter((item: any) => {
+                const matchesSearch =
+                  !q ||
+                  item.title.toLowerCase().includes(q) ||
+                  item.category.toLowerCase().includes(q) ||
+                  item.description.toLowerCase().includes(q) ||
+                  item.id.toLowerCase().includes(q);
+
+                let matchesStatus = true;
+                if (statusFilter === "IN_STOCK") matchesStatus = Boolean(item.inStock && !item.isHidden);
+                if (statusFilter === "OUT_OF_STOCK") matchesStatus = Boolean(!item.inStock && !item.isHidden);
+                if (statusFilter === "HIDDEN") matchesStatus = Boolean(item.isHidden);
+
+                return matchesSearch && matchesStatus;
+              });
+
+              if (isLoading) {
+                return (
+                  <div className={cn("p-12 rounded-2xl border text-center flex flex-col items-center justify-center gap-3", panelClass)}>
+                    <ButtonSpinner />
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Loading Storefront Products...</p>
+                  </div>
+                );
+              }
+
+              if (filteredList.length === 0) {
+                return (
+                  <div className={cn("p-12 rounded-2xl border text-center space-y-3", panelClass)}>
+                    <span className="material-symbols-outlined text-[48px] text-gray-400">inventory_2</span>
+                    <p className="text-xs font-black uppercase text-gray-400">No Matching Store Products</p>
+                    <p className="text-[11px] text-gray-500 max-w-md mx-auto">
+                      {adminSearchQuery
+                        ? `No products matched search query "${adminSearchQuery}".`
+                        : "No products match the selected status filter."}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredList.map((item: any) => {
+                    const isDeleting = deletingId === item.id;
+                    const isTogglingVisibility = isTogglingVisibilityId === item.id;
+                    const galleryImages = Array.isArray(item.images) && item.images.length > 0 ? item.images : (item.imageUrl ? [item.imageUrl] : []);
+                    const activeImageIdx = cardImageIndexes[item.id] || 0;
+                    const currentCardImage = galleryImages[activeImageIdx] || galleryImages[0] || item.imageUrl || "";
+
+                    const sellPrice = item.discountPrice || item.price || 0;
+                    const costPrice = item.costPrice || 0;
+                    const unitProfit = sellPrice - costPrice;
+                    const isProfitable = unitProfit > 0;
+                    const unitProfitPct = costPrice > 0 ? Math.round((unitProfit / costPrice) * 100) : 0;
+                    const stockQuantity = !item.unlimitedStock && typeof item.stockQuantity === "number" ? item.stockQuantity : 1;
+                    const totalCardProfit = unitProfit * stockQuantity;
+
+                    return (
+                      <div key={item.id} className={cn("p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition-all relative", panelClass)}>
+                        <div className="space-y-3">
+                          {/* Image Carousel Card Header */}
+                          <div className="w-full h-44 rounded-xl border border-gray-200/50 bg-white overflow-hidden relative flex items-center justify-center group select-none">
+                            {currentCardImage ? (
+                              <img src={currentCardImage} alt={item.title} className="w-full h-full object-contain p-2" />
+                            ) : (
+                              <span className="material-symbols-outlined text-[48px] text-gray-300">storefront</span>
+                            )}
+
+                            {/* Image Slide Prev / Next Overlay Buttons */}
+                            {galleryImages.length > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCardImageIndexes((prev) => ({
+                                      ...prev,
+                                      [item.id]: (activeImageIdx - 1 + galleryImages.length) % galleryImages.length,
+                                    }));
+                                  }}
+                                  className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center shadow-md cursor-pointer transition-transform active:scale-90 border-0"
+                                  title="Previous Image"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCardImageIndexes((prev) => ({
+                                      ...prev,
+                                      [item.id]: (activeImageIdx + 1) % galleryImages.length,
+                                    }));
+                                  }}
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center shadow-md cursor-pointer transition-transform active:scale-90 border-0"
+                                  title="Next Image"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                                </button>
+
+                                {/* Gallery Slide Counter Dots */}
+                                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/70 text-white text-[8px] font-mono font-bold backdrop-blur-xs">
+                                  {activeImageIdx + 1} / {galleryImages.length}
                                 </div>
-                              ) : (
-                                <span className="font-mono font-black text-sm text-[#FC7A00]">₦{item.price.toLocaleString()}</span>
-                              )}
+                              </>
+                            )}
+
+                            {/* Category Badge */}
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-black/75 text-white backdrop-blur-xs">
+                              {item.category}
+                            </span>
+
+                            {/* Hidden Status Tag */}
+                            {item.isHidden && (
+                              <span className="absolute top-2 right-2 px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase bg-purple-600 text-white shadow-xs">
+                                HIDDEN FROM STORE
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{item.title}</h4>
+                              <div className="text-right">
+                                {item.discountPrice ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-[10px] text-gray-400 line-through">₦{item.price.toLocaleString()}</span>
+                                    <span className="font-mono font-black text-sm text-emerald-600">₦{item.discountPrice.toLocaleString()}</span>
+                                  </div>
+                                ) : (
+                                  <span className="font-mono font-black text-sm text-[#FC7A00]">₦{item.price.toLocaleString()}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <p className="text-[10.5px] text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">
+                              {item.description || "No description provided."}
+                            </p>
+                          </div>
+
+                          {/* Profit & Unit Margin Summary Banner */}
+                          <div className="p-2.5 rounded-xl border border-gray-200/50 bg-gray-50/70 dark:bg-gray-900/60 grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <span className="text-[9px] font-extrabold text-gray-400 uppercase block">Wholesale Cost:</span>
+                              <span className="font-mono font-bold text-gray-700 dark:text-gray-300">
+                                {item.costPrice ? `₦${Number(item.costPrice).toLocaleString()}` : "Not Set"}
+                              </span>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="text-[9px] font-extrabold text-emerald-600 uppercase block">Profit / Unit:</span>
+                              <span className={cn("font-mono font-black", isProfitable ? "text-emerald-600" : "text-gray-500")}>
+                                {isProfitable ? `+₦${unitProfit.toLocaleString()} (${unitProfitPct}%)` : "₦0"}
+                              </span>
                             </div>
                           </div>
-                          <p className="text-[10.5px] text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{item.description || "No description provided."}</p>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-200/40">
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
+                              item.inStock ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"
+                            )}>
+                              {item.inStock ? (item.unlimitedStock ? "IN STOCK" : `${item.stockQuantity} UNITS`) : "OUT OF STOCK"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Hide / Unhide Store Visibility Quick Button */}
+                            <button
+                              type="button"
+                              disabled={isTogglingVisibility}
+                              onClick={() => handleToggleVisibility(item.id)}
+                              className={cn(
+                                "px-2 py-1 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider border flex items-center gap-1 cursor-pointer transition-all",
+                                item.isHidden
+                                  ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300"
+                                  : "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                              )}
+                              title={item.isHidden ? "Unhide from public store" : "Hide from public store"}
+                            >
+                              {isTogglingVisibility ? (
+                                <ButtonSpinner />
+                              ) : (
+                                <span className="material-symbols-outlined text-[14px]">
+                                  {item.isHidden ? "visibility_off" : "visibility"}
+                                </span>
+                              )}
+                              <span>{item.isHidden ? "Hidden" : "Visible"}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditItem(item)}
+                              className="text-[10px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">edit</span>
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isDeleting}
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                            >
+                              {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">delete</span>}
+                              <span>Delete</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-200/40">
-                        <span className={cn(
-                          "px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider border",
-                          item.inStock ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"
-                        )}>
-                          {item.inStock ? "IN STOCK" : "OUT OF STOCK"}
-                        </span>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleStartEditItem(item)}
-                            className="text-[10px] font-bold text-[#FC7A00] hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">edit</span>
-                            <span>Edit</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isDeleting}
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="text-[10px] font-bold text-red-500 hover:underline uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-                          >
-                            {isDeleting ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">delete</span>}
-                            <span>Delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -694,6 +1016,22 @@ function CpanelStorePageContent() {
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="p-3.5 rounded-2xl border border-gray-200/50 bg-gray-50/50 dark:bg-gray-900/50 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-extrabold uppercase text-purple-600 dark:text-purple-400 block">Product Visibility</span>
+                  <span className="text-[10px] text-gray-400 font-medium block">Hide or unhide this product from public storefront</span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={itemIsHidden}
+                    onChange={(e) => setItemIsHidden(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded"
+                  />
+                  <span className="text-[11px] font-extrabold text-purple-700 dark:text-purple-300">Hide Product</span>
+                </label>
               </div>
 
               <div className="space-y-2">

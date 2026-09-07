@@ -11,9 +11,12 @@ export async function GET() {
       ? data.categories
       : DEFAULT_STORE_CATEGORIES;
 
+    const rawItems = Array.isArray(data.items) ? data.items : [];
+    const visibleItems = rawItems.filter((i: any) => !i.isHidden);
+
     return NextResponse.json({
       success: true,
-      items: Array.isArray(data.items) ? data.items : [],
+      items: visibleItems,
       slides: Array.isArray(data.slides) ? data.slides : [],
       categories,
       settings: data.settings || { storeName: "E-Tech Store", storeLogoUrl: "", borderColor: "#FC7A00", hideBorders: false },
