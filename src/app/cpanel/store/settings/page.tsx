@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
 import { uploadImageSecurely } from "@/lib/image-upload";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
+import { clearStoreCache } from "@/lib/store-cache";
 
 interface StoreSettings {
   storeName?: string;
@@ -281,6 +282,7 @@ function CpanelStoreSettingsPageContent() {
 
       const data = await res.json();
       if (res.ok && data.success) {
+        clearStoreCache();
         toast.success("Storefront settings updated!");
       } else {
         toast.error(data.error || "Failed to update store settings.");
