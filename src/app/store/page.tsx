@@ -514,9 +514,9 @@ export default function StorePage() {
             }))}
           />
 
-          {/* Robust Search Input - Opens Full Screen Search Drawer */}
+          {/* Robust Search Input with Gradient Border - Opens Full Screen Search Drawer */}
           <div
-            className="relative w-full mb-4 transition-all duration-300 cursor-pointer"
+            className="w-full mb-4 transition-all duration-300 cursor-pointer p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] shadow-2xs hover:shadow-xs"
             style={{
               marginTop: `${settings.searchBarMarginTop || 0}px`,
             }}
@@ -527,28 +527,30 @@ export default function StorePage() {
               setIsSearchModalOpen(true);
             }}
           >
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
-              search
-            </span>
-            <input
-              type="text"
-              readOnly
-              value={searchQuery}
-              placeholder="Search store hardware, memberships, gear..."
-              className="w-full bg-gray-100/90 hover:bg-gray-150 rounded-2xl pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none transition-all cursor-pointer"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSearchQuery("");
-                }}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
+            <div className="relative w-full bg-white rounded-[14px] flex items-center overflow-hidden">
+              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#FC7A00] text-[20px]">
+                search
+              </span>
+              <input
+                type="text"
+                readOnly
+                value={searchQuery}
+                placeholder="Search store hardware, memberships, gear..."
+                className="w-full bg-white rounded-[14px] pl-11 pr-10 py-3 text-xs font-bold text-black placeholder-gray-400 outline-none border-0 shadow-none cursor-pointer"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchQuery("");
+                  }}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors border-0"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Visual Category Filter Chips with Custom Logos */}

@@ -59,9 +59,31 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [newComment, setNewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  // Gallery slider state
+  // Gallery slider & Full-Screen Image Viewer state
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
   const [productQuantity, setProductQuantity] = useState(1);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  useModalBackHandler(isImageViewerOpen, () => setIsImageViewerOpen(false), "product-image-viewer-modal");
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 35 && gallery.length > 1) {
+      if (diff > 0) {
+        setSelectedGalleryIndex((prev) => (prev + 1) % gallery.length);
+      } else {
+        setSelectedGalleryIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+      }
+    }
+    setTouchStartX(null);
+  };
 
   // User state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -241,12 +263,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       return;
     }
 
+    const itemToCart = {
+      ...product,
+      price: displayPrice,
+    };
+
     let updatedCart: CartItem[];
     if (existingIndex > -1) {
       updatedCart = [...cart];
+      updatedCart[existingIndex].product = itemToCart;
       updatedCart[existingIndex].quantity = targetTotalQty;
     } else {
-      updatedCart = [...cart, { product, quantity: qty }];
+      updatedCart = [...cart, { product: itemToCart, quantity: qty }];
     }
 
     updateCart(updatedCart);
@@ -427,10 +455,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const gallery = getProductGallery(product);
   const activeImgUrl = gallery[selectedGalleryIndex] || gallery[0] || product.imageUrl;
 
-  const promoPrice = product.promoPrice || (product.originalPrice && product.originalPrice > product.price ? product.price : undefined);
-  const listPrice = product.originalPrice || (promoPrice ? Math.round(product.price * 1.25) : undefined);
-  const discountPercent = listPrice && listPrice > product.price
-    ? Math.round(((listPrice - product.price) / listPrice) * 100)
+  const effectivePromoPrice = product.discountPrice || product.promoPrice;
+  const hasPromo = typeof effectivePromoPrice === "number" && effectivePromoPrice > 0 && effectivePromoPrice < product.price;
+  const displayPrice = hasPromo ? effectivePromoPrice : product.price;
+  const listPrice = hasPromo ? product.price : product.originalPrice;
+  const discountPercent = listPrice && listPrice > displayPrice
+    ? Math.round(((listPrice - displayPrice) / listPrice) * 100)
     : 0;
 
   const recommendedProducts = allItems.filter(
@@ -527,13 +557,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         <main className="max-w-md mx-auto pt-1 px-3 space-y-2.5">
           {/* Hero Media Carousel */}
           <div className="bg-white rounded-2xl p-2.5 shadow-3xs space-y-2 border-0">
-            <div className="w-full h-72 min-[375px]:h-80 rounded-xl bg-gray-50 relative overflow-hidden flex items-center justify-center p-2">
+            <div
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onClick={() => setIsImageViewerOpen(true)}
+              className="w-full h-72 min-[375px]:h-80 rounded-xl bg-gray-50 relative overflow-hidden flex items-center justify-center p-2 cursor-zoom-in group select-none"
+            >
               {activeImgUrl ? (
                 <Image
                   src={activeImgUrl}
                   alt={product.title}
                   fill
-                  className="object-contain p-1"
+                  className="object-contain p-1 group-hover:scale-102 transition-transform duration-300"
                   unoptimized
                 />
               ) : (
@@ -552,8 +587,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
-              <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-black/70 text-white backdrop-blur-md">
-                {selectedGalleryIndex + 1} / {gallery.length}
+              <div className="absolute bottom-2 right-2 px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-black/75 text-white backdrop-blur-md flex items-center gap-1">
+                <span className="material-symbols-outlined text-[12px]">zoom_in</span>
+                <span>{selectedGalleryIndex + 1} / {gallery.length}</span>
               </div>
             </div>
 
@@ -586,11 +622,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <div className="flex items-baseline justify-between gap-2">
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="font-mono text-2xl font-black text-[#FC7A00]">
-                  ₦{product.price.toLocaleString()}
+                  ₦{displayPrice.toLocaleString()}
                 </span>
-                {listPrice && listPrice > product.price && (
+                {listPrice && listPrice > displayPrice && (
                   <span className="font-mono text-xs text-gray-400 line-through">
                     ₦{listPrice.toLocaleString()}
+                  </span>
+                )}
+                {discountPercent > 0 && (
+                  <span className="px-2 py-0.5 rounded text-[8.5px] font-black uppercase bg-red-600 text-white shadow-2xs">
+                    -{discountPercent}% OFF
                   </span>
                 )}
                 {product.discountBadge && (
@@ -859,29 +900,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </button>
         </div>
 
-        {/* Shopping Cart Drawer */}
+        {/* Shopping Cart Smooth Full Screen Modal */}
         <AnimatePresence>
           {isCartOpen && (
-            <div className="fixed inset-0 z-[100002] flex flex-col justify-end">
+            <div className="fixed inset-0 z-[100002] bg-white flex flex-col justify-between overflow-hidden">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsCartOpen(false)}
-                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              />
-
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="relative bg-white rounded-t-[28px] max-h-[90vh] h-[85vh] flex flex-col text-black shadow-2xl z-10 max-w-md mx-auto w-full overflow-hidden"
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", damping: 32, stiffness: 350 }}
+                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
               >
-                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
-
-                <div className="px-5 pb-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100">
+                {/* Header */}
+                <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCartOpen(false)}
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                      title="Back"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    </button>
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">shopping_bag</span>
                     <div>
                       <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
@@ -1190,6 +1230,100 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <span>Confirm Order & Pay ₦{cartSubtotal.toLocaleString()}</span>
                       </button>
                     </div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Full-Screen Zoomable Image Viewer Modal */}
+        <AnimatePresence>
+          {isImageViewerOpen && (
+            <div className="fixed inset-0 z-[100010] bg-black text-white flex flex-col justify-between overflow-hidden">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                className="w-full h-full flex flex-col justify-between p-4 max-w-md mx-auto relative select-none"
+              >
+                {/* Header Bar */}
+                <div className="flex items-center justify-between z-20 pt-2">
+                  <span className="text-xs font-mono font-black uppercase tracking-widest text-gray-300">
+                    {selectedGalleryIndex + 1} of {gallery.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsImageViewerOpen(false)}
+                    className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer border-0"
+                    title="Close Viewer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">close</span>
+                  </button>
+                </div>
+
+                {/* Main Full Image View Area */}
+                <div
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  className="flex-1 relative flex items-center justify-center my-4 overflow-hidden"
+                >
+                  {activeImgUrl ? (
+                    <img
+                      src={activeImgUrl}
+                      alt={product.title}
+                      className="max-w-full max-h-full object-contain transition-all duration-300"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-[64px] text-gray-600">storefront</span>
+                  )}
+
+                  {/* Prev / Next Arrows */}
+                  {gallery.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedGalleryIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
+                        }}
+                        className="absolute left-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 shadow-lg cursor-pointer"
+                        title="Previous Image"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedGalleryIndex((prev) => (prev + 1) % gallery.length);
+                        }}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 shadow-lg cursor-pointer"
+                        title="Next Image"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Bottom Thumbnails Strip */}
+                {gallery.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar justify-center py-2 z-20">
+                    {gallery.map((img, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedGalleryIndex(idx)}
+                        className={`w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 relative transition-all cursor-pointer bg-gray-900 border ${
+                          selectedGalleryIndex === idx ? "border-[#FC7A00] ring-2 ring-[#FC7A00] scale-105" : "border-gray-800 opacity-50"
+                        }`}
+                      >
+                        <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-contain p-0.5" />
+                      </button>
+                    ))}
                   </div>
                 )}
               </motion.div>
