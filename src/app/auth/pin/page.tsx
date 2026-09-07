@@ -9,6 +9,7 @@ import { motion, AnimatePresence, PanInfo } from "framer-motion";
 
 import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { handleAppSignOut } from "@/lib/logout-util";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 function maskEmail(email?: string | null): string {
   if (!email || !email.includes("@")) return "t***t@gmail.com";
@@ -50,6 +51,8 @@ export default function PinPage() {
 
   // Forgot PIN bottom drawer state
   const [showForgotPin, setShowForgotPin] = useState(false);
+
+  useModalBackHandler(showForgotPin, () => setShowForgotPin(false), "forgot-pin-drawer");
   const [isRequestingReset, setIsRequestingReset] = useState(false);
   const [resetOption, setResetOption] = useState<"email" | "otp">("email");
   const hasPushedState = useRef(false);

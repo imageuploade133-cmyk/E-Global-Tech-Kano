@@ -1035,7 +1035,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">shopping_bag</span>
                     <div>
                       <h2 className="font-hanken font-bold text-base text-black uppercase tracking-wide">
-                        Shopping Cart
+                        Cart
                       </h2>
                       <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
                         {totalCartItems} {totalCartItems === 1 ? "Item" : "Items"} Selected
@@ -1209,7 +1209,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
                           Back to Cart
                         </button>
-                        <span className="text-xs font-black uppercase text-[#FC7A00]">Delivery & Payment Channel</span>
+                        <span className="text-xs font-black uppercase text-[#FC7A00]">Delivery & Payment</span>
                       </div>
 
                       <form id="checkout-form" onSubmit={handleConfirmCheckout} className="space-y-3.5">

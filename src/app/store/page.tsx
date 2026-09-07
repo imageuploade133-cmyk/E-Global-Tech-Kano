@@ -935,7 +935,7 @@ export default function StorePage() {
                     </button>
                     <span className="material-symbols-outlined text-red-500 text-[22px]">favorite</span>
                     <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
-                      My Saved Wishlist
+                      Wishlist
                     </h2>
                   </div>
                   <button
@@ -1063,7 +1063,7 @@ export default function StorePage() {
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">shopping_bag</span>
                     <div>
                       <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
-                        Shopping Cart
+                        Cart
                       </h2>
                       <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
                         {totalCartItems} {totalCartItems === 1 ? "Item" : "Items"} Selected
@@ -1400,7 +1400,7 @@ export default function StorePage() {
                     </button>
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
                     <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
-                      My Order History
+                      Order History
                     </h2>
                   </div>
                   <button
@@ -1484,7 +1484,7 @@ export default function StorePage() {
                     </button>
                     <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">history</span>
                     <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
-                      Recently Viewed History
+                      Recently Viewed
                     </h2>
                   </div>
                   <button

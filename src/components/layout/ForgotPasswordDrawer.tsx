@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { toast } from "sonner";
@@ -14,6 +15,8 @@ interface ForgotPasswordDrawerProps {
 
 export const ForgotPasswordDrawer: React.FC<ForgotPasswordDrawerProps> = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState("");
+
+  useModalBackHandler(isOpen, onClose, "forgot-password-drawer");
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const controls = useAnimation();
