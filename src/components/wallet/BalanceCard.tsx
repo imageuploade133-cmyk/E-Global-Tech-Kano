@@ -4328,8 +4328,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </form>
             ) : (
               /* PIN Authorization Step */
-              <div className="space-y-5 text-left">
-                <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-3 font-hanken shadow-xs">
+              <div className="space-y-5 flex flex-col items-center text-center w-full max-w-md mx-auto">
+                <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-3 font-hanken shadow-xs w-full text-left">
                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap Summary Breakdown</p>
 
                   <div className="flex justify-between text-xs font-bold text-gray-700">
@@ -4393,7 +4393,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </div>
 
                 {/* Custom Keypad for PIN input */}
-                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                     <button
                       key={num}
