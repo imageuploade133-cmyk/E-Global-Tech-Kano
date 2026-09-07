@@ -923,28 +923,33 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
               >
                 {/* Full Screen Header */}
-                <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
-                  <div className="flex items-center gap-2">
+                <div className="px-4 md:px-8 py-3.5 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
+                  <div className="flex items-center gap-2.5">
                     <button
                       type="button"
                       onClick={() => setIsWishlistModalOpen(false)}
-                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
+                      className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
                       title="Back"
                     >
                       <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                     </button>
-                    <span className="material-symbols-outlined text-red-500 text-[22px]">favorite</span>
-                    <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
-                      My Saved Wishlist
-                    </h2>
+                    <span className="material-symbols-outlined text-red-500 text-[24px]">favorite</span>
+                    <div>
+                      <h2 className="font-hanken font-black text-base md:text-lg text-black uppercase tracking-wide">
+                        My Saved Wishlist
+                      </h2>
+                      <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                        {wishlist.length} {wishlist.length === 1 ? "Saved Item" : "Saved Items"}
+                      </p>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsWishlistModalOpen(false)}
-                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                    className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
                     title="Close"
                   >
                     <span className="material-symbols-outlined text-[18px]">close</span>
@@ -952,7 +957,8 @@ export default function StorePage() {
                 </div>
 
                 {/* Scrollable Wishlist Content */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 custom-scrollbar">
+                  <div className="max-w-6xl mx-auto w-full">
                   {wishlist.length === 0 ? (
                     <div className="py-20 flex flex-col items-center text-center space-y-3">
                       <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-400">
@@ -969,7 +975,7 @@ export default function StorePage() {
                         Saved Items ({wishlist.length})
                       </p>
 
-                      <div className="grid grid-cols-2 gap-3.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
                         {wishlist.map((item) => (
                           <div
                             key={item.id}
@@ -1022,6 +1028,7 @@ export default function StorePage() {
                       </div>
                     </div>
                   )}
+                  </div>
                 </div>
               </motion.div>
             </div>
@@ -1037,7 +1044,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
               >
                 {/* Header */}
                 <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1375,7 +1382,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
               >
                 {/* Header */}
                 <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1459,7 +1466,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
               >
                 {/* Header */}
                 <div className="px-4 py-3 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1573,7 +1580,7 @@ export default function StorePage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 32, stiffness: 350 }}
-                className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
+                className="w-full h-full flex flex-col text-black overflow-hidden will-change-transform"
               >
                 {/* Header with Search Input & Back Button */}
                 <div className="px-4 py-2.5 flex items-center justify-between gap-2.5 flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
@@ -1590,33 +1597,35 @@ export default function StorePage() {
                     <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                   </button>
 
-                  <div className="relative flex-1">
-                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
-                      search
-                    </span>
-                    <input
-                      type="text"
-                      autoFocus
-                      value={searchModalQuery}
-                      onChange={(e) => {
-                        setSearchModalQuery(e.target.value);
-                        setVisibleSearchLimit(20);
-                      }}
-                      placeholder="Search store products, gear, hardware..."
-                      className="w-full bg-gray-100 focus:bg-gray-150 rounded-2xl pl-10 pr-9 py-2.5 text-xs font-semibold text-black placeholder-gray-400 outline-none border-0 shadow-none"
-                    />
-                    {searchModalQuery && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchModalQuery("");
+                  <div className="relative flex-1 p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] shadow-2xs">
+                    <div className="relative w-full bg-white rounded-[14px] flex items-center overflow-hidden">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#FC7A00] text-[18px]">
+                        search
+                      </span>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={searchModalQuery}
+                        onChange={(e) => {
+                          setSearchModalQuery(e.target.value);
                           setVisibleSearchLimit(20);
                         }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black border-0"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
-                      </button>
-                    )}
+                        placeholder="Search store products, gear, hardware..."
+                        className="w-full bg-white rounded-[14px] pl-9 pr-9 py-2 text-xs font-bold text-black placeholder-gray-400 outline-none border-0 shadow-none"
+                      />
+                      {searchModalQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchModalQuery("");
+                            setVisibleSearchLimit(20);
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black border-0"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">close</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <button
