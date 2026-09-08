@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 export interface Notification {
   id: string;
@@ -45,37 +46,15 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [isPageLoadingMore, setIsPageLoadingMore] = useState(false);
 
-  // Use refs to avoid effect-cleanup loops when states transition
-  const selectedRef = useRef<Notification | null>(null);
-  selectedRef.current = selectedNotification;
+  // 1. Back button & history stack handler for main Notification Tray
+  useModalBackHandler(isOpen, onClose, "notification-tray");
 
-  // Single-channel, unified popstate listener for back button integration
-  useEffect(() => {
-    if (isOpen) {
-      // Push state representing main tray open
-      window.history.pushState({ notificationsOpen: true }, "");
-
-      const handlePopState = (e: PopStateEvent) => {
-        // Only respond if this state actually is ours to avoid closing other modals (like LogoutDrawer)
-        if (e.state && (e.state.notificationsOpen || e.state.detailOpen)) {
-          if (selectedRef.current) {
-            setSelectedNotification(null);
-          } else {
-            onClose();
-          }
-        }
-      };
-
-      window.addEventListener("popstate", handlePopState);
-      return () => {
-        window.removeEventListener("popstate", handlePopState);
-        // Clean up main tray history state if closed manually
-        if (window.history.state?.notificationsOpen) {
-          window.history.back();
-        }
-      };
-    }
-  }, [isOpen, onClose]);
+  // 2. Back button & history stack handler for Notification Detail Sub-drawer
+  useModalBackHandler(
+    !!selectedNotification,
+    () => setSelectedNotification(null),
+    "notification-detail"
+  );
 
   // Simulate skeleton loader when opening the tray
   useEffect(() => {
@@ -93,30 +72,14 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
     setIsPageLoadingMore(false);
   }, [notifications.length]);
 
-  // Prevent background scrolling while tray or detail is open
-  useEffect(() => {
-    if (isOpen || selectedNotification) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, selectedNotification]);
-
-  // Trigger sub-drawer and push custom history state for popstate back button support
+  // Trigger sub-drawer for notification details
   const handleNotificationClick = (n: Notification) => {
     onToggleRead(n.id);
-    window.history.pushState({ detailOpen: true }, "");
     setSelectedNotification(n);
   };
 
-  // Close sub-drawer manually and align browser history
+  // Close sub-drawer manually
   const handleCloseDetail = () => {
-    if (window.history.state?.detailOpen) {
-      window.history.back();
-    }
     setSelectedNotification(null);
   };
 
