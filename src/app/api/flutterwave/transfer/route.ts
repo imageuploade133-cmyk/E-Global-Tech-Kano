@@ -370,24 +370,6 @@ export async function POST(req: Request) {
           processingTimeMs: Date.now() - startTime,
         });
 
-        // Send Notification
-        try {
-          NotificationService.sendPushNotification(uid, {
-            title: "💸 Bank Transfer Sent",
-            body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
-            type: "transaction",
-            url: "/history",
-            amount: trfAmount,
-            currency: trfCurrency || "NGN",
-            reference: trfReference,
-            recipientName: trfName,
-            bankName: trfBankName || "Bank Transfer",
-            channel: "Outward Transfer",
-          });
-        } catch (notifErr: any) {
-          console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);
-        }
-
         // Update transaction record with provider reference and re-affirm customer fee & markup
         const provRef = gatewayData.provider_reference || gatewayData.data?.id || gatewayData.data?.reference;
         const combinedFee = providerFee + transferProfitMargin;
@@ -410,6 +392,34 @@ export async function POST(req: Request) {
           await adminDb.collection("transactions").doc(`tx-${trfReference}`).update(updatePayload);
         } catch (updateErr: any) {
           console.warn("[Transfer API] Failed to update transaction providerReference:", updateErr.message);
+        }
+
+        // Verification delay: Re-read transaction status from Firestore to confirm 100% SUCCESS (not FAILED, PENDING, or REVERSED)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        try {
+          const finalTxSnap = await adminDb.collection("transactions").doc(`tx-${trfReference}`).get();
+          const finalTxStatus = finalTxSnap.exists ? String(finalTxSnap.data()?.status || "").toUpperCase() : "SUCCESS";
+
+          if (finalTxStatus === "SUCCESS") {
+            NotificationService.sendPushNotification(uid, {
+              title: "💸 Bank Transfer Sent",
+              body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
+              type: "transaction",
+              url: "/history",
+              amount: trfAmount,
+              currency: trfCurrency || "NGN",
+              reference: trfReference,
+              recipientName: trfName,
+              bankName: trfBankName || "Bank Transfer",
+              channel: "Outward Transfer",
+            });
+            console.log(`[Transfer API] Added notification for 100% successful transfer ref=${trfReference}`);
+          } else {
+            console.warn(`[Transfer API] Skipping notification dispatch: transfer ref=${trfReference} status is '${finalTxStatus}' (not 100% SUCCESS)`);
+          }
+        } catch (notifErr: any) {
+          console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);
         }
 
         return NextResponse.json({
