@@ -430,7 +430,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Route protection rules for standard login status
   useEffect(() => {
     const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-    if (loading && !isMock) return;
+    if ((loading || (user && !userData)) && !isMock) return;
 
     const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
 
@@ -438,7 +438,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       if (!isPublicRoute) {
         router.push("/auth/login");
       }
-    } else if (user) {
+    } else if (user && userData) {
       const hasPin = Boolean(userData?.pin || userData?.pinHash);
       const isPinRequired = userData?.isPinRequired !== false;
 
@@ -776,6 +776,40 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   if (!user && !isPublicRoute && !isMockRoute) return null;
   if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) return <>{children}</>;
+
+  // Wait for Firestore user data to arrive before making any PIN decision
+  if (user && !userData && !isMockRoute) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
+        <div className="relative flex flex-col items-center">
+          <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50">
+            <div className="relative w-10 h-10 flex items-center justify-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1.0, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-[2px] border-gray-100/80 border-t-[#FC7A00] border-r-[#0b513d]"
+              />
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                className="relative w-7 h-7 bg-white rounded-full flex items-center justify-center overflow-hidden"
+              >
+                <AppLogo size={24} />
+              </motion.div>
+            </div>
+            <motion.p
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+              className="mt-3 font-hanken font-bold text-[8px] tracking-[0.25em] uppercase text-gray-400 select-none"
+            >
+              E-TECH HUB
+            </motion.p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (user && !(userData?.pin || userData?.pinHash) && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
   if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
