@@ -409,9 +409,21 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const showPendingCard = !isPermAccountLoading && !permanentAccount;
   const showSuccessCard = !isPermAccountLoading && !!permanentAccount;
 
-  // Outward Transfer Wizard States
+  // Outward Transfer Wizard States & Fast Deferred Loading
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isTrfContentReady, setIsTrfContentReady] = useState(false);
   const [trfStep, setTrfStep] = useState<"input" | "amount" | "confirm" | "pin" | "completion">("input");
+
+  useEffect(() => {
+    if (isTransferOpen) {
+      const raf = requestAnimationFrame(() => {
+        setIsTrfContentReady(true);
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      setIsTrfContentReady(false);
+    }
+  }, [isTransferOpen]);
   const [trfKeypadNumbers, setTrfKeypadNumbers] = useState<string[]>([]);
 
   const shuffleTrfKeypad = () => {
@@ -1305,6 +1317,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   // Close Outward Transfer Drawer
   const handleCloseTransferModal = () => {
     setIsTransferOpen(false);
+    setIsTrfContentReady(false);
     setTimeout(() => {
       setTrfStep("input");
       setTrfBank(null);
@@ -3031,6 +3044,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </button>
             </div>
 
+            {!isTrfContentReady ? (
+              <div className="flex-1 flex flex-col items-center justify-center my-auto py-12">
+                <div className="w-9 h-9 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin mb-3" />
+                <span className="font-hanken text-xs font-bold text-gray-400 uppercase tracking-wider">Loading Transfer Portal...</span>
+              </div>
+            ) : (
             <AnimatePresence mode="wait">
               {/* STAGE 1: Single or Bulk Mode Recipient Selector */}
               {trfStep === "input" && (
@@ -4016,6 +4035,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
             </AnimatePresence>
+            )}
           </motion.div>
         </>
       )}
