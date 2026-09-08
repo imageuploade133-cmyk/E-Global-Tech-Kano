@@ -1,23 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
+import React from "react";
+import { motion } from "framer-motion";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { useAuth } from "@/lib/AuthContext";
-
 import { useAppConfig } from "@/lib/ConfigContext";
+
+import { SupportHeroSection } from "@/components/support/SupportHeroSection";
+import { SupportNoticeSection } from "@/components/support/SupportNoticeSection";
+import { ContactHotlinesSection } from "@/components/support/ContactHotlinesSection";
+import { QuickDisputeSection } from "@/components/support/QuickDisputeSection";
+import { SupportFaqSection } from "@/components/support/SupportFaqSection";
 
 export default function SupportPage() {
   const { userData, user } = useAuth();
   const { config } = useAppConfig();
-  const [activeFAQ, setActiveFAQ] = useState<number | null>(null);
 
   const userName = (userData?.name || user?.displayName || "Captain") as string;
   const currentPhoto = (userData?.photoURL || user?.photoURL || "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
-  // Mock priority number list
   const CONTACTS = [
     {
       id: "priority",
@@ -56,18 +58,6 @@ export default function SupportPage() {
     }
   ];
 
-  const handleCopyPhone = (phone: string, title: string) => {
-    navigator.clipboard.writeText(phone);
-    toast.success(`${title} number copied to clipboard!`);
-  };
-
-  const handleSimulateDispute = (type: string) => {
-    toast.info(`Dispute ticket for "${type}" initiated! Our support system is generating your tracking reference...`);
-    setTimeout(() => {
-      toast.success("Ticket #ET-99382 Created. A care representative will reach out in a few minutes.");
-    }, 1500);
-  };
-
   return (
     <>
       <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
@@ -93,192 +83,20 @@ export default function SupportPage() {
             </div>
           </div>
 
-          {/* Premium Hero Card with Support Mic Icon */}
-          <section className="premium-gradient-card premium-gradient-border p-5 relative overflow-hidden bg-gradient-to-br from-surface-container-highest to-surface-container">
-            <div className="absolute right-[-10px] top-[-10px] opacity-10">
-              <span className="material-symbols-outlined text-[120px] text-primary" style={{ fontVariationSettings: '"wght" 300' }}>
-                support_agent
-              </span>
-            </div>
+          {/* Premium Hero Card */}
+          <SupportHeroSection userName={userName} />
 
-            <div className="flex gap-4 items-start relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] flex-shrink-0">
-                <span className="material-symbols-outlined text-[28px]">headset_mic</span>
-              </div>
-              <div>
-                <h3 className="font-hanken font-extrabold text-sm text-black">How can we assist you, {userName.split(" ")[0]}?</h3>
-                <p className="font-hanken text-xs text-gray-500 mt-1 leading-relaxed font-semibold">
-                  Reach out directly via call or chat for immediate resolution of transfer issues, limits, or security concerns.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Core Instruction Steps: Beautiful and Clear */}
-          <section className="premium-gradient-card premium-gradient-border p-5 space-y-4 bg-white shadow-sm">
-            <h4 className="font-hanken font-bold text-[12px] uppercase tracking-wider text-gray-400 border-b border-gray-100 pb-2">
-              Calling Support: Steps & Security Notice
-            </h4>
-
-            <div className="space-y-3.5">
-              {/* Step 1 */}
-              <div className="flex gap-3 items-start">
-                <div className="w-5 h-5 rounded-full bg-[#FC7A00] text-white flex items-center justify-center font-mono text-[10px] font-bold mt-0.5 flex-shrink-0">
-                  1
-                </div>
-                <div>
-                  <p className="font-hanken font-bold text-xs text-black">Locate Your Account Details</p>
-                  <p className="font-hanken text-[10px] text-gray-400 mt-0.5 leading-relaxed font-semibold">
-                    Find your Customer ID or registered email. Providing this to our agent expedites identity confirmation.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="flex gap-3 items-start">
-                <div className="w-5 h-5 rounded-full bg-[#FC7A00] text-white flex items-center justify-center font-mono text-[10px] font-bold mt-0.5 flex-shrink-0">
-                  2
-                </div>
-                <div>
-                  <p className="font-hanken font-bold text-xs text-black">Tap the Phone Link below</p>
-                  <p className="font-hanken text-[10px] text-gray-400 mt-0.5 leading-relaxed font-semibold">
-                    We support one-touch direct dial. Click any hotline below to initiate a premium, immediate call connection.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 3 - Critical Security Notice */}
-              <div className="flex gap-3 items-start p-3 bg-error-container/40 border border-error/15 rounded-2xl">
-                <div className="w-5 h-5 rounded-full bg-error text-error-container flex items-center justify-center mt-0.5 flex-shrink-0">
-                  <span className="material-symbols-outlined text-[12px] font-bold">gpp_maybe</span>
-                </div>
-                <div>
-                  <p className="font-hanken font-bold text-xs text-error">CRITICAL SECURITY WARNING</p>
-                  <p className="font-hanken text-[10px] text-gray-600 mt-0.5 leading-relaxed font-semibold">
-                    Our support agents will <strong className="text-black underline">NEVER</strong> ask for your Access PIN, login password, or transaction OTP tokens. Never share this data with anyone over phone or chat.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
+          {/* Core Instruction Steps */}
+          <SupportNoticeSection />
 
           {/* Contact Methods (Interactive Hotlines) */}
-          <section className="space-y-3">
-            <h4 className="font-hanken font-bold text-[12px] uppercase tracking-wider text-gray-400 px-1">
-              Select Contact Hotline
-            </h4>
-
-            <div className="space-y-3">
-              {CONTACTS.map((contact) => (
-                <div
-                  key={contact.id}
-                  className="premium-gradient-card premium-gradient-border p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex gap-3 items-center min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-700 flex-shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">{contact.icon}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="font-hanken font-bold text-xs text-black truncate">{contact.title}</p>
-                        <span className="px-1.5 py-0.5 bg-gray-100 text-[8px] font-black uppercase text-gray-500 rounded tracking-wider">
-                          {contact.badge}
-                        </span>
-                      </div>
-                      <p className="font-mono font-bold text-[13px] text-black mt-1 tracking-tight">
-                        {contact.formattedPhone}
-                      </p>
-                      <p className="font-hanken text-[9px] text-gray-400 mt-0.5">{contact.subtitle}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-1.5 flex-shrink-0 ml-2">
-                    <button
-                      type="button"
-                      onClick={() => handleCopyPhone(contact.phone, contact.title)}
-                      className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 hover:text-black active:scale-90 transition-all cursor-pointer"
-                      title="Copy Number"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                    </button>
-                    <a
-                      href={`tel:${contact.phone.replace(/\s+/g, "")}`}
-                      className="w-8 h-8 rounded-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] flex items-center justify-center text-white active:scale-90 transition-all cursor-pointer"
-                      title="Call Now"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">call</span>
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <ContactHotlinesSection contacts={CONTACTS} />
 
           {/* Priority Quick Dispute Tickets */}
-          <section className="premium-gradient-card premium-gradient-border p-5 space-y-3 bg-white shadow-sm">
-            <div>
-              <h4 className="font-hanken font-bold text-xs text-black">Need Quick Troubleshooting?</h4>
-              <p className="font-hanken text-[10px] text-gray-400 mt-0.5">Click any category to raise a priority claim instantly</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleSimulateDispute("Failed Transfer Return")}
-                className="p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-xl text-left transition-colors active:scale-95 cursor-pointer flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">payments</span>
-                <span className="font-hanken text-[10px] font-bold text-black leading-tight">Failed Transfer</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSimulateDispute("Biometric Re-calibration")}
-                className="p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-xl text-left transition-colors active:scale-95 cursor-pointer flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px] text-emerald-500">face</span>
-                <span className="font-hanken text-[10px] font-bold text-black leading-tight">KYC / Face ID</span>
-              </button>
-            </div>
-          </section>
+          <QuickDisputeSection />
 
           {/* Quick FAQ Section */}
-          <section className="premium-gradient-card premium-gradient-border p-5 space-y-3 bg-white shadow-sm">
-            <h4 className="font-hanken font-bold text-[11px] uppercase tracking-wider text-gray-400 border-b border-gray-100 pb-2">
-              Frequently Asked Questions
-            </h4>
-
-            <div className="space-y-2">
-              {FAQs.map((faq, idx) => (
-                <div key={idx} className="border-b border-gray-50 pb-2 last:border-none last:pb-0">
-                  <button
-                    type="button"
-                    onClick={() => setActiveFAQ(activeFAQ === idx ? null : idx)}
-                    className="w-full flex justify-between items-center text-left py-1 outline-none text-black hover:text-[#FC7A00] transition-colors cursor-pointer"
-                  >
-                    <span className="font-hanken font-bold text-[11px] pr-2">{faq.question}</span>
-                    <span className="material-symbols-outlined text-[16px] text-gray-400 flex-shrink-0">
-                      {activeFAQ === idx ? "expand_less" : "expand_more"}
-                    </span>
-                  </button>
-                  <AnimatePresence>
-                    {activeFAQ === idx && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <p className="font-hanken text-[10px] text-gray-400 mt-1 leading-relaxed font-semibold">
-                          {faq.answer}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ))}
-            </div>
-          </section>
+          <SupportFaqSection faqs={FAQs} />
         </motion.div>
       </main>
 
