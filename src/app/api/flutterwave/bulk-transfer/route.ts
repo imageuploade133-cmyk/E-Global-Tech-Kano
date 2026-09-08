@@ -364,14 +364,24 @@ export async function POST(req: Request) {
           processingTimeMs: Date.now() - startTime,
         });
 
-        // Send Notification
+        // Verification delay: Re-read transaction status from Firestore to confirm 100% SUCCESS (not FAILED, PENDING, or REVERSED)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         try {
-          NotificationService.sendPushNotification(uid, {
-            title: "💸 Bulk Transfer Queued",
-            body: `Your bulk transfer of ₦${totalAmt.toLocaleString()} for ${trfRecipients.length} recipients has been successfully queued.`,
-            type: "transaction",
-            url: "/history",
-          });
+          const finalTxSnap = await adminDb.collection("transactions").doc(`tx-${trfReference}`).get();
+          const finalTxStatus = finalTxSnap.exists ? String(finalTxSnap.data()?.status || "").toUpperCase() : "SUCCESS";
+
+          if (finalTxStatus === "SUCCESS") {
+            NotificationService.sendPushNotification(uid, {
+              title: "💸 Bulk Transfer Queued",
+              body: `Your bulk transfer of ₦${totalAmt.toLocaleString()} for ${trfRecipients.length} recipients has been successfully queued.`,
+              type: "transaction",
+              url: "/history",
+            });
+            console.log(`[Bulk Transfer API] Added notification for 100% successful bulk transfer ref=${trfReference}`);
+          } else {
+            console.warn(`[Bulk Transfer API] Skipping notification dispatch: bulk transfer ref=${trfReference} status is '${finalTxStatus}' (not 100% SUCCESS)`);
+          }
         } catch (notifErr: any) {
           console.error("[Notification Warning] Failed to dispatch real bulk transfer notification:", notifErr.message);
         }
