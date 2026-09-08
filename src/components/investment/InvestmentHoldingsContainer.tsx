@@ -11,7 +11,7 @@ interface InvestmentHoldingsContainerProps {
   isLoadingHistory: boolean;
   investments: ActiveInvestment[];
   onSelectDetailInv: (inv: ActiveInvestment) => void;
-  onClaim: (invId: string) => void;
+  onOpenClaimPinModal: (invId: string) => void;
   onOpenCancelModal: (invId: string) => void;
 }
 
@@ -23,7 +23,7 @@ export function InvestmentHoldingsContainer({
   isLoadingHistory,
   investments,
   onSelectDetailInv,
-  onClaim,
+  onOpenClaimPinModal,
   onOpenCancelModal,
 }: InvestmentHoldingsContainerProps) {
   return (
@@ -176,12 +176,12 @@ export function InvestmentHoldingsContainer({
                               {inv.status === "CLAIM_REQUESTED" ? (
                                 <div className="w-full py-2 bg-amber-500/10 border border-amber-500/30 text-amber-600 rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5">
                                   <span className="material-symbols-outlined text-[14px] animate-spin">hourglass_empty</span>
-                                  Payout Requested • Awaiting Admin Approval
+                                  Payout Requested • Pending Approval
                                 </div>
                               ) : isMatured ? (
                                 <button
                                   type="button"
-                                  onClick={() => onClaim(inv.id)}
+                                  onClick={() => onOpenClaimPinModal(inv.id)}
                                   className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-hanken text-[11px] font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
                                 >
                                   <span className="material-symbols-outlined text-[14px]">payments</span>
@@ -224,7 +224,7 @@ export function InvestmentHoldingsContainer({
                     : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                 }`}
               >
-                {chip}
+                {chip === "CLAIMED" ? "Settled" : chip}
               </button>
             ))}
           </div>
@@ -249,7 +249,7 @@ export function InvestmentHoldingsContainer({
                 No Investment History Found
               </p>
               <p className="font-hanken text-[10px] text-gray-400 leading-relaxed max-w-[220px]">
-                Completed payouts and early cancellations will appear here.
+                Pending requests, completed payouts, and early cancellations will appear here.
               </p>
             </div>
           ) : (
@@ -263,6 +263,7 @@ export function InvestmentHoldingsContainer({
                 })
                 .map((inv) => {
                   const isClaimed = inv.status === "CLAIMED";
+                  const isPendingApproval = inv.status === "CLAIM_REQUESTED";
                   const isCancelled = inv.status === "CANCELLED";
 
                   return (
@@ -275,15 +276,25 @@ export function InvestmentHoldingsContainer({
                         <div>
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-hanken text-[8.5px] font-black uppercase tracking-wider mb-1.5 border ${
                             isClaimed
-                              ? "bg-blue-50 text-blue-600 border-blue-200"
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                              : isPendingApproval
+                              ? "bg-amber-50 text-amber-600 border-amber-200"
                               : isCancelled
                               ? "bg-red-50 text-red-600 border-red-200"
                               : "bg-gray-50 text-gray-600 border-gray-200"
                           }`}>
                             <span className="material-symbols-outlined text-[10px]">
-                              {isClaimed ? "check_circle" : "cancel"}
+                              {isClaimed
+                                ? "check_circle"
+                                : isPendingApproval
+                                ? "hourglass_empty"
+                                : "cancel"}
                             </span>
-                            {inv.status}
+                            {isClaimed
+                              ? "SETTLED & CREDITED"
+                              : isPendingApproval
+                              ? "PENDING"
+                              : inv.status}
                           </span>
                           <h3 className="font-hanken text-[13px] font-extrabold text-black leading-snug">
                             {inv.optionName}
@@ -293,8 +304,18 @@ export function InvestmentHoldingsContainer({
                           <span className="block font-hanken text-[14px] font-extrabold text-black font-mono">
                             ₦{inv.amount.toLocaleString()}
                           </span>
-                          <span className={`font-hanken text-[9.5px] font-extrabold font-mono ${isCancelled ? "text-red-500 line-through" : "text-blue-600"}`}>
-                            {isCancelled ? "Canceled Lock" : `Settled: ₦${inv.totalValue?.toLocaleString() || inv.amount.toLocaleString()}`}
+                          <span className={`font-hanken text-[9.5px] font-extrabold font-mono ${
+                            isCancelled
+                              ? "text-red-500 line-through"
+                              : isPendingApproval
+                              ? "text-amber-600"
+                              : "text-emerald-600"
+                          }`}>
+                            {isCancelled
+                              ? "Canceled Lock"
+                              : isPendingApproval
+                              ? `Pending Approval: ₦${inv.totalValue?.toLocaleString() || inv.amount.toLocaleString()}`
+                              : `Settled & Credited: ₦${inv.totalValue?.toLocaleString() || inv.amount.toLocaleString()}`}
                           </span>
                         </div>
                       </div>

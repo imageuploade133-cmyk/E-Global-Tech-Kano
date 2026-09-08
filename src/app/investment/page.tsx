@@ -14,6 +14,7 @@ import { EarlyCancelModal } from "@/components/investment/EarlyCancelModal";
 import { InvestmentDetailsModal, ActiveInvestment } from "@/components/investment/InvestmentDetailsModal";
 import { InvestmentPlanForm } from "@/components/investment/InvestmentPlanForm";
 import { InvestmentHoldingsContainer } from "@/components/investment/InvestmentHoldingsContainer";
+import { InvestmentPinModal } from "@/components/investment/InvestmentPinModal";
 
 export default function InvestmentPage() {
   const { userData, user } = useAuth();
@@ -22,7 +23,7 @@ export default function InvestmentPage() {
 
   // DB-driven specs & Settings
   const [plans, setPlans] = useState<SavingsPlanData[]>(DEFAULT_SAVINGS_PLANS);
-  const [penaltyRate, setPenaltyRate] = useState<number>(0.10); // Early Cancellation Penalty decimal (e.g. 0.10)
+  const [penaltyRate, setPenaltyRate] = useState<number>(0.10);
   const [penaltyPolicyText, setPenaltyPolicyText] = useState<string>(
     "Early liquidation of locked savings before the target unlock date incurs a 10% penalty on principal. The remaining 90% balance will be instantly refunded to your wallet."
   );
@@ -57,6 +58,11 @@ export default function InvestmentPage() {
 
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
+
+  // PIN Authorization Modal States
+  const [showPinModal, setShowPinModal] = useState<boolean>(false);
+  const [pinAction, setPinAction] = useState<"CREATE" | "CLAIM">("CREATE");
+  const [selectedClaimId, setSelectedClaimId] = useState<string>("");
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) || plans[0] || DEFAULT_SAVINGS_PLANS[0];
 
@@ -109,7 +115,6 @@ export default function InvestmentPage() {
       setIsLoadingPlans(true);
       setIsLoadingHistory(true);
 
-      // Fetch dynamic savings plans and global penalty policy
       const [plansRes, settingsRes] = await Promise.all([
         fetch("/api/investments/plans"),
         fetch("/api/investments/settings")
@@ -141,7 +146,6 @@ export default function InvestmentPage() {
 
       if (user) {
         const idToken = await user.getIdToken();
-        // Fetch user holdings
         const holdingsRes = await fetch("/api/investments", {
           headers: { Authorization: `Bearer ${idToken}` }
         });
@@ -169,11 +173,9 @@ export default function InvestmentPage() {
   const bonusBalance = (userData?.bonusBalance as number) ?? 0;
   const userBalance = walletTypeSelected === "BONUS" ? bonusBalance : mainBalance;
 
-  // Calculate active investments balance & daily yield income
   const activeInvestmentsList = investments.filter((i) => i.status === "ACTIVE");
   const totalActiveInvestmentBalance = activeInvestmentsList.reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
 
-  // Calculate daily income generated across all active savings locks
   const totalDailyIncome = activeInvestmentsList.reduce((sum, inv) => {
     const principal = Number(inv.amount) || 0;
     const rate = Number(inv.interestRate) || 0;
@@ -181,7 +183,6 @@ export default function InvestmentPage() {
     return sum + dailyReturn;
   }, 0);
 
-  // Real-time server-side reward calculation
   const getEstimatedReward = () => {
     const amt = parseFloat(amountStr) || 0;
     if (amt <= 0) return 0;
@@ -246,8 +247,15 @@ export default function InvestmentPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLiquidating, setIsLiquidating] = useState<boolean>(false);
 
-  // Confirm Lock Setup
-  const handleConfirmInvestment = async () => {
+  // Trigger PIN prompt after rules confirmation
+  const handleConfirmRulesAndPromptPin = () => {
+    setShowConfirmModal(false);
+    setPinAction("CREATE");
+    setShowPinModal(true);
+  };
+
+  // Execute Creation with PIN
+  const handleExecuteInvestmentWithPin = async (pin: string) => {
     setIsSubmitting(true);
     const amt = parseFloat(amountStr) || 0;
 
@@ -276,21 +284,19 @@ export default function InvestmentPage() {
           walletType: walletTypeSelected,
           durationDays: calculatedLockDays,
           idempotencyKey,
+          pin,
         })
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success(data.message || `Savings locked successfully under ${selectedPlan.name}!`);
+        setShowPinModal(false);
+        setAmountStr("");
         await loadInvestmentData();
       } else {
         toast.error(data.error || "Failed to establish savings lock.");
-        setIsSubmitting(false);
-        return;
       }
-
-      setAmountStr("");
-      setShowConfirmModal(false);
     } catch (err) {
       console.error("Investment Error:", err);
       toast.error("Failed to process savings lock. Please try again.");
@@ -299,30 +305,44 @@ export default function InvestmentPage() {
     }
   };
 
-  // Claim Earnings Request
-  const handleClaim = async (invId: string) => {
-    toast.loading("Submitting payout claim request...");
+  // Trigger PIN prompt for claim request
+  const handleOpenClaimPinModal = (invId: string) => {
+    setSelectedClaimId(invId);
+    setPinAction("CLAIM");
+    setShowPinModal(true);
+  };
+
+  // Execute Claim with PIN
+  const handleExecuteClaimWithPin = async (pin: string) => {
+    if (!selectedClaimId) return;
+    setIsSubmitting(true);
 
     try {
       if (!user) return;
       const idToken = await user.getIdToken();
-      const res = await fetch(`/api/investments/${invId}/claim`, {
+      const res = await fetch(`/api/investments/${selectedClaimId}/claim`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${idToken}` }
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ pin }),
       });
 
       const data = await res.json();
-      toast.dismiss();
 
       if (res.ok && data.success) {
         toast.success(data.message);
+        setShowPinModal(false);
+        setSelectedClaimId("");
         await loadInvestmentData();
       } else {
         toast.error(data.error || "Claim request submission failed.");
       }
     } catch {
-      toast.dismiss();
       toast.error("Network error during payout claim execution.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -477,7 +497,7 @@ export default function InvestmentPage() {
             isLoadingHistory={isLoadingHistory}
             investments={investments}
             onSelectDetailInv={setSelectedDetailInv}
-            onClaim={handleClaim}
+            onOpenClaimPinModal={handleOpenClaimPinModal}
             onOpenCancelModal={(invId) => {
               setSelectedCancelId(invId);
               setShowCancelModal(true);
@@ -497,7 +517,23 @@ export default function InvestmentPage() {
           calculatedMaturityDateObj={calculatedMaturityDateObj}
           estimatedReward={getEstimatedReward()}
           penaltyRate={penaltyRate}
-          onConfirm={handleConfirmInvestment}
+          onConfirm={handleConfirmRulesAndPromptPin}
+        />
+
+        {/* PIN Authorization Pad Modal */}
+        <InvestmentPinModal
+          isOpen={showPinModal}
+          onClose={() => setShowPinModal(false)}
+          title={pinAction === "CREATE" ? "Authorize Savings Lock" : "Authorize Payout Request"}
+          description={pinAction === "CREATE" ? "Enter 4-digit PIN to confirm and lock funds." : "Enter 4-digit PIN to submit payout request."}
+          isSubmitting={isSubmitting}
+          onPinSubmit={(pin) => {
+            if (pinAction === "CREATE") {
+              handleExecuteInvestmentWithPin(pin);
+            } else {
+              handleExecuteClaimWithPin(pin);
+            }
+          }}
         />
 
         {/* Penalty Warning Cancel Confirmation Modal */}
