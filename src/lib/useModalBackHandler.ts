@@ -2,10 +2,14 @@
 
 import { useEffect, useRef } from "react";
 
+let isProgrammaticBack = false;
+let programmaticBackTimer: NodeJS.Timeout | null = null;
+
 /**
  * Custom React hook for robust Modal & Drawer UX:
  * 1. Locks background body scrolling on all devices (iOS, Android, Desktop) when active.
  * 2. Intercepts hardware / browser Back button (`popstate`) on mobile & desktop to close the modal instead of navigating away.
+ * 3. Handles nested/stacked modals safely so closing a child modal programmatically does not accidentally close parent modals.
  *
  * @param isOpen Boolean indicating if the modal/drawer is open.
  * @param onClose Callback to close the modal when Back button is pressed or requested.
@@ -39,6 +43,9 @@ export function useModalBackHandler(
     window.history.pushState({ modalStateKey: stateKey }, "", window.location.href);
 
     const handlePopState = (event: PopStateEvent) => {
+      if (isProgrammaticBack) {
+        return;
+      }
       isPoppedByBackButton = true;
       if (onCloseRef.current) {
         onCloseRef.current();
@@ -57,7 +64,13 @@ export function useModalBackHandler(
 
       // Clean history state if closing programmatically rather than via back button
       if (!isPoppedByBackButton && window.history.state && window.history.state.modalStateKey === stateKey) {
+        isProgrammaticBack = true;
         window.history.back();
+
+        if (programmaticBackTimer) clearTimeout(programmaticBackTimer);
+        programmaticBackTimer = setTimeout(() => {
+          isProgrammaticBack = false;
+        }, 100);
       }
     };
   }, [isOpen, modalId]);
