@@ -89,6 +89,7 @@ export default function RootLayout({
             <ServiceWorkerRegister />
           <Toaster
             position="top-center"
+            style={{ top: "32px" }}
             toastOptions={{
               style: {
                 background: "linear-gradient(135deg, #0c1324 0%, #141d30 100%)",
@@ -97,6 +98,7 @@ export default function RootLayout({
                 fontFamily: "var(--font-hanken-grotesk), sans-serif",
                 borderRadius: "16px",
                 boxShadow: "none",
+                marginTop: "16px",
               },
               classNames: {
                 toast: "shadow-none border border-[#FC7A00]/20",
