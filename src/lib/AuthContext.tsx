@@ -104,6 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               name: (data.displayName as string | undefined) || data.name || "",
               ...data
             });
+          } else {
+            // Document does not exist yet (brand new registration before Firestore write completes)
+            setUserData({
+              isPinRequired: true,
+              isFaceIdEnabled: false,
+              dailyLimit: 500000,
+              balance: 0.00,
+            });
           }
           setLoading(false);
         }, (error) => {
