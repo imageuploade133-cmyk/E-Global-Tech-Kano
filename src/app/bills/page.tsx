@@ -828,7 +828,7 @@ export default function GenericBillPage() {
               transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
               className="mt-3 font-hanken font-bold text-[8px] tracking-[0.25em] uppercase text-gray-500 select-none"
             >
-              E-TECH HUB
+              E-Global Pay
             </motion.p>
           </div>
         </div>
