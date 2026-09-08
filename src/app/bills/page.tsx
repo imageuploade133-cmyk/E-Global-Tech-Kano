@@ -1330,11 +1330,11 @@ export default function GenericBillPage() {
 
               {/* Bottom Sheet Review & Checkout panel */}
               <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 280 }}
-                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[1001] p-6 pb-8 shadow-2xl text-black max-h-[85dvh] overflow-y-auto custom-scrollbar"
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] z-[1001] p-6 pb-8 shadow-2xl text-black max-h-[85dvh] overflow-y-auto custom-scrollbar will-change-transform"
               >
                 {/* Drag handle */}
                 <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-4 mx-auto" />

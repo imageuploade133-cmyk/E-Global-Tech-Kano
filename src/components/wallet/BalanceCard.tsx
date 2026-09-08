@@ -2994,11 +2994,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
           {/* Transfer drawer */}
           <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto no-scrollbar flex flex-col"
+            className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto no-scrollbar flex flex-col will-change-transform"
           >
             {/* Header row */}
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5 flex-shrink-0">
@@ -4153,7 +4153,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-          className="fixed inset-0 bg-white z-[99999] flex flex-col justify-between overflow-hidden text-black font-hanken"
+          className="fixed inset-0 bg-white z-[100000] flex flex-col justify-between overflow-hidden text-black font-hanken will-change-transform"
         >
           {/* Top Header */}
           <div className="w-full px-5 py-4 border-b border-gray-200/80 flex items-center justify-between bg-white flex-shrink-0">
