@@ -50,10 +50,22 @@ export default function PinPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyingText, setVerifyingText] = useState("Securing connection...");
 
-  // Forgot PIN bottom drawer state
+  // Forgot PIN bottom drawer state & fast deferred content loading
   const [showForgotPin, setShowForgotPin] = useState(false);
+  const [isForgotContentReady, setIsForgotContentReady] = useState(false);
 
   useModalBackHandler(showForgotPin, () => setShowForgotPin(false), "forgot-pin-drawer");
+
+  useEffect(() => {
+    if (showForgotPin) {
+      const raf = requestAnimationFrame(() => {
+        setIsForgotContentReady(true);
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      setIsForgotContentReady(false);
+    }
+  }, [showForgotPin]);
   const [isRequestingReset, setIsRequestingReset] = useState(false);
   const [resetOption, setResetOption] = useState<"email" | "otp">("email");
   const hasPushedState = useRef(false);
@@ -568,7 +580,13 @@ export default function PinPage() {
 
               {/* Content body with dynamic reset stage rendering */}
               <div className="flex-grow flex flex-col justify-start items-center px-2 text-center w-full overflow-y-auto no-scrollbar">
-                {resetStage === 1 && (
+                {!isForgotContentReady ? (
+                  <div className="flex-grow flex items-center justify-center my-auto">
+                    <div className="w-8 h-8 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <>
+                    {resetStage === 1 && (
                   <>
                     <div className="w-12 h-12 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4 shrink-0">
                       <span className="material-symbols-outlined text-[24px] font-bold">lock_reset</span>
@@ -753,6 +771,8 @@ export default function PinPage() {
                       </div>
                     </div>
                   </div>
+                )}
+                  </>
                 )}
               </div>
 
