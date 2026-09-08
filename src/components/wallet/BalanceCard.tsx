@@ -493,12 +493,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [listTab, setListTab] = useState<"recents" | "beneficiaries">("recents");
   const [showSaveBeneficiaryPrompt, setShowSaveBeneficiaryPrompt] = useState(false);
 
-  // Intercept hardware / mobile back button & lock body scroll across drawers
+  // Intercept hardware / mobile back button & lock body scroll across drawers with stacked back history
   useModalBackHandler(isAddMoneyOpen, () => handleCloseModal(), "add-money-modal");
+  useModalBackHandler(isAddMoneyOpen && wizardStep !== "amount" && wizardStep !== "success", () => {
+    if (wizardStep === "methods") setWizardStep("amount");
+    else if (wizardStep === "ussd-bank") setWizardStep("methods");
+    else if (wizardStep === "ussd-pay") setWizardStep("ussd-bank");
+    else if (wizardStep === "transfer-pay") setWizardStep("methods");
+  }, "add-money-substep");
+
   useModalBackHandler(isTransferOpen, () => handleCloseTransferModal(), "transfer-modal");
+  useModalBackHandler(isTransferOpen && trfStep === "confirm", () => setTrfStep("input"), "transfer-step-confirm");
+  useModalBackHandler(isTransferOpen && trfStep === "pin", () => setTrfStep("confirm"), "transfer-step-pin");
+  useModalBackHandler(isTransferOpen && showTrfBankSelector, () => setShowTrfBankSelector(false), "bank-selector-modal");
+  useModalBackHandler(isTransferOpen && showSaveBeneficiaryPrompt, () => setShowSaveBeneficiaryPrompt(false), "save-beneficiary-prompt");
+
   useModalBackHandler(isSwapOpen, () => setIsSwapOpen(false), "swap-modal");
+  useModalBackHandler(isSwapOpen && swapStep === "pin", () => setSwapStep("form"), "swap-step-pin");
   useModalBackHandler(isUsdFundingOpen, () => setIsUsdFundingOpen(false), "usd-funding-modal");
-  useModalBackHandler(showTrfBankSelector, () => setShowTrfBankSelector(false), "bank-selector-modal");
 
   const loadRecentsAndBeneficiaries = async () => {
     if (!user) return;
