@@ -11,6 +11,7 @@ import { useCards } from "@/hooks/useCards";
 import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { cn } from "@/lib/utils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { RequestCardModal } from "@/components/cards/RequestCardModal";
 
 export default function CardsPage() {
   const { userData, user } = useAuth();
@@ -208,14 +209,12 @@ export default function CardsPage() {
     setShowRequestSheet(false);
   };
 
-  const handleSubmitRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const initAmt = Number(initialAmount);
-    if (isNaN(initAmt) || initAmt < 0) {
-      toast.error("Please enter a valid initial funding amount.");
-      return;
-    }
-
+  const handleRequestCardSubmit = async (data: {
+    currency: "USD" | "NGN";
+    amount: number;
+    billingAddress: BillingAddress;
+    nameOnCard: string;
+  }) => {
     setIsMinting(true);
     setMintProgress(0);
     setMintStatusText("VERIFYING WALLET LEDGER...");
@@ -238,7 +237,7 @@ export default function CardsPage() {
         }
         if (nextProgress >= 100) {
           clearInterval(progressInterval);
-          executeMintCard();
+          executeMintCard(data);
           return 100;
         }
         return nextProgress;
@@ -246,19 +245,18 @@ export default function CardsPage() {
     }, 150);
   };
 
-  const executeMintCard = async () => {
+  const executeMintCard = async (data: {
+    currency: "USD" | "NGN";
+    amount: number;
+    billingAddress: BillingAddress;
+    nameOnCard: string;
+  }) => {
     try {
       await createCard({
-        currency: formCurrency,
-        amount: Number(initialAmount),
-        billingAddress: {
-          country: billingCountry,
-          state: billingState,
-          city: billingCity,
-          postalCode: billingPostalCode,
-          address: billingStreetAddress,
-        },
-        cardholder: formName,
+        currency: data.currency,
+        amount: data.amount,
+        billingAddress: data.billingAddress,
+        cardholder: data.nameOnCard,
       });
       setIsMinting(false);
       setShowRequestSheet(false);
@@ -783,239 +781,16 @@ export default function CardsPage() {
         </motion.div>
       </main>
 
-      {/* Swipeable Card Request Sheet Modal */}
-      <AnimatePresence>
-        {showRequestSheet && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleCancelRequest}
-              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[99998]"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, y: "100%" }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-              className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] flex flex-col justify-between shadow-none overflow-hidden text-black will-change-transform"
-            >
-              {/* Full-screen Sticky Top Header */}
-              <div className="safe-top w-full px-6 py-4 flex justify-between items-center border-b border-gray-100 bg-white flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={handleCancelRequest}
-                  className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
-                </button>
-                <h3 className="font-hanken font-extrabold text-base text-black text-center">
-                  Request Virtual Card
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleCancelRequest}
-                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmitRequest} className="flex-grow flex flex-col justify-between overflow-y-auto w-full">
-                <div className="p-6 space-y-5 flex-grow">
-                  {/* Currency Selector */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">1. Select Card Currency</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setFormCurrency("USD")}
-                        className={cn(
-                          "p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer",
-                          formCurrency === "USD"
-                            ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                            : "border-gray-200 bg-white"
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">currency_exchange</span>
-                        <div>
-                          <p className="font-hanken font-bold text-xs text-black">US Dollar (USD)</p>
-                          <p className="font-hanken text-[9px] text-gray-400">$2.00 setup cost</p>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setFormCurrency("NGN")}
-                        className={cn(
-                          "p-3 rounded-xl border text-left flex items-center gap-3 transition-all cursor-pointer",
-                          formCurrency === "NGN"
-                            ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
-                            : "border-gray-200 bg-white"
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">payments</span>
-                        <div>
-                          <p className="font-hanken font-bold text-xs text-black">Naira (NGN)</p>
-                          <p className="font-hanken text-[9px] text-gray-400">Zero setup fee</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Initial Funding Amount */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">2. Initial Funding Amount</label>
-                    <input
-                      type="text"
-                      required
-                      value={initialAmount}
-                      onChange={(e) => setInitialAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  {/* Display Name */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">3. Card Holder Display Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value.toUpperCase())}
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                      placeholder="CARD DISPLAY NAME"
-                    />
-                  </div>
-
-                  {/* Billing Address Details */}
-                  <div className="space-y-3.5 pt-2 border-t border-gray-100">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">4. Card Billing Address</label>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <span className="text-[8px] font-bold text-gray-400">Country Code</span>
-                        <input
-                          type="text"
-                          required
-                          value={billingCountry}
-                          onChange={(e) => setBillingCountry(e.target.value.toUpperCase())}
-                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
-                          placeholder="US"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[8px] font-bold text-gray-400">State / Region</span>
-                        <input
-                          type="text"
-                          required
-                          value={billingState}
-                          onChange={(e) => setBillingState(e.target.value)}
-                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
-                          placeholder="CA"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <span className="text-[8px] font-bold text-gray-400">City</span>
-                        <input
-                          type="text"
-                          required
-                          value={billingCity}
-                          onChange={(e) => setBillingCity(e.target.value)}
-                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
-                          placeholder="San Francisco"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[8px] font-bold text-gray-400">Postal / ZIP Code</span>
-                        <input
-                          type="text"
-                          required
-                          value={billingPostalCode}
-                          onChange={(e) => setBillingPostalCode(e.target.value)}
-                          className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
-                          placeholder="94105"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[8px] font-bold text-gray-400">Street Address</span>
-                      <input
-                        type="text"
-                        required
-                        value={billingStreetAddress}
-                        onChange={(e) => setBillingStreetAddress(e.target.value)}
-                        className="w-full bg-white border border-black rounded-xl px-3 py-2 text-[11px] font-semibold text-black outline-none"
-                        placeholder="333 Fremont Street"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Submit */}
-                <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-col gap-3 flex-shrink-0">
-                  <div className="flex justify-between text-xs font-semibold text-gray-500">
-                    <span>Card Issuance Setup:</span>
-                    <span className="font-bold text-black">
-                      {formCurrency === "USD" ? "$2.00 USD" : "Free (₦0.00)"}
-                    </span>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">add_card</span>
-                    Mint Digital Card Now
-                  </button>
-                </div>
-              </form>
-
-              {/* Progress Modal Overlay */}
-              {isMinting && (
-                <div className="absolute inset-0 bg-white/95 z-[100000] flex flex-col items-center justify-center p-6 text-center">
-                  <div className="relative w-36 h-36 flex items-center justify-center mb-6">
-                    <div className="absolute inset-0 border-2 border-dashed border-[#FC7A00]/30 rounded-full animate-spin" style={{ animationDuration: "12s" }} />
-                    <div className="absolute inset-2 border border-dashed border-[#FC7A00]/50 rounded-full animate-spin" style={{ animationDuration: "6s" }} />
-                    <motion.div
-                      animate={{
-                        scale: [0.9, 1.05, 0.9],
-                        rotateY: [0, 180, 360],
-                      }}
-                      transition={{
-                        repeat: Infinity,
-                        duration: 3,
-                        ease: "easeInOut",
-                      }}
-                      className="w-20 h-12 rounded bg-gradient-to-r from-[#FC7A00] to-[#FF9022] shadow-[0_0_20px_rgba(252,122,0,0.3)] z-10"
-                    />
-                  </div>
-
-                  <h4 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">Minting E-Tech Secure Card</h4>
-                  <p className="font-mono text-[10px] text-gray-400 mt-2 min-h-[16px] tracking-widest uppercase">
-                    {mintStatusText}
-                  </p>
-
-                  <div className="w-48 h-1 bg-gray-100 rounded-full overflow-hidden mt-6 border border-gray-100">
-                    <motion.div
-                      className="h-full bg-[#FC7A00]"
-                      style={{ width: `${mintProgress}%` }}
-                    />
-                  </div>
-                  <span className="font-mono text-[11px] font-bold text-[#FC7A00] mt-1.5">{mintProgress}%</span>
-                </div>
-              )}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {/* Request Virtual Card Standalone Modal */}
+      <RequestCardModal
+        isOpen={showRequestSheet}
+        onClose={handleCancelRequest}
+        defaultName={formName}
+        isMinting={isMinting}
+        mintProgress={mintProgress}
+        mintStatusText={mintStatusText}
+        onRequestCard={handleRequestCardSubmit}
+      />
 
       {/* Fund Modal */}
       {fundModalOpen && activeCard && (
