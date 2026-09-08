@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useCards } from "@/hooks/useCards";
 import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { cn } from "@/lib/utils";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 export default function CardsPage() {
   const { userData, user } = useAuth();
@@ -795,25 +796,30 @@ export default function CardsPage() {
             />
 
             <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] h-[90dvh] z-[99999] flex flex-col justify-between shadow-none overflow-hidden text-black"
+              className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] flex flex-col justify-between shadow-none overflow-hidden text-black will-change-transform"
             >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mt-4 mb-2 mx-auto flex-shrink-0" />
-
-              <div className="w-full px-6 flex justify-between items-center border-b border-gray-100 pb-4 flex-shrink-0">
-                <div className="w-8" />
+              {/* Full-screen Sticky Top Header */}
+              <div className="safe-top w-full px-6 py-4 flex justify-between items-center border-b border-gray-100 bg-white flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCancelRequest}
+                  className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+                </button>
                 <h3 className="font-hanken font-extrabold text-base text-black text-center">
                   Request Virtual Card
                 </h3>
                 <button
                   type="button"
                   onClick={handleCancelRequest}
-                  className="w-8 h-8 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-400 hover:text-black transition-all cursor-pointer"
+                  className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                  <span className="material-symbols-outlined text-[18px] font-bold">close</span>
                 </button>
               </div>
 
