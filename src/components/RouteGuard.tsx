@@ -591,7 +591,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
               className="mt-3 font-hanken font-bold text-[8px] tracking-[0.25em] uppercase text-gray-400 select-none"
             >
-              E-TECH HUB
+              E-Global Pay
             </motion.p>
           </div>
         </div>
@@ -802,7 +802,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
               className="mt-3 font-hanken font-bold text-[8px] tracking-[0.25em] uppercase text-gray-400 select-none"
             >
-              E-TECH HUB
+              E-Global Pay
             </motion.p>
           </div>
         </div>
