@@ -464,6 +464,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [bankSearchQuery, setBankSearchQuery] = useState("");
   const [showTrfBankSelector, setShowTrfBankSelector] = useState(false);
 
+  const handleOpenBankSelector = () => {
+    const activeAccount = isBulkMode ? bulkAccount : trfAccount;
+    if (!activeAccount || activeAccount.length !== 10) {
+      toast.error("Please enter a valid 10-digit account number first.");
+      return;
+    }
+    setBankSearchQuery("");
+    setShowTrfBankSelector(true);
+  };
+
   // Recents & Beneficiaries States
   interface SavedRecipientItem {
     id?: string;
@@ -3081,7 +3091,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Destination Bank (Manual Fallback)</label>
                           <button
                             type="button"
-                            onClick={() => setShowTrfBankSelector(true)}
+                            onClick={handleOpenBankSelector}
                             className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-left font-hanken text-xs font-extrabold text-black flex items-center justify-between cursor-pointer transition-all hover:bg-gray-100/50"
                           >
                             <span className="flex items-center gap-3">
@@ -3230,8 +3240,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           <button
                             type="button"
                             onClick={() => {
+                              const activeAccount = isBulkMode ? bulkAccount : trfAccount;
+                              if (!activeAccount || activeAccount.length !== 10) {
+                                toast.error("Please enter a valid 10-digit account number first.");
+                                return;
+                              }
                               setIsManualFallback(true);
-                              setTrfAccountName(""); // Clear verified name to force re-verification with manually chosen bank
+                              setTrfAccountName("");
+                              setBankSearchQuery("");
                               setShowTrfBankSelector(true);
                             }}
                             className="text-[10px] font-black text-[#FC7A00] uppercase hover:underline"
@@ -3392,10 +3408,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         {/* Bank selector (Reuses the elegant Select Bank Drawer Overlay) */}
                         <button
                           type="button"
-                          onClick={() => {
-                            setBankSearchQuery("");
-                            setShowTrfBankSelector(true);
-                          }}
+                          onClick={handleOpenBankSelector}
                           className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-left font-hanken text-xs font-bold text-black flex items-center justify-between cursor-pointer"
                         >
                           <span className="flex items-center gap-2 min-w-0 truncate">
@@ -3432,10 +3445,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         {bulkAccount.length === 10 && !bulkName && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setBankSearchQuery("");
-                              setShowTrfBankSelector(true);
-                            }}
+                            onClick={handleOpenBankSelector}
                             className="w-full py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white text-xs font-bold uppercase tracking-wider rounded-xl active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[14px]">search</span>
