@@ -42,6 +42,10 @@ export function InvestmentDetailsModal({
 
   if (!investment) return null;
 
+  const isClaimed = investment.status === "CLAIMED";
+  const isPendingApproval = investment.status === "CLAIM_REQUESTED";
+  const isCancelled = investment.status === "CANCELLED";
+
   return (
     <AnimatePresence>
       <motion.div
@@ -75,13 +79,15 @@ export function InvestmentDetailsModal({
 
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-center space-y-1">
             <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border mb-1 ${
-              investment.status === "CLAIMED"
-                ? "bg-blue-50 text-blue-600 border-blue-200"
-                : investment.status === "CANCELLED"
+              isClaimed
+                ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                : isPendingApproval
+                ? "bg-amber-50 text-amber-600 border-amber-200"
+                : isCancelled
                 ? "bg-red-50 text-red-600 border-red-200"
                 : "bg-green-50 text-green-600 border-green-200"
             }`}>
-              {investment.status}
+              {isClaimed ? "SETTLED & CREDITED" : isPendingApproval ? "PENDING" : investment.status}
             </span>
             <p className="text-xs font-bold text-gray-400 font-hanken uppercase">{investment.optionName}</p>
             <p className="font-mono font-black text-2xl text-black">
@@ -125,7 +131,7 @@ export function InvestmentDetailsModal({
             {/* Principal Capital / Settled Value depending on status */}
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-gray-400 font-semibold uppercase text-[10px]">
-                {investment.status === "CLAIMED"
+                {isClaimed
                   ? "Payout Amount / Settled Value"
                   : "Principal Amount"}
               </span>
@@ -149,7 +155,7 @@ export function InvestmentDetailsModal({
               <span className="font-bold text-[#FC7A00]">{new Date(investment.maturityDate).toLocaleDateString()}</span>
             </div>
 
-            {investment.status === "CANCELLED" ? (
+            {isCancelled ? (
               <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-1 mt-2">
                 <div className="flex justify-between text-red-600 font-bold">
                   <span>Early Penalty Deducted ({(penaltyRate * 100).toFixed(0)}%):</span>
@@ -160,10 +166,20 @@ export function InvestmentDetailsModal({
                   <span className="font-mono text-emerald-600">₦{investment.totalValue?.toLocaleString() || (investment.amount * (1 - penaltyRate)).toLocaleString()}</span>
                 </div>
               </div>
-            ) : investment.status === "CLAIMED" && (
+            ) : isClaimed ? (
               <div className="flex justify-between py-2 border-b border-gray-100">
                 <span className="text-gray-400 font-semibold uppercase text-[10px]">Total Settled Value</span>
                 <span className="font-mono font-bold text-emerald-600">₦{investment.totalValue?.toLocaleString() || investment.amount.toLocaleString()}</span>
+              </div>
+            ) : isPendingApproval && (
+              <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl space-y-1 mt-2">
+                <div className="flex justify-between text-amber-700 font-bold">
+                  <span>Expected Settlement Value:</span>
+                  <span className="font-mono text-amber-800">₦{investment.totalValue?.toLocaleString() || investment.amount.toLocaleString()}</span>
+                </div>
+                <p className="text-[10px] text-amber-600 font-semibold">
+                  Payout request submitted and currently under review for administrator approval.
+                </p>
               </div>
             )}
           </div>
