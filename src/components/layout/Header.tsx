@@ -173,6 +173,11 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
     await handleAppSignOut(router);
   };
 
+  // Fast action navigation to Profile Page
+  const handleOpenProfile = () => {
+    router.push("/profile");
+  };
+
   // Production-grade action handlers with live Firestore synchronization
   const handleMarkAllRead = async () => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
@@ -247,27 +252,36 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
         <div className="flex items-center gap-1.5 min-[375px]:gap-2.5 flex-1 min-w-0 mr-2">
           {isLoading ? (
             <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full skeleton-shimmer flex-shrink-0" />
-          ) : hasCustomPhoto ? (
-            <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative flex-shrink-0">
-              <Image
-                className="object-cover"
-                alt="Profile"
-                src={profileImage}
-                fill
-                sizes="36px"
-                priority
-                onError={() => setImgError(true)}
-              />
-            </div>
           ) : (
-            <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gradient-to-tr from-[#FC7A00] to-[#FF9022] flex items-center justify-center text-white scale-95 active:scale-90 transition-transform relative flex-shrink-0 shadow-sm">
-              <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] font-bold">person</span>
-            </div>
+            <button
+              type="button"
+              onClick={handleOpenProfile}
+              className="focus:outline-none flex-shrink-0 cursor-pointer"
+              title="View Profile Settings"
+            >
+              {hasCustomPhoto ? (
+                <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-primary/30 overflow-hidden scale-95 active:scale-90 transition-transform relative flex-shrink-0">
+                  <Image
+                    className="object-cover"
+                    alt="Profile"
+                    src={profileImage}
+                    fill
+                    sizes="36px"
+                    priority
+                    onError={() => setImgError(true)}
+                  />
+                </div>
+              ) : (
+                <div className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gradient-to-tr from-[#FC7A00] to-[#FF9022] flex items-center justify-center text-white scale-95 active:scale-90 transition-transform relative flex-shrink-0 shadow-sm">
+                  <span className="material-symbols-outlined text-[18px] min-[375px]:text-[20px] font-bold">person</span>
+                </div>
+              )}
+            </button>
           )}
           <div className="relative w-7 h-7 flex-shrink-0 flex items-center justify-center animate-fade-in">
             <AppLogo logoUrl={config.logoUrl} size={28} />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={handleOpenProfile}>
             <p className="font-label-sm text-[8px] min-[375px]:text-[9px] text-on-surface-variant uppercase tracking-tighter font-bold leading-none truncate">
               Welcome back
             </p>
