@@ -7,9 +7,10 @@ import { BalanceCard } from "@/components/wallet/BalanceCard";
 import { RecentTransactions } from "@/components/wallet/RecentTransactions";
 import { ServiceGrid } from "@/components/wallet/ServiceGrid";
 import { Promotions } from "@/components/wallet/Promotions";
+import { PullToRefreshOverlay } from "@/components/wallet/PullToRefreshOverlay";
+import { PaymentVerificationOverlay } from "@/components/wallet/PaymentVerificationOverlay";
 import { useAuth } from "@/lib/AuthContext";
 import { useSearchParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useFcm } from "@/hooks/useFcm";
 
@@ -21,6 +22,14 @@ export default function Home() {
 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
+  const [verifiedAmount, setVerifiedAmount] = useState(0);
+  const [verifyMessage, setVerifyMessage] = useState("");
+  const [isDuplicate, setIsDuplicate] = useState(false);
+
+  // Touch / Pull-To-Refresh States
+  const [startY, setStartY] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -54,14 +63,6 @@ export default function Home() {
       document.body.style.overflow = "";
     };
   }, [verificationStatus]);
-  const [verifiedAmount, setVerifiedAmount] = useState(0);
-  const [verifyMessage, setVerifyMessage] = useState("");
-  const [isDuplicate, setIsDuplicate] = useState(false);
-
-  // Touch / Pull-To-Refresh States
-  const [startY, setStartY] = useState(0);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY <= 0 && !isRefreshing) {
@@ -75,7 +76,7 @@ export default function Home() {
     const distance = currentY - startY;
 
     if (distance > 0 && window.scrollY <= 0) {
-      // Apply a logarithmic damping curve for luxurious mobile physical resistance
+      // Apply a logarithmic damping curve for mobile physical resistance
       const dampedDistance = Math.min(120, distance * 0.45);
       setPullDistance(dampedDistance);
     } else if (distance < 0) {
@@ -89,7 +90,7 @@ export default function Home() {
 
     if (pullDistance > 60) {
       setIsRefreshing(true);
-      setPullDistance(60); // Hold spinner at active rotating offset during fetch
+      setPullDistance(60);
 
       try {
         let idToken = "mock-token";
@@ -98,7 +99,6 @@ export default function Home() {
           idToken = await user.getIdToken();
         }
 
-        // Fetch /api/wallets to run Referral Validation & Self-Healing Auto-Refund
         const res = await fetch("/api/wallets", {
           headers: {
             "Authorization": `Bearer ${idToken}`,
@@ -107,12 +107,8 @@ export default function Home() {
 
         if (res.ok) {
           const data = await res.json();
-          console.log("[Pull-To-Refresh] Wallet API Response received:", data);
-
-          // Dispatch the custom global event so all inline sub-components refresh immediately
           window.dispatchEvent(new CustomEvent("app-refresh"));
 
-          // Securely update local user context memory without full-browser navigation reload
           if (data.success && data.wallets?.NGN) {
             await updateUserData({
               balance: data.wallets.NGN.balance,
@@ -150,19 +146,7 @@ export default function Home() {
     const txRef = searchParams.get("tx_ref") || searchParams.get("txRef");
     const verifyParam = searchParams.get("verify");
 
-    // Automatically trigger verification if transaction_id, success status, or verify params are detected
     if (transactionId || status === "successful" || status === "completed" || verifyParam === "flw" || verifyParam === "flw_success") {
-      console.log("[Success page loaded] URL parameters detected:", {
-        transactionId,
-        status,
-        txRef,
-        verifyParam
-      });
-
-      if (transactionId) {
-        console.log(`[transaction_id received] ID: ${transactionId}, tx_ref: ${txRef || "N/A"}`);
-      }
-
       const verifyPayment = async () => {
         setVerificationStatus("verifying");
         toast.loading("Verifying Flutterwave transaction details...");
@@ -179,7 +163,6 @@ export default function Home() {
               }
             }
 
-            console.log(`[Verify API called] Requesting POST /api/flutterwave/verify with transactionId: ${transactionId}, txRef: ${txRef}`);
             const res = await fetch(`/api/flutterwave/verify`, {
               method: "POST",
               headers: {
@@ -196,25 +179,18 @@ export default function Home() {
                 setIsDuplicate(true);
                 setVerificationStatus("success");
                 toast.info("Transaction already processed.");
-                console.log("[Duplicate Detected] Transaction was already processed.");
               } else {
                 setIsDuplicate(false);
-                console.log("[Verification successful] Response data:", data);
                 setVerifiedAmount(data.fundedAmount || 0);
                 setVerificationStatus("success");
                 toast.success("Wallet successfully funded!");
-
-                console.log(`[Wallet credited] Amount: ₦${data.fundedAmount || 0}, New Balance: ₦${data.newBalance || 0}`);
-                console.log("[Transaction saved] Ledger entry secured in Firestore database.");
               }
             } else {
-              console.error("[Verification failed] Endpoint returned error:", data.error);
               setVerifyMessage(data.error || "Verification was rejected by the gateway.");
               setVerificationStatus("error");
               toast.error("Wallet funding was unsuccessful.");
             }
           } else {
-            console.warn("[Success page loaded] Direct callback loaded without a specific transaction_id.");
             setVerifiedAmount(0);
             setVerificationStatus("success");
             toast.dismiss();
@@ -231,7 +207,6 @@ export default function Home() {
 
       verifyPayment();
     } else if (status === "cancelled") {
-      console.log("[Success page loaded] Payment was cancelled by user.");
       toast.error("The transaction checkout flow was cancelled.");
 
       if (txRef) {
@@ -247,8 +222,7 @@ export default function Home() {
               }
             }
 
-            console.log(`[Cancel Cleanup Started] Cleaning up pending payment: ${txRef}`);
-            const res = await fetch("/api/flutterwave/cancel", {
+            await fetch("/api/flutterwave/cancel", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -256,10 +230,8 @@ export default function Home() {
               },
               body: JSON.stringify({ txRef })
             });
-            const data = await res.json();
-            console.log("[Cancel Cleanup Complete] Server response received:", data);
           } catch (err) {
-            console.error("[Cancel Cleanup Error] Failed to contact cancel clean endpoint:", err);
+            console.error("[Cancel Cleanup Error]", err);
           } finally {
             router.replace("/");
           }
@@ -270,7 +242,7 @@ export default function Home() {
         router.replace("/");
       }
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, user]);
 
   const handleDismissSuccess = () => {
     setVerificationStatus("idle");
@@ -290,139 +262,20 @@ export default function Home() {
         isLoading={isPageLoading}
       />
 
-      {/* Floating Pull-To-Refresh App-Like Overlay Spinner */}
-      <div
-        className="fixed left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none"
-        style={{
-          top: `${Math.min(100, 64 + pullDistance)}px`,
-          opacity: pullDistance > 10 || isRefreshing ? 1 : 0,
-          scale: pullDistance > 10 || isRefreshing ? 1 : 0.85,
-        }}
-      >
-        <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-full border border-gray-150 shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
-          <div className="relative w-5 h-5 flex items-center justify-center flex-shrink-0">
-            <motion.div
-              animate={isRefreshing ? { rotate: 360 } : { rotate: pullDistance * 4.5 }}
-              transition={isRefreshing ? { repeat: Infinity, duration: 0.8, ease: "linear" } : { duration: 0 }}
-              className="w-4.5 h-4.5 rounded-full border-2 border-gray-200 border-t-[#FC7A00] border-r-[#0b513d] flex items-center justify-center"
-            />
-          </div>
-          <span className="font-hanken text-[10px] font-black uppercase tracking-wider text-gray-500 select-none">
-            {isRefreshing ? "Refreshing..." : "Pull to Refresh"}
-          </span>
-        </div>
-      </div>
+      {/* Floating Pull-To-Refresh Overlay */}
+      <PullToRefreshOverlay
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+      />
 
-      {/* Dynamic transaction verification overlays */}
-      <AnimatePresence>
-        {verificationStatus === "verifying" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black/85 backdrop-blur-md z-[99999] flex flex-col items-center justify-center p-6 text-white"
-          >
-            <div className="flex flex-col items-center p-6 rounded-3xl bg-white/5 border border-white/10 shadow-2xl max-w-sm text-center space-y-4">
-              <div className="relative w-12 h-12 flex items-center justify-center">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1.0, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-[3px] border-white/20 border-t-[#FC7A00]"
-                />
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px] font-bold">lock_clock</span>
-              </div>
-              <div>
-                <h3 className="font-hanken font-extrabold text-base text-white uppercase tracking-wider">Verifying Settlement</h3>
-                <p className="font-hanken text-[11px] text-gray-400 mt-1 font-semibold leading-relaxed">
-                  Communicating with Flutterwave verification rails to secure your wallet deposit. Please do not close or reload this window...
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {verificationStatus === "success" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[99999] flex items-center justify-center p-6 text-black"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-center space-y-5 border border-gray-100"
-            >
-              {isDuplicate ? (
-                <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mx-auto shadow-inner">
-                  <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>info</span>
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-inner">
-                  <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>check_circle</span>
-                </div>
-              )}
-
-              <div>
-                <h3 className="font-hanken font-black text-lg text-gray-900 leading-tight">
-                  {isDuplicate ? "Already Processed" : "Payment Verified!"}
-                </h3>
-                <p className="font-hanken text-xs text-gray-500 mt-1 font-semibold leading-relaxed">
-                  {isDuplicate
-                    ? "This transaction has already been processed. Your wallet was not credited again."
-                    : "Your transaction has been securely processed and confirmed. Your wallet balance has been credited."}
-                </p>
-              </div>
-
-              {!isDuplicate && verifiedAmount > 0 && (
-                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150">
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Credited Amount</p>
-                  <p className="font-mono text-2xl font-black text-emerald-600 mt-0.5">
-                    +₦{verifiedAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              )}
-
-              <button
-                onClick={handleDismissSuccess}
-                className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all"
-              >
-                Go to Dashboard
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {verificationStatus === "error" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[99999] flex items-center justify-center p-6 text-black"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-center space-y-5 border border-gray-100"
-            >
-              <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto shadow-inner">
-                <span className="material-symbols-outlined text-[32px]" style={{ fontVariationSettings: '"FILL" 1' }}>error</span>
-              </div>
-
-              <div>
-                <h3 className="font-hanken font-black text-lg text-gray-900 leading-tight">Funding Failed</h3>
-                <p className="font-hanken text-xs text-rose-600 mt-1.5 font-bold leading-relaxed">
-                  {verifyMessage || "The transaction verification check was rejected by Flutterwave secure payment gateway."}
-                </p>
-              </div>
-
-              <button
-                onClick={handleDismissSuccess}
-                className="w-full py-4 bg-gray-900 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:bg-black active:scale-98 transition-all"
-              >
-                Dismiss
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Dynamic payment verification overlays */}
+      <PaymentVerificationOverlay
+        verificationStatus={verificationStatus}
+        isDuplicate={isDuplicate}
+        verifiedAmount={verifiedAmount}
+        verifyMessage={verifyMessage}
+        onDismiss={handleDismissSuccess}
+      />
 
       <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-24 min-[375px]:pb-32">
         <BalanceCard
