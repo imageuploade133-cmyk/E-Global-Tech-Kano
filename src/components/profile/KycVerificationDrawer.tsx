@@ -239,11 +239,11 @@ export function KycVerificationDrawer({
         <>
           {/* Immersive Full Screen Page Container */}
           <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
             transition={{ type: "spring", damping: 26, stiffness: 220, mass: 1 }}
-            className="fixed inset-0 max-w-md mx-auto bg-white h-screen w-full z-[99999] flex flex-col items-center shadow-2xl text-black overflow-hidden"
+            className="fixed inset-0 max-w-md mx-auto bg-white h-screen w-full z-[99999] flex flex-col items-center shadow-2xl text-black overflow-hidden will-change-transform"
           >
             {/* Header / Top Navigation Bar */}
             <div className="w-full flex justify-between items-center bg-gray-50/50 border-b border-gray-100 px-6 py-4 flex-shrink-0">

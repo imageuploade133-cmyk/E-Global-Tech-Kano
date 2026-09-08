@@ -56,14 +56,10 @@ export const NotificationTray: React.FC<NotificationTrayProps> = ({
     "notification-detail"
   );
 
-  // Simulate skeleton loader when opening the tray
+  // Show tray content immediately when opened
   useEffect(() => {
     if (isOpen) {
-      setTrayLoading(true);
-      const timer = setTimeout(() => {
-        setTrayLoading(false);
-      }, 700);
-      return () => clearTimeout(timer);
+      setTrayLoading(false);
     }
   }, [isOpen]);
 
