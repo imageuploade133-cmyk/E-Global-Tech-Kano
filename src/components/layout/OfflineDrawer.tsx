@@ -13,12 +13,12 @@ export const OfflineDrawer: React.FC = () => {
 
       const handleOnline = () => {
         setIsOffline(false);
-        toast.success("Connection restored! Synchronizing your wallet...");
+        toast.success("Back online. Synced!");
       };
 
       const handleOffline = () => {
         setIsOffline(true);
-        toast.error("You are currently offline. Check your connection.");
+        toast.error("You are offline.");
       };
 
       window.addEventListener("online", handleOnline);
@@ -36,9 +36,9 @@ export const OfflineDrawer: React.FC = () => {
       const isNowOnline = window.navigator.onLine;
       if (isNowOnline) {
         setIsOffline(false);
-        toast.success("Wallet synchronized successfully!");
+        toast.success("Back online. Synced!");
       } else {
-        toast.error("Device is still offline. Please check your data settings.");
+        toast.error("Still offline. Check connection.");
       }
     }
   };
@@ -68,10 +68,10 @@ export const OfflineDrawer: React.FC = () => {
 
             <div className="text-left">
               <h4 className="font-hanken font-extrabold text-[11px] uppercase tracking-widest text-[#FC7A00]">
-                Network Offline
+                No Internet
               </h4>
               <p className="font-hanken text-[10px] text-gray-300 font-medium leading-tight">
-                No active internet or data connection detected.
+                Check your connection
               </p>
             </div>
           </div>
