@@ -419,6 +419,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit", permission: "vtu.manage" },
         { id: "exchange_rates", label: "Exchange Rates & Swaps", icon: "currency_exchange", href: "/cpanel/exchange-rates", permission: "exchange_rates.manage" },
         { id: "investments", label: "Fixed Deposits", icon: "savings", href: "/cpanel/investments", permission: "investments.manage" },
+        { id: "estate", label: "Estate Marketplace", icon: "domain", href: "/cpanel/estate", permission: "estate.view" },
         { id: "history", label: "User Ledger Audits", icon: "history", href: "/cpanel/user-history", permission: "user_history.view" },
       ]
     }
