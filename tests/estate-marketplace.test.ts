@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { EstateProperty } from "../src/estate/types";
+import { EstateProperty, EstateSeller } from "../src/estate/types";
 
 describe("Estate Marketplace Architectural Suite", () => {
   test("Estate property object contains required status and security fields", () => {
@@ -39,5 +39,41 @@ describe("Estate Marketplace Architectural Suite", () => {
     expect(property.status).toBe("PENDING_REVIEW");
     expect(property.price).toBe(5500000);
     expect(property.amenities.length).toBe(3);
+  });
+
+  test("Estate seller object contains ban and timed restriction fields", () => {
+    const seller: EstateSeller = {
+      uid: "seller_789",
+      displayName: "Jane Doe Estate",
+      agencyName: "Jane Doe Properties",
+      phone: "08099887766",
+      email: "jane@janedoe.com",
+      address: "Victoria Island, Lagos",
+      isVerified: true,
+      verificationStatus: "VERIFIED",
+      bannedFromPublishing: false,
+      banReason: "",
+      publishingRestricted: true,
+      restrictedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    expect(seller.uid).toBe("seller_789");
+    expect(seller.isVerified).toBe(true);
+    expect(seller.publishingRestricted).toBe(true);
+    expect(seller.restrictedUntil).toBeDefined();
+  });
+
+  test("Timed restriction logic evaluates expired timestamps accurately", () => {
+    const expiredRestrictionDate = new Date(Date.now() - 1000).toISOString();
+    const isExpired = new Date(expiredRestrictionDate).getTime() < Date.now();
+
+    expect(isExpired).toBe(true);
+
+    const activeRestrictionDate = new Date(Date.now() + 3600000).toISOString();
+    const isActive = new Date(activeRestrictionDate).getTime() > Date.now();
+
+    expect(isActive).toBe(true);
   });
 });

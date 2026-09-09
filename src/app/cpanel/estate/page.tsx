@@ -174,7 +174,7 @@ export default function CpanelEstatePropertiesPage() {
                   <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Property Listings Audit</h1>
                 </div>
                 <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                  Audit property submissions, review seller listings, approve marketplace items, or toggle featured status.
+                  Audit property submissions, review seller listings, approve/unapprove marketplace items, or toggle featured status.
                 </p>
               </div>
             </div>
@@ -333,6 +333,7 @@ export default function CpanelEstatePropertiesPage() {
                     {properties.map((prop) => {
                       const coverImg = prop.images?.[0] || "";
                       const isExecuting = executingActionId === prop.id;
+                      const isApproved = prop.status === "APPROVED" || prop.status === "PUBLISHED";
 
                       return (
                         <tr key={prop.id} className={cn("transition-colors", isDark ? "hover:bg-gray-800/40" : "hover:bg-gray-50/80")}>
@@ -370,7 +371,7 @@ export default function CpanelEstatePropertiesPage() {
                             <span
                               className={cn(
                                 "px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase border",
-                                prop.status === "APPROVED" || prop.status === "PUBLISHED"
+                                isApproved
                                   ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                                   : prop.status === "PENDING_REVIEW"
                                   ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
@@ -396,7 +397,16 @@ export default function CpanelEstatePropertiesPage() {
                                 Inspect
                               </button>
 
-                              {prop.status === "PENDING_REVIEW" && (
+                              {isApproved ? (
+                                <button
+                                  type="button"
+                                  disabled={isExecuting}
+                                  onClick={() => handleAdminPropertyAction("unapprove", prop.id)}
+                                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
+                                >
+                                  {isExecuting ? "..." : "Unapprove"}
+                                </button>
+                              ) : (
                                 <>
                                   <button
                                     type="button"
@@ -548,7 +558,15 @@ export default function CpanelEstatePropertiesPage() {
                   </div>
 
                   <div className="flex justify-end gap-2 pt-2 border-t border-gray-200/40">
-                    {selectedInspectProp.status === "PENDING_REVIEW" && (
+                    {selectedInspectProp.status === "APPROVED" || selectedInspectProp.status === "PUBLISHED" ? (
+                      <button
+                        type="button"
+                        onClick={() => handleAdminPropertyAction("unapprove", selectedInspectProp.id)}
+                        className="px-4 h-10 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase rounded-xl cursor-pointer border-0"
+                      >
+                        Unapprove Listing
+                      </button>
+                    ) : selectedInspectProp.status === "PENDING_REVIEW" ? (
                       <>
                         <button
                           type="button"
@@ -567,7 +585,7 @@ export default function CpanelEstatePropertiesPage() {
                           Reject Listing
                         </button>
                       </>
-                    )}
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => setSelectedInspectProp(null)}

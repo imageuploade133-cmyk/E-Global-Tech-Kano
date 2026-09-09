@@ -22,14 +22,14 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/estate/admin/sellers - Verify / Reject seller agent
+// POST /api/estate/admin/sellers - Verify / Reject / Ban / Restrict seller agent
 export async function POST(req: Request) {
   try {
     const authCheck = await requireAdminPermission(req, "estate.manage");
     if (!authCheck.authorized) return authCheck.response!;
 
     const body = await req.json();
-    const { action, sellerUid } = body;
+    const { action, sellerUid, banReason, restrictionHours } = body;
 
     if (!sellerUid || !action) {
       return NextResponse.json({ error: "Seller UID and action are required." }, { status: 400 });
@@ -58,6 +58,40 @@ export async function POST(req: Request) {
         updatedAt: nowIso,
       });
       return NextResponse.json({ success: true, message: "Seller agent verification rejected." });
+    } else if (action === "ban") {
+      await docRef.update({
+        bannedFromPublishing: true,
+        banReason: banReason ? String(banReason).trim() : "Violation of marketplace publishing guidelines.",
+        updatedAt: nowIso,
+      });
+      return NextResponse.json({ success: true, message: "Seller agent banned from publishing properties." });
+    } else if (action === "unban") {
+      await docRef.update({
+        bannedFromPublishing: false,
+        banReason: "",
+        updatedAt: nowIso,
+      });
+      return NextResponse.json({ success: true, message: "Seller agent unbanned successfully." });
+    } else if (action === "restrict") {
+      const hours = Number(restrictionHours) || 24; // Default to 24 hours restriction if omitted
+      const restrictedUntilDate = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+
+      await docRef.update({
+        publishingRestricted: true,
+        restrictedUntil: restrictedUntilDate,
+        updatedAt: nowIso,
+      });
+      return NextResponse.json({
+        success: true,
+        message: `Seller agent publishing restricted for ${hours} hours (until ${new Date(restrictedUntilDate).toLocaleString()}).`,
+      });
+    } else if (action === "unrestrict") {
+      await docRef.update({
+        publishingRestricted: false,
+        restrictedUntil: null,
+        updatedAt: nowIso,
+      });
+      return NextResponse.json({ success: true, message: "Seller agent publishing restriction removed." });
     }
 
     return NextResponse.json({ error: "Invalid admin seller action." }, { status: 400 });

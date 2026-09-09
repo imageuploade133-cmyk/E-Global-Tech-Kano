@@ -151,7 +151,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/estate/admin/properties - Approve / Reject / Feature property
+// POST /api/estate/admin/properties - Approve / Unapprove / Reject / Feature property
 export async function POST(req: Request) {
   try {
     const authCheck = await requireAdminPermission(req, "estate.manage");
@@ -183,6 +183,13 @@ export async function POST(req: Request) {
         updatedAt: nowIso,
       });
       return NextResponse.json({ success: true, message: "Property listing approved and published." });
+    } else if (action === "unapprove" || action === "unpublish") {
+      await docRef.update({
+        status: "PENDING_REVIEW",
+        publishedAt: null,
+        updatedAt: nowIso,
+      });
+      return NextResponse.json({ success: true, message: "Property listing unapproved and returned to review queue." });
     } else if (action === "reject") {
       await docRef.update({
         status: "REJECTED",
