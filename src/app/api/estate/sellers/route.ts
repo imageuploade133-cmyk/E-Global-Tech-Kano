@@ -2,9 +2,24 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
 
-// GET /api/estate/sellers - Get current user seller profile
+// GET /api/estate/sellers - Get seller profile by query sellerId or current authenticated user
 export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const querySellerId = searchParams.get("sellerId");
+
+    // If querySellerId is supplied, allow reading public seller agent profile
+    if (querySellerId) {
+      const docSnap = await adminDb.collection("estate_sellers").doc(querySellerId).get();
+      if (!docSnap.exists) {
+        return NextResponse.json({ success: true, seller: null });
+      }
+      return NextResponse.json({
+        success: true,
+        seller: { uid: docSnap.id, ...docSnap.data() },
+      });
+    }
+
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized access token required." }, { status: 401 });

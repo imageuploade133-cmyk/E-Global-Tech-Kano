@@ -2,6 +2,68 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
 
+// GET /api/estate/favorites - Get user's saved favorite properties
+export async function GET(req: Request) {
+  try {
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized access token required." }, { status: 401 });
+    }
+
+    const token = authHeader.split("Bearer ")[1];
+    let decoded;
+    try {
+      decoded = await verifyFirebaseIdToken(token);
+    } catch {
+      return NextResponse.json({ error: "Invalid session token." }, { status: 401 });
+    }
+
+    const uid = decoded.uid;
+    const favSnap = await adminDb
+      .collection("estate_favorites")
+      .where("userId", "==", uid)
+      .get();
+
+    const favoritePropertyIds: string[] = [];
+    favSnap.forEach((doc) => {
+      const data = doc.data();
+      if (data.propertyId) {
+        favoritePropertyIds.push(data.propertyId);
+      }
+    });
+
+    if (favoritePropertyIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        favoriteIds: [],
+        properties: [],
+      });
+    }
+
+    // Batch fetch property documents (up to 30)
+    const propertyRefs = favoritePropertyIds.slice(0, 30).map((id) =>
+      adminDb.collection("estate_properties").doc(id)
+    );
+    const propSnaps = await adminDb.getAll(...propertyRefs);
+
+    const properties: any[] = [];
+    propSnaps.forEach((snap) => {
+      if (snap.exists) {
+        properties.push({ id: snap.id, ...snap.data() });
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      favoriteIds: favoritePropertyIds,
+      properties,
+    });
+  } catch (err: any) {
+    console.error("[GET /api/estate/favorites Error]:", err.message);
+    return NextResponse.json({ error: "Failed to fetch saved favorites." }, { status: 500 });
+  }
+}
+
 // POST /api/estate/favorites - Toggle save property
 export async function POST(req: Request) {
   try {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { RouteGuard } from "@/components/RouteGuard";
 import { useAuth } from "@/lib/AuthContext";
@@ -15,6 +15,7 @@ import {
   PropertyCard,
   PropertyDetailModal,
   SellerProfileModal,
+  EstateFavoritesModal,
   EstateHeader,
 } from "@/components/estate";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
@@ -30,25 +31,37 @@ export default function EstateMarketplacePage() {
   const [selectedType, setSelectedType] = useState<PropertyType | "ALL">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Store last scroll position before search or modal interaction
+  const lastScrollPosRef = useRef<number>(0);
+
   // Selected Property Detail Modal
   const [selectedProperty, setSelectedProperty] = useState<EstateProperty | null>(null);
+
+  // Favorites state
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [favoriteProperties, setFavoriteProperties] = useState<EstateProperty[]>([]);
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
 
   // Agent Profile Modal State
   const [inspectedSeller, setInspectedSeller] = useState<EstateSeller | null>(null);
 
   useModalBackHandler(Boolean(selectedProperty), () => setSelectedProperty(null), "estate-detail-modal");
   useModalBackHandler(Boolean(inspectedSeller), () => setInspectedSeller(null), "estate-seller-profile-modal");
+  useModalBackHandler(isFavoritesOpen, () => setIsFavoritesOpen(false), "estate-favorites-drawer-modal");
 
-  const fetchProperties = async () => {
+  const fetchProperties = async (queryToUse?: string) => {
     setIsLoading(true);
+    const currentScroll = window.scrollY;
     try {
       let url = "/api/estate/properties";
       const params = new URLSearchParams();
 
       if (selectedPurpose !== "ALL") params.append("purpose", selectedPurpose);
       if (selectedType !== "ALL") params.append("type", selectedType);
-      if (searchQuery.trim()) params.append("query", searchQuery.trim());
+
+      const activeQuery = queryToUse !== undefined ? queryToUse : searchQuery;
+      if (activeQuery.trim()) params.append("query", activeQuery.trim());
 
       if (params.toString()) {
         url += `?${params.toString()}`;
@@ -67,12 +80,62 @@ export default function EstateMarketplacePage() {
       toast.error("Unable to load estate listings.");
     } finally {
       setIsLoading(false);
+      // Restore scroll position after search/clear if user was scrolled
+      if (lastScrollPosRef.current > 0) {
+        window.scrollTo({ top: lastScrollPosRef.current });
+      }
+    }
+  };
+
+  const handleExecuteSearch = () => {
+    lastScrollPosRef.current = window.scrollY;
+    fetchProperties(searchQuery);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    lastScrollPosRef.current = window.scrollY;
+    fetchProperties("");
+  };
+
+  const fetchUserFavorites = async () => {
+    if (!user) return;
+    setIsLoadingFavorites(true);
+    try {
+      let idToken = "";
+      if (typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/estate/favorites", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        if (Array.isArray(data.favoriteIds)) {
+          setFavorites(data.favoriteIds);
+        }
+        if (Array.isArray(data.properties)) {
+          setFavoriteProperties(data.properties);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load saved favorites:", err);
+    } finally {
+      setIsLoadingFavorites(false);
     }
   };
 
   useEffect(() => {
     fetchProperties();
   }, [selectedPurpose, selectedType]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserFavorites();
+    }
+  }, [user]);
 
   const handleToggleFavorite = async (e: React.MouseEvent, property: EstateProperty) => {
     e.stopPropagation();
@@ -95,9 +158,11 @@ export default function EstateMarketplacePage() {
       if (data.success) {
         if (data.saved) {
           setFavorites((prev) => [...prev, property.id]);
+          setFavoriteProperties((prev) => [property, ...prev.filter((p) => p.id !== property.id)]);
           toast.success(`Saved "${property.title}" to favorites.`);
         } else {
           setFavorites((prev) => prev.filter((id) => id !== property.id));
+          setFavoriteProperties((prev) => prev.filter((p) => p.id !== property.id));
           toast.info(`Removed "${property.title}" from saved.`);
         }
       }
@@ -106,7 +171,20 @@ export default function EstateMarketplacePage() {
     }
   };
 
-  const handleOpenSellerProfile = (sellerId?: string, sellerName?: string, sellerPhone?: string) => {
+  const handleOpenSellerProfile = async (sellerId?: string, sellerName?: string, sellerPhone?: string) => {
+    if (sellerId) {
+      try {
+        const res = await fetch(`/api/estate/sellers?sellerId=${sellerId}`);
+        const data = await res.json();
+        if (data.success && data.seller) {
+          setInspectedSeller(data.seller);
+          return;
+        }
+      } catch (err) {
+        console.warn("Could not fetch full seller details:", err);
+      }
+    }
+
     setInspectedSeller({
       uid: sellerId || "agent-id",
       displayName: sellerName || "Partner Agent",
@@ -198,13 +276,17 @@ export default function EstateMarketplacePage() {
           title="E-Global Estate"
           subtitle="Houses, Apartments & Land"
           favoritesCount={favorites.length}
-          onRefresh={fetchProperties}
+          onRefresh={() => fetchProperties()}
+          onOpenFavorites={() => {
+            fetchUserFavorites();
+            setIsFavoritesOpen(true);
+          }}
         />
 
         <main className="max-w-7xl mx-auto pt-4 px-4 md:px-8 flex-grow pb-28 text-black">
           {/* Search Box with Gradient Border */}
           <div className="relative w-full mb-4 bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl shadow-2xs">
-            <div className="relative w-full bg-white rounded-[14.5px] flex items-center">
+            <div className="relative w-full bg-white rounded-[14.5px] flex items-center pr-2">
               <span className="material-symbols-outlined absolute left-3.5 text-[#FC7A00] text-[20px]">
                 search
               </span>
@@ -213,23 +295,33 @@ export default function EstateMarketplacePage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") fetchProperties();
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleExecuteSearch();
+                  }
                 }}
                 placeholder="Search Lekki duplex, Ikeja apartment, land for sale..."
-                className="w-full bg-transparent border-0 pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+                className="w-full bg-transparent border-0 pl-11 pr-20 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none"
               />
-              {searchQuery && (
+              <div className="absolute right-2 flex items-center gap-1">
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-black border-0 cursor-pointer"
+                    title="Cancel Search"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    fetchProperties();
-                  }}
-                  className="absolute right-3 text-gray-400 hover:text-black border-0 cursor-pointer"
+                  onClick={handleExecuteSearch}
+                  className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-2xs"
                 >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  Search
                 </button>
-              )}
+              </div>
             </div>
           </div>
 
@@ -314,7 +406,10 @@ export default function EstateMarketplacePage() {
                 <PropertyCard
                   key={prop.id}
                   property={prop}
-                  onOpenDetails={(p) => setSelectedProperty(p)}
+                  onOpenDetails={(p) => {
+                    lastScrollPosRef.current = window.scrollY;
+                    setSelectedProperty(p);
+                  }}
                   onSaveFavorite={handleToggleFavorite}
                   isSaved={favorites.includes(prop.id)}
                 />
@@ -342,6 +437,19 @@ export default function EstateMarketplacePage() {
           isOpen={Boolean(inspectedSeller)}
           seller={inspectedSeller}
           onClose={() => setInspectedSeller(null)}
+        />
+
+        {/* User Saved Favorites Drawer Modal */}
+        <EstateFavoritesModal
+          isOpen={isFavoritesOpen}
+          properties={favoriteProperties}
+          isLoading={isLoadingFavorites}
+          onClose={() => setIsFavoritesOpen(false)}
+          onOpenPropertyDetails={(p) => {
+            setSelectedProperty(p);
+          }}
+          onRemoveFavorite={handleToggleFavorite}
+          onRefresh={fetchUserFavorites}
         />
 
         <BottomNav />

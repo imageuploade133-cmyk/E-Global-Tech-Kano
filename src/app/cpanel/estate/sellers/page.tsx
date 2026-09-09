@@ -21,6 +21,14 @@ export default function CpanelEstateSellersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
 
+  // Ban seller modal state
+  const [selectedBanSeller, setSelectedBanSeller] = useState<EstateSeller | null>(null);
+  const [banReasonInput, setBanReasonInput] = useState("");
+
+  // Restrict publishing modal state
+  const [selectedRestrictSeller, setSelectedRestrictSeller] = useState<EstateSeller | null>(null);
+  const [restrictionHoursInput, setRestrictionHoursInput] = useState<number>(24);
+
   const fetchSellers = async () => {
     setIsLoading(true);
     try {
@@ -42,17 +50,20 @@ export default function CpanelEstateSellersPage() {
     fetchSellers();
   }, []);
 
-  const handleAdminSellerAction = async (action: string, sellerUid: string) => {
+  const handleAdminSellerAction = async (action: string, sellerUid: string, extra = {}) => {
     setExecutingActionId(sellerUid);
     try {
       const res = await fetch("/api/estate/admin/sellers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, sellerUid }),
+        body: JSON.stringify({ action, sellerUid, ...extra }),
       });
       const data = await res.json();
       if (data.success) {
         toast.success(data.message || "Seller status updated.");
+        setSelectedBanSeller(null);
+        setBanReasonInput("");
+        setSelectedRestrictSeller(null);
         fetchSellers();
       } else {
         toast.error(data.error || "Seller action failed.");
@@ -66,6 +77,7 @@ export default function CpanelEstateSellersPage() {
 
   const verifiedCount = sellers.filter((s) => s.isVerified).length;
   const pendingCount = sellers.filter((s) => !s.isVerified).length;
+  const restrictedOrBannedCount = sellers.filter((s) => s.bannedFromPublishing || s.publishingRestricted).length;
 
   const filteredSellers = sellers.filter((sel) => {
     const q = searchQuery.toLowerCase().trim();
@@ -103,7 +115,7 @@ export default function CpanelEstateSellersPage() {
                   <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Sellers & Property Agents</h1>
                 </div>
                 <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                  Verify property agents, review partner agency credentials, or revoke verification status.
+                  Verify property agents, review agency credentials, ban sellers, or temporarily restrict publishing privileges.
                 </p>
               </div>
             </div>
@@ -129,10 +141,10 @@ export default function CpanelEstateSellersPage() {
           </div>
 
           {/* Metric Cards Summary Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
             <div className={cn("p-4 rounded-2xl border space-y-1", panelClass)}>
               <div className="flex items-center justify-between text-gray-400">
-                <span className="text-[10px] font-black uppercase tracking-wider">Total Registered Agents</span>
+                <span className="text-[10px] font-black uppercase tracking-wider">Total Agents</span>
                 <span className="material-symbols-outlined text-[18px] text-purple-500">groups</span>
               </div>
               <p className="font-mono text-xl font-black text-purple-600">{sellers.length}</p>
@@ -155,6 +167,15 @@ export default function CpanelEstateSellersPage() {
               </div>
               <p className="font-mono text-xl font-black text-amber-500">{pendingCount}</p>
               <span className="text-[10px] text-gray-400 block">Awaiting verification</span>
+            </div>
+
+            <div className={cn("p-4 rounded-2xl border space-y-1", panelClass)}>
+              <div className="flex items-center justify-between text-gray-400">
+                <span className="text-[10px] font-black uppercase tracking-wider">Banned / Restricted</span>
+                <span className="material-symbols-outlined text-[18px] text-red-500">block</span>
+              </div>
+              <p className="font-mono text-xl font-black text-red-500">{restrictedOrBannedCount}</p>
+              <span className="text-[10px] text-gray-400 block">Publishing restricted</span>
             </div>
           </div>
 
@@ -215,14 +236,16 @@ export default function CpanelEstateSellersPage() {
                   <tr className={cn("border-b text-[10px] font-black uppercase tracking-wider", isDark ? "bg-gray-900/80 border-gray-800 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-500")}>
                     <th className="p-3.5">Agent / Agency Name</th>
                     <th className="p-3.5">Contact Details</th>
-                    <th className="p-3.5">Office Address</th>
                     <th className="p-3.5">Verification</th>
+                    <th className="p-3.5">Publishing Status</th>
                     <th className="p-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className={cn("divide-y font-semibold", isDark ? "divide-gray-800 text-gray-200" : "divide-gray-100 text-gray-800")}>
                   {filteredSellers.map((sel) => {
                     const isExecuting = executingActionId === sel.uid;
+                    const isBanned = sel.bannedFromPublishing;
+                    const isRestricted = sel.publishingRestricted && sel.restrictedUntil && new Date(sel.restrictedUntil).getTime() > Date.now();
 
                     return (
                       <tr key={sel.uid} className={cn("transition-colors", isDark ? "hover:bg-gray-800/40" : "hover:bg-gray-50/80")}>
@@ -234,10 +257,6 @@ export default function CpanelEstateSellersPage() {
                         <td className="p-3.5">
                           <p className="font-extrabold font-mono">{sel.phone}</p>
                           <p className="text-[10px] text-gray-400 font-mono">{sel.email}</p>
-                        </td>
-
-                        <td className="p-3.5 text-[11px] text-gray-400 max-w-[200px] truncate">
-                          {sel.address || "Address not specified"}
                         </td>
 
                         <td className="p-3.5 whitespace-nowrap">
@@ -253,32 +272,194 @@ export default function CpanelEstateSellersPage() {
                           </span>
                         </td>
 
-                        <td className="p-3.5 text-right whitespace-nowrap">
-                          {!sel.isVerified ? (
-                            <button
-                              type="button"
-                              disabled={isExecuting}
-                              onClick={() => handleAdminSellerAction("verify", sel.uid)}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
-                            >
-                              {isExecuting ? "..." : "Verify Agent"}
-                            </button>
+                        <td className="p-3.5 whitespace-nowrap">
+                          {isBanned ? (
+                            <span className="px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase border bg-red-500/10 text-red-500 border-red-500/20">
+                              BANNED
+                            </span>
+                          ) : isRestricted ? (
+                            <div>
+                              <span className="px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase border bg-orange-500/10 text-orange-500 border-orange-500/20 block w-fit">
+                                RESTRICTED
+                              </span>
+                              <span className="text-[8.5px] text-gray-400 block mt-0.5 font-mono">
+                                Until {new Date(sel.restrictedUntil!).toLocaleDateString()}
+                              </span>
+                            </div>
                           ) : (
-                            <button
-                              type="button"
-                              disabled={isExecuting}
-                              onClick={() => handleAdminSellerAction("reject", sel.uid)}
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
-                            >
-                              {isExecuting ? "..." : "Revoke Verification"}
-                            </button>
+                            <span className="px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                              ACTIVE
+                            </span>
                           )}
+                        </td>
+
+                        <td className="p-3.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {!sel.isVerified ? (
+                              <button
+                                type="button"
+                                disabled={isExecuting}
+                                onClick={() => handleAdminSellerAction("verify", sel.uid)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
+                              >
+                                Verify
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isExecuting}
+                                onClick={() => handleAdminSellerAction("reject", sel.uid)}
+                                className="px-2.5 py-1 bg-gray-600 hover:bg-gray-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
+                              >
+                                Revoke
+                              </button>
+                            )}
+
+                            {isBanned ? (
+                              <button
+                                type="button"
+                                disabled={isExecuting}
+                                onClick={() => handleAdminSellerAction("unban", sel.uid)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
+                              >
+                                Unban
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isExecuting}
+                                onClick={() => setSelectedBanSeller(sel)}
+                                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
+                              >
+                                Ban
+                              </button>
+                            )}
+
+                            {isRestricted ? (
+                              <button
+                                type="button"
+                                disabled={isExecuting}
+                                onClick={() => handleAdminSellerAction("unrestrict", sel.uid)}
+                                className="px-2.5 py-1 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
+                              >
+                                Unrestrict
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isExecuting}
+                                onClick={() => setSelectedRestrictSeller(sel)}
+                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
+                              >
+                                Restrict
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Ban Seller Modal */}
+          {selectedBanSeller && (
+            <div className="fixed inset-0 z-[100001] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className={cn("w-full max-w-sm p-5 space-y-3 rounded-3xl border shadow-2xl text-left", panelClass)}>
+                <h3 className="font-extrabold text-sm uppercase text-red-500">Ban Seller Agent</h3>
+                <p className="text-xs text-gray-400 font-medium">
+                  Ban &quot;{selectedBanSeller.displayName}&quot; permanently from publishing estate listings?
+                </p>
+                <textarea
+                  rows={3}
+                  value={banReasonInput}
+                  onChange={(e) => setBanReasonInput(e.target.value)}
+                  placeholder="Reason for ban..."
+                  className={cn("w-full p-3 rounded-xl text-xs font-semibold outline-none resize-none", isDark ? "bg-[#111827] border border-gray-700 text-white" : "bg-gray-50 border border-gray-200 text-black")}
+                />
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBanSeller(null)}
+                    className="w-1/2 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs uppercase rounded-xl cursor-pointer border-0"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleAdminSellerAction("ban", selectedBanSeller.uid, {
+                        banReason: banReasonInput,
+                      })
+                    }
+                    className="w-1/2 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase rounded-xl cursor-pointer border-0"
+                  >
+                    Confirm Ban
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Restrict Publishing Modal */}
+          {selectedRestrictSeller && (
+            <div className="fixed inset-0 z-[100001] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className={cn("w-full max-w-sm p-5 space-y-3 rounded-3xl border shadow-2xl text-left", panelClass)}>
+                <h3 className="font-extrabold text-sm uppercase text-amber-500">Restrict Publishing Privilege</h3>
+                <p className="text-xs text-gray-400 font-medium">
+                  Select timed restriction limit for &quot;{selectedRestrictSeller.displayName}&quot;. System will automatically unrestrict after timer expires.
+                </p>
+
+                <div className="space-y-2 pt-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Restriction Duration</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { hours: 1, label: "1 Hour" },
+                      { hours: 24, label: "24 Hours (1 Day)" },
+                      { hours: 72, label: "72 Hours (3 Days)" },
+                      { hours: 168, label: "168 Hours (7 Days)" },
+                      { hours: 720, label: "720 Hours (30 Days)" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.hours}
+                        type="button"
+                        onClick={() => setRestrictionHoursInput(opt.hours)}
+                        className={cn(
+                          "py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer",
+                          restrictionHoursInput === opt.hours
+                            ? "bg-[#FC7A00] text-white border-[#FC7A00]"
+                            : isDark ? "bg-gray-900 border-gray-800 text-gray-300" : "bg-gray-100 border-gray-200 text-gray-800"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRestrictSeller(null)}
+                    className="w-1/2 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs uppercase rounded-xl cursor-pointer border-0"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleAdminSellerAction("restrict", selectedRestrictSeller.uid, {
+                        restrictionHours: restrictionHoursInput,
+                      })
+                    }
+                    className="w-1/2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase rounded-xl cursor-pointer border-0"
+                  >
+                    Confirm Restrict
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

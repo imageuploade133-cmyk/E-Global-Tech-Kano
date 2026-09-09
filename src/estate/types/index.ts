@@ -71,6 +71,10 @@ export interface EstateSeller {
   verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
   idDocumentUrl?: string;
   totalListings?: number;
+  bannedFromPublishing?: boolean;
+  banReason?: string;
+  publishingRestricted?: boolean;
+  restrictedUntil?: string | null;
   createdAt: string;
   updatedAt: string;
 }

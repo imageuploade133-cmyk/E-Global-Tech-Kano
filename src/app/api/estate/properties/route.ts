@@ -147,9 +147,46 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify user seller profile
-    const sellerDoc = await adminDb.collection("estate_sellers").doc(uid).get();
+    // Verify user seller profile & publishing permissions
+    const sellerDocRef = adminDb.collection("estate_sellers").doc(uid);
+    const sellerDoc = await sellerDocRef.get();
     const sellerData = sellerDoc.data() || {};
+
+    // Check if banned from publishing
+    if (sellerData.bannedFromPublishing) {
+      return NextResponse.json(
+        {
+          error: `Publishing Restricted: ${
+            sellerData.banReason || "Your account has been banned from publishing properties."
+          }`,
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check timed publishing restriction
+    if (sellerData.publishingRestricted && sellerData.restrictedUntil) {
+      const restrictedUntilTime = new Date(sellerData.restrictedUntil).getTime();
+      const nowTime = Date.now();
+
+      if (nowTime < restrictedUntilTime) {
+        return NextResponse.json(
+          {
+            error: `Your publishing privileges are temporarily restricted until ${new Date(
+              sellerData.restrictedUntil
+            ).toLocaleString()}.`,
+          },
+          { status: 403 }
+        );
+      } else {
+        // Auto-unrestrict expired publishing restriction
+        await sellerDocRef.update({
+          publishingRestricted: false,
+          restrictedUntil: null,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
 
     const requestedStatus = status === "DRAFT" ? "DRAFT" : "PENDING_REVIEW";
     const nowIso = new Date().toISOString();
