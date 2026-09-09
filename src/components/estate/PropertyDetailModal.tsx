@@ -21,6 +21,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onClose,
   onSubmitInquiry,
   onReportProperty,
+  onInspectAgent,
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [inquiryMessage, setInquiryMessage] = useState("");
