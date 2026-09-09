@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { RouteGuard } from "@/components/RouteGuard";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
-import Link from "next/link";
 import {
   EstateProperty,
   EstateSeller,
@@ -17,6 +15,7 @@ import {
   PropertyDetailModal,
   AddPropertyModal,
   SellerProfileModal,
+  EstateHeader,
 } from "@/components/estate";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
@@ -177,33 +176,29 @@ export default function EstateSellerDashboard() {
   return (
     <RouteGuard>
       <div id="estate-page-root" className="min-h-dvh bg-background text-on-background pb-32">
-        <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
+        {/* Dedicated Estate Top Header */}
+        <EstateHeader
+          title="Seller Agent Console"
+          subtitle="Manage Estate Listings"
+          showBackButton={true}
+          onRefresh={fetchSellerData}
+        />
 
-        <main className="max-w-7xl mx-auto pt-3 px-4 md:px-8 flex-grow pb-28 text-black space-y-6">
-          {/* Header Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-3xl bg-white border border-gray-150 shadow-2xs">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/estate"
-                className="w-10 h-10 rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 hover:text-black active:scale-95 transition-all cursor-pointer shadow-none"
-              >
-                <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
-              </Link>
-              <div>
-                <h1 className="font-bodoni text-xl md:text-2xl font-bold tracking-tight text-black">
-                  Seller Agent Console
-                </h1>
-                <p className="font-hanken text-xs text-gray-500 font-medium">
-                  Manage Estate Listings, Seller Profile & Inquiries
-                </p>
-              </div>
+        <main className="max-w-7xl mx-auto pt-4 px-4 md:px-8 flex-grow pb-28 text-black space-y-5">
+          {/* Action Row */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">domain</span>
+              <h2 className="font-bodoni text-lg md:text-xl font-bold tracking-tight text-black">
+                My Property Portfolio ({properties.length})
+              </h2>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsProfileModalOpen(true)}
-                className="px-3.5 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">account_circle</span>
                 <span>Agent Profile</span>
@@ -212,7 +207,7 @@ export default function EstateSellerDashboard() {
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
-                className="px-4 py-2.5 rounded-2xl bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-xs flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-xs flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[18px]">add</span>
                 <span>Add Property</span>
@@ -264,7 +259,7 @@ export default function EstateSellerDashboard() {
           {/* Status Tabs */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
             {[
-              { id: "ALL" as const, label: `All Properties (${properties.length})` },
+              { id: "ALL" as const, label: `All (${properties.length})` },
               { id: "PUBLISHED" as const, label: "Published" },
               { id: "PENDING_REVIEW" as const, label: "Pending Review" },
               { id: "DRAFT" as const, label: "Drafts" },
