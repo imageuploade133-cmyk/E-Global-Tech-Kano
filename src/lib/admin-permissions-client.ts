@@ -38,6 +38,10 @@ export const CPANEL_PERMISSIONS_CATALOG: PermissionDefinition[] = [
   { key: "store.view", label: "View E-Store Directory", category: "Store", description: "Access store products, orders, categories, and stock" },
   { key: "store.manage", label: "Manage Store Products & Orders", category: "Store", description: "Add/edit products, fulfill orders, and manage inventory" },
 
+  // Estate Marketplace
+  { key: "estate.view", label: "View Estate Directory", category: "Estate", description: "Access property listings, sellers, and inquiry logs" },
+  { key: "estate.manage", label: "Manage Estate & Approvals", category: "Estate", description: "Approve/reject property listings, manage sellers, categories, and settings" },
+
   // Audit & History
   { key: "user_history.view", label: "User History & Audit Inspector", category: "Audit", description: "Inspect comprehensive user audit ledgers and activity" },
 ];
@@ -49,7 +53,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     "kyc.view", "kyc.manage", "freeze.manage", "limits.manage",
     "branding.manage", "communication.branding.manage", "banners.manage", "bank_logos.manage", "bill_logos.manage",
     "whatsapp.manage", "email_connect.manage", "vtu.manage", "exchange_rates.manage", "investments.manage", "deposit.manage",
-    "store.view", "store.manage", "user_history.view"
+    "store.view", "store.manage", "estate.view", "estate.manage", "user_history.view"
   ],
   support: ["metrics.view", "users.view", "kyc.view", "store.view", "user_history.view"],
   finance: ["metrics.view", "users.view", "vtu.manage", "investments.manage", "deposit.manage", "user_history.view"],
