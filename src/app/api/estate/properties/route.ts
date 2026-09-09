@@ -40,6 +40,9 @@ export async function GET(req: Request) {
       queryRef = queryRef.where("featured", "==", true);
     }
 
+    // Order by createdAt to trigger compound index evaluation
+    queryRef = queryRef.orderBy("createdAt", "desc");
+
     // Default canonical index URL for estate properties indexing setup
     const canonicalIndexUrl =
       "https://console.firebase.google.com/project/_/firestore/indexes";
@@ -96,6 +99,8 @@ export async function GET(req: Request) {
       );
     }
 
+    console.log("[FIRESTORE ESTATE INDEX LINK]:", canonicalIndexUrl);
+
     return NextResponse.json({
       success: true,
       properties,
@@ -106,6 +111,11 @@ export async function GET(req: Request) {
     const extractedUrl = extractIndexUrl(err.message || "");
     const indexUrl =
       extractedUrl || "https://console.firebase.google.com/project/_/firestore/indexes";
+
+    console.log("\n==========================================================================");
+    console.log("🔥 FIRESTORE MISSING INDEX REQUIRED! CLICK LINK BELOW TO CREATE INSTANTLY:");
+    console.log("👉 " + indexUrl);
+    console.log("==========================================================================\n");
 
     return NextResponse.json(
       {

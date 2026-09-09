@@ -58,13 +58,16 @@ export default function EstateMarketplacePage() {
       const data = await res.json();
 
       if (data.indexUrl) {
+        // Output raw link string to browser DevTools console so it is directly clickable in all browsers
+        console.log("🔥 FIRESTORE INDEX LINK (CLICK TO CREATE INSTANTLY):", data.indexUrl);
+
         toast.info("Fast Search & Sorting Index Available", {
-          description: "Click to create/view the required Firestore index.",
+          description: "Click link below to create or view the Firestore index.",
           action: {
             label: "Open Index Link",
             onClick: () => window.open(data.indexUrl, "_blank"),
           },
-          duration: 10000,
+          duration: 12000,
         });
       }
 
