@@ -245,12 +245,12 @@ header {
   background-image: none !important;
 }
 
-body:not(:has(#store-page-root)) main {
+body:not(:has(#store-page-root, #estate-page-root)) main {
   margin-top: 80px !important;
 }
 
 @media (min-width: 375px) {
-  body:not(:has(#store-page-root)) main {
+  body:not(:has(#store-page-root, #estate-page-root)) main {
     margin-top: 96px !important;
   }
 }

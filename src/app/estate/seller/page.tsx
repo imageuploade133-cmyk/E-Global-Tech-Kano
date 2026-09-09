@@ -16,6 +16,7 @@ import {
   PropertyCard,
   PropertyDetailModal,
   AddPropertyModal,
+  SellerProfileModal,
 } from "@/components/estate";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
@@ -36,16 +37,13 @@ export default function EstateSellerDashboard() {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<EstateProperty | null>(null);
-
-  // Profile Form States
-  const [agencyName, setAgencyName] = useState("");
-  const [sellerPhone, setSellerPhone] = useState("");
-  const [sellerAddress, setSellerAddress] = useState("");
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSavingSeller, setIsSavingSeller] = useState(false);
   const [isSubmittingProperty, setIsSubmittingProperty] = useState(false);
 
   useModalBackHandler(isAddModalOpen, () => setIsAddModalOpen(false), "seller-add-modal");
   useModalBackHandler(Boolean(selectedProperty), () => setSelectedProperty(null), "seller-detail-modal");
+  useModalBackHandler(isProfileModalOpen, () => setIsProfileModalOpen(false), "seller-edit-profile-modal");
 
   const fetchSellerData = async () => {
     setIsLoading(true);
@@ -63,11 +61,19 @@ export default function EstateSellerDashboard() {
 
       if (sellerData.success && sellerData.seller) {
         setSellerProfile(sellerData.seller);
-        setAgencyName(sellerData.seller.agencyName || "");
-        setSellerPhone(sellerData.seller.phone || userData?.phoneNumber || "");
-        setSellerAddress(sellerData.seller.address || "");
       } else {
-        setSellerPhone(String(userData?.phoneNumber || ""));
+        setSellerProfile({
+          uid: user?.uid || "seller-id",
+          displayName: userName,
+          agencyName: "Independent Agent",
+          phone: String(userData?.phoneNumber || ""),
+          email: String(userData?.email || user?.email || ""),
+          address: "",
+          isVerified: false,
+          verificationStatus: "PENDING",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       }
 
       // Fetch Seller Properties
@@ -93,8 +99,7 @@ export default function EstateSellerDashboard() {
     }
   }, [user]);
 
-  const handleSaveSellerProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveSellerProfile = async (updated: { agencyName: string; phone: string; address: string }) => {
     setIsSavingSeller(true);
     try {
       let idToken = "";
@@ -110,10 +115,10 @@ export default function EstateSellerDashboard() {
         },
         body: JSON.stringify({
           displayName: userName,
-          agencyName,
-          phone: sellerPhone,
+          agencyName: updated.agencyName,
+          phone: updated.phone,
           email: userData?.email || user?.email || "",
-          address: sellerAddress,
+          address: updated.address,
         }),
       });
 
@@ -121,6 +126,7 @@ export default function EstateSellerDashboard() {
       if (data.success) {
         setSellerProfile(data.seller);
         toast.success("Seller profile saved successfully!");
+        setIsProfileModalOpen(false);
       } else {
         toast.error(data.error || "Failed to save profile.");
       }
@@ -170,116 +176,95 @@ export default function EstateSellerDashboard() {
 
   return (
     <RouteGuard>
-      <div className="min-h-dvh bg-background text-on-background pb-32">
+      <div id="estate-page-root" className="min-h-dvh bg-background text-on-background pb-32">
         <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
-        <main className="max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 text-black space-y-5">
+        <main className="max-w-7xl mx-auto pt-3 px-4 md:px-8 flex-grow pb-28 text-black space-y-6">
           {/* Header Row */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-3xl bg-white border border-gray-150 shadow-2xs">
             <div className="flex items-center gap-3">
               <Link
                 href="/estate"
-                className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black active:scale-95 transition-all cursor-pointer shadow-none"
+                className="w-10 h-10 rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 hover:text-black active:scale-95 transition-all cursor-pointer shadow-none"
               >
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </Link>
               <div>
-                <h1 className="font-bodoni text-lg min-[375px]:text-xl font-bold tracking-tight text-black">
-                  Seller Dashboard
+                <h1 className="font-bodoni text-xl md:text-2xl font-bold tracking-tight text-black">
+                  Seller Agent Console
                 </h1>
-                <p className="font-hanken text-[10.5px] text-gray-500 font-medium">
-                  Manage Property Listings & Inquiries
+                <p className="font-hanken text-xs text-gray-500 font-medium">
+                  Manage Estate Listings, Seller Profile & Inquiries
                 </p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-[#FC7A00] text-white text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0 shadow-xs flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Add Property</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className="px-3.5 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">account_circle</span>
+                <span>Agent Profile</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-4 py-2.5 rounded-2xl bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-xs flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span>Add Property</span>
+              </button>
+            </div>
           </div>
 
-          {/* Seller Agent Profile Setup Form */}
-          <div className="p-4 bg-white border border-gray-150 rounded-2xl space-y-3 shadow-xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">badge</span>
-                <h3 className="font-hanken font-extrabold text-xs text-black uppercase tracking-wider">
-                  Seller / Agent Profile
-                </h3>
-              </div>
-
-              {sellerProfile?.isVerified ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  Verified Agent
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
-                  Pending Verification
-                </span>
-              )}
-            </div>
-
-            <form onSubmit={handleSaveSellerProfile} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[9.5px] font-black uppercase text-gray-400 block mb-1">
-                    Agency / Business Name
-                  </label>
-                  <input
-                    type="text"
-                    value={agencyName}
-                    onChange={(e) => setAgencyName(e.target.value)}
-                    placeholder="e.g. Apex Real Estate"
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-black"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9.5px] font-black uppercase text-gray-400 block mb-1">
-                    Contact Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={sellerPhone}
-                    onChange={(e) => setSellerPhone(e.target.value)}
-                    placeholder="e.g. 08012345678"
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-black"
-                  />
-                </div>
+          {/* Seller / Agent Profile Header Banner */}
+          <div
+            onClick={() => setIsProfileModalOpen(true)}
+            className="p-4 md:p-5 bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:border-[#FC7A00] transition-all shadow-2xs"
+          >
+            <div className="flex items-center gap-4">
+              <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-xs flex-shrink-0 bg-white">
+                <img src={currentPhoto} alt={userName} className="w-full h-full object-cover" />
+                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
               </div>
 
               <div>
-                <label className="text-[9.5px] font-black uppercase text-gray-400 block mb-1">
-                  Office / Business Address
-                </label>
-                <input
-                  type="text"
-                  value={sellerAddress}
-                  onChange={(e) => setSellerAddress(e.target.value)}
-                  placeholder="e.g. Suite 12, Victoria Island Plaza, Lagos"
-                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-black"
-                />
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm md:text-base text-black">{userName}</h3>
+                  {sellerProfile?.isVerified ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Verified Agent
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                      Pending Verification
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-[#FC7A00] uppercase mt-0.5">
+                  {sellerProfile?.agencyName || "Independent Real Estate Agent"}
+                </p>
+                <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  {sellerProfile?.address || "Click to update office address & contact phone"}
+                </p>
               </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={isSavingSeller}
-                className="w-full py-2.5 bg-black hover:bg-gray-900 text-white font-black text-[10px] uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-xs"
-              >
-                {isSavingSeller ? "Saving Profile..." : "Update Agent Profile"}
-              </button>
-            </form>
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <span className="text-xs font-extrabold text-[#FC7A00] uppercase tracking-wider">
+                Edit Agent Profile
+              </span>
+              <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">chevron_right</span>
+            </div>
           </div>
 
           {/* Status Tabs */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
             {[
-              { id: "ALL" as const, label: "All Properties" },
+              { id: "ALL" as const, label: `All Properties (${properties.length})` },
               { id: "PUBLISHED" as const, label: "Published" },
               { id: "PENDING_REVIEW" as const, label: "Pending Review" },
               { id: "DRAFT" as const, label: "Drafts" },
@@ -289,10 +274,10 @@ export default function EstateSellerDashboard() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
                   activeTab === tab.id
-                    ? "bg-[#FC7A00] text-white shadow-xs"
-                    : "bg-white text-gray-700 hover:bg-gray-100"
+                    ? "bg-[#FC7A00] text-white shadow-2xs"
+                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
                 }`}
               >
                 {tab.label}
@@ -300,24 +285,30 @@ export default function EstateSellerDashboard() {
             ))}
           </div>
 
-          {/* My Properties List */}
+          {/* My Properties Directory Grid */}
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <div key={i} className="h-32 bg-white rounded-2xl border border-gray-150 p-3 animate-pulse" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-64 bg-white rounded-2xl border border-gray-150 p-3 animate-pulse space-y-3">
+                  <div className="w-full h-36 bg-gray-100 rounded-xl" />
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                </div>
               ))}
             </div>
           ) : filteredProperties.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center space-y-2 border border-gray-150">
-              <span className="material-symbols-outlined text-[40px] text-gray-300">
+            <div className="bg-white rounded-3xl p-12 text-center space-y-3 border border-gray-150 shadow-xs">
+              <span className="material-symbols-outlined text-[56px] text-gray-300">
                 home_work
               </span>
-              <h3 className="font-bold text-xs text-gray-500 uppercase">
+              <h3 className="font-bold text-sm text-gray-500 uppercase">
                 No listings under {activeTab}
               </h3>
+              <p className="text-xs text-gray-400">
+                Submit new property listings to showcase them to buyers across the marketplace.
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {filteredProperties.map((prop) => (
                 <PropertyCard
                   key={prop.id}
@@ -335,6 +326,17 @@ export default function EstateSellerDashboard() {
           onClose={() => setIsAddModalOpen(false)}
           onSubmitProperty={handleCreateProperty}
           isSubmitting={isSubmittingProperty}
+        />
+
+        {/* Editable Seller Profile Modal */}
+        <SellerProfileModal
+          isOpen={isProfileModalOpen}
+          seller={sellerProfile}
+          currentPhoto={currentPhoto}
+          isEditable={true}
+          onClose={() => setIsProfileModalOpen(false)}
+          onSaveProfile={handleSaveSellerProfile}
+          isSaving={isSavingSeller}
         />
 
         {/* Property Detail View */}
