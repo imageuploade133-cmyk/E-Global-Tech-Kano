@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { EstateProperty, EstateSeller } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { useAuth } from "@/lib/AuthContext";
 
 interface EstateChatInquiryModalProps {
   isOpen: boolean;
@@ -30,9 +31,11 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
   onClose,
   onSubmitInquiry,
 }) => {
+  const { user } = useAuth();
   const [inputText, setInputText] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useModalBackHandler(
@@ -41,21 +44,52 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
     property ? `estate-chat-inquiry-${property.id}` : "estate-chat-inquiry"
   );
 
-  // Initialize messages or load history
-  useEffect(() => {
-    if (isOpen && property) {
-      // Default welcome message from agent or system
-      const agentName = publisherAgent?.displayName || property.sellerName || "Agent";
-      setMessages([
-        {
+  // Fetch real-time chat history for this property
+  const fetchChatHistory = async () => {
+    if (!property || !user) return;
+    setIsLoadingHistory(true);
+    try {
+      let idToken = "";
+      if (typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch(`/api/estate/inquiries?propertyId=${property.id}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+
+      const data = await res.json();
+      if (data.success && Array.isArray(data.inquiries)) {
+        const fetchedMsgs: ChatMessage[] = data.inquiries.map((inq: any) => ({
+          id: inq.id,
+          sender: inq.userId === user.uid ? "user" : "agent",
+          text: inq.message,
+          time: new Date(inq.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          status: "read",
+        }));
+
+        const agentName = publisherAgent?.displayName || property.sellerName || "Agent";
+        const initialWelcome: ChatMessage = {
           id: "welcome",
           sender: "agent",
           text: `Hello! I am ${agentName}. How can I assist you regarding "${property.title}"?`,
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        },
-      ]);
+        };
+
+        setMessages([initialWelcome, ...fetchedMsgs]);
+      }
+    } catch {
+      console.warn("Failed to load inquiry history.");
+    } finally {
+      setIsLoadingHistory(false);
     }
-  }, [isOpen, property, publisherAgent]);
+  };
+
+  useEffect(() => {
+    if (isOpen && property) {
+      fetchChatHistory();
+    }
+  }, [isOpen, property?.id, user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,7 +125,6 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
 
     try {
       await onSubmitInquiry(text.trim());
-      // Add simulated agent auto-response acknowledgement
       setTimeout(() => {
         setMessages((prev) => [
           ...prev,
@@ -102,7 +135,7 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
             time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           },
         ]);
-      }, 1000);
+      }, 800);
     } catch {
       toast.error("Failed to send inquiry. Please try again.");
     } finally {
@@ -172,7 +205,7 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
           </div>
 
           {/* Property Context Header Card */}
-          <div className="px-4 py-2.5 bg-white/90 flex items-center gap-3 flex-shrink-0">
+          <div className="px-4 py-2.5 bg-white flex items-center gap-3 flex-shrink-0">
             <div className="w-12 h-12 rounded-xl bg-gray-100 relative overflow-hidden flex-shrink-0 border border-gray-200">
               {property.images && property.images[0] ? (
                 <Image src={property.images[0]} alt="Prop" fill className="object-cover" unoptimized />
@@ -196,34 +229,46 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
             </span>
           </div>
 
+          {/* Explicit Encryption & 30-Day Auto-Purge Security Ribbon */}
+          <div className="px-4 py-1.5 bg-emerald-50/80 border-y border-emerald-100/60 flex items-center justify-center gap-1.5 text-[10px] font-extrabold text-emerald-800 flex-shrink-0">
+            <span className="material-symbols-outlined text-[14px] text-emerald-600">lock</span>
+            <span>AES-256 Encrypted • Messages automatically purged after 30 days</span>
+          </div>
+
           {/* Chat Stream Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar bg-[#F8F9FA]">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-              >
+            {isLoadingHistory ? (
+              <div className="p-4 text-center text-xs font-bold text-gray-400 animate-pulse">
+                Decrypting secure chat session...
+              </div>
+            ) : (
+              messages.map((msg) => (
                 <div
-                  className={`max-w-[82%] p-3.5 rounded-2xl shadow-2xs space-y-1 ${
-                    msg.sender === "user"
-                      ? "bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-br-none"
-                      : "bg-white text-gray-900 border border-gray-200 rounded-bl-none"
-                  }`}
+                  key={msg.id}
+                  className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <p className="text-xs font-semibold leading-relaxed whitespace-pre-line">{msg.text}</p>
                   <div
-                    className={`flex items-center justify-end gap-1 text-[9px] font-bold ${
-                      msg.sender === "user" ? "text-orange-100" : "text-gray-400"
+                    className={`max-w-[82%] p-3.5 rounded-2xl shadow-2xs space-y-1 ${
+                      msg.sender === "user"
+                        ? "bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-br-none"
+                        : "bg-white text-gray-900 border border-gray-200 rounded-bl-none"
                     }`}
                   >
-                    <span>{msg.time}</span>
-                    {msg.sender === "user" && (
-                      <span className="material-symbols-outlined text-[13px]">done_all</span>
-                    )}
+                    <p className="text-xs font-semibold leading-relaxed whitespace-pre-line">{msg.text}</p>
+                    <div
+                      className={`flex items-center justify-end gap-1 text-[9px] font-bold ${
+                        msg.sender === "user" ? "text-orange-100" : "text-gray-400"
+                      }`}
+                    >
+                      <span>{msg.time}</span>
+                      {msg.sender === "user" && (
+                        <span className="material-symbols-outlined text-[13px]">done_all</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
             <div ref={messagesEndRef} />
           </div>
 

@@ -133,7 +133,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           {/* Main Scrollable Body */}
-          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-5 custom-scrollbar pb-28">
+          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-5 custom-scrollbar pb-44">
             {/* Main Featured Image Gallery Viewer */}
             <div className="space-y-2">
               <div
