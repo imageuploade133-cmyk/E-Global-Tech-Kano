@@ -153,9 +153,6 @@ export default function CpanelEstatePropertiesPage() {
   const panelClass = isDark
     ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
     : "bg-white border-gray-200/90 text-gray-900 shadow-3xs";
-  const inputClass = isDark
-    ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs h-10 px-3 text-xs outline-none font-semibold truncate w-full"
-    : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs h-10 px-3 text-xs outline-none font-semibold truncate w-full";
 
   return (
     <CpanelRouteGuard requiredPermission="estate.view">
@@ -241,55 +238,44 @@ export default function CpanelEstatePropertiesPage() {
             </div>
           </div>
 
-          {/* Firestore Index & Read Optimization Guide */}
-          <div className={cn("p-4 rounded-2xl border flex items-center justify-between gap-4 bg-gradient-to-r from-[#FC7A00]/10 via-amber-500/5 to-transparent border-[#FC7A00]/20", panelClass)}>
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">speed</span>
-              <div>
-                <h4 className="font-extrabold text-xs uppercase text-[#FC7A00]">High Efficiency Index Query Mode</h4>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
-                  Cursor pagination and server-side caching active. Index requirements: <code className="font-mono font-bold text-black dark:text-white">status ASC + createdAt DESC</code>.
-                </p>
-              </div>
-            </div>
-            <span className="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 flex-shrink-0">
-              Low Read Active
-            </span>
-          </div>
-
-          {/* Search Bar & Status Filter Tabs */}
-          <div className={cn("p-4 rounded-2xl border space-y-4", panelClass)}>
+          {/* Premium Search Bar & Status Filter Section */}
+          <div className={cn("p-5 rounded-2xl border space-y-4", panelClass)}>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">filter_list</span>
-                <h3 className="font-extrabold text-sm uppercase">Directory Filters</h3>
+                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">tune</span>
+                <h3 className="font-extrabold text-sm uppercase">Directory Search & Filters</h3>
               </div>
 
-              {/* Server Search Input */}
-              <div className="relative flex-1 max-w-md">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
-                  search
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search title, address, type, seller name, phone, ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={cn("pl-9 pr-8", inputClass)}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black dark:hover:text-white border-0 cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                )}
+              {/* Styled Gradient Search Container */}
+              <div className="relative flex-1 max-w-lg bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl shadow-xs">
+                <div className={cn("relative w-full rounded-[14.5px] flex items-center h-10 px-3", isDark ? "bg-[#111827]" : "bg-white")}>
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[18px] mr-2">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search title, location, type, seller name, phone, ID..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={cn(
+                      "w-full bg-transparent border-0 outline-none text-xs font-semibold placeholder-gray-400 truncate",
+                      isDark ? "text-white" : "text-gray-900"
+                    )}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="ml-2 text-gray-400 hover:text-black dark:hover:text-white border-0 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Status Tabs */}
+            {/* Status Filter Tabs */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
               {[
                 { id: "ALL", label: `All (${metrics.totalCount})` },
@@ -608,7 +594,7 @@ export default function CpanelEstatePropertiesPage() {
                   value={rejectionReasonInput}
                   onChange={(e) => setRejectionReasonInput(e.target.value)}
                   placeholder="Reason for rejection..."
-                  className={cn("w-full p-3 rounded-xl text-xs font-semibold outline-none resize-none", inputClass)}
+                  className={cn("w-full p-3 rounded-xl text-xs font-semibold outline-none resize-none", isDark ? "bg-[#111827] border border-gray-700 text-white" : "bg-gray-50 border border-gray-200 text-black")}
                 />
                 <div className="flex gap-2 pt-2">
                   <button
