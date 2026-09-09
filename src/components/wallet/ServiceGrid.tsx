@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
@@ -43,9 +42,19 @@ export const ServiceGrid: React.FC = () => {
   const { userData } = useAuth();
   const router = useRouter();
 
+  // Loading state for clicked service icon
+  const [loadingLabel, setLoadingLabel] = useState<string | null>(null);
+
   // Modal states
   const [activeModal, setActiveModal] = useState<"loan" | "wealth" | "more" | null>(null);
   const [isKycDrawerOpen, setIsKycDrawerOpen] = useState(false);
+
+  // Clear loading spinner if modal closes or route changes
+  useEffect(() => {
+    if (!activeModal) {
+      setLoadingLabel(null);
+    }
+  }, [activeModal]);
 
   // Prevent background scrolling while the service info modal is active
   useEffect(() => {
@@ -60,10 +69,12 @@ export const ServiceGrid: React.FC = () => {
   }, [activeModal]);
 
   const handleServiceClick = (service: typeof services[0]) => {
+    setLoadingLabel(service.label);
     const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
     if (userData?.kycStatus !== "VERIFIED" && !isMockMode) {
       toast.warning("Please complete your identity verification (KYC) to access this activity.");
       setIsKycDrawerOpen(true);
+      setLoadingLabel(null);
       return;
     }
     if (service.action) {
@@ -71,15 +82,18 @@ export const ServiceGrid: React.FC = () => {
     }
   };
 
-  const handleLinkClick = (e: React.MouseEvent, href: string) => {
+  const handleLinkClick = (e: React.MouseEvent, service: typeof services[0]) => {
     e.preventDefault();
+    setLoadingLabel(service.label);
+
     const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
-    if (href !== "/referrals" && userData?.kycStatus !== "VERIFIED" && !isMockMode) {
+    if (service.href !== "/referrals" && userData?.kycStatus !== "VERIFIED" && !isMockMode) {
       toast.warning("Please complete your identity verification (KYC) to access this utility.");
       setIsKycDrawerOpen(true);
+      setLoadingLabel(null);
       return;
     }
-    router.push(href);
+    router.push(service.href);
   };
 
   return (
@@ -93,18 +107,26 @@ export const ServiceGrid: React.FC = () => {
         >
           {services.map((service) => {
             const isLink = service.href !== "#";
+            const isLoading = loadingLabel === service.label;
+
             const content = (
               <div className="flex flex-col items-center gap-1 min-[360px]:gap-1.5 py-1.5 min-[360px]:py-2.5 min-w-0 w-full relative">
                 {/* Premium gold-orange/emerald gradient border matching physical card */}
-                <div className="p-2 min-[360px]:p-2.5 min-[390px]:p-3 bg-surface-container rounded-lg border flex items-center justify-center flex-shrink-0 premium-gradient-border">
-                  <span
-                    className={cn("material-symbols-outlined text-[16px] min-[360px]:text-[18px] min-[390px]:text-xl", service.color)}
-                    style={service.fill ? { fontVariationSettings: '"FILL" 1' } : {}}
-                  >
-                    {service.icon}
-                  </span>
+                <div className="p-2 min-[360px]:p-2.5 min-[390px]:p-3 bg-surface-container rounded-lg border flex items-center justify-center flex-shrink-0 premium-gradient-border relative min-w-[40px] min-h-[40px] min-[360px]:min-w-[44px] min-[360px]:min-h-[44px]">
+                  {isLoading ? (
+                    <span className="material-symbols-outlined text-[18px] min-[360px]:text-[20px] text-[#FC7A00] animate-spin">
+                      progress_activity
+                    </span>
+                  ) : (
+                    <span
+                      className={cn("material-symbols-outlined text-[16px] min-[360px]:text-[18px] min-[390px]:text-xl", service.color)}
+                      style={service.fill ? { fontVariationSettings: '"FILL" 1' } : {}}
+                    >
+                      {service.icon}
+                    </span>
+                  )}
                 </div>
-                <span className="font-label-sm text-[9px] min-[360px]:text-[10px] min-[390px]:text-xs text-on-surface-variant/80 truncate w-full text-center mt-1">
+                <span className="font-label-sm text-[9px] min-[360px]:text-[10px] min-[390px]:text-xs text-on-surface-variant/80 truncate w-full text-center mt-1 font-semibold">
                   {service.label}
                 </span>
               </div>
@@ -114,16 +136,16 @@ export const ServiceGrid: React.FC = () => {
               return (
                 <button
                   key={service.label}
-                  onClick={(e) => handleLinkClick(e, service.href!)}
+                  onClick={(e) => handleLinkClick(e, service)}
                   className="w-full flex justify-center bg-transparent border-0 p-0"
                 >
-                  <motion.button
+                  <motion.div
                     variants={item}
                     whileTap={{ scale: 0.9 }}
                     className="w-full flex flex-col items-center cursor-pointer"
                   >
                     {content}
-                  </motion.button>
+                  </motion.div>
                 </button>
               );
             }
@@ -134,7 +156,7 @@ export const ServiceGrid: React.FC = () => {
                 variants={item}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => handleServiceClick(service)}
-                className="flex flex-col items-center cursor-pointer w-full"
+                className="flex flex-col items-center cursor-pointer w-full bg-transparent border-0 p-0"
               >
                 {content}
               </motion.button>
