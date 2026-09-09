@@ -1,9 +1,85 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import { NotificationService } from "@/services/notification-service";
 
-// GET /api/estate/inquiries - Fetch inquiries sent to seller
+// Master encryption key derived from environment or secret fallback
+const ENCRYPTION_SECRET = process.env.CHAT_ENCRYPTION_KEY || process.env.PAYMENT_GATEWAY_API_KEY || "e_global_estate_secure_chat_32_byte_secret_key_v1";
+const ALGORITHM = "aes-256-gcm";
+
+function getDerivedKey(): Buffer {
+  return crypto.createHash("sha256").update(ENCRYPTION_SECRET).digest();
+}
+
+/**
+ * Encrypts sensitive chat content using AES-256-GCM.
+ */
+function encryptText(text: string): { encryptedData: string; iv: string; tag: string } {
+  const iv = crypto.randomBytes(12);
+  const key = getDerivedKey();
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  let encrypted = cipher.update(text, "utf8", "hex");
+  encrypted += cipher.final("hex");
+  const tag = cipher.getAuthTag().toString("hex");
+  return {
+    encryptedData: encrypted,
+    iv: iv.toString("hex"),
+    tag,
+  };
+}
+
+/**
+ * Decrypts AES-256-GCM encrypted chat payload.
+ */
+function decryptText(payload: { encryptedData?: string; iv?: string; tag?: string; raw?: string }): string {
+  if (payload.raw) return payload.raw;
+  if (!payload.encryptedData || !payload.iv || !payload.tag) return payload.encryptedData || "";
+  try {
+    const key = getDerivedKey();
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(payload.iv, "hex"));
+    decipher.setAuthTag(Buffer.from(payload.tag, "hex"));
+    let decrypted = decipher.update(payload.encryptedData, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return decrypted;
+  } catch (err) {
+    return payload.encryptedData || "";
+  }
+}
+
+/**
+ * Auto-purges chat inquiries older than 30 days (720 hours).
+ */
+async function purgeExpiredInquiries(): Promise<number> {
+  try {
+    const thirtyDaysAgoMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const thirtyDaysAgoIso = new Date(thirtyDaysAgoMs).toISOString();
+
+    const staleSnap = await adminDb
+      .collection("estate_inquiries")
+      .where("createdAt", "<", thirtyDaysAgoIso)
+      .limit(100)
+      .get();
+
+    if (staleSnap.empty) return 0;
+
+    const batch = adminDb.batch();
+    let count = 0;
+    staleSnap.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+      count++;
+    });
+
+    await batch.commit();
+    console.log(`[Estate Chat] Auto-purged ${count} expired chat inquiry record(s) older than 30 days.`);
+    return count;
+  } catch (err: any) {
+    console.warn("[Estate Chat Purge Warning]:", err?.message);
+    return 0;
+  }
+}
+
+// GET /api/estate/inquiries - Fetch chat inquiries (with 30-day auto-purge)
 export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -20,25 +96,55 @@ export async function GET(req: Request) {
     }
 
     const uid = decoded.uid;
-    const snap = await adminDb
-      .collection("estate_inquiries")
-      .where("sellerId", "==", uid)
-      .limit(50)
-      .get();
+    const url = new URL(req.url);
+    const propertyId = url.searchParams.get("propertyId");
+
+    // Trigger non-blocking 30-day auto-purge cleanup
+    purgeExpiredInquiries().catch(() => {});
+
+    let query: FirebaseFirestore.Query = adminDb.collection("estate_inquiries");
+
+    if (propertyId) {
+      query = query.where("propertyId", "==", propertyId);
+    } else {
+      query = query.where("sellerId", "==", uid);
+    }
+
+    const snap = await query.limit(100).get();
 
     const inquiries: any[] = [];
     snap.forEach((docSnap) => {
-      inquiries.push({ id: docSnap.id, ...docSnap.data() });
+      const data = docSnap.data();
+      // Only include if belonging to seller or user
+      if (data.sellerId === uid || data.userId === uid) {
+        const decryptedMessage = decryptText({
+          encryptedData: data.encryptedMessage,
+          iv: data.iv,
+          tag: data.tag,
+          raw: data.message,
+        });
+
+        inquiries.push({
+          id: docSnap.id,
+          ...data,
+          message: decryptedMessage,
+          // Expose calculated expiry timestamp for UI timer
+          expiresAt: new Date(new Date(data.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+      }
     });
+
+    // Sort by createdAt ASC for chat timeline
+    inquiries.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     return NextResponse.json({ success: true, inquiries });
   } catch (err: any) {
     console.error("[GET /api/estate/inquiries Error]:", err.message);
-    return NextResponse.json({ error: "Failed to fetch inquiries." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch chat inquiries." }, { status: 500 });
   }
 }
 
-// POST /api/estate/inquiries - Submit an inquiry for a property
+// POST /api/estate/inquiries - Submit an encrypted inquiry (with 30-day retention)
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -66,7 +172,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const cleanText = String(message).trim();
+    const encrypted = encryptText(cleanText);
+
+    // Non-blocking auto-purge background worker
+    purgeExpiredInquiries().catch(() => {});
+
     const newInquiryRef = adminDb.collection("estate_inquiries").doc();
+    const createdAtIso = new Date().toISOString();
+    const expiresAtIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
     const newInquiry = {
       id: newInquiryRef.id,
       propertyId,
@@ -76,18 +191,22 @@ export async function POST(req: Request) {
       userName: userName || decoded.email || "Interested Buyer/Tenant",
       userPhone: userPhone || "",
       userEmail: userEmail || decoded.email || "",
-      message: String(message).trim(),
+      encryptedMessage: encrypted.encryptedData,
+      iv: encrypted.iv,
+      tag: encrypted.tag,
       status: "NEW",
-      createdAt: new Date().toISOString(),
+      createdAt: createdAtIso,
+      expiresAt: expiresAtIso,
+      autoDeleteDays: 30,
     };
 
     await newInquiryRef.set(newInquiry);
 
-    // Dispatch wallet notification to the agent/seller if sellerId exists
+    // Dispatch wallet push notification to agent/seller
     try {
       await NotificationService.sendPushNotification(sellerId, {
-        title: "New Estate Inquiry",
-        body: `You received an inquiry for "${propertyTitle || "Property"}" from ${userName || "a buyer"}: "${message.slice(0, 60)}..."`,
+        title: "New Estate Inquiry Chat",
+        body: `New message regarding "${propertyTitle || "Property"}": "${cleanText.slice(0, 50)}..."`,
         type: "transaction",
       });
     } catch (notifErr: any) {
@@ -96,8 +215,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Inquiry sent to property agent/seller successfully.",
-      inquiry: newInquiry,
+      message: "Encrypted inquiry dispatched successfully. Auto-deletes in 30 days.",
+      inquiry: {
+        ...newInquiry,
+        message: cleanText,
+      },
     });
   } catch (err: any) {
     console.error("[POST /api/estate/inquiries Error]:", err.message);
