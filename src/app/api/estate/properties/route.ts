@@ -3,12 +3,6 @@ import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import { EstateProperty } from "@/estate/types";
 
-function extractIndexUrl(message: string): string | null {
-  if (!message) return null;
-  const match = message.match(/(https:\/\/console\.firebase\.google\.com\/[^\s]+)/);
-  return match ? match[1] : null;
-}
-
 // GET /api/estate/properties - Public & Authenticated search/filter properties
 export async function GET(req: Request) {
   try {
@@ -39,13 +33,6 @@ export async function GET(req: Request) {
     if (featured === "true") {
       queryRef = queryRef.where("featured", "==", true);
     }
-
-    // Order by createdAt to trigger compound index evaluation
-    queryRef = queryRef.orderBy("createdAt", "desc");
-
-    // Default canonical index URL for estate properties indexing setup
-    const canonicalIndexUrl =
-      "https://console.firebase.google.com/project/_/firestore/indexes";
 
     const snap = await queryRef.limit(100).get();
     let properties: EstateProperty[] = [];
@@ -99,31 +86,18 @@ export async function GET(req: Request) {
       );
     }
 
-    console.log("[FIRESTORE ESTATE INDEX LINK]:", canonicalIndexUrl);
-
     return NextResponse.json({
       success: true,
       properties,
-      indexUrl: canonicalIndexUrl,
     });
   } catch (err: any) {
     console.error("[GET /api/estate/properties Error]:", err.message);
-    const extractedUrl = extractIndexUrl(err.message || "");
-    const indexUrl =
-      extractedUrl || "https://console.firebase.google.com/project/_/firestore/indexes";
-
-    console.log("\n==========================================================================");
-    console.log("🔥 FIRESTORE MISSING INDEX REQUIRED! CLICK LINK BELOW TO CREATE INSTANTLY:");
-    console.log("👉 " + indexUrl);
-    console.log("==========================================================================\n");
-
     return NextResponse.json(
       {
         success: false,
-        error: "Firestore query requires an index for fast performance.",
-        indexUrl,
+        error: "Failed to fetch property directory.",
       },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
