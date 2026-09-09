@@ -117,12 +117,12 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-white z-[100005+] flex flex-col justify-between overflow-y-auto no-scrollbar text-black animate-in fade-in duration-200">
+    <div className="fixed inset-0 w-full h-full bg-white z-[100005] flex flex-col justify-between overflow-y-auto no-scrollbar text-black animate-in fade-in duration-200 font-hanken">
       {/* Full Screen Top Header & Body Container */}
       <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-between p-4 sm:p-6 space-y-6 pb-28">
         <div>
           {/* Top Header */}
-          <div className="flex items-center justify-between pb-3 pt-1 border-b border-gray-100">
+          <div className="flex items-center justify-between pb-3 pt-1">
             <div className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">
                 add_home_work

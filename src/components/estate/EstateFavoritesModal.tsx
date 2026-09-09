@@ -46,9 +46,9 @@ export const EstateFavoritesModal: React.FC<EstateFavoritesModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100000+] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100000] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black animate-in fade-in duration-200 font-hanken">
           {/* Header Bar */}
-          <div className="px-4 py-3.5 border-b border-gray-150 flex items-center justify-between flex-shrink-0 bg-white z-20 shadow-xs">
+          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20">
             <div className="flex items-center gap-3">
               <button
                 type="button"
