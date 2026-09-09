@@ -16,6 +16,7 @@ const services = [
   { icon: "bolt", label: "Electricity", color: "text-secondary", href: "/bills?type=utility" },
   { icon: "school", label: "WAEC", color: "text-secondary", href: "/bills?type=waec" },
   { icon: "sports_basketball", label: "Betting", color: "text-secondary", href: "/bills?type=betting" },
+  { icon: "domain", label: "Property", color: "text-[#FC7A00]", href: "/estate", fill: true },
   { icon: "credit_card", label: "Cards", color: "text-primary", href: "/cards", fill: true },
   { icon: "group_add", label: "Referral", color: "text-[#FC7A00]", href: "/referrals", fill: true },
   { icon: "real_estate_agent", label: "Loan", color: "text-primary", href: "#", action: "loan" },
