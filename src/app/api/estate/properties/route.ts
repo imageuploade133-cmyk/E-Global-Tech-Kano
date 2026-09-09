@@ -3,6 +3,12 @@ import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import { EstateProperty } from "@/estate/types";
 
+function extractIndexUrl(message: string): string | null {
+  if (!message) return null;
+  const match = message.match(/(https:\/\/console\.firebase\.google\.com\/[^\s]+)/);
+  return match ? match[1] : null;
+}
+
 // GET /api/estate/properties - Public & Authenticated search/filter properties
 export async function GET(req: Request) {
   try {
@@ -33,6 +39,10 @@ export async function GET(req: Request) {
     if (featured === "true") {
       queryRef = queryRef.where("featured", "==", true);
     }
+
+    // Default canonical index URL for estate properties indexing setup
+    const canonicalIndexUrl =
+      "https://console.firebase.google.com/project/_/firestore/indexes";
 
     const snap = await queryRef.limit(100).get();
     let properties: EstateProperty[] = [];
@@ -86,10 +96,25 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, properties });
+    return NextResponse.json({
+      success: true,
+      properties,
+      indexUrl: canonicalIndexUrl,
+    });
   } catch (err: any) {
     console.error("[GET /api/estate/properties Error]:", err.message);
-    return NextResponse.json({ error: "Failed to fetch property directory." }, { status: 500 });
+    const extractedUrl = extractIndexUrl(err.message || "");
+    const indexUrl =
+      extractedUrl || "https://console.firebase.google.com/project/_/firestore/indexes";
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Firestore query requires an index for fast performance.",
+        indexUrl,
+      },
+      { status: 400 }
+    );
   }
 }
 

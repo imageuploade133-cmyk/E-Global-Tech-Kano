@@ -57,8 +57,21 @@ export default function EstateMarketplacePage() {
       const res = await fetch(url);
       const data = await res.json();
 
+      if (data.indexUrl) {
+        toast.info("Fast Search & Sorting Index Available", {
+          description: "Click to create/view the required Firestore index.",
+          action: {
+            label: "Open Index Link",
+            onClick: () => window.open(data.indexUrl, "_blank"),
+          },
+          duration: 10000,
+        });
+      }
+
       if (data.success && Array.isArray(data.properties)) {
         setProperties(data.properties);
+      } else if (data.error) {
+        toast.error(data.error);
       }
     } catch (err) {
       console.warn("Failed to load estate properties:", err);
