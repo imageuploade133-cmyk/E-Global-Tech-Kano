@@ -82,9 +82,6 @@ export default function CpanelEstateSellersPage() {
   const panelClass = isDark
     ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
     : "bg-white border-gray-200/90 text-gray-900 shadow-3xs";
-  const inputClass = isDark
-    ? "bg-[#111827] border border-gray-700 text-white placeholder-gray-500 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs h-10 px-3 text-xs outline-none font-semibold truncate w-full"
-    : "bg-[#F9FAFB] border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-[#FC7A00] focus:ring-1 focus:ring-[#FC7A00] rounded-xl transition-all shadow-3xs h-10 px-3 text-xs outline-none font-semibold truncate w-full";
 
   return (
     <CpanelRouteGuard requiredPermission="estate.view">
@@ -123,7 +120,7 @@ export default function CpanelEstateSellersPage() {
               <button
                 type="button"
                 onClick={fetchSellers}
-                className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm border-0"
               >
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 <span>Refresh</span>
@@ -161,33 +158,39 @@ export default function CpanelEstateSellersPage() {
             </div>
           </div>
 
-          {/* Search Filter Header */}
-          <div className={cn("p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
+          {/* Premium Search Filter Header */}
+          <div className={cn("p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4", panelClass)}>
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">manage_search</span>
               <h3 className="font-extrabold text-sm uppercase">Agent Directory ({filteredSellers.length})</h3>
             </div>
 
-            <div className="relative flex-1 max-w-md">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
-                search
-              </span>
-              <input
-                type="text"
-                placeholder="Search by name, agency, phone, email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={cn("pl-9 pr-8", inputClass)}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black dark:hover:text-white border-0"
-                >
-                  ✕
-                </button>
-              )}
+            {/* Styled Gradient Search Container */}
+            <div className="relative flex-1 max-w-lg bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl shadow-xs">
+              <div className={cn("relative w-full rounded-[14.5px] flex items-center h-10 px-3", isDark ? "bg-[#111827]" : "bg-white")}>
+                <span className="material-symbols-outlined text-[#FC7A00] text-[18px] mr-2">
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by name, agency, phone, email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={cn(
+                    "w-full bg-transparent border-0 outline-none text-xs font-semibold placeholder-gray-400 truncate",
+                    isDark ? "text-white" : "text-gray-900"
+                  )}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="ml-2 text-gray-400 hover:text-black dark:hover:text-white border-0 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
