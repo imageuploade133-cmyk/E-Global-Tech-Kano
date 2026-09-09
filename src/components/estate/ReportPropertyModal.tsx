@@ -49,7 +49,7 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100010+] bg-white w-full h-full flex flex-col justify-between overflow-y-auto no-scrollbar text-black animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100025+] bg-white w-full h-full flex flex-col justify-between overflow-y-auto no-scrollbar text-black animate-in fade-in duration-200">
           <div className="w-full max-w-lg mx-auto flex-1 flex flex-col justify-between p-4 sm:p-6 space-y-6 pb-28">
             <div>
               {/* Header */}
@@ -139,7 +139,7 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
             </div>
 
             {/* Fixed Footer */}
-            <div className="fixed bottom-0 left-0 right-0 z-[100012] bg-white border-t border-gray-200 p-4 shadow-lg flex justify-center">
+            <div className="fixed bottom-0 left-0 right-0 z-[100030] bg-white border-t border-gray-200 p-4 shadow-lg flex justify-center">
               <div className="w-full max-w-lg flex gap-3">
                 <button
                   type="button"
