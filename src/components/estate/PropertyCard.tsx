@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { EstateProperty } from "@/estate/types";
 
@@ -9,6 +9,7 @@ interface PropertyCardProps {
   onOpenDetails: (property: EstateProperty) => void;
   onSaveFavorite?: (e: React.MouseEvent, property: EstateProperty) => void;
   isSaved?: boolean;
+  onInspectAgent?: (e: React.MouseEvent, sellerId?: string, sellerName?: string, sellerPhone?: string) => void;
 }
 
 export const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -16,9 +17,26 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   onOpenDetails,
   onSaveFavorite,
   isSaved,
+  onInspectAgent,
 }) => {
-  const displayImage =
-    property.images && property.images.length > 0 ? property.images[0] : "";
+  const images = property.images && property.images.length > 0 ? property.images : [];
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (images.length > 1) {
+      setActiveImgIndex((prev) => (prev + 1) % images.length);
+    }
+  };
+
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (images.length > 1) {
+      setActiveImgIndex((prev) => (prev - 1 + images.length) % images.length);
+    }
+  };
+
+  const displayImage = images[activeImgIndex] || "";
 
   return (
     <div
@@ -27,14 +45,14 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
     >
       <div className="bg-white rounded-[14.5px] p-3 space-y-3 h-full flex flex-col justify-between">
         <div className="space-y-2.5">
-          {/* Property Thumbnail Container */}
+          {/* Property Thumbnail Container with Image Swiper */}
           <div className="w-full h-38 min-[375px]:h-42 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden relative flex items-center justify-center p-1">
             {displayImage ? (
               <Image
                 src={displayImage}
                 alt={property.title}
                 fill
-                className="object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                className="object-cover transition-transform duration-500 ease-out"
                 unoptimized
               />
             ) : (
@@ -43,12 +61,34 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               </span>
             )}
 
+            {/* Agent Profile Icon Badge on Top-Left */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onInspectAgent) {
+                  onInspectAgent(e, property.sellerId, property.sellerName, property.sellerPhone);
+                } else {
+                  onOpenDetails(property);
+                }
+              }}
+              className="absolute top-2.5 left-2.5 h-8 px-2 rounded-full bg-white/95 backdrop-blur-md flex items-center gap-1.5 text-black shadow-md z-10 hover:scale-105 active:scale-95 transition-all border-0 cursor-pointer"
+              title="View Agent Profile"
+            >
+              <div className="w-5 h-5 rounded-full bg-[#FC7A00] text-white text-[10px] font-black flex items-center justify-center">
+                {(property.sellerName || "A")[0]}
+              </div>
+              <span className="material-symbols-outlined text-[15px] text-[#FC7A00]">
+                account_circle
+              </span>
+            </button>
+
             {/* Favorite Heart Trigger */}
             {onSaveFavorite && (
               <button
                 type="button"
                 onClick={(e) => onSaveFavorite(e, property)}
-                className="absolute top-2.5 left-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-gray-700 hover:text-red-500 shadow-md z-10 transition-transform active:scale-90 border-0 cursor-pointer"
+                className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-gray-700 hover:text-red-500 shadow-md z-10 transition-transform active:scale-90 border-0 cursor-pointer"
                 title={isSaved ? "Remove Favorite" : "Save Property"}
               >
                 <span
@@ -62,9 +102,43 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               </button>
             )}
 
+            {/* Image Swap Prev/Next Arrow Triggers (when multiple images exist) */}
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePrevImage}
+                  className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center opacity-80 group-hover:opacity-100 z-10 border-0 cursor-pointer active:scale-90 transition-all"
+                  title="Previous Image"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextImage}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center opacity-80 group-hover:opacity-100 z-10 border-0 cursor-pointer active:scale-90 transition-all"
+                  title="Next Image"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+
+                {/* Dot Pagination Indicator */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10 px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-xs">
+                  {images.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${
+                        activeImgIndex === idx ? "bg-[#FC7A00] w-3" : "bg-white/60"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
             {/* Purpose Badge */}
             <span
-              className={`absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white shadow-md backdrop-blur-xs ${
+              className={`absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white shadow-md backdrop-blur-xs z-10 ${
                 property.purpose === "Sale"
                   ? "bg-emerald-600/90"
                   : property.purpose === "Short-let"
@@ -77,7 +151,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
 
             {/* Featured Tag */}
             {property.featured && (
-              <span className="absolute bottom-2.5 left-2.5 px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md flex items-center gap-1">
+              <span className="absolute bottom-2.5 left-2.5 px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md flex items-center gap-1 z-10">
                 <span className="material-symbols-outlined text-[10px]">star</span>
                 <span>Featured</span>
               </span>

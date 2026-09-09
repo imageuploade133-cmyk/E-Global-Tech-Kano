@@ -174,7 +174,13 @@ export default function EstateMarketplacePage() {
     }
   };
 
-  const handleOpenSellerProfile = async (sellerId?: string, sellerName?: string, sellerPhone?: string) => {
+  const handleOpenSellerProfile = async (
+    e?: React.MouseEvent,
+    sellerId?: string,
+    sellerName?: string,
+    sellerPhone?: string
+  ) => {
+    if (e) e.stopPropagation();
     if (sellerId) {
       try {
         const res = await fetch(`/api/estate/sellers?sellerId=${sellerId}`);
@@ -415,6 +421,9 @@ export default function EstateMarketplacePage() {
                   }}
                   onSaveFavorite={handleToggleFavorite}
                   isSaved={favorites.includes(prop.id)}
+                  onInspectAgent={(e, sellerId, sellerName, sellerPhone) => {
+                    handleOpenSellerProfile(e, sellerId, sellerName, sellerPhone);
+                  }}
                 />
               ))}
             </div>
@@ -430,7 +439,7 @@ export default function EstateMarketplacePage() {
           onReportProperty={handleReportProperty}
           onInspectAgent={() => {
             if (selectedProperty) {
-              handleOpenSellerProfile(selectedProperty.sellerId, selectedProperty.sellerName, selectedProperty.sellerPhone);
+              handleOpenSellerProfile(undefined, selectedProperty.sellerId, selectedProperty.sellerName, selectedProperty.sellerPhone);
             }
           }}
           onOpenReportDrawer={() => setIsReportOpen(true)}
