@@ -21,19 +21,19 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
   onOpenFavorites,
 }) => {
   return (
-    <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md pt-3.5 pb-2.5 px-4 md:px-8 border-b border-gray-100 shadow-3xs">
+    <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md pt-3.5 pb-2.5 px-4 md:px-8 shadow-2xs">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {showBackButton ? (
             <Link
               href="/estate"
-              className="w-9 h-9 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 hover:text-black active:scale-90 transition-all cursor-pointer flex-shrink-0"
+              className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-700 hover:text-black active:scale-90 transition-all cursor-pointer flex-shrink-0 border-0"
               title="Back to Marketplace"
             >
               <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             </Link>
           ) : (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] flex items-center justify-center flex-shrink-0">
               <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">
                 domain
               </span>
@@ -56,7 +56,7 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
             <button
               type="button"
               onClick={onRefresh}
-              className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+              className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 active:scale-90 transition-all cursor-pointer border-0"
               title="Refresh Directory"
             >
               <span className="material-symbols-outlined text-[18px] text-gray-700">
@@ -69,7 +69,7 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
             <button
               type="button"
               onClick={onOpenFavorites}
-              className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+              className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 active:scale-90 transition-all cursor-pointer border-0"
               title="Saved Properties"
             >
               <span className="material-symbols-outlined text-[18px] text-red-500">

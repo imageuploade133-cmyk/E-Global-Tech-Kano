@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { EstateProperty } from "@/estate/types";
+import { EstateProperty, EstateSeller } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface PropertyDetailModalProps {
@@ -14,6 +14,7 @@ interface PropertyDetailModalProps {
   onSubmitInquiry: (message: string) => void;
   onReportProperty: (reason: string, details: string) => void;
   onInspectAgent?: () => void;
+  onOpenReportDrawer?: () => void;
 }
 
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
@@ -23,15 +24,37 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onSubmitInquiry,
   onReportProperty,
   onInspectAgent,
+  onOpenReportDrawer,
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [inquiryMessage, setInquiryMessage] = useState("");
-  const [isReporting, setIsReporting] = useState(false);
-  const [reportReason, setReportReason] = useState("");
-  const [reportDetails, setReportDetails] = useState("");
+
+  // Publisher full agent state
+  const [publisherAgent, setPublisherAgent] = useState<EstateSeller | null>(null);
+  const [isLoadingPublisher, setIsLoadingLoadingPublisher] = useState(false);
 
   useModalBackHandler(isOpen, onClose, property ? `property-detail-${property.id}` : "property-detail");
+
+  // Fetch agent full details when property opens
+  useEffect(() => {
+    if (property?.sellerId) {
+      setIsLoadingLoadingPublisher(true);
+      fetch(`/api/estate/sellers?sellerId=${property.sellerId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.seller) {
+            setPublisherAgent(data.seller);
+          } else {
+            setPublisherAgent(null);
+          }
+        })
+        .catch(() => setPublisherAgent(null))
+        .finally(() => setIsLoadingLoadingPublisher(false));
+    } else {
+      setPublisherAgent(null);
+    }
+  }, [property?.sellerId]);
 
   if (!isOpen || !property) return null;
 
@@ -55,7 +78,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       {isOpen && (
         <div className="fixed inset-0 z-[100008] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black">
           {/* Header Bar */}
-          <div className="px-4 py-3 border-b border-gray-150 flex items-center justify-between flex-shrink-0 bg-white z-20 shadow-xs">
+          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20 shadow-2xs">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
@@ -75,6 +98,17 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {onOpenReportDrawer && (
+                <button
+                  type="button"
+                  onClick={onOpenReportDrawer}
+                  className="w-9 h-9 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 transition-all cursor-pointer border-0 active:scale-90"
+                  title="Report Listing"
+                >
+                  <span className="material-symbols-outlined text-[18px]">flag</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleShare}
@@ -87,12 +121,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           {/* Main Scrollable Body */}
-          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-6 custom-scrollbar pb-12">
+          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-6 custom-scrollbar pb-16">
             {/* Main Featured Image Gallery Viewer */}
             <div className="space-y-2">
               <div
                 onClick={() => setFullscreenImageIndex(activeImageIndex)}
-                className="w-full h-64 min-[425px]:h-80 rounded-2xl bg-gray-100 relative overflow-hidden flex items-center justify-center p-1 border border-gray-200 cursor-pointer group shadow-sm"
+                className="w-full h-64 min-[425px]:h-80 rounded-2xl bg-gray-100 relative overflow-hidden flex items-center justify-center p-1 border border-gray-100 cursor-pointer group shadow-2xs"
               >
                 {images[activeImageIndex] ? (
                   <Image
@@ -114,7 +148,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </span>
 
                 <span
-                  className={`absolute top-3 right-3 px-3 py-1 rounded-md text-[9.5px] font-black uppercase tracking-wider text-white shadow-sm ${
+                  className={`absolute top-3 right-3 px-3 py-1 rounded-md text-[9.5px] font-black uppercase tracking-wider text-white shadow-2xs ${
                     property.purpose === "Sale"
                       ? "bg-emerald-600"
                       : property.purpose === "Short-let"
@@ -136,7 +170,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       onClick={() => setActiveImageIndex(idx)}
                       className={`w-16 h-16 rounded-xl border-2 overflow-hidden flex-shrink-0 relative cursor-pointer transition-all ${
                         activeImageIndex === idx
-                          ? "border-[#FC7A00] scale-105 shadow-sm"
+                          ? "border-[#FC7A00] scale-105 shadow-2xs"
                           : "border-transparent opacity-60 hover:opacity-100"
                       }`}
                     >
@@ -148,7 +182,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
 
             {/* Price & Location Card Container */}
-            <div className="bg-gradient-to-r from-[#FC7A00]/10 via-amber-50 to-[#E06600]/10 p-4 rounded-2xl border border-[#FC7A00]/25 flex items-center justify-between shadow-xs">
+            <div className="bg-gradient-to-r from-[#FC7A00]/10 via-amber-50 to-[#E06600]/10 p-4 rounded-2xl border border-[#FC7A00]/20 flex items-center justify-between shadow-2xs">
               <div>
                 <span className="text-[10px] font-black uppercase text-gray-500 block">Listing Price</span>
                 <span className="font-mono text-2xl font-black text-[#FC7A00]">
@@ -174,25 +208,120 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
             {/* Property Key Metrics Grid */}
             <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-1 shadow-2xs">
+              <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl space-y-1 shadow-2xs">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">bed</span>
                 <span className="text-[10px] font-black uppercase text-gray-400 block">Bedrooms</span>
                 <span className="font-mono font-black text-sm text-black block">{property.bedrooms || "-"}</span>
               </div>
-              <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-1 shadow-2xs">
+              <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl space-y-1 shadow-2xs">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">bathtub</span>
                 <span className="text-[10px] font-black uppercase text-gray-400 block">Bathrooms</span>
                 <span className="font-mono font-black text-sm text-black block">{property.bathrooms || "-"}</span>
               </div>
-              <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-1 shadow-2xs">
+              <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl space-y-1 shadow-2xs">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">square_foot</span>
                 <span className="text-[10px] font-black uppercase text-gray-400 block">Size</span>
                 <span className="font-mono font-black text-xs text-black block truncate">{property.propertySize || "N/A"}</span>
               </div>
             </div>
 
+            {/* Publisher Agent Information Section */}
+            <div className="p-5 rounded-3xl bg-white border border-gray-150 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">account_circle</span>
+                  <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider">
+                    Published By Agent
+                  </h4>
+                </div>
+                {onInspectAgent && (
+                  <button
+                    type="button"
+                    onClick={onInspectAgent}
+                    className="px-3 py-1 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-[10.5px] uppercase rounded-xl cursor-pointer border-0 transition-all"
+                  >
+                    View Full Agent Profile
+                  </button>
+                )}
+              </div>
+
+              {isLoadingPublisher ? (
+                <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-1/2" />
+                  <div className="h-3 bg-gray-100 rounded w-1/3" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-100 text-[#FC7A00] font-black text-lg flex items-center justify-center border border-orange-200 flex-shrink-0">
+                      {(publisherAgent?.displayName || property.sellerName || "A")[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h5 className="font-extrabold text-sm text-black truncate">
+                          {publisherAgent?.displayName || property.sellerName || "Verified Property Partner"}
+                        </h5>
+                        {publisherAgent?.isVerified && (
+                          <span className="px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Verified Agent
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] font-black text-[#FC7A00] uppercase tracking-wider truncate">
+                        {publisherAgent?.agencyName || "Independent Property Partner"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-150 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Phone</span>
+                      <span className="font-mono font-extrabold text-black">
+                        {publisherAgent?.phone || property.sellerPhone || "Contact via Inquiry"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Email</span>
+                      <span className="font-mono text-gray-700 truncate max-w-[180px]">
+                        {publisherAgent?.email || property.sellerEmail || "agent@eglobal.pay"}
+                      </span>
+                    </div>
+                    {publisherAgent?.address && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Office</span>
+                        <span className="font-medium text-gray-700 truncate max-w-[180px]">
+                          {publisherAgent.address}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {(publisherAgent?.phone || property.sellerPhone) && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <a
+                        href={`tel:${publisherAgent?.phone || property.sellerPhone}`}
+                        className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase rounded-xl text-center cursor-pointer border-0 flex items-center justify-center gap-1.5 shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">call</span>
+                        <span>Call</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/${(publisherAgent?.phone || property.sellerPhone || "").replace(/[^0-9]/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="py-2.5 bg-black hover:bg-gray-900 text-white font-black text-[11px] uppercase rounded-xl text-center cursor-pointer border-0 flex items-center justify-center gap-1.5 shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chat</span>
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Property Overview & Description */}
-            <div className="space-y-2 bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs">
+            <div className="space-y-2 bg-white p-4 rounded-2xl border border-gray-150 shadow-2xs">
               <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">description</span>
                 <span>Property Overview</span>
@@ -204,7 +333,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
             {/* Amenities & Facilities */}
             {property.amenities && property.amenities.length > 0 && (
-              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs">
+              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-gray-150 shadow-2xs">
                 <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">verified</span>
                   <span>Amenities & Facilities</span>
@@ -223,37 +352,18 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             )}
 
             {/* Contact Seller Inquiry Form */}
-            <div className="p-5 rounded-2xl bg-gray-50 border border-gray-200 space-y-4 shadow-2xs">
+            <div className="p-5 rounded-3xl bg-gray-50 border border-gray-150 space-y-4 shadow-2xs">
               <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">support_agent</span>
-                <span>Agent & Seller Inquiry</span>
+                <span>Send Direct Inquiry To Agent</span>
               </h4>
-
-              <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-200">
-                <div className="min-w-0 pr-2">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase block">Verified Agent</span>
-                  <p className="font-hanken text-xs font-black text-black truncate">
-                    {property.sellerName || "E-Global Estate Partner"}
-                  </p>
-                </div>
-                {onInspectAgent && (
-                  <button
-                    type="button"
-                    onClick={onInspectAgent}
-                    className="px-3 py-1.5 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-[10.5px] uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1 flex-shrink-0 transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[15px]">account_circle</span>
-                    <span>View Profile</span>
-                  </button>
-                )}
-              </div>
 
               <textarea
                 rows={3}
                 value={inquiryMessage}
                 onChange={(e) => setInquiryMessage(e.target.value)}
                 placeholder="Ask about inspection dates, availability, or payment terms..."
-                className="w-full p-3.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00] resize-none"
+                className="w-full p-3.5 bg-white border border-gray-200 rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00] resize-none"
               />
 
               <button
@@ -266,66 +376,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   onSubmitInquiry(inquiryMessage);
                   setInquiryMessage("");
                 }}
-                className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-xs font-black uppercase tracking-wider hover:brightness-105 active:scale-95 transition-all cursor-pointer border-0 shadow-sm"
+                className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
               >
                 Send Direct Message
               </button>
-            </div>
-
-            {/* Report Property Trigger */}
-            <div className="pt-2 text-center">
-              {!isReporting ? (
-                <button
-                  type="button"
-                  onClick={() => setIsReporting(true)}
-                  className="text-[10.5px] font-black text-gray-400 hover:text-red-500 uppercase tracking-wider cursor-pointer border-0 transition-colors"
-                >
-                  🚩 Report inaccurate or suspicious listing
-                </button>
-              ) : (
-                <div className="p-4 bg-red-50/80 border border-red-200 rounded-2xl space-y-3 text-left">
-                  <h5 className="font-black text-xs text-red-600 uppercase">Report Listing</h5>
-                  <input
-                    type="text"
-                    value={reportReason}
-                    onChange={(e) => setReportReason(e.target.value)}
-                    placeholder="Reason (e.g. Fraud, Wrong Price)"
-                    className="w-full p-2.5 bg-white border border-red-200 rounded-xl text-xs font-bold"
-                  />
-                  <textarea
-                    rows={2}
-                    value={reportDetails}
-                    onChange={(e) => setReportDetails(e.target.value)}
-                    placeholder="Additional details..."
-                    className="w-full p-2.5 bg-white border border-red-200 rounded-xl text-xs font-medium resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsReporting(false)}
-                      className="w-1/3 py-2 bg-gray-200 text-gray-700 text-[10px] font-bold uppercase rounded-lg cursor-pointer border-0"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!reportReason.trim()) {
-                          toast.error("Please enter a report reason.");
-                          return;
-                        }
-                        onReportProperty(reportReason, reportDetails);
-                        setIsReporting(false);
-                        setReportReason("");
-                        setReportDetails("");
-                      }}
-                      className="w-2/3 py-2 bg-red-600 text-white text-[10px] font-black uppercase rounded-lg cursor-pointer border-0"
-                    >
-                      Submit Report
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 

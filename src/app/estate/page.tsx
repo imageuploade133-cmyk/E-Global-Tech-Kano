@@ -16,6 +16,7 @@ import {
   PropertyDetailModal,
   SellerProfileModal,
   EstateFavoritesModal,
+  ReportPropertyModal,
   EstateHeader,
 } from "@/components/estate";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
@@ -43,16 +44,19 @@ export default function EstateMarketplacePage() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
 
+  // Report Modal Drawer State
+  const [isReportOpen, setIsReportOpen] = useState(false);
+
   // Agent Profile Modal State
   const [inspectedSeller, setInspectedSeller] = useState<EstateSeller | null>(null);
 
   useModalBackHandler(Boolean(selectedProperty), () => setSelectedProperty(null), "estate-detail-modal");
   useModalBackHandler(Boolean(inspectedSeller), () => setInspectedSeller(null), "estate-seller-profile-modal");
   useModalBackHandler(isFavoritesOpen, () => setIsFavoritesOpen(false), "estate-favorites-drawer-modal");
+  useModalBackHandler(isReportOpen, () => setIsReportOpen(false), "estate-report-drawer-modal");
 
   const fetchProperties = async (queryToUse?: string) => {
     setIsLoading(true);
-    const currentScroll = window.scrollY;
     try {
       let url = "/api/estate/properties";
       const params = new URLSearchParams();
@@ -80,7 +84,6 @@ export default function EstateMarketplacePage() {
       toast.error("Unable to load estate listings.");
     } finally {
       setIsLoading(false);
-      // Restore scroll position after search/clear if user was scrolled
       if (lastScrollPosRef.current > 0) {
         window.scrollTo({ top: lastScrollPosRef.current });
       }
@@ -430,6 +433,7 @@ export default function EstateMarketplacePage() {
               handleOpenSellerProfile(selectedProperty.sellerId, selectedProperty.sellerName, selectedProperty.sellerPhone);
             }
           }}
+          onOpenReportDrawer={() => setIsReportOpen(true)}
         />
 
         {/* Inspected Seller / Agent Profile Modal */}
@@ -450,6 +454,16 @@ export default function EstateMarketplacePage() {
           }}
           onRemoveFavorite={handleToggleFavorite}
           onRefresh={fetchUserFavorites}
+        />
+
+        {/* Dedicated Report Property Modal Drawer */}
+        <ReportPropertyModal
+          isOpen={isReportOpen}
+          property={selectedProperty}
+          onClose={() => setIsReportOpen(false)}
+          onSubmitReport={async (reason, details) => {
+            await handleReportProperty(reason, details);
+          }}
         />
 
         <BottomNav />
