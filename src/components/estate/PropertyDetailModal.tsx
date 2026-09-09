@@ -6,15 +6,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { EstateProperty, EstateSeller } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { EstateChatInquiryModal } from "./EstateChatInquiryModal";
 
 interface PropertyDetailModalProps {
   isOpen: boolean;
   property: EstateProperty | null;
   onClose: () => void;
-  onSubmitInquiry: (message: string) => void;
+  onSubmitInquiry: (message: string) => Promise<boolean | void> | void;
   onReportProperty: (reason: string, details: string) => void;
   onInspectAgent?: () => void;
   onOpenReportDrawer?: () => void;
+  inquiryCount?: number;
 }
 
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
@@ -25,10 +27,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onReportProperty,
   onInspectAgent,
   onOpenReportDrawer,
+  inquiryCount = 0,
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
-  const [inquiryMessage, setInquiryMessage] = useState("");
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 
   // Publisher full agent state
   const [publisherAgent, setPublisherAgent] = useState<EstateSeller | null>(null);
@@ -80,31 +83,33 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     window.open(mapsUrl, "_blank");
   };
 
+  const agentPhone = publisherAgent?.phone || property.sellerPhone;
+
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100008] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black">
+        <div className="fixed inset-0 z-[100008] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken">
           {/* Header Bar */}
-          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20 shadow-2xs">
+          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20 shadow-2xs border-b border-gray-100">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-all cursor-pointer border-0 active:scale-90"
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-all cursor-pointer border-0 active:scale-90 flex-shrink-0"
               >
                 <span className="material-symbols-outlined text-[20px]">arrow_back</span>
               </button>
               <div className="min-w-0">
-                <h2 className="font-hanken font-extrabold text-sm text-black truncate uppercase tracking-tight">
+                <h2 className="font-extrabold text-sm text-black truncate uppercase tracking-tight">
                   {property.title}
                 </h2>
-                <p className="font-hanken text-[10px] text-gray-400 font-bold uppercase">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">
                   For {property.purpose} • {property.propertyType}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               {onOpenReportDrawer && (
                 <button
                   type="button"
@@ -128,12 +133,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           {/* Main Scrollable Body */}
-          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-6 custom-scrollbar pb-16">
+          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-5 custom-scrollbar pb-28">
             {/* Main Featured Image Gallery Viewer */}
             <div className="space-y-2">
               <div
                 onClick={() => setFullscreenImageIndex(activeImageIndex)}
-                className="w-full h-64 min-[425px]:h-80 rounded-2xl bg-gray-100 relative overflow-hidden flex items-center justify-center p-1 border border-gray-100 cursor-pointer group shadow-2xs"
+                className="w-full h-64 min-[425px]:h-80 rounded-3xl bg-gray-100 relative overflow-hidden flex items-center justify-center p-1 border border-gray-100 cursor-pointer group shadow-2xs"
               >
                 {images[activeImageIndex] ? (
                   <Image
@@ -175,7 +180,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       key={idx}
                       type="button"
                       onClick={() => setActiveImageIndex(idx)}
-                      className={`w-16 h-16 rounded-xl border-2 overflow-hidden flex-shrink-0 relative cursor-pointer transition-all ${
+                      className={`w-16 h-16 rounded-2xl border-2 overflow-hidden flex-shrink-0 relative cursor-pointer transition-all ${
                         activeImageIndex === idx
                           ? "border-[#FC7A00] scale-105 shadow-2xs"
                           : "border-transparent opacity-60 hover:opacity-100"
@@ -188,256 +193,264 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               )}
             </div>
 
-            {/* Price Card Container */}
-            <div className="bg-gradient-to-r from-[#FC7A00]/10 via-amber-50 to-[#E06600]/10 p-4 rounded-2xl border border-[#FC7A00]/20 flex items-center justify-between shadow-2xs">
-              <div>
-                <span className="text-[10px] font-black uppercase text-gray-500 block">Listing Price</span>
-                <span className="font-mono text-2xl font-black text-[#FC7A00]">
-                  ₦{property.price.toLocaleString()}
-                </span>
-                {property.purpose !== "Sale" && property.pricePeriod && (
-                  <span className="text-xs text-gray-600 font-extrabold"> /{property.pricePeriod}</span>
-                )}
-              </div>
-
-              <div className="text-right">
-                <span className="text-[10px] font-black uppercase text-gray-500 block">Category</span>
-                <span className="font-extrabold text-xs text-gray-900 block truncate max-w-[160px]">
-                  {property.propertyType}
-                </span>
-                <span className="text-[10px] font-bold text-[#FC7A00] uppercase block">
-                  For {property.purpose}
-                </span>
-              </div>
-            </div>
-
-            {/* Dedicated Property Location Section Card */}
-            <div className="p-5 rounded-3xl bg-gradient-to-br from-white via-orange-50/40 to-amber-50/30 border border-[#FC7A00]/20 space-y-3.5 shadow-2xs">
-              <div className="flex items-center justify-between border-b border-orange-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
-                    <span className="material-symbols-outlined text-[20px]">location_on</span>
-                  </div>
-                  <div>
-                    <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider">
-                      Property Location & Area
-                    </h4>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase">
-                      Exact Address & Neighborhood
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleOpenGoogleMaps}
-                  className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[10px] uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1 shadow-2xs transition-all active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-[14px]">map</span>
-                  <span>Open Maps</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-semibold">
-                <div className="p-3 bg-white/90 rounded-2xl border border-gray-150 space-y-0.5 shadow-2xs">
-                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">Street Address</span>
-                  <span className="font-bold text-gray-900 block truncate">
-                    {property.location?.address || "Address details on request"}
+            {/* Price Card Container with Luxury Gradient Border */}
+            <div className="bg-gradient-to-r from-[#FC7A00] via-amber-300 to-[#E06600] p-[1.5px] rounded-3xl shadow-2xs">
+              <div className="bg-white p-4 rounded-[22.5px] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400 block">Listing Price</span>
+                  <span className="font-mono text-2xl font-black text-[#FC7A00]">
+                    ₦{property.price.toLocaleString()}
                   </span>
+                  {property.purpose !== "Sale" && property.pricePeriod && (
+                    <span className="text-xs text-gray-600 font-extrabold"> /{property.pricePeriod}</span>
+                  )}
                 </div>
 
-                <div className="p-3 bg-white/90 rounded-2xl border border-gray-150 space-y-0.5 shadow-2xs">
-                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">City / Town</span>
-                  <span className="font-bold text-gray-900 block truncate">
-                    {property.location?.city || "Local City"}
+                <div className="text-right">
+                  <span className="text-[10px] font-black uppercase text-gray-400 block">Category</span>
+                  <span className="font-extrabold text-xs text-black block truncate max-w-[160px]">
+                    {property.propertyType}
                   </span>
-                </div>
-
-                <div className="p-3 bg-white/90 rounded-2xl border border-gray-150 space-y-0.5 shadow-2xs">
-                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">State / Region</span>
-                  <span className="font-bold text-gray-900 block truncate">
-                    {property.location?.state || "State"}
+                  <span className="text-[10px] font-bold text-[#FC7A00] uppercase block">
+                    For {property.purpose}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Property Key Metrics Grid */}
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl space-y-1 shadow-2xs">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">bed</span>
-                <span className="text-[10px] font-black uppercase text-gray-400 block">Bedrooms</span>
-                <span className="font-mono font-black text-sm text-black block">{property.bedrooms || "-"}</span>
-              </div>
-              <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl space-y-1 shadow-2xs">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">bathtub</span>
-                <span className="text-[10px] font-black uppercase text-gray-400 block">Bathrooms</span>
-                <span className="font-mono font-black text-sm text-black block">{property.bathrooms || "-"}</span>
-              </div>
-              <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl space-y-1 shadow-2xs">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">square_foot</span>
-                <span className="text-[10px] font-black uppercase text-gray-400 block">Size</span>
-                <span className="font-mono font-black text-xs text-black block truncate">{property.propertySize || "N/A"}</span>
+            <div className="bg-gradient-to-r from-[#FC7A00]/40 via-amber-200/50 to-[#E06600]/40 p-[1.5px] rounded-3xl shadow-2xs">
+              <div className="bg-white p-3.5 rounded-[22.5px] grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 bg-orange-50/50 rounded-2xl space-y-0.5 border border-orange-100">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">bed</span>
+                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">Bedrooms</span>
+                  <span className="font-mono font-black text-sm text-black block">{property.bedrooms || "-"}</span>
+                </div>
+                <div className="p-3 bg-orange-50/50 rounded-2xl space-y-0.5 border border-orange-100">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">bathtub</span>
+                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">Bathrooms</span>
+                  <span className="font-mono font-black text-sm text-black block">{property.bathrooms || "-"}</span>
+                </div>
+                <div className="p-3 bg-orange-50/50 rounded-2xl space-y-0.5 border border-orange-100">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">square_foot</span>
+                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">Size</span>
+                  <span className="font-mono font-black text-xs text-black block truncate">{property.propertySize || "N/A"}</span>
+                </div>
               </div>
             </div>
 
-            {/* Publisher Agent Information Section */}
-            <div className="p-5 rounded-3xl bg-white border border-gray-150 space-y-4 shadow-xs">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">account_circle</span>
-                  <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider">
-                    Published By Agent
-                  </h4>
-                </div>
-                {onInspectAgent && (
-                  <button
-                    type="button"
-                    onClick={onInspectAgent}
-                    className="px-3 py-1 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-[10.5px] uppercase rounded-xl cursor-pointer border-0 transition-all"
-                  >
-                    View Full Agent Profile
-                  </button>
-                )}
-              </div>
-
-              {isLoadingPublisher ? (
-                <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-1/2" />
-                  <div className="h-3 bg-gray-100 rounded w-1/3" />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-orange-100 text-[#FC7A00] font-black text-lg flex items-center justify-center border border-orange-200 flex-shrink-0">
-                      {(publisherAgent?.displayName || property.sellerName || "A")[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h5 className="font-extrabold text-sm text-black truncate">
-                          {publisherAgent?.displayName || property.sellerName || "Verified Property Partner"}
-                        </h5>
-                        {publisherAgent?.isVerified && (
-                          <span className="px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            Verified Agent
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] font-black text-[#FC7A00] uppercase tracking-wider truncate">
-                        {publisherAgent?.agencyName || "Independent Property Partner"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-150 text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">Phone</span>
-                      <span className="font-mono font-extrabold text-black">
-                        {publisherAgent?.phone || property.sellerPhone || "Contact via Inquiry"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">Email</span>
-                      <span className="font-mono text-gray-700 truncate max-w-[180px]">
-                        {publisherAgent?.email || property.sellerEmail || "agent@eglobal.pay"}
-                      </span>
-                    </div>
-                    {publisherAgent?.address && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">Office</span>
-                        <span className="font-medium text-gray-700 truncate max-w-[180px]">
-                          {publisherAgent.address}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {(publisherAgent?.phone || property.sellerPhone) && (
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <a
-                        href={`tel:${publisherAgent?.phone || property.sellerPhone}`}
-                        className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase rounded-xl text-center cursor-pointer border-0 flex items-center justify-center gap-1.5 shadow-2xs"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">call</span>
-                        <span>Call</span>
-                      </a>
-                      <a
-                        href={`https://wa.me/${(publisherAgent?.phone || property.sellerPhone || "").replace(/[^0-9]/g, "")}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="py-2.5 bg-black hover:bg-gray-900 text-white font-black text-[11px] uppercase rounded-xl text-center cursor-pointer border-0 flex items-center justify-center gap-1.5 shadow-2xs"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">chat</span>
-                        <span>WhatsApp</span>
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Property Overview & Description */}
-            <div className="space-y-2 bg-white p-4 rounded-2xl border border-gray-150 shadow-2xs">
-              <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">description</span>
-                <span>Property Overview</span>
-              </h4>
-              <p className="font-hanken text-xs text-gray-700 leading-relaxed font-medium whitespace-pre-line">
-                {property.description}
-              </p>
-            </div>
-
-            {/* Amenities & Facilities */}
-            {property.amenities && property.amenities.length > 0 && (
-              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-gray-150 shadow-2xs">
-                <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">verified</span>
-                  <span>Amenities & Facilities</span>
+            {/* Property Overview & Description Card with Gradient Border */}
+            <div className="bg-gradient-to-r from-[#FC7A00]/40 via-amber-200/50 to-[#E06600]/40 p-[1.5px] rounded-3xl shadow-2xs">
+              <div className="bg-white p-4.5 rounded-[22.5px] space-y-2">
+                <h4 className="font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">description</span>
+                  <span>Property Overview</span>
                 </h4>
-                <div className="flex flex-wrap gap-2">
-                  {property.amenities.map((am, i) => (
-                    <span
-                      key={i}
-                      className="px-3.5 py-1.5 rounded-xl bg-orange-50/80 border border-[#FC7A00]/20 text-[11px] font-extrabold text-[#FC7A00]"
-                    >
-                      ✓ {am}
-                    </span>
-                  ))}
+                <p className="text-xs text-gray-700 leading-relaxed font-medium whitespace-pre-line">
+                  {property.description}
+                </p>
+              </div>
+            </div>
+
+            {/* Amenities & Facilities Card with Gradient Border */}
+            {property.amenities && property.amenities.length > 0 && (
+              <div className="bg-gradient-to-r from-[#FC7A00]/40 via-amber-200/50 to-[#E06600]/40 p-[1.5px] rounded-3xl shadow-2xs">
+                <div className="bg-white p-4.5 rounded-[22.5px] space-y-2.5">
+                  <h4 className="font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">verified</span>
+                    <span>Amenities & Facilities</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {property.amenities.map((am, i) => (
+                      <span
+                        key={i}
+                        className="px-3.5 py-1.5 rounded-xl bg-orange-50 border border-[#FC7A00]/25 text-[11px] font-extrabold text-[#FC7A00]"
+                      >
+                        ✓ {am}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Contact Seller Inquiry Form */}
-            <div className="p-5 rounded-3xl bg-gray-50 border border-gray-150 space-y-4 shadow-2xs">
-              <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">support_agent</span>
-                <span>Send Direct Inquiry To Agent</span>
-              </h4>
+            {/* Property Location & Area Card with Gradient Border (Moved to bottom) */}
+            <div className="bg-gradient-to-r from-[#FC7A00]/40 via-amber-200/50 to-[#E06600]/40 p-[1.5px] rounded-3xl shadow-2xs">
+              <div className="bg-white p-4.5 rounded-[22.5px] space-y-3.5">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
+                      <span className="material-symbols-outlined text-[20px]">location_on</span>
+                    </div>
+                    <div>
+                      <h4 className="font-black text-xs text-black uppercase tracking-wider">
+                        Property Location & Area
+                      </h4>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">
+                        Exact Address & Neighborhood
+                      </p>
+                    </div>
+                  </div>
 
-              <textarea
-                rows={3}
-                value={inquiryMessage}
-                onChange={(e) => setInquiryMessage(e.target.value)}
-                placeholder="Ask about inspection dates, availability, or payment terms..."
-                className="w-full p-3.5 bg-white border border-gray-200 rounded-2xl text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00] resize-none"
-              />
+                  <button
+                    type="button"
+                    onClick={handleOpenGoogleMaps}
+                    className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[10px] uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1 shadow-2xs transition-all active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">map</span>
+                    <span>Open Maps</span>
+                  </button>
+                </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (!inquiryMessage.trim()) {
-                    toast.error("Please type your inquiry message first.");
-                    return;
-                  }
-                  onSubmitInquiry(inquiryMessage);
-                  setInquiryMessage("");
-                }}
-                className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 active:scale-95 transition-all cursor-pointer border-0 shadow-xs"
-              >
-                Send Direct Message
-              </button>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-semibold">
+                  <div className="p-3 bg-gray-50/80 rounded-2xl border border-gray-150 space-y-0.5">
+                    <span className="text-[9.5px] font-black uppercase text-gray-400 block">Street Address</span>
+                    <span className="font-bold text-gray-900 block truncate">
+                      {property.location?.address || "Address details on request"}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-gray-50/80 rounded-2xl border border-gray-150 space-y-0.5">
+                    <span className="text-[9.5px] font-black uppercase text-gray-400 block">City / Town</span>
+                    <span className="font-bold text-gray-900 block truncate">
+                      {property.location?.city || "Local City"}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-gray-50/80 rounded-2xl border border-gray-150 space-y-0.5">
+                    <span className="text-[9.5px] font-black uppercase text-gray-400 block">State / Region</span>
+                    <span className="font-bold text-gray-900 block truncate">
+                      {property.location?.state || "State"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Published By Agent Card with Gradient Border (Moved to bottom) */}
+            <div className="bg-gradient-to-r from-[#FC7A00]/40 via-amber-200/50 to-[#E06600]/40 p-[1.5px] rounded-3xl shadow-2xs">
+              <div className="bg-white p-4.5 rounded-[22.5px] space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">account_circle</span>
+                    <h4 className="font-black text-xs text-black uppercase tracking-wider">
+                      Published By Agent
+                    </h4>
+                  </div>
+                  {onInspectAgent && (
+                    <button
+                      type="button"
+                      onClick={onInspectAgent}
+                      className="px-3 py-1 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-[10.5px] uppercase rounded-xl cursor-pointer border-0 transition-all"
+                    >
+                      View Profile
+                    </button>
+                  )}
+                </div>
+
+                {isLoadingPublisher ? (
+                  <div className="p-4 bg-gray-50 rounded-2xl animate-pulse space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="h-3 bg-gray-100 rounded w-1/3" />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FC7A00] to-[#E06600] text-white font-black text-lg flex items-center justify-center flex-shrink-0 shadow-2xs">
+                        {(publisherAgent?.displayName || property.sellerName || "A")[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h5 className="font-extrabold text-sm text-black truncate">
+                            {publisherAgent?.displayName || property.sellerName || "Verified Property Partner"}
+                          </h5>
+                          {(publisherAgent?.isVerified || true) && (
+                            <span className="px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              Verified Agent
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-black text-[#FC7A00] uppercase tracking-wider truncate">
+                          {publisherAgent?.agencyName || "Independent Property Partner"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-150 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Phone</span>
+                        <span className="font-mono font-extrabold text-black">
+                          {publisherAgent?.phone || property.sellerPhone || "Contact via Inquiry"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Email</span>
+                        <span className="font-mono text-gray-700 truncate max-w-[180px]">
+                          {publisherAgent?.email || property.sellerEmail || "agent@eglobal.pay"}
+                        </span>
+                      </div>
+                      {publisherAgent?.address && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">Office</span>
+                          <span className="font-medium text-gray-700 truncate max-w-[180px]">
+                            {publisherAgent.address}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Static Fixed Bottom Action Bar */}
+          <div className="fixed bottom-0 left-0 right-0 z-30 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl flex items-center gap-2.5">
+            {agentPhone && (
+              <>
+                <a
+                  href={`tel:${agentPhone}`}
+                  className="w-12 h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center cursor-pointer border-0 transition-all active:scale-90 flex-shrink-0 shadow-xs"
+                  title="Call Agent"
+                >
+                  <span className="material-symbols-outlined text-[20px]">call</span>
+                </a>
+                <a
+                  href={`https://wa.me/${agentPhone.replace(/[^0-9]/g, "")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-12 h-12 rounded-2xl bg-black hover:bg-gray-900 text-white flex items-center justify-center cursor-pointer border-0 transition-all active:scale-90 flex-shrink-0 shadow-xs"
+                  title="WhatsApp Agent"
+                >
+                  <span className="material-symbols-outlined text-[20px]">chat</span>
+                </a>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsChatModalOpen(true)}
+              className="flex-1 py-3.5 px-4 bg-gradient-to-r from-[#FC7A00] via-amber-500 to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 active:scale-95 transition-all cursor-pointer border-0 shadow-md flex items-center justify-center gap-2 relative overflow-hidden"
+            >
+              <span className="material-symbols-outlined text-[20px]">forum</span>
+              <span>Send Direct Inquiry to Agent</span>
+
+              {inquiryCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-white text-[#FC7A00] font-black text-[10px] shadow-2xs">
+                  {inquiryCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Full-Screen Chat Inquiry Modal */}
+          <EstateChatInquiryModal
+            isOpen={isChatModalOpen}
+            property={property}
+            publisherAgent={publisherAgent}
+            onClose={() => setIsChatModalOpen(false)}
+            onSubmitInquiry={onSubmitInquiry}
+          />
 
           {/* Fullscreen Image Zoom Overlay */}
           {fullscreenImageIndex !== null && images[fullscreenImageIndex] && (

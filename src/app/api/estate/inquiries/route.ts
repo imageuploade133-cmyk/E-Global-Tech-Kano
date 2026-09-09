@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
+import { NotificationService } from "@/services/notification-service";
 
 // GET /api/estate/inquiries - Fetch inquiries sent to seller
 export async function GET(req: Request) {
@@ -81,6 +82,17 @@ export async function POST(req: Request) {
     };
 
     await newInquiryRef.set(newInquiry);
+
+    // Dispatch wallet notification to the agent/seller if sellerId exists
+    try {
+      await NotificationService.sendPushNotification(sellerId, {
+        title: "New Estate Inquiry",
+        body: `You received an inquiry for "${propertyTitle || "Property"}" from ${userName || "a buyer"}: "${message.slice(0, 60)}..."`,
+        type: "transaction",
+      });
+    } catch (notifErr: any) {
+      console.warn("[POST /api/estate/inquiries Notification Warning]:", notifErr?.message);
+    }
 
     return NextResponse.json({
       success: true,
