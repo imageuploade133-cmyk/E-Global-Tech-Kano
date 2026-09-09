@@ -118,7 +118,7 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
       {isOpen && (
         <div className="fixed inset-0 z-[100020] bg-gray-50 w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken">
           {/* Header Bar */}
-          <div className="px-4 py-3 bg-white border-b border-gray-150 flex items-center justify-between shadow-2xs z-10">
+          <div className="px-4 py-3 bg-white flex items-center justify-between z-10">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
@@ -172,7 +172,7 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
           </div>
 
           {/* Property Context Header Card */}
-          <div className="px-4 py-2.5 bg-white/90 border-b border-gray-150 flex items-center gap-3 shadow-2xs flex-shrink-0">
+          <div className="px-4 py-2.5 bg-white/90 flex items-center gap-3 flex-shrink-0">
             <div className="w-12 h-12 rounded-xl bg-gray-100 relative overflow-hidden flex-shrink-0 border border-gray-200">
               {property.images && property.images[0] ? (
                 <Image src={property.images[0]} alt="Prop" fill className="object-cover" unoptimized />

@@ -49,18 +49,18 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100025+] bg-white w-full h-full flex flex-col justify-between overflow-y-auto no-scrollbar text-black animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100025] bg-white w-full h-full flex flex-col justify-between overflow-y-auto no-scrollbar text-black font-hanken animate-in fade-in duration-200">
           <div className="w-full max-w-lg mx-auto flex-1 flex flex-col justify-between p-4 sm:p-6 space-y-6 pb-28">
             <div>
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 pt-1 border-b border-gray-100">
+              {/* Header Bar without Border */}
+              <div className="flex items-center justify-between pb-2 pt-1">
                 <div className="flex items-center gap-2.5">
                   <span className="material-symbols-outlined text-red-500 text-[24px]">flag</span>
                   <div>
-                    <h3 className="font-hanken text-base font-black text-black leading-tight uppercase">
-                      Report Property Listing
+                    <h3 className="font-extrabold text-sm text-black uppercase tracking-tight">
+                      Report Listing
                     </h3>
-                    <p className="text-[10.5px] text-gray-400 font-bold uppercase truncate max-w-[220px]">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase truncate max-w-[220px]">
                       {property.title}
                     </p>
                   </div>
@@ -68,14 +68,14 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 border-0 flex items-center justify-center text-gray-600 hover:text-black cursor-pointer transition-all"
+                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 border-0 flex items-center justify-center text-gray-600 hover:text-black cursor-pointer transition-all active:scale-90"
                 >
                   <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
               {/* Form Content */}
-              <form id="report-property-form" onSubmit={handleSubmit} className="mt-6 space-y-4 text-left">
+              <form id="report-property-form" onSubmit={handleSubmit} className="mt-4 space-y-4 text-left">
                 <div className="p-4 bg-red-50/80 rounded-2xl border border-red-100 space-y-1">
                   <h4 className="font-extrabold text-xs text-red-600 uppercase">
                     🚩 Marketplace Safety Guarantee
@@ -138,7 +138,7 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
               </form>
             </div>
 
-            {/* Fixed Footer */}
+            {/* Fixed Footer Action */}
             <div className="fixed bottom-0 left-0 right-0 z-[100030] bg-white border-t border-gray-200 p-4 shadow-lg flex justify-center">
               <div className="w-full max-w-lg flex gap-3">
                 <button

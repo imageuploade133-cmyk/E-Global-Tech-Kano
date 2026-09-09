@@ -90,7 +90,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       {isOpen && (
         <div className="fixed inset-0 z-[100008] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken">
           {/* Header Bar */}
-          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20 shadow-2xs border-b border-gray-100">
+          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
