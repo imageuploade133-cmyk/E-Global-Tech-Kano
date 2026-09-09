@@ -70,7 +70,9 @@ export default function EstateSellerDashboard() {
           email: String(userData?.email || user?.email || ""),
           address: "",
           isVerified: false,
+          verificationStatus: "PENDING",
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         });
       }
 

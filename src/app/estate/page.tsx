@@ -118,7 +118,9 @@ export default function EstateMarketplacePage() {
       email: "contact@estate.agent",
       address: "Verified Marketplace Partner",
       isVerified: true,
+      verificationStatus: "VERIFIED",
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   };
 
