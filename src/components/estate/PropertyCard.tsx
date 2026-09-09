@@ -23,130 +23,134 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   return (
     <div
       onClick={() => onOpenDetails(property)}
-      className="bg-white rounded-2xl p-3 shadow-xs hover:shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between h-full"
+      className="bg-gradient-to-br from-[#FC7A00] via-amber-300 to-[#E06600] p-[1.5px] rounded-2xl shadow-xs hover:shadow-xl hover:scale-[1.01] transition-all duration-300 cursor-pointer group relative overflow-hidden flex flex-col justify-between h-full"
     >
-      <div className="space-y-2.5">
-        {/* Property Thumbnail */}
-        <div className="w-full h-36 min-[375px]:h-40 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden relative flex items-center justify-center p-1">
-          {displayImage ? (
-            <Image
-              src={displayImage}
-              alt={property.title}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
-              unoptimized
-            />
-          ) : (
-            <span className="material-symbols-outlined text-[40px] text-gray-300">
-              domain
-            </span>
-          )}
-
-          {/* Favorite Heart Trigger */}
-          {onSaveFavorite && (
-            <button
-              type="button"
-              onClick={(e) => onSaveFavorite(e, property)}
-              className="absolute top-2 left-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center text-gray-600 hover:text-red-500 shadow-xs z-10 transition-transform active:scale-90 border-0 cursor-pointer"
-              title={isSaved ? "Remove Favorite" : "Save Property"}
-            >
-              <span
-                className={`material-symbols-outlined text-[17px] ${
-                  isSaved ? "text-red-500" : ""
-                }`}
-                style={{ fontVariationSettings: isSaved ? '"FILL" 1' : '"FILL" 0' }}
-              >
-                favorite
+      <div className="bg-white rounded-[14.5px] p-3 space-y-3 h-full flex flex-col justify-between">
+        <div className="space-y-2.5">
+          {/* Property Thumbnail Container */}
+          <div className="w-full h-38 min-[375px]:h-42 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden relative flex items-center justify-center p-1">
+            {displayImage ? (
+              <Image
+                src={displayImage}
+                alt={property.title}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                unoptimized
+              />
+            ) : (
+              <span className="material-symbols-outlined text-[42px] text-gray-300">
+                domain
               </span>
-            </button>
-          )}
+            )}
 
-          {/* Purpose Badge */}
-          <span
-            className={`absolute top-2 right-2 px-2.5 py-0.5 rounded-md text-[8.5px] font-black uppercase tracking-wider text-white shadow-xs ${
-              property.purpose === "Sale"
-                ? "bg-emerald-600"
-                : property.purpose === "Short-let"
-                ? "bg-purple-600"
-                : "bg-[#FC7A00]"
-            }`}
+            {/* Favorite Heart Trigger */}
+            {onSaveFavorite && (
+              <button
+                type="button"
+                onClick={(e) => onSaveFavorite(e, property)}
+                className="absolute top-2.5 left-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-gray-700 hover:text-red-500 shadow-md z-10 transition-transform active:scale-90 border-0 cursor-pointer"
+                title={isSaved ? "Remove Favorite" : "Save Property"}
+              >
+                <span
+                  className={`material-symbols-outlined text-[18px] ${
+                    isSaved ? "text-red-500" : ""
+                  }`}
+                  style={{ fontVariationSettings: isSaved ? '"FILL" 1' : '"FILL" 0' }}
+                >
+                  favorite
+                </span>
+              </button>
+            )}
+
+            {/* Purpose Badge */}
+            <span
+              className={`absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white shadow-md backdrop-blur-xs ${
+                property.purpose === "Sale"
+                  ? "bg-emerald-600/90"
+                  : property.purpose === "Short-let"
+                  ? "bg-purple-600/90"
+                  : "bg-[#FC7A00]/95"
+              }`}
+            >
+              For {property.purpose}
+            </span>
+
+            {/* Featured Tag */}
+            {property.featured && (
+              <span className="absolute bottom-2.5 left-2.5 px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-md flex items-center gap-1">
+                <span className="material-symbols-outlined text-[10px]">star</span>
+                <span>Featured</span>
+              </span>
+            )}
+          </div>
+
+          {/* Info Body */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-1">
+              <span className="px-2 py-0.5 bg-orange-50 text-[#FC7A00] rounded-md text-[8.5px] font-black uppercase tracking-wider">
+                {property.propertyType}
+              </span>
+              <span className="text-[9.5px] font-extrabold text-gray-500 flex items-center gap-0.5 truncate">
+                <span className="material-symbols-outlined text-[12px] text-[#FC7A00]">location_on</span>
+                <span>{property.location?.city || property.location?.state || "Nigeria"}</span>
+              </span>
+            </div>
+
+            <h3 className="font-hanken font-extrabold text-xs text-black line-clamp-1 group-hover:text-[#FC7A00] transition-colors leading-tight">
+              {property.title}
+            </h3>
+
+            <p className="font-hanken text-[10.5px] text-gray-400 line-clamp-1 leading-relaxed">
+              {property.location?.address}
+            </p>
+
+            {/* Features icons row */}
+            <div className="flex items-center gap-3 pt-1 text-[10px] font-bold text-gray-600">
+              {typeof property.bedrooms === "number" && property.bedrooms > 0 && (
+                <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+                  <span className="material-symbols-outlined text-[14px] text-gray-400">bed</span>
+                  <span>{property.bedrooms} Bed</span>
+                </div>
+              )}
+              {typeof property.bathrooms === "number" && property.bathrooms > 0 && (
+                <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+                  <span className="material-symbols-outlined text-[14px] text-gray-400">bathtub</span>
+                  <span>{property.bathrooms} Bath</span>
+                </div>
+              )}
+              {property.propertySize && (
+                <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg truncate">
+                  <span className="material-symbols-outlined text-[14px] text-gray-400">square_foot</span>
+                  <span>{property.propertySize}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Price Footer */}
+        <div className="pt-2.5 border-t border-gray-100 flex items-center justify-between">
+          <div>
+            <span className="font-mono font-black text-sm text-[#FC7A00]">
+              ₦{property.price.toLocaleString()}
+            </span>
+            {property.purpose !== "Sale" && property.pricePeriod && (
+              <span className="text-[9px] text-gray-400 font-bold"> /{property.pricePeriod}</span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails(property);
+            }}
+            className="px-3 py-1.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-xs hover:brightness-105 active:scale-95 flex items-center gap-1"
           >
-            For {property.purpose}
-          </span>
-
-          {/* Featured Tag */}
-          {property.featured && (
-            <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded text-[8px] font-black uppercase bg-amber-500 text-black shadow-xs flex items-center gap-1">
-              <span className="material-symbols-outlined text-[10px]">star</span>
-              <span>Featured</span>
-            </span>
-          )}
+            <span>Explore</span>
+            <span className="material-symbols-outlined text-[12px]">arrow_forward</span>
+          </button>
         </div>
-
-        {/* Info Body */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-              {property.propertyType}
-            </span>
-            <span className="text-[9px] font-extrabold text-gray-600 truncate">
-              {property.location?.city || property.location?.state || "Nigeria"}
-            </span>
-          </div>
-
-          <h3 className="font-hanken font-extrabold text-xs text-black line-clamp-1 group-hover:text-[#FC7A00] transition-colors leading-tight">
-            {property.title}
-          </h3>
-
-          <p className="font-hanken text-[10px] text-gray-400 line-clamp-1 leading-relaxed">
-            {property.location?.address}
-          </p>
-
-          {/* Features icons row */}
-          <div className="flex items-center gap-3 pt-1 text-[10px] font-bold text-gray-500">
-            {typeof property.bedrooms === "number" && property.bedrooms > 0 && (
-              <div className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px] text-gray-400">bed</span>
-                <span>{property.bedrooms} Bed</span>
-              </div>
-            )}
-            {typeof property.bathrooms === "number" && property.bathrooms > 0 && (
-              <div className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px] text-gray-400">bathtub</span>
-                <span>{property.bathrooms} Bath</span>
-              </div>
-            )}
-            {property.propertySize && (
-              <div className="flex items-center gap-1 truncate">
-                <span className="material-symbols-outlined text-[14px] text-gray-400">square_foot</span>
-                <span>{property.propertySize}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Price Footer */}
-      <div className="pt-2.5 mt-2 border-t border-gray-100 flex items-center justify-between">
-        <div>
-          <span className="font-mono font-black text-sm text-[#FC7A00]">
-            ₦{property.price.toLocaleString()}
-          </span>
-          {property.purpose !== "Sale" && property.pricePeriod && (
-            <span className="text-[9px] text-gray-400 font-bold"> /{property.pricePeriod}</span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenDetails(property);
-          }}
-          className="px-2.5 py-1 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-2xs active:scale-95"
-        >
-          View
-        </button>
       </div>
     </div>
   );
