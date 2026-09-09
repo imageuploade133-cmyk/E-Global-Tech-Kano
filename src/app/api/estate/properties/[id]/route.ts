@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import { verifyFirebaseIdToken } from "@/lib/auth-util";
 
 // GET /api/estate/properties/[id] - Fetch single property details
 export async function GET(
@@ -39,7 +40,7 @@ export async function PUT(
     const token = authHeader.split("Bearer ")[1];
     let decoded;
     try {
-      decoded = await adminAuth.verifyIdToken(token);
+      decoded = await verifyFirebaseIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid session token." }, { status: 401 });
     }
@@ -118,7 +119,7 @@ export async function DELETE(
     const token = authHeader.split("Bearer ")[1];
     let decoded;
     try {
-      decoded = await adminAuth.verifyIdToken(token);
+      decoded = await verifyFirebaseIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid session token." }, { status: 401 });
     }

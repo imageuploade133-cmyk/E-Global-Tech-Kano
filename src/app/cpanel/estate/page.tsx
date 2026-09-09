@@ -379,7 +379,7 @@ export default function CpanelEstateManagementPage() {
           <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="w-full max-w-sm bg-white rounded-3xl p-5 space-y-3 shadow-2xl text-black border-0">
               <h3 className="font-black text-sm uppercase">Reject Property Listing</h3>
-              <p className="text-xs text-gray-500">Provide a reason for rejecting "{selectedRejectProp.title}".</p>
+              <p className="text-xs text-gray-500">Provide a reason for rejecting &quot;{selectedRejectProp.title}&quot;.</p>
               <textarea
                 rows={3}
                 value={rejectionReasonInput}

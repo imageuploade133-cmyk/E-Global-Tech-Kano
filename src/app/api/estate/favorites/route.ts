@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import { verifyFirebaseIdToken } from "@/lib/auth-util";
 
 // POST /api/estate/favorites - Toggle save property
 export async function POST(req: Request) {
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
     const token = authHeader.split("Bearer ")[1];
     let decoded;
     try {
-      decoded = await adminAuth.verifyIdToken(token);
+      decoded = await verifyFirebaseIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid session token." }, { status: 401 });
     }
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
   }
 }
 
-// POST /api/estate/reports - Report listing
+// PUT /api/estate/favorites - Report listing
 export async function PUT(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -65,7 +66,7 @@ export async function PUT(req: Request) {
     const token = authHeader.split("Bearer ")[1];
     let decoded;
     try {
-      decoded = await adminAuth.verifyIdToken(token);
+      decoded = await verifyFirebaseIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid session token." }, { status: 401 });
     }
@@ -98,7 +99,7 @@ export async function PUT(req: Request) {
       report: reportData,
     });
   } catch (err: any) {
-    console.error("[PUT /api/estate/reports Error]:", err.message);
+    console.error("[PUT /api/estate/favorites Error]:", err.message);
     return NextResponse.json({ error: "Failed to submit property report." }, { status: 500 });
   }
 }

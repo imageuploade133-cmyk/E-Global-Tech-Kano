@@ -6,7 +6,7 @@ import { requireAdminPermission } from "@/lib/admin-permissions";
 export async function GET(req: Request) {
   try {
     const authCheck = await requireAdminPermission(req, "estate.view");
-    if (authCheck.error) return authCheck.error;
+    if (!authCheck.authorized) return authCheck.response!;
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
@@ -35,10 +35,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const authCheck = await requireAdminPermission(req, "estate.manage");
-    if (authCheck.error) return authCheck.error;
+    if (!authCheck.authorized) return authCheck.response!;
 
     const body = await req.json();
-    const { action, propertyId, rejectionReason, featured } = body;
+    const { action, propertyId, rejectionReason } = body;
 
     if (!propertyId || !action) {
       return NextResponse.json({ error: "Property ID and action are required." }, { status: 400 });

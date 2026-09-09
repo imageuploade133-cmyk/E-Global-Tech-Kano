@@ -6,7 +6,7 @@ import { requireAdminPermission } from "@/lib/admin-permissions";
 export async function GET(req: Request) {
   try {
     const authCheck = await requireAdminPermission(req, "estate.view");
-    if (authCheck.error) return authCheck.error;
+    if (!authCheck.authorized) return authCheck.response!;
 
     const snap = await adminDb.collection("estate_sellers").limit(100).get();
     const sellers: any[] = [];
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const authCheck = await requireAdminPermission(req, "estate.manage");
-    if (authCheck.error) return authCheck.error;
+    if (!authCheck.authorized) return authCheck.response!;
 
     const body = await req.json();
     const { action, sellerUid } = body;

@@ -67,7 +67,7 @@ export default function EstateSellerDashboard() {
         setSellerPhone(sellerData.seller.phone || userData?.phoneNumber || "");
         setSellerAddress(sellerData.seller.address || "");
       } else {
-        setSellerPhone(userData?.phoneNumber || "");
+        setSellerPhone(String(userData?.phoneNumber || ""));
       }
 
       // Fetch Seller Properties

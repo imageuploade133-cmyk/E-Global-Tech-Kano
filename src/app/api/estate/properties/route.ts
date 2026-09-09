@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import { EstateProperty } from "@/estate/types";
 
 // GET /api/estate/properties - Public & Authenticated search/filter properties
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
     const token = authHeader.split("Bearer ")[1];
     let decoded;
     try {
-      decoded = await adminAuth.verifyIdToken(token);
+      decoded = await verifyFirebaseIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid session token." }, { status: 401 });
     }
