@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { RouteGuard } from "@/components/RouteGuard";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
-import Link from "next/link";
 import {
   EstateProperty,
   EstateSeller,
@@ -17,15 +15,12 @@ import {
   PropertyCard,
   PropertyDetailModal,
   SellerProfileModal,
+  EstateHeader,
 } from "@/components/estate";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 export default function EstateMarketplacePage() {
   const { userData, user } = useAuth();
-  const userName = (userData?.name || user?.displayName || "Captain") as string;
-  const currentPhoto = (userData?.photoURL ||
-    user?.photoURL ||
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
   const [properties, setProperties] = useState<EstateProperty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -196,40 +191,19 @@ export default function EstateMarketplacePage() {
   return (
     <RouteGuard>
       <div id="estate-page-root" className="min-h-dvh bg-background text-on-background pb-32">
-        <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
+        {/* Dedicated Estate Top Bar */}
+        <EstateHeader
+          title="E-Global Estate"
+          subtitle="Houses, Apartments & Land"
+          favoritesCount={favorites.length}
+          onRefresh={fetchProperties}
+        />
 
-        <main className="max-w-7xl mx-auto pt-3 px-4 md:px-8 flex-grow pb-28 text-black">
-          {/* Header Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 p-4 rounded-3xl bg-white border border-gray-150 shadow-2xs">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center flex-shrink-0 shadow-xs">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[26px]">
-                  domain
-                </span>
-              </div>
-              <div>
-                <h1 className="font-bodoni text-xl md:text-2xl font-bold tracking-tight text-black">
-                  Estate Marketplace
-                </h1>
-                <p className="font-hanken text-xs text-gray-500 font-medium">
-                  Houses, Apartments, Duplexes & Land for Rent or Sale
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/estate/seller"
-              className="px-4 py-2.5 rounded-2xl bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 flex-shrink-0 shadow-xs border-0"
-            >
-              <span className="material-symbols-outlined text-[18px]">add_home_work</span>
-              <span>Seller / Agent Hub</span>
-            </Link>
-          </div>
-
+        <main className="max-w-7xl mx-auto pt-4 px-4 md:px-8 flex-grow pb-28 text-black">
           {/* Search Box with Gradient Border */}
           <div className="relative w-full mb-4 bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl shadow-2xs">
             <div className="relative w-full bg-white rounded-[14.5px] flex items-center">
-              <span className="material-symbols-outlined absolute left-3.5 text-gray-400 text-[20px]">
+              <span className="material-symbols-outlined absolute left-3.5 text-[#FC7A00] text-[20px]">
                 search
               </span>
               <input
@@ -240,7 +214,7 @@ export default function EstateMarketplacePage() {
                   if (e.key === "Enter") fetchProperties();
                 }}
                 placeholder="Search Lekki duplex, Ikeja apartment, land for sale..."
-                className="w-full bg-transparent border-0 pl-11 pr-10 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+                className="w-full bg-transparent border-0 pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none"
               />
               {searchQuery && (
                 <button
@@ -249,7 +223,7 @@ export default function EstateMarketplacePage() {
                     setSearchQuery("");
                     fetchProperties();
                   }}
-                  className="absolute right-3 text-gray-400 hover:text-black border-0"
+                  className="absolute right-3 text-gray-400 hover:text-black border-0 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
