@@ -54,7 +54,8 @@ export function SellerProfileModal({
       {/* Full Screen App Drawer Header */}
       <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-between space-y-6">
         <div>
-          <div className="flex items-center justify-between border-b border-gray-150 pb-4 pt-2">
+          {/* Borderless Header */}
+          <div className="flex items-center justify-between pb-2 pt-2">
             <div className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">
                 account_circle
@@ -77,9 +78,9 @@ export function SellerProfileModal({
             </button>
           </div>
 
-          {/* Banner Card */}
-          <div className="mt-5 p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left shadow-2xs">
-            <div className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-sm flex-shrink-0 bg-white">
+          {/* Borderless Banner Card */}
+          <div className="mt-5 p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left shadow-2xs">
+            <div className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-2xl overflow-hidden shadow-sm flex-shrink-0 bg-white">
               <img src={avatarUrl} alt={seller.displayName} className="w-full h-full object-cover" />
               <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
             </div>
@@ -88,11 +89,11 @@ export function SellerProfileModal({
               <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                 <h4 className="font-extrabold text-base text-black">{seller.displayName}</h4>
                 {seller.isVerified ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800">
                     Verified Agent
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-800">
                     Pending Verification
                   </span>
                 )}
@@ -117,7 +118,7 @@ export function SellerProfileModal({
                     value={agencyName}
                     onChange={(e) => setAgencyName(e.target.value)}
                     placeholder="e.g. Apex Real Estate"
-                    className="w-full p-3.5 bg-gray-50 border border-gray-250 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] transition-all"
+                    className="w-full p-3.5 bg-gray-50 border-0 rounded-2xl font-semibold text-black text-xs outline-none focus:ring-2 focus:ring-[#FC7A00]/20 transition-all"
                   />
                 </div>
 
@@ -131,7 +132,7 @@ export function SellerProfileModal({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="e.g. 08012345678"
-                    className="w-full p-3.5 bg-gray-50 border border-gray-250 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] transition-all"
+                    className="w-full p-3.5 bg-gray-50 border-0 rounded-2xl font-semibold text-black text-xs outline-none focus:ring-2 focus:ring-[#FC7A00]/20 transition-all"
                   />
                 </div>
 
@@ -144,13 +145,13 @@ export function SellerProfileModal({
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="e.g. Suite 12, Victoria Island Plaza, Lagos"
-                    className="w-full p-3.5 bg-gray-50 border border-gray-250 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] transition-all resize-none"
+                    className="w-full p-3.5 bg-gray-50 border-0 rounded-2xl font-semibold text-black text-xs outline-none focus:ring-2 focus:ring-[#FC7A00]/20 transition-all resize-none"
                   />
                 </div>
               </form>
             ) : (
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-150 space-y-3 text-xs">
+                <div className="p-4 bg-gray-50 rounded-2xl border-0 space-y-3 text-xs">
                   <div>
                     <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
                       Phone Number
@@ -192,9 +193,9 @@ export function SellerProfileModal({
           </div>
         </div>
 
-        {/* Action Footer for Editable Form */}
+        {/* Borderless Action Footer for Editable Form */}
         {isEditable && (
-          <div className="pt-4 border-t border-gray-150 flex gap-3 pb-4">
+          <div className="pt-4 flex gap-3 pb-4">
             <button
               type="button"
               onClick={onClose}
