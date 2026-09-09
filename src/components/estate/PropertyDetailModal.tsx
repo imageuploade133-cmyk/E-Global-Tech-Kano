@@ -12,6 +12,7 @@ interface PropertyDetailModalProps {
   onClose: () => void;
   onSubmitInquiry: (message: string) => void;
   onReportProperty: (reason: string, details: string) => void;
+  onInspectAgent?: () => void;
 }
 
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
@@ -201,9 +202,21 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   <span className="material-symbols-outlined text-[#FC7A00] text-[18px]">contact_support</span>
                   <span>Contact Agent / Seller</span>
                 </h4>
-                <p className="font-hanken text-[11px] text-gray-500 font-semibold">
-                  Agent: <strong className="text-black">{property.sellerName || "Verified Partner"}</strong>
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="font-hanken text-[11px] text-gray-500 font-semibold">
+                    Agent: <strong className="text-black">{property.sellerName || "Verified Partner"}</strong>
+                  </p>
+                  {onInspectAgent && (
+                    <button
+                      type="button"
+                      onClick={onInspectAgent}
+                      className="px-2.5 py-1 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-[10px] uppercase rounded-lg cursor-pointer border-0 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">account_circle</span>
+                      <span>View Profile</span>
+                    </button>
+                  )}
+                </div>
 
                 <textarea
                   rows={3}
