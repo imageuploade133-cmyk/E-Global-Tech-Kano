@@ -60,6 +60,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const images = property.images && property.images.length > 0 ? property.images : [];
 
+  const fullLocationString = `${property.location?.address || ""}, ${property.location?.city || ""}, ${property.location?.state || "Nigeria"}`.replace(/^,\s*/, "");
+
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
@@ -71,6 +73,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       navigator.clipboard.writeText(window.location.href);
       toast.success("Property link copied to clipboard!");
     }
+  };
+
+  const handleOpenGoogleMaps = () => {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocationString)}`;
+    window.open(mapsUrl, "_blank");
   };
 
   return (
@@ -181,7 +188,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               )}
             </div>
 
-            {/* Price & Location Card Container */}
+            {/* Price Card Container */}
             <div className="bg-gradient-to-r from-[#FC7A00]/10 via-amber-50 to-[#E06600]/10 p-4 rounded-2xl border border-[#FC7A00]/20 flex items-center justify-between shadow-2xs">
               <div>
                 <span className="text-[10px] font-black uppercase text-gray-500 block">Listing Price</span>
@@ -194,15 +201,64 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               </div>
 
               <div className="text-right">
-                <span className="text-[10px] font-black uppercase text-gray-500 block">Location</span>
+                <span className="text-[10px] font-black uppercase text-gray-500 block">Category</span>
                 <span className="font-extrabold text-xs text-gray-900 block truncate max-w-[160px]">
-                  {property.location?.city || "City"}, {property.location?.state || "State"}
+                  {property.propertyType}
                 </span>
-                {property.location?.address && (
-                  <span className="text-[10px] font-semibold text-gray-500 block truncate max-w-[160px]">
-                    {property.location.address}
+                <span className="text-[10px] font-bold text-[#FC7A00] uppercase block">
+                  For {property.purpose}
+                </span>
+              </div>
+            </div>
+
+            {/* Dedicated Property Location Section Card */}
+            <div className="p-5 rounded-3xl bg-gradient-to-br from-white via-orange-50/40 to-amber-50/30 border border-[#FC7A00]/20 space-y-3.5 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-orange-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
+                    <span className="material-symbols-outlined text-[20px]">location_on</span>
+                  </div>
+                  <div>
+                    <h4 className="font-hanken font-black text-xs text-black uppercase tracking-wider">
+                      Property Location & Area
+                    </h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">
+                      Exact Address & Neighborhood
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleOpenGoogleMaps}
+                  className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[10px] uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1 shadow-2xs transition-all active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[14px]">map</span>
+                  <span>Open Maps</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-semibold">
+                <div className="p-3 bg-white/90 rounded-2xl border border-gray-150 space-y-0.5 shadow-2xs">
+                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">Street Address</span>
+                  <span className="font-bold text-gray-900 block truncate">
+                    {property.location?.address || "Address details on request"}
                   </span>
-                )}
+                </div>
+
+                <div className="p-3 bg-white/90 rounded-2xl border border-gray-150 space-y-0.5 shadow-2xs">
+                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">City / Town</span>
+                  <span className="font-bold text-gray-900 block truncate">
+                    {property.location?.city || "Local City"}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white/90 rounded-2xl border border-gray-150 space-y-0.5 shadow-2xs">
+                  <span className="text-[9.5px] font-black uppercase text-gray-400 block">State / Region</span>
+                  <span className="font-bold text-gray-900 block truncate">
+                    {property.location?.state || "State"}
+                  </span>
+                </div>
               </div>
             </div>
 
