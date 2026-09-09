@@ -31,13 +31,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, reports });
     }
 
-    let queryRef: FirebaseFirestore.Query = adminDb.collection("estate_properties");
-
-    if (status) {
-      queryRef = queryRef.where("status", "==", status);
-    }
-
-    const snap = await queryRef.limit(100).get();
+    const snap = await adminDb.collection("estate_properties").limit(300).get();
     const properties: any[] = [];
 
     snap.forEach((docSnap) => {
