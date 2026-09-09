@@ -184,32 +184,35 @@ export default function EstateSellerDashboard() {
           onRefresh={fetchSellerData}
         />
 
-        <main className="max-w-7xl mx-auto pt-4 px-4 md:px-8 flex-grow pb-28 text-black space-y-5">
-          {/* Action Row */}
-          <div className="flex items-center justify-between gap-3">
+        <main className="max-w-7xl mx-auto pt-3 px-3.5 sm:px-6 md:px-8 flex-grow pb-28 text-black space-y-4">
+          {/* Action Header Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-150 shadow-2xs">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">domain</span>
-              <h2 className="font-bodoni text-lg md:text-xl font-bold tracking-tight text-black">
-                My Property Portfolio ({properties.length})
-              </h2>
+              <div>
+                <h2 className="font-bodoni text-base sm:text-lg font-bold tracking-tight text-black leading-tight">
+                  Property Portfolio ({properties.length})
+                </h2>
+                <p className="text-[11px] text-gray-500 font-medium">Manage and publish real estate listings</p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setIsProfileModalOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 flex items-center gap-1.5"
+                className="px-3 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5"
               >
-                <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">account_circle</span>
+                <span className="material-symbols-outlined text-[17px] text-[#FC7A00]">account_circle</span>
                 <span>Agent Profile</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-xs flex items-center gap-1.5"
+                className="px-3.5 py-2.5 rounded-xl bg-[#FC7A00] hover:bg-[#e06600] text-white text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-2xs flex items-center justify-center gap-1.5"
               >
-                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span className="material-symbols-outlined text-[17px]">add</span>
                 <span>Add Property</span>
               </button>
             </div>
@@ -218,46 +221,46 @@ export default function EstateSellerDashboard() {
           {/* Seller / Agent Profile Header Banner */}
           <div
             onClick={() => setIsProfileModalOpen(true)}
-            className="p-4 md:p-5 bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:border-[#FC7A00] transition-all shadow-2xs"
+            className="p-3.5 sm:p-5 bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] rounded-3xl flex items-center justify-between gap-3 cursor-pointer hover:border-[#FC7A00] transition-all shadow-2xs"
           >
-            <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-xs flex-shrink-0 bg-white">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-xs flex-shrink-0 bg-white">
                 <img src={currentPhoto} alt={userName} className="w-full h-full object-cover" />
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+                <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
               </div>
 
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-sm md:text-base text-black">{userName}</h3>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="font-extrabold text-xs sm:text-sm text-black truncate">{userName}</h3>
                   {sellerProfile?.isVerified ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      Verified Agent
+                    <span className="px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Verified
                     </span>
                   ) : (
-                    <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
-                      Pending Verification
+                    <span className="px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                      Pending
                     </span>
                   )}
                 </div>
-                <p className="text-xs font-bold text-[#FC7A00] uppercase mt-0.5">
+                <p className="text-[11px] font-extrabold text-[#FC7A00] uppercase truncate mt-0.5">
                   {sellerProfile?.agencyName || "Independent Real Estate Agent"}
                 </p>
-                <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                  {sellerProfile?.address || "Click to update office address & contact phone"}
+                <p className="text-[10px] text-gray-500 font-medium truncate mt-0.5">
+                  {sellerProfile?.address || "Tap to edit office address & contact phone"}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 self-end sm:self-center">
-              <span className="text-xs font-extrabold text-[#FC7A00] uppercase tracking-wider">
-                Edit Agent Profile
+            <div className="flex items-center gap-1 flex-shrink-0 pl-1">
+              <span className="text-[10px] font-black text-[#FC7A00] uppercase tracking-wider hidden sm:inline">
+                Edit
               </span>
               <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">chevron_right</span>
             </div>
           </div>
 
           {/* Status Tabs */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 select-none">
             {[
               { id: "ALL" as const, label: `All (${properties.length})` },
               { id: "PUBLISHED" as const, label: "Published" },
@@ -269,7 +272,7 @@ export default function EstateSellerDashboard() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
+                className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
                   activeTab === tab.id
                     ? "bg-[#FC7A00] text-white shadow-2xs"
                     : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
@@ -282,7 +285,7 @@ export default function EstateSellerDashboard() {
 
           {/* My Properties Directory Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="h-64 bg-white rounded-2xl border border-gray-150 p-3 animate-pulse space-y-3">
                   <div className="w-full h-36 bg-gray-100 rounded-xl" />
@@ -291,19 +294,19 @@ export default function EstateSellerDashboard() {
               ))}
             </div>
           ) : filteredProperties.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center space-y-3 border border-gray-150 shadow-xs">
-              <span className="material-symbols-outlined text-[56px] text-gray-300">
+            <div className="bg-white rounded-3xl p-10 text-center space-y-3 border border-gray-150 shadow-xs">
+              <span className="material-symbols-outlined text-[52px] text-gray-300">
                 home_work
               </span>
-              <h3 className="font-bold text-sm text-gray-500 uppercase">
+              <h3 className="font-bold text-xs sm:text-sm text-gray-600 uppercase tracking-wider">
                 No listings under {activeTab}
               </h3>
-              <p className="text-xs text-gray-400">
+              <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
                 Submit new property listings to showcase them to buyers across the marketplace.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               {filteredProperties.map((prop) => (
                 <PropertyCard
                   key={prop.id}
@@ -323,7 +326,7 @@ export default function EstateSellerDashboard() {
           isSubmitting={isSubmittingProperty}
         />
 
-        {/* Editable Seller Profile Modal */}
+        {/* Full Screen App Drawer Editable Seller Profile Modal */}
         <SellerProfileModal
           isOpen={isProfileModalOpen}
           seller={sellerProfile}
