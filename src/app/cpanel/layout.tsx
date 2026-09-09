@@ -121,6 +121,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [isStoreExpanded, setIsStoreExpanded] = useState(pathname.startsWith("/cpanel/store"));
+  const [isEstateExpanded, setIsEstateExpanded] = useState(pathname.startsWith("/cpanel/estate"));
   const [unrepliedReviewsBadge, setUnrepliedReviewsBadge] = useState<number>(0);
 
   // Fetch unreplied reviews count for slide menu notification
@@ -419,7 +420,6 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit", permission: "vtu.manage" },
         { id: "exchange_rates", label: "Exchange Rates & Swaps", icon: "currency_exchange", href: "/cpanel/exchange-rates", permission: "exchange_rates.manage" },
         { id: "investments", label: "Fixed Deposits", icon: "savings", href: "/cpanel/investments", permission: "investments.manage" },
-        { id: "estate", label: "Estate Marketplace", icon: "domain", href: "/cpanel/estate", permission: "estate.view" },
         { id: "history", label: "User Ledger Audits", icon: "history", href: "/cpanel/user-history", permission: "user_history.view" },
       ]
     }
@@ -433,6 +433,13 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     { id: "store_categories", label: "Manage Categories", icon: "category", href: "/cpanel/store/categories", permission: "store.view" },
     { id: "store_slides", label: "Store Slides", icon: "view_carousel", href: "/cpanel/store/slides", permission: "store.view" },
     { id: "store_settings", label: "Store Settings", icon: "settings", href: "/cpanel/store/settings", permission: "store.view" },
+  ];
+
+  const estateNavItems: NavItem[] = [
+    { id: "estate_properties", label: "Property Listings", icon: "home_work", href: "/cpanel/estate", exact: true, permission: "estate.view" },
+    { id: "estate_sellers", label: "Sellers & Agents", icon: "badge", href: "/cpanel/estate/sellers", permission: "estate.view" },
+    { id: "estate_inquiries", label: "Customer Inquiries", icon: "contact_support", href: "/cpanel/estate/inquiries", permission: "estate.view" },
+    { id: "estate_reports", label: "Flagged Reports", icon: "flag", href: "/cpanel/estate/reports", permission: "estate.view" },
   ];
 
   const checkItemPermission = (item: NavItem): boolean => {
@@ -461,6 +468,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     .filter((cat) => cat.items.length > 0);
 
   const filteredStoreNavItems = storeNavItems.filter((item) => checkItemPermission(item));
+  const filteredEstateNavItems = estateNavItems.filter((item) => checkItemPermission(item));
 
   const isNavActive = (item: NavItem) => {
     if (item.exact) {
@@ -880,6 +888,66 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
                     })}
                   </div>
                 ))}
+
+                {/* Estate Marketplace Accordion / Submenu */}
+                {filteredEstateNavItems.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200/40 dark:border-gray-800">
+                    <button
+                      onClick={() => {
+                        if (isSidebarMinimized && !isMenuOpen) {
+                          setIsSidebarMinimized(false);
+                          setIsEstateExpanded(true);
+                        } else {
+                          setIsEstateExpanded(!isEstateExpanded);
+                        }
+                      }}
+                      title={isSidebarMinimized && !isMenuOpen ? "Estate Marketplace" : undefined}
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full",
+                        isSidebarMinimized && !isMenuOpen && "justify-center px-0 py-2.5",
+                        pathname.startsWith("/cpanel/estate")
+                          ? "bg-orange-500/10 text-[#FC7A00]"
+                          : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-500 hover:bg-gray-50"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="material-symbols-outlined text-[18px] flex-shrink-0">domain</span>
+                        {(!isSidebarMinimized || isMenuOpen) && <span>Estate Marketplace</span>}
+                      </div>
+                      {(!isSidebarMinimized || isMenuOpen) && (
+                        <span className="material-symbols-outlined text-[16px]">
+                          {isEstateExpanded ? "expand_less" : "expand_more"}
+                        </span>
+                      )}
+                    </button>
+
+                    {isEstateExpanded && (!isSidebarMinimized || isMenuOpen) && (
+                      <div className="pl-6 pt-1 space-y-1">
+                        {filteredEstateNavItems.map((sub) => {
+                          const active = isNavActive(sub);
+                          return (
+                            <Link
+                              key={sub.id}
+                              href={sub.href}
+                              onClick={() => setIsMenuOpen(false)}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap w-full justify-between",
+                                active
+                                  ? "text-[#FC7A00] bg-orange-500/10 font-black"
+                                  : isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+                              )}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="material-symbols-outlined text-[15px] flex-shrink-0">{sub.icon}</span>
+                                <span className="flex-1 text-left truncate">{sub.label}</span>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Storefront Manager Accordion / Submenu */}
                 {filteredStoreNavItems.length > 0 && (

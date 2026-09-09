@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
-// GET /api/estate/admin/properties - CPanel Admin manage property directory & approvals
+// GET /api/estate/admin/properties - CPanel Admin manage property directory, inquiries & reports
 export async function GET(req: Request) {
   try {
     const authCheck = await requireAdminPermission(req, "estate.view");
@@ -10,6 +10,26 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const inquiriesFlag = searchParams.get("inquiries");
+    const reportsFlag = searchParams.get("reports");
+
+    if (inquiriesFlag === "true") {
+      const snap = await adminDb.collection("estate_inquiries").limit(100).get();
+      const inquiries: any[] = [];
+      snap.forEach((docSnap) => {
+        inquiries.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      return NextResponse.json({ success: true, inquiries });
+    }
+
+    if (reportsFlag === "true") {
+      const snap = await adminDb.collection("estate_reports").limit(100).get();
+      const reports: any[] = [];
+      snap.forEach((docSnap) => {
+        reports.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      return NextResponse.json({ success: true, reports });
+    }
 
     let queryRef: FirebaseFirestore.Query = adminDb.collection("estate_properties");
 
