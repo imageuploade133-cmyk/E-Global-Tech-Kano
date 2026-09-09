@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { requireAdminPermission } from "@/lib/admin-auth-middleware";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 // GET /api/estate/admin/sellers - CPanel fetch sellers
 export async function GET(req: Request) {
