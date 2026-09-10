@@ -148,8 +148,6 @@ export interface EstateSettingsData {
   autoApproveListings: boolean;
   requireAgentKYC: boolean;
   maxActiveListingsPerAgent: number;
-  maxTitleLength?: number;
-  hidePropertyIcons?: boolean;
   platformCommissionPercent: number;
   enableVoiceNotes: boolean;
   enableAutoResponses: boolean;
@@ -169,8 +167,6 @@ export const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
   autoApproveListings: false,
   requireAgentKYC: true,
   maxActiveListingsPerAgent: 20,
-  maxTitleLength: 100,
-  hidePropertyIcons: false,
   platformCommissionPercent: 2.5,
   enableVoiceNotes: true,
   enableAutoResponses: true,

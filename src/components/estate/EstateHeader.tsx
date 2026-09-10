@@ -85,19 +85,6 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {onRefresh && (
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 active:scale-90 transition-all cursor-pointer border-0"
-              title="Refresh Directory"
-            >
-              <span className="material-symbols-outlined text-[18px] text-gray-700">
-                refresh
-              </span>
-            </button>
-          )}
-
           {onOpenFavorites && (
             <button
               type="button"

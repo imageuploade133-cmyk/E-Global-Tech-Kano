@@ -99,8 +99,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           className="fixed inset-0 z-[100008] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken"
         >
           {/* Header Bar */}
-          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20 border-b border-gray-100">
-            <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+          <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20">
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
                 onClick={onClose}
@@ -108,8 +108,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               >
                 <span className="material-symbols-outlined text-[20px]">arrow_back</span>
               </button>
-              <div className="min-w-0 flex-1">
-                <h2 className="font-extrabold text-xs sm:text-sm text-black uppercase tracking-tight leading-snug break-words line-clamp-2">
+              <div className="min-w-0">
+                <h2 className="font-extrabold text-sm text-black truncate uppercase tracking-tight">
                   {property.title}
                 </h2>
                 <p className="text-[10px] text-gray-400 font-bold uppercase">
@@ -200,17 +200,6 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Full Property Title Header Displayed Above Price Listing */}
-            <div className="px-1 pt-1">
-              <h1 className="font-extrabold text-base sm:text-lg text-black uppercase tracking-tight leading-snug break-words">
-                {property.title}
-              </h1>
-              <p className="text-[11px] text-gray-500 font-bold flex items-center gap-1 mt-1">
-                <span className="material-symbols-outlined text-[14px] text-[#FC7A00]">location_on</span>
-                <span>{fullLocationString || "Nigeria"}</span>
-              </p>
             </div>
 
             {/* Price Card Container with Luxury Gradient Border */}

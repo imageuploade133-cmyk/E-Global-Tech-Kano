@@ -21,6 +21,7 @@ import {
 } from "@/components/estate";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { PullToRefreshOverlay } from "@/components/wallet/PullToRefreshOverlay";
 
 export default function EstateMarketplacePage() {
   const { userData, user } = useAuth();
@@ -36,6 +37,12 @@ export default function EstateMarketplacePage() {
   // Store last scroll position before search or modal interaction
   const lastScrollPosRef = useRef<number>(0);
 
+  // Pull-to-Refresh State
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartYRef = useRef(0);
+  const isPullingRef = useRef(false);
+
   // Selected Property Detail Modal
   const [selectedProperty, setSelectedProperty] = useState<EstateProperty | null>(null);
 
@@ -44,20 +51,6 @@ export default function EstateMarketplacePage() {
   const [favoriteProperties, setFavoriteProperties] = useState<EstateProperty[]>([]);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
-
-  // Settings
-  const [hidePropertyIcons, setHidePropertyIcons] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/estate/settings")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.settings) {
-          setHidePropertyIcons(Boolean(data.settings.hidePropertyIcons));
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   // Report Modal Drawer State
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -99,9 +92,40 @@ export default function EstateMarketplacePage() {
       toast.error("Unable to load estate listings.");
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
+      setPullDistance(0);
       if (lastScrollPosRef.current > 0) {
         window.scrollTo({ top: lastScrollPosRef.current });
       }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      touchStartYRef.current = e.touches[0].clientY;
+      isPullingRef.current = true;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPullingRef.current || isRefreshing) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartYRef.current;
+    if (diff > 0 && window.scrollY === 0) {
+      setPullDistance(Math.min(diff * 0.45, 90));
+    } else {
+      setPullDistance(0);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isPullingRef.current) return;
+    isPullingRef.current = false;
+    if (pullDistance > 50 && !isRefreshing) {
+      setIsRefreshing(true);
+      fetchProperties();
+    } else {
+      setPullDistance(0);
     }
   };
 
@@ -312,13 +336,23 @@ export default function EstateMarketplacePage() {
 
   return (
     <RouteGuard>
-      <div id="estate-page-root" className="min-h-dvh bg-background text-on-background pb-32">
+      <div
+        id="estate-page-root"
+        className="min-h-dvh bg-background text-on-background pb-32"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <PullToRefreshOverlay
+          pullDistance={pullDistance}
+          isRefreshing={isRefreshing}
+        />
+
         {/* Dedicated Estate Top Bar */}
         <EstateHeader
           title="E-Global Estate"
           subtitle="Houses, Apartments & Land"
           favoritesCount={favorites.length}
-          onRefresh={() => fetchProperties()}
           onOpenFavorites={() => {
             fetchUserFavorites();
             setIsFavoritesOpen(true);
@@ -436,12 +470,16 @@ export default function EstateMarketplacePage() {
               ))}
             </div>
           ) : properties.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center space-y-3 border border-gray-150 shadow-xs">
-              <span className="material-symbols-outlined text-[56px] text-gray-300">
-                domain_disabled
-              </span>
-              <h3 className="font-bodoni font-bold text-lg text-black">No Properties Found</h3>
-              <p className="font-hanken text-xs text-gray-500 max-w-sm mx-auto">
+            <div className="bg-white rounded-[24px] border-0 p-8 shadow-xs flex flex-col items-center text-center justify-center min-h-[260px]">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-[#FC7A00] text-[32px]">
+                  domain_disabled
+                </span>
+              </div>
+              <h3 className="font-bodoni text-[16px] font-bold text-black mb-1">
+                No Properties Found
+              </h3>
+              <p className="font-hanken text-[11.5px] text-gray-500 leading-relaxed max-w-[260px]">
                 No active property listings matched your current filter or search criteria.
               </p>
             </div>
@@ -451,7 +489,6 @@ export default function EstateMarketplacePage() {
                 <PropertyCard
                   key={prop.id}
                   property={prop}
-                  hideIcons={hidePropertyIcons}
                   onOpenDetails={(p) => {
                     lastScrollPosRef.current = window.scrollY;
                     setSelectedProperty(p);

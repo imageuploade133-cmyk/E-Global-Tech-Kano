@@ -1,22 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-import crypto from "crypto";
-
-const ENCRYPTION_SECRET = process.env.PAYMENT_GATEWAY_API_KEY || "estate-inquiry-secret-key-32-chars!!";
-const ENCRYPTION_KEY = crypto.createHash("sha256").update(ENCRYPTION_SECRET).digest();
-
-function decryptText(encryptedHex: string, ivHex: string, tagHex: string): string {
-  try {
-    const decipher = crypto.createDecipheriv("aes-256-gcm", ENCRYPTION_KEY, Buffer.from(ivHex, "hex"));
-    decipher.setAuthTag(Buffer.from(tagHex, "hex"));
-    let decrypted = decipher.update(encryptedHex, "hex", "utf8");
-    decrypted += decipher.final("utf8");
-    return decrypted;
-  } catch {
-    return "[Encrypted Message]";
-  }
-}
 
 // GET /api/estate/admin/inquiries - Group inquiry chat threads by agent & customer
 export async function GET(req: Request) {
@@ -50,11 +34,6 @@ export async function GET(req: Request) {
 
     for (const inq of rawInquiries) {
       const threadKey = `${inq.propertyId}_${inq.userId}`;
-      let textContent = inq.message || "";
-      if (!textContent && inq.encryptedMessage && inq.iv && inq.tag) {
-        textContent = decryptText(inq.encryptedMessage, inq.iv, inq.tag);
-      }
-
       if (!threadsMap.has(threadKey)) {
         threadsMap.set(threadKey, {
           threadKey,
@@ -65,7 +44,7 @@ export async function GET(req: Request) {
           userName: inq.userName || "Customer",
           userPhone: inq.userPhone || "",
           userEmail: inq.userEmail || "",
-          lastMessage: textContent || "🎤 Voice Note",
+          lastMessage: inq.message || "🎤 Voice Note",
           lastMessageType: inq.messageType || "text",
           lastMessageTime: inq.createdAt,
           messages: [],
@@ -77,7 +56,7 @@ export async function GET(req: Request) {
         id: inq.id,
         senderId: inq.userId,
         senderName: inq.userName,
-        message: textContent,
+        message: inq.message,
         messageType: inq.messageType || "text",
         audioData: inq.audioData || null,
         audioDuration: inq.audioDuration || 0,
