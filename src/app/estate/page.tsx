@@ -19,6 +19,7 @@ import {
   ReportPropertyModal,
   EstateHeader,
 } from "@/components/estate";
+import { EstateBannerSlideshow } from "@/components/estate/EstateBannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 export default function EstateMarketplacePage() {
@@ -311,6 +312,9 @@ export default function EstateMarketplacePage() {
         />
 
         <main className="max-w-7xl mx-auto pt-4 px-4 md:px-8 flex-grow pb-28 text-black">
+          {/* Estate Home Slideshow Banner */}
+          <EstateBannerSlideshow />
+
           {/* Search Box with Gradient Border */}
           <div className="relative w-full mb-4 bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl shadow-2xs">
             <div className="relative w-full bg-white rounded-[14.5px] flex items-center pr-2">

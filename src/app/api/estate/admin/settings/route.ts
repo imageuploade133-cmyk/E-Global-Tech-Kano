@@ -1,37 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-
-export interface EstateSettingsData {
-  estateLogoUrl?: string;
-  autoApproveListings: boolean;
-  requireAgentKYC: boolean;
-  maxActiveListingsPerAgent: number;
-  platformCommissionPercent: number;
-  enableVoiceNotes: boolean;
-  enableAutoResponses: boolean;
-  enableChat: boolean;
-  enableCalls: boolean;
-  chatSecurityNoticeUser: string;
-  chatSecurityNoticeAgent: string;
-  updatedAt?: string;
-}
-
-const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
-  estateLogoUrl: "",
-  autoApproveListings: false,
-  requireAgentKYC: true,
-  maxActiveListingsPerAgent: 20,
-  platformCommissionPercent: 2.5,
-  enableVoiceNotes: true,
-  enableAutoResponses: true,
-  enableChat: true,
-  enableCalls: true,
-  chatSecurityNoticeUser:
-    "Do NOT deposit or transfer funds directly to an agent's personal bank account. Fund your E-Global Wallet account and transfer directly to the agent's wallet account.",
-  chatSecurityNoticeAgent:
-    "Do NOT request or instruct customers to transfer funds directly to your external personal bank account. Provide ONLY your E-Global Wallet Account to receive funds.",
-};
+import { DEFAULT_ESTATE_SETTINGS, EstateSettingsData } from "@/estate/types";
 
 // GET /api/estate/admin/settings - Read administrative marketplace settings
 export async function GET(req: Request) {
@@ -76,6 +46,10 @@ export async function POST(req: Request) {
 
     const updatedSettings: EstateSettingsData = {
       estateLogoUrl: body.estateLogoUrl ? String(body.estateLogoUrl).trim() : "",
+      estateTitle: body.estateTitle ? String(body.estateTitle).trim() : DEFAULT_ESTATE_SETTINGS.estateTitle,
+      estateSubtitle: body.estateSubtitle ? String(body.estateSubtitle).trim() : DEFAULT_ESTATE_SETTINGS.estateSubtitle,
+      estateTitleColor: body.estateTitleColor ? String(body.estateTitleColor).trim() : DEFAULT_ESTATE_SETTINGS.estateTitleColor,
+      estateSubtitleColor: body.estateSubtitleColor ? String(body.estateSubtitleColor).trim() : DEFAULT_ESTATE_SETTINGS.estateSubtitleColor,
       autoApproveListings: Boolean(body.autoApproveListings),
       requireAgentKYC: Boolean(body.requireAgentKYC),
       maxActiveListingsPerAgent: Math.max(1, Number(body.maxActiveListingsPerAgent) || 20),
