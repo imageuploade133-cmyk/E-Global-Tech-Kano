@@ -188,6 +188,33 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   <span>{activeImageIndex + 1} / {images.length || 1}</span>
                 </span>
 
+                {/* Agent Icon & Business Name Overlay on Top-Left of Image */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onInspectAgent) onInspectAgent();
+                  }}
+                  className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-black shadow-md hover:bg-white active:scale-95 transition-all border border-white/40 cursor-pointer overflow-hidden max-w-[70%]"
+                  title="View Agent Profile"
+                >
+                  {publisherAgent?.avatarUrl && !publisherAgent.mutedFields?.includes("avatar") ? (
+                    <div className="w-6 h-6 rounded-full overflow-hidden relative border border-[#FC7A00] flex-shrink-0">
+                      <Image src={publisherAgent.avatarUrl} alt="Agent" fill className="object-cover" unoptimized />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#FC7A00] to-[#E06600] text-white font-black text-[10px] flex items-center justify-center flex-shrink-0 shadow-2xs">
+                      {(publisherAgent?.displayName || property.sellerName || "A")[0]}
+                    </div>
+                  )}
+                  <span className="text-[10px] sm:text-[11px] font-black uppercase text-black tracking-tight truncate">
+                    {publisherAgent?.agencyName || publisherAgent?.displayName || property.sellerName || "Verified Agent"}
+                  </span>
+                  <span className="material-symbols-outlined text-[14px] text-[#FC7A00] flex-shrink-0">
+                    verified
+                  </span>
+                </button>
+
                 <span
                   className={`absolute top-3 right-3 px-3 py-1 rounded-md text-[9.5px] font-black uppercase tracking-wider text-white shadow-2xs ${
                     property.purpose === "Sale"
