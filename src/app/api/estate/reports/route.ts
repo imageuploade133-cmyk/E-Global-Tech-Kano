@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { verifyFirebaseIdToken } from "@/lib/auth-util";
+import { authenticateUserRequest } from "@/lib/auth-util";
 
 // POST /api/estate/reports - Submit property violation/fraud report
 export async function POST(req: Request) {
   try {
-    const authCheck = await verifyFirebaseIdToken(req);
-    const userId = authCheck.uid || "anonymous_user";
+    let userId = "anonymous_user";
+    try {
+      const authCheck = await authenticateUserRequest(req);
+      userId = authCheck.uid || "anonymous_user";
+    } catch {
+      // Allow report submission if unauthenticated
+    }
 
     const body = await req.json();
     const { propertyId, propertyTitle, sellerId, reason, details, evidenceUrl, reporterPhone } = body;
