@@ -62,9 +62,13 @@ export function SellerProfileModal({
     if (!file) return;
     setIsUploadingAvatar(true);
     try {
-      const url = await uploadImageSecurely(file);
-      setAvatarUrl(url);
-      toast.success("Agent profile picture uploaded successfully!");
+      const result = await uploadImageSecurely(file);
+      if (result.success && result.url) {
+        setAvatarUrl(result.url);
+        toast.success("Agent profile picture uploaded successfully!");
+      } else {
+        toast.error(result.error || "Failed to upload agent profile picture.");
+      }
     } catch {
       toast.error("Failed to upload agent profile picture.");
     } finally {
