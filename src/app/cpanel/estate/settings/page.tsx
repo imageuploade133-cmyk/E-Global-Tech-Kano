@@ -1,24 +1,49 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 import { cn } from "@/lib/utils";
+import { uploadImageSecurely } from "@/lib/image-upload";
 
 export default function CpanelEstateSettingsPage() {
   const { isDark } = useCpanelTheme();
 
+  const [estateLogoUrl, setEstateLogoUrl] = useState("");
   const [autoApproveListings, setAutoApproveListings] = useState(false);
   const [requireAgentKYC, setRequireAgentKYC] = useState(true);
   const [maxActiveListingsPerAgent, setMaxActiveListingsPerAgent] = useState("20");
   const [platformCommissionPercent, setPlatformCommissionPercent] = useState("2.5");
   const [enableVoiceNotes, setEnableVoiceNotes] = useState(true);
   const [enableAutoResponses, setEnableAutoResponses] = useState(true);
+  const [enableChat, setEnableChat] = useState(true);
+  const [enableCalls, setEnableCalls] = useState(true);
   const [chatSecurityNoticeUser, setChatSecurityNoticeUser] = useState("");
   const [chatSecurityNoticeAgent, setChatSecurityNoticeAgent] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    try {
+      const res = await uploadImageSecurely(file, "estate_logo");
+      if (res.success && res.url) {
+        setEstateLogoUrl(res.url);
+        toast.success("E-Global Estate Logo uploaded successfully!");
+      } else {
+        toast.error(res.error || "Failed to upload logo.");
+      }
+    } catch {
+      toast.error("Error uploading logo image.");
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
 
   const fetchSettings = async () => {
     setIsLoading(true);
@@ -27,12 +52,15 @@ export default function CpanelEstateSettingsPage() {
       const data = await res.json();
       if (data.success && data.settings) {
         const s = data.settings;
+        setEstateLogoUrl(s.estateLogoUrl || "");
         setAutoApproveListings(Boolean(s.autoApproveListings));
         setRequireAgentKYC(Boolean(s.requireAgentKYC));
         setMaxActiveListingsPerAgent(String(s.maxActiveListingsPerAgent || 20));
         setPlatformCommissionPercent(String(s.platformCommissionPercent || 2.5));
         setEnableVoiceNotes(s.enableVoiceNotes !== false);
         setEnableAutoResponses(s.enableAutoResponses !== false);
+        setEnableChat(s.enableChat !== false);
+        setEnableCalls(s.enableCalls !== false);
         setChatSecurityNoticeUser(s.chatSecurityNoticeUser || "");
         setChatSecurityNoticeAgent(s.chatSecurityNoticeAgent || "");
       }
@@ -55,12 +83,15 @@ export default function CpanelEstateSettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          estateLogoUrl,
           autoApproveListings,
           requireAgentKYC,
           maxActiveListingsPerAgent: Number(maxActiveListingsPerAgent) || 20,
           platformCommissionPercent: Number(platformCommissionPercent) || 0,
           enableVoiceNotes,
           enableAutoResponses,
+          enableChat,
+          enableCalls,
           chatSecurityNoticeUser,
           chatSecurityNoticeAgent,
         }),
@@ -184,27 +215,111 @@ export default function CpanelEstateSettingsPage() {
             </div>
           </div>
 
+          {/* Section 0: E-Global Estate Logo Settings */}
+          <div className={cn("p-5 sm:p-6 rounded-3xl border space-y-4 shadow-xs", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200")}>
+            <div className="flex items-center gap-2 border-b pb-3 border-gray-100 dark:border-gray-800">
+              <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">photo_camera</span>
+              <h3 className="font-extrabold text-sm uppercase tracking-wide">E-Global Estate Branding Logo</h3>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl border-2 border-[#FC7A00] overflow-hidden bg-white flex items-center justify-center relative shadow-xs flex-shrink-0">
+                {estateLogoUrl ? (
+                  <img src={estateLogoUrl} alt="Estate Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <span className="material-symbols-outlined text-[36px] text-gray-300">domain</span>
+                )}
+              </div>
+
+              <div className="space-y-2 flex-1 text-center sm:text-left">
+                <p className="text-xs font-bold text-gray-800 dark:text-gray-200">Custom Marketplace Logo</p>
+                <p className="text-[10.5px] text-gray-500 font-medium">
+                  Upload a custom brand logo image to display on the E-Global Estate header and public marketplace.
+                </p>
+
+                <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                    className="px-4 py-2 bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase rounded-xl border-0 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+                  >
+                    {isUploadingLogo ? "Uploading..." : estateLogoUrl ? "Change Logo" : "Upload Logo"}
+                  </button>
+                  {estateLogoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setEstateLogoUrl("")}
+                      className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold uppercase rounded-xl border-0 cursor-pointer transition-all"
+                    >
+                      Reset Default
+                    </button>
+                  )}
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Section 2: Communication & Voice Note Controls */}
           <div className={cn("p-5 sm:p-6 rounded-3xl border space-y-4 shadow-xs", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200")}>
             <div className="flex items-center gap-2 border-b pb-3 border-gray-100 dark:border-gray-800">
               <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">forum</span>
-              <h3 className="font-extrabold text-sm uppercase tracking-wide">Inquiry Chat & Voice Note Features</h3>
+              <h3 className="font-extrabold text-sm uppercase tracking-wide">Communication & Contact Feature Switches</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
                 <div>
-                  <span className="text-xs font-bold block">50s Voice Note Recordings</span>
+                  <span className="text-xs font-bold block">Inquiry Chat Messaging</span>
                   <span className="text-[10.5px] text-gray-500 font-medium block">
-                    Allow buyers & agents to exchange encrypted voice notes in inquiry chat
+                    Global ON/OFF switch to enable or disable direct chat messaging with agents
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEnableChat(!enableChat)}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableChat ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
+                >
+                  {enableChat ? "ENABLED" : "DISABLED"}
+                </button>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div>
+                  <span className="text-xs font-bold block">Direct Phone & WhatsApp Calling</span>
+                  <span className="text-[10.5px] text-gray-500 font-medium block">
+                    Global ON/OFF switch for agent phone call and WhatsApp contact buttons
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEnableCalls(!enableCalls)}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableCalls ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
+                >
+                  {enableCalls ? "ENABLED" : "DISABLED"}
+                </button>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div>
+                  <span className="text-xs font-bold block">50s Encrypted Voice Notes</span>
+                  <span className="text-[10.5px] text-gray-500 font-medium block">
+                    Allow buyers & agents to record and exchange 50s voice notes in chat
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEnableVoiceNotes(!enableVoiceNotes)}
-                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableVoiceNotes ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-700")}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableVoiceNotes ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
                 >
-                  {enableVoiceNotes ? "ON" : "OFF"}
+                  {enableVoiceNotes ? "ENABLED" : "DISABLED"}
                 </button>
               </div>
 
@@ -218,9 +333,9 @@ export default function CpanelEstateSettingsPage() {
                 <button
                   type="button"
                   onClick={() => setEnableAutoResponses(!enableAutoResponses)}
-                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableAutoResponses ? "bg-emerald-600 text-white" : "bg-gray-200 text-gray-700")}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableAutoResponses ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
                 >
-                  {enableAutoResponses ? "ON" : "OFF"}
+                  {enableAutoResponses ? "ENABLED" : "DISABLED"}
                 </button>
               </div>
             </div>
