@@ -142,18 +142,22 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               </>
             )}
 
-            {/* Status Pill Badge (Draft, Pending Review, Rejected, Live) */}
+            {/* Status Pill Badge (Draft, Pending Review, Rejected, Published / Live) */}
             {property.status === "DRAFT" ? (
-              <span className="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-amber-900 bg-amber-300 shadow-md z-10">
-                Draft (Private)
+              <span className="absolute top-2.5 right-2.5 px-3 py-1 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider text-white bg-slate-700 shadow-lg border border-white/20 z-10">
+                DRAFT
               </span>
             ) : property.status === "PENDING_REVIEW" ? (
-              <span className="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white bg-amber-600 shadow-md z-10">
-                Pending Review
+              <span className="absolute top-2.5 right-2.5 px-3 py-1 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider text-white bg-red-600 shadow-lg border border-white/20 z-10">
+                PENDING REVIEW
+              </span>
+            ) : property.status === "PUBLISHED" || property.status === "APPROVED" ? (
+              <span className="absolute top-2.5 right-2.5 px-3 py-1 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider text-white bg-emerald-600 shadow-lg border border-white/20 z-10">
+                PUBLISHED
               </span>
             ) : property.status === "REJECTED" ? (
-              <span className="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white bg-red-600 shadow-md z-10">
-                Rejected
+              <span className="absolute top-2.5 right-2.5 px-3 py-1 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider text-white bg-rose-700 shadow-lg border border-white/20 z-10">
+                REJECTED
               </span>
             ) : null}
 
