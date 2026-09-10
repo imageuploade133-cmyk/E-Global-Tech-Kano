@@ -382,7 +382,7 @@ export default function CpanelEstateSettingsPage() {
                 <div>
                   <span className="text-xs font-bold block">Inquiry Chat Messaging</span>
                   <span className="text-[10.5px] text-gray-500 font-medium block">
-                    Global ON/OFF switch to enable or disable direct chat messaging with agents
+                    Global ON/OFF switch to show or hide the Chat button and enable or disable direct chat messaging
                   </span>
                 </div>
                 <button

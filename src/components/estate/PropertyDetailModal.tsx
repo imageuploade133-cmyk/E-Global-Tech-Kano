@@ -35,6 +35,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [enableChat, setEnableChat] = useState(true);
 
   // Publisher full agent state
   const [publisherAgent, setPublisherAgent] = useState<EstateSeller | null>(null);
@@ -42,9 +43,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   useModalBackHandler(isOpen, onClose, property ? `property-detail-${property.id}` : "property-detail");
 
-  // Fetch agent full details when property opens
+  // Fetch estate settings and agent full details when property opens
   useEffect(() => {
-    if (property?.sellerId) {
+    if (isOpen) {
+      fetch("/api/estate/settings")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.settings) {
+            setEnableChat(data.settings.enableChat !== false);
+          }
+        })
+        .catch(() => {});
+    }
+
+    if (property?.sellerId && isOpen) {
       setIsLoadingLoadingPublisher(true);
       fetch(`/api/estate/sellers?sellerId=${property.sellerId}`)
         .then((res) => res.json())
@@ -60,7 +72,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     } else {
       setPublisherAgent(null);
     }
-  }, [property?.sellerId]);
+  }, [property?.sellerId, isOpen]);
+
+  const handleOpenChat = () => {
+    if (!enableChat) {
+      toast.error("Chat is disabled at this time");
+      return;
+    }
+    setIsChatModalOpen(true);
+  };
 
   if (!isOpen || !property) return null;
 
@@ -487,13 +507,19 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setIsChatModalOpen(true)}
-              className="flex-1 py-3.5 px-4 bg-gradient-to-r from-[#FC7A00] via-amber-500 to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 active:scale-95 transition-all cursor-pointer border-0 shadow-md flex items-center justify-center gap-2 relative overflow-hidden"
+              onClick={handleOpenChat}
+              className={`flex-1 py-3.5 px-4 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-md flex items-center justify-center gap-2 relative overflow-hidden ${
+                enableChat
+                  ? "bg-gradient-to-r from-[#FC7A00] via-amber-500 to-[#E06600] text-white hover:brightness-105 active:scale-95"
+                  : "bg-gray-200 text-gray-500"
+              }`}
             >
-              <span className="material-symbols-outlined text-[20px]">forum</span>
-              <span>Chat Agent</span>
+              <span className="material-symbols-outlined text-[20px]">
+                {enableChat ? "forum" : "chat_error"}
+              </span>
+              <span>{enableChat ? "Chat Agent" : "Chat Disabled"}</span>
 
-              {inquiryCount > 0 && (
+              {enableChat && inquiryCount > 0 && (
                 <span className="ml-1 px-2 py-0.5 rounded-full bg-white text-[#FC7A00] font-black text-[10px] shadow-2xs">
                   {inquiryCount}
                 </span>
