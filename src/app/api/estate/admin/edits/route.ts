@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   try {
     const authResult = await requireAdminPermission(req, "estate.view");
     if (!authResult.authorized) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return authResult.response!;
     }
 
     const { searchParams } = new URL(req.url);
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   try {
     const authResult = await requireAdminPermission(req, "estate.manage");
     if (!authResult.authorized) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return authResult.response!;
     }
 
     const body = await req.json();
