@@ -190,7 +190,7 @@ export async function POST(req: Request) {
 
     if (!enableChat) {
       return NextResponse.json(
-        { error: "Messaging and chat inquiries are currently disabled by administrator settings." },
+        { error: "Chat is disabled at this time" },
         { status: 403 }
       );
     }
