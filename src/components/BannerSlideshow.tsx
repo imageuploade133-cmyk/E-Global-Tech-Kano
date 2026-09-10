@@ -11,7 +11,7 @@ interface BannerSlide {
   imageUrl: string;
   title?: string;
   description?: string;
-  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "store";
+  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate";
   link?: string;
   customWidth?: number | null;
   customHeight?: number | null;
@@ -23,7 +23,7 @@ interface BannerSlide {
 }
 
 interface BannerSlideshowProps {
-  page: "bills" | "investment" | "referral" | "transfer" | "store";
+  page: "bills" | "investment" | "referral" | "transfer" | "store" | "estate";
   isDark?: boolean;
   fallbackSlides?: BannerSlide[];
 }
