@@ -36,8 +36,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Image URL is required for the banner slide." }, { status: 400 });
     }
 
-    if (!targetPage || !["all", "bills", "investment", "referral", "transfer", "store"].includes(targetPage)) {
-      return NextResponse.json({ error: "Valid targetPage parameter is required ('all', 'bills', 'investment', 'referral', 'transfer', 'store')." }, { status: 400 });
+    if (!targetPage || !["all", "bills", "investment", "referral", "transfer", "store", "estate"].includes(targetPage)) {
+      return NextResponse.json({ error: "Valid targetPage parameter is required ('all', 'bills', 'investment', 'referral', 'transfer', 'store', 'estate')." }, { status: 400 });
     }
 
     const bannerDoc = {
