@@ -3,24 +3,30 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export interface EstateSettingsData {
+  estateLogoUrl?: string;
   autoApproveListings: boolean;
   requireAgentKYC: boolean;
   maxActiveListingsPerAgent: number;
   platformCommissionPercent: number;
   enableVoiceNotes: boolean;
   enableAutoResponses: boolean;
+  enableChat: boolean;
+  enableCalls: boolean;
   chatSecurityNoticeUser: string;
   chatSecurityNoticeAgent: string;
   updatedAt?: string;
 }
 
 const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
+  estateLogoUrl: "",
   autoApproveListings: false,
   requireAgentKYC: true,
   maxActiveListingsPerAgent: 20,
   platformCommissionPercent: 2.5,
   enableVoiceNotes: true,
   enableAutoResponses: true,
+  enableChat: true,
+  enableCalls: true,
   chatSecurityNoticeUser:
     "Do NOT deposit or transfer funds directly to an agent's personal bank account. Fund your E-Global Wallet account and transfer directly to the agent's wallet account.",
   chatSecurityNoticeAgent:
@@ -69,12 +75,15 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
 
     const updatedSettings: EstateSettingsData = {
+      estateLogoUrl: body.estateLogoUrl ? String(body.estateLogoUrl).trim() : "",
       autoApproveListings: Boolean(body.autoApproveListings),
       requireAgentKYC: Boolean(body.requireAgentKYC),
       maxActiveListingsPerAgent: Math.max(1, Number(body.maxActiveListingsPerAgent) || 20),
       platformCommissionPercent: Math.max(0, Number(body.platformCommissionPercent) || 0),
       enableVoiceNotes: Boolean(body.enableVoiceNotes !== false),
       enableAutoResponses: Boolean(body.enableAutoResponses !== false),
+      enableChat: Boolean(body.enableChat !== false),
+      enableCalls: Boolean(body.enableCalls !== false),
       chatSecurityNoticeUser: String(
         body.chatSecurityNoticeUser || DEFAULT_ESTATE_SETTINGS.chatSecurityNoticeUser
       ).trim(),
