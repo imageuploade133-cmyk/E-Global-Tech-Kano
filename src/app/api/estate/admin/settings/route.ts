@@ -1,45 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-
-export interface EstateSettingsData {
-  estateLogoUrl?: string;
-  estateTitle?: string;
-  estateSubtitle?: string;
-  estateTitleColor?: string;
-  estateSubtitleColor?: string;
-  autoApproveListings: boolean;
-  requireAgentKYC: boolean;
-  maxActiveListingsPerAgent: number;
-  platformCommissionPercent: number;
-  enableVoiceNotes: boolean;
-  enableAutoResponses: boolean;
-  enableChat: boolean;
-  enableCalls: boolean;
-  chatSecurityNoticeUser: string;
-  chatSecurityNoticeAgent: string;
-  updatedAt?: string;
-}
-
-export const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
-  estateLogoUrl: "",
-  estateTitle: "E-Global Estate",
-  estateSubtitle: "Houses, Apartments & Land",
-  estateTitleColor: "#000000",
-  estateSubtitleColor: "#FC7A00",
-  autoApproveListings: false,
-  requireAgentKYC: true,
-  maxActiveListingsPerAgent: 20,
-  platformCommissionPercent: 2.5,
-  enableVoiceNotes: true,
-  enableAutoResponses: true,
-  enableChat: true,
-  enableCalls: true,
-  chatSecurityNoticeUser:
-    "Do NOT deposit or transfer funds directly to an agent's personal bank account. Fund your E-Global Wallet account and transfer directly to the agent's wallet account.",
-  chatSecurityNoticeAgent:
-    "Do NOT request or instruct customers to transfer funds directly to your external personal bank account. Provide ONLY your E-Global Wallet Account to receive funds.",
-};
+import { DEFAULT_ESTATE_SETTINGS, EstateSettingsData } from "@/estate/types";
 
 // GET /api/estate/admin/settings - Read administrative marketplace settings
 export async function GET(req: Request) {

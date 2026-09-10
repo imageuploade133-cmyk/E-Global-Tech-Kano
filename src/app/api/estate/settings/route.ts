@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { DEFAULT_ESTATE_SETTINGS } from "@/app/api/estate/admin/settings/route";
+import { DEFAULT_ESTATE_SETTINGS } from "@/estate/types";
 
 // GET /api/estate/settings - Public unauthenticated route for marketplace header & settings
 export async function GET() {
