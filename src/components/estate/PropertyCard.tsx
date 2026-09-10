@@ -72,12 +72,18 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                   onOpenDetails(property);
                 }
               }}
-              className="absolute top-2.5 left-2.5 h-8 px-2 rounded-full bg-white/95 backdrop-blur-md flex items-center gap-1.5 text-black shadow-md z-10 hover:scale-105 active:scale-95 transition-all border-0 cursor-pointer"
+              className="absolute top-2.5 left-2.5 h-8 px-2 rounded-full bg-white/95 backdrop-blur-md flex items-center gap-1.5 text-black shadow-md z-10 hover:scale-105 active:scale-95 transition-all border-0 cursor-pointer overflow-hidden"
               title="View Agent Profile"
             >
-              <div className="w-5 h-5 rounded-full bg-[#FC7A00] text-white text-[10px] font-black flex items-center justify-center">
-                {(property.sellerName || "A")[0]}
-              </div>
+              {property.sellerAvatarUrl ? (
+                <div className="w-5 h-5 rounded-full overflow-hidden relative border border-[#FC7A00]">
+                  <Image src={property.sellerAvatarUrl} alt="Agent" fill className="object-cover" unoptimized />
+                </div>
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-[#FC7A00] text-white text-[10px] font-black flex items-center justify-center">
+                  {(property.sellerName || "A")[0]}
+                </div>
+              )}
               <span className="material-symbols-outlined text-[15px] text-[#FC7A00]">
                 account_circle
               </span>

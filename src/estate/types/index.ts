@@ -27,6 +27,7 @@ export interface EstateProperty {
   sellerName?: string;
   sellerPhone?: string;
   sellerEmail?: string;
+  sellerAvatarUrl?: string;
   title: string;
   description: string;
   purpose: PropertyPurpose;
