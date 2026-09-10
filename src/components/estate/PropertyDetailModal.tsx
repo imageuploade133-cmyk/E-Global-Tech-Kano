@@ -88,7 +88,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100008] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken">
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          className="fixed inset-0 z-[100008] bg-white w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken"
+        >
           {/* Header Bar */}
           <div className="px-4 py-3.5 flex items-center justify-between flex-shrink-0 bg-white z-20">
             <div className="flex items-center gap-3 min-w-0">
@@ -402,6 +408,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Generous Bottom Spacer to guarantee Published by Agent is never cut off */}
+            <div className="h-32 sm:h-40 flex-shrink-0" />
           </div>
 
           {/* Static Fixed Bottom Action Bar */}
@@ -504,7 +513,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

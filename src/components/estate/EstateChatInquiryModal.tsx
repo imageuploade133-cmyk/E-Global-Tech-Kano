@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { EstateProperty, EstateSeller } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
@@ -149,7 +149,13 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100020] bg-gray-50 w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken">
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          className="fixed inset-0 z-[100020] bg-gray-50 w-full h-full flex flex-col justify-between overflow-hidden text-black font-hanken"
+        >
           {/* Header Bar */}
           <div className="px-4 py-3 bg-white flex items-center justify-between z-10">
             <div className="flex items-center gap-3 min-w-0">
@@ -229,17 +235,17 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
             </span>
           </div>
 
-          {/* Explicit Encryption & 30-Day Auto-Purge Security Ribbon */}
+          {/* User-Friendly Privacy & Security Banner */}
           <div className="px-4 py-1.5 bg-emerald-50/80 border-y border-emerald-100/60 flex items-center justify-center gap-1.5 text-[10px] font-extrabold text-emerald-800 flex-shrink-0">
             <span className="material-symbols-outlined text-[14px] text-emerald-600">lock</span>
-            <span>AES-256 Encrypted • Messages automatically purged after 30 days</span>
+            <span>End-to-End Private Messaging • Cleared after 30 days for your privacy</span>
           </div>
 
           {/* Chat Stream Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar bg-[#F8F9FA]">
             {isLoadingHistory ? (
               <div className="p-4 text-center text-xs font-bold text-gray-400 animate-pulse">
-                Decrypting secure chat session...
+                Securing chat session...
               </div>
             ) : (
               messages.map((msg) => (
@@ -320,7 +326,7 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
