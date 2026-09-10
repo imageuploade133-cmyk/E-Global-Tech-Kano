@@ -113,7 +113,7 @@ export function SellerProfileModal({
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: "100%", opacity: 0 }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
-          className="fixed inset-0 w-full h-full bg-white z-[100000] flex flex-col justify-between overflow-y-auto no-scrollbar text-black font-hanken"
+          className="fixed inset-0 w-full h-full bg-white z-[100015] flex flex-col justify-between overflow-y-auto no-scrollbar text-black font-hanken"
         >
           {/* Full Screen Top Header */}
           <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-between p-4 sm:p-6 space-y-6 pb-28">
