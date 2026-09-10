@@ -26,7 +26,7 @@ interface BannerSlide {
   imageUrl: string;
   title?: string;
   description?: string;
-  targetPage: "all" | "bills" | "investment" | "referral" | "transfer";
+  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "estate";
   link?: string;
   customWidth?: number | null;
   customHeight?: number | null;
@@ -68,7 +68,7 @@ function AdminBannersPageContent() {
   const [imageUrl, setImageUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer">("all");
+  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer" | "estate">("all");
   const [link, setLink] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -825,6 +825,7 @@ function AdminBannersPageContent() {
                   <option value="investment">Investment Page</option>
                   <option value="referral">Referral Page</option>
                   <option value="transfer">Secure Transfer Drawer</option>
+                  <option value="estate">E-Global Estate Page</option>
                 </select>
               </div>
 
@@ -1059,6 +1060,7 @@ function AdminBannersPageContent() {
                       <option value="investment">Investment</option>
                       <option value="referral">Referral</option>
                       <option value="transfer">Transfer</option>
+                      <option value="estate">Estate Marketplace</option>
                     </select>
                   </div>
                 </div>
