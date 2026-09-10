@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { EstateSeller } from "@/estate/types";
 
@@ -50,172 +51,182 @@ export function SellerProfileModal({
   };
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-white z-[100000] flex flex-col justify-between overflow-y-auto no-scrollbar text-black animate-in fade-in duration-200 font-hanken">
-      {/* Full Screen Top Header */}
-      <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-between p-4 sm:p-6 space-y-6 pb-28">
-        <div>
-          <div className="flex items-center justify-between pb-3 pt-1">
-            <div className="flex items-center gap-2.5">
-              <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">
-                account_circle
-              </span>
-              <div>
-                <h3 className="font-bodoni text-base sm:text-lg font-bold text-black leading-tight">
-                  {isEditable ? "Edit Agent Profile" : "Seller & Agent Profile"}
-                </h3>
-                <p className="text-[11px] text-gray-500 font-medium">
-                  {isEditable ? "Update business & phone details" : "Agent contact & verification status"}
-                </p>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          className="fixed inset-0 w-full h-full bg-white z-[100000] flex flex-col justify-between overflow-y-auto no-scrollbar text-black font-hanken"
+        >
+          {/* Full Screen Top Header */}
+          <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-between p-4 sm:p-6 space-y-6 pb-28">
+            <div>
+              <div className="flex items-center justify-between pb-3 pt-1">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">
+                    account_circle
+                  </span>
+                  <div>
+                    <h3 className="font-bodoni text-base sm:text-lg font-bold text-black leading-tight">
+                      {isEditable ? "Edit Agent Profile" : "Seller & Agent Profile"}
+                    </h3>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      {isEditable ? "Update business & phone details" : "Agent contact & verification status"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 border-0 flex items-center justify-center text-gray-600 hover:text-black cursor-pointer transition-all active:scale-90"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
               </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 border-0 flex items-center justify-center text-gray-600 hover:text-black cursor-pointer transition-all"
-            >
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-          </div>
 
-          {/* Premium Gradient Profile Card */}
-          <div className="mt-5 p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#FFF5EB] via-[#FFEADB] to-[#FFE0CC] border border-[#FFD0A1]/80 flex flex-col items-center text-center space-y-3 shadow-xs">
-            <div className="relative w-20 h-20 sm:w-24 sm:h-22 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-sm bg-white">
-              <img src={avatarUrl} alt={seller.displayName} className="w-full h-full object-cover" />
-              <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
-            </div>
+              {/* Premium Gradient Profile Card */}
+              <div className="mt-5 p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#FFF5EB] via-[#FFEADB] to-[#FFE0CC] border border-[#FFD0A1]/80 flex flex-col items-center text-center space-y-3 shadow-xs">
+                <div className="relative w-20 h-20 sm:w-24 sm:h-22 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-sm bg-white">
+                  <img src={avatarUrl} alt={seller.displayName} className="w-full h-full object-cover" />
+                  <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+                </div>
 
-            <div className="min-w-0 space-y-1">
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                <h4 className="font-extrabold text-base sm:text-lg text-black">{seller.displayName}</h4>
-                {seller.isVerified ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    Verified Agent
-                  </span>
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <h4 className="font-extrabold text-base sm:text-lg text-black">{seller.displayName}</h4>
+                    {seller.isVerified ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Verified Agent
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                        Pending Verification
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs font-black text-[#FC7A00] uppercase tracking-wider">
+                    {seller.agencyName || "Independent Property Agent"}
+                  </p>
+                  <p className="text-xs text-gray-500 font-mono">{seller.email}</p>
+                </div>
+              </div>
+
+              {/* Editable Form with Crisp Input Borders */}
+              <div className="mt-6">
+                {isEditable ? (
+                  <form id="seller-profile-form" onSubmit={handleFormSubmit} className="space-y-4">
+                    <div>
+                      <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                        Agency / Business Name
+                      </label>
+                      <input
+                        type="text"
+                        value={agencyName}
+                        onChange={(e) => setAgencyName(e.target.value)}
+                        placeholder="e.g. Apex Real Estate"
+                        className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                        Contact Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g. 08012345678"
+                        className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                        Office / Business Address
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="e.g. Suite 12, Victoria Island Plaza, Lagos"
+                        className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all resize-none shadow-2xs"
+                      />
+                    </div>
+                  </form>
                 ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
-                    Pending Verification
-                  </span>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3 text-xs">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
+                          Phone Number
+                        </span>
+                        <span className="font-mono font-extrabold text-black text-sm">
+                          {seller.phone || "Not specified"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
+                          Office Address
+                        </span>
+                        <span className="font-medium text-gray-700 leading-relaxed">
+                          {seller.address || "Location not provided"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <a
+                        href={`tel:${seller.phone}`}
+                        className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">call</span>
+                        <span>Call Agent</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/${(seller.phone || "").replace(/[^0-9]/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="py-3.5 bg-black hover:bg-gray-900 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">chat</span>
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
+                  </div>
                 )}
               </div>
-              <p className="text-xs font-black text-[#FC7A00] uppercase tracking-wider">
-                {seller.agencyName || "Independent Property Agent"}
-              </p>
-              <p className="text-xs text-gray-500 font-mono">{seller.email}</p>
             </div>
-          </div>
 
-          {/* Editable Form with Crisp Input Borders */}
-          <div className="mt-6">
-            {isEditable ? (
-              <form id="seller-profile-form" onSubmit={handleFormSubmit} className="space-y-4">
-                <div>
-                  <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                    Agency / Business Name
-                  </label>
-                  <input
-                    type="text"
-                    value={agencyName}
-                    onChange={(e) => setAgencyName(e.target.value)}
-                    placeholder="e.g. Apex Real Estate"
-                    className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                    Contact Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. 08012345678"
-                    className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                    Office / Business Address
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="e.g. Suite 12, Victoria Island Plaza, Lagos"
-                    className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all resize-none shadow-2xs"
-                  />
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3 text-xs">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
-                      Phone Number
-                    </span>
-                    <span className="font-mono font-extrabold text-black text-sm">
-                      {seller.phone || "Not specified"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
-                      Office Address
-                    </span>
-                    <span className="font-medium text-gray-700 leading-relaxed">
-                      {seller.address || "Location not provided"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <a
-                    href={`tel:${seller.phone}`}
-                    className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
+            {/* Floating/Fixed Mobile Safe Action Footer */}
+            {isEditable && (
+              <div className="fixed bottom-0 left-0 right-0 z-[100001] bg-white border-t border-gray-200 p-4 shadow-lg flex justify-center">
+                <div className="w-full max-w-2xl flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-1/2 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs uppercase rounded-2xl border-0 cursor-pointer transition-all"
                   >
-                    <span className="material-symbols-outlined text-[18px]">call</span>
-                    <span>Call Agent</span>
-                  </a>
-                  <a
-                    href={`https://wa.me/${(seller.phone || "").replace(/[^0-9]/g, "")}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="py-3.5 bg-black hover:bg-gray-900 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    form="seller-profile-form"
+                    disabled={isSaving}
+                    className="w-1/2 py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-xs uppercase rounded-2xl border-0 cursor-pointer shadow-md disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                   >
-                    <span className="material-symbols-outlined text-[18px]">chat</span>
-                    <span>WhatsApp</span>
-                  </a>
+                    <span className="material-symbols-outlined text-[18px]">save</span>
+                    <span>{isSaving ? "Saving..." : "Save Profile"}</span>
+                  </button>
                 </div>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Floating/Fixed Mobile Safe Action Footer - Ensures Save Button is never covered by Bottom Nav */}
-        {isEditable && (
-          <div className="fixed bottom-0 left-0 right-0 z-[100001] bg-white border-t border-gray-200 p-4 shadow-lg flex justify-center">
-            <div className="w-full max-w-2xl flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-1/2 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs uppercase rounded-2xl border-0 cursor-pointer transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="seller-profile-form"
-                disabled={isSaving}
-                className="w-1/2 py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-xs uppercase rounded-2xl border-0 cursor-pointer shadow-md disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">save</span>
-                <span>{isSaving ? "Saving..." : "Save Profile"}</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

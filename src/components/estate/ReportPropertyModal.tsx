@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { EstateProperty } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
@@ -30,7 +30,7 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim()) {
-      toast.error("Please enter or select a report reason.");
+      toast.error("Please select or enter a reason for reporting this listing.");
       return;
     }
     setIsSubmitting(true);
@@ -49,7 +49,13 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100025] bg-white w-full h-full flex flex-col justify-between overflow-y-auto no-scrollbar text-black font-hanken animate-in fade-in duration-200">
+        <motion.div
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0 }}
+          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+          className="fixed inset-0 z-[100025] bg-white w-full h-full flex flex-col justify-between overflow-y-auto no-scrollbar text-black font-hanken"
+        >
           <div className="w-full max-w-lg mx-auto flex-1 flex flex-col justify-between p-4 sm:p-6 space-y-6 pb-28">
             <div>
               {/* Header Bar without Border */}
@@ -87,7 +93,7 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
 
                 <div>
                   <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                    Select Common Reason
+                    Select Common Reason *
                   </label>
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     {[
@@ -160,7 +166,7 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
