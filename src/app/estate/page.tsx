@@ -45,6 +45,20 @@ export default function EstateMarketplacePage() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
 
+  // Settings
+  const [hidePropertyIcons, setHidePropertyIcons] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/estate/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setHidePropertyIcons(Boolean(data.settings.hidePropertyIcons));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Report Modal Drawer State
   const [isReportOpen, setIsReportOpen] = useState(false);
 
@@ -437,6 +451,7 @@ export default function EstateMarketplacePage() {
                 <PropertyCard
                   key={prop.id}
                   property={prop}
+                  hideIcons={hidePropertyIcons}
                   onOpenDetails={(p) => {
                     lastScrollPosRef.current = window.scrollY;
                     setSelectedProperty(p);

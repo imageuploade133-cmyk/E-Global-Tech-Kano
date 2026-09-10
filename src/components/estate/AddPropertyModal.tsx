@@ -22,11 +22,24 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
   isSubmitting,
 }) => {
   const [title, setTitle] = useState("");
+  const [maxTitleLength, setMaxTitleLength] = useState(100);
   const [description, setDescription] = useState("");
   const [purpose, setPurpose] = useState<PropertyPurpose>("Rent");
   const [propertyType, setPropertyType] = useState<PropertyType>("Apartment");
   const [price, setPrice] = useState("");
   const [pricePeriod, setPricePeriod] = useState<"year" | "month" | "night" | "total" | "None">("year");
+
+  // Fetch maxTitleLength from public settings
+  React.useEffect(() => {
+    fetch("/api/estate/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings?.maxTitleLength) {
+          setMaxTitleLength(data.settings.maxTitleLength);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     if (editingProperty) {
@@ -237,14 +250,20 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
               <div className="mt-5 space-y-4 text-xs font-semibold">
                 {/* Title */}
                 <div>
-                  <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                    Property Title *
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10.5px] font-black uppercase text-gray-500 block tracking-wider">
+                      Property Title *
+                    </label>
+                    <span className="text-[10px] font-bold text-gray-400">
+                      {title.length} / {maxTitleLength}
+                    </span>
+                  </div>
                   <input
                     type="text"
                     required
+                    maxLength={maxTitleLength}
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => setTitle(e.target.value.slice(0, maxTitleLength))}
                     placeholder="e.g. Modern 3-Bedroom Duplex with Swimming Pool"
                     className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
                   />

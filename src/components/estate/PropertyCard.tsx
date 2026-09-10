@@ -10,6 +10,7 @@ interface PropertyCardProps {
   onSaveFavorite?: (e: React.MouseEvent, property: EstateProperty) => void;
   isSaved?: boolean;
   onInspectAgent?: (e: React.MouseEvent, sellerId?: string, sellerName?: string, sellerPhone?: string) => void;
+  hideIcons?: boolean;
 }
 
 export const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -195,7 +196,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               </span>
             </div>
 
-            <h3 className="font-hanken font-extrabold text-xs text-black line-clamp-1 group-hover:text-[#FC7A00] transition-colors leading-tight">
+            <h3 className="font-hanken font-extrabold text-xs text-black line-clamp-2 break-words group-hover:text-[#FC7A00] transition-colors leading-tight">
               {property.title}
             </h3>
 
@@ -204,26 +205,28 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
             </p>
 
             {/* Features icons row */}
-            <div className="flex items-center gap-3 pt-1 text-[10px] font-bold text-gray-600">
-              {typeof property.bedrooms === "number" && property.bedrooms > 0 && (
-                <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
-                  <span className="material-symbols-outlined text-[14px] text-gray-400">bed</span>
-                  <span>{property.bedrooms} Bed</span>
-                </div>
-              )}
-              {typeof property.bathrooms === "number" && property.bathrooms > 0 && (
-                <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
-                  <span className="material-symbols-outlined text-[14px] text-gray-400">bathtub</span>
-                  <span>{property.bathrooms} Bath</span>
-                </div>
-              )}
-              {property.propertySize && (
-                <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg truncate">
-                  <span className="material-symbols-outlined text-[14px] text-gray-400">square_foot</span>
-                  <span>{property.propertySize}</span>
-                </div>
-              )}
-            </div>
+            {!hideIcons && (
+              <div className="flex items-center gap-3 pt-1 text-[10px] font-bold text-gray-600">
+                {typeof property.bedrooms === "number" && property.bedrooms > 0 && (
+                  <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+                    <span className="material-symbols-outlined text-[14px] text-gray-400">bed</span>
+                    <span>{property.bedrooms} Bed</span>
+                  </div>
+                )}
+                {typeof property.bathrooms === "number" && property.bathrooms > 0 && (
+                  <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+                    <span className="material-symbols-outlined text-[14px] text-gray-400">bathtub</span>
+                    <span>{property.bathrooms} Bath</span>
+                  </div>
+                )}
+                {property.propertySize && (
+                  <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg truncate">
+                    <span className="material-symbols-outlined text-[14px] text-gray-400">square_foot</span>
+                    <span>{property.propertySize}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
