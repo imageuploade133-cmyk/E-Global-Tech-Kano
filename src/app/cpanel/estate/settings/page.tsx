@@ -18,6 +18,8 @@ export default function CpanelEstateSettingsPage() {
   const [requireAgentKYC, setRequireAgentKYC] = useState(true);
   const [maxActiveListingsPerAgent, setMaxActiveListingsPerAgent] = useState("20");
   const [platformCommissionPercent, setPlatformCommissionPercent] = useState("2.5");
+  const [maxTitleLength, setMaxTitleLength] = useState("100");
+  const [hidePropertyIcons, setHidePropertyIcons] = useState(false);
   const [enableVoiceNotes, setEnableVoiceNotes] = useState(true);
   const [enableAutoResponses, setEnableAutoResponses] = useState(true);
   const [enableChat, setEnableChat] = useState(true);
@@ -65,6 +67,8 @@ export default function CpanelEstateSettingsPage() {
         setRequireAgentKYC(Boolean(s.requireAgentKYC));
         setMaxActiveListingsPerAgent(String(s.maxActiveListingsPerAgent || 20));
         setPlatformCommissionPercent(String(s.platformCommissionPercent || 2.5));
+        setMaxTitleLength(String(s.maxTitleLength || 100));
+        setHidePropertyIcons(Boolean(s.hidePropertyIcons));
         setEnableVoiceNotes(s.enableVoiceNotes !== false);
         setEnableAutoResponses(s.enableAutoResponses !== false);
         setEnableChat(s.enableChat !== false);
@@ -100,6 +104,8 @@ export default function CpanelEstateSettingsPage() {
           requireAgentKYC,
           maxActiveListingsPerAgent: Number(maxActiveListingsPerAgent) || 20,
           platformCommissionPercent: Number(platformCommissionPercent) || 0,
+          maxTitleLength: Number(maxTitleLength) || 100,
+          hidePropertyIcons,
           enableVoiceNotes,
           enableAutoResponses,
           enableChat,
@@ -223,6 +229,44 @@ export default function CpanelEstateSettingsPage() {
                   onChange={(e) => setPlatformCommissionPercent(e.target.value)}
                   className="w-full p-3.5 bg-gray-50 dark:bg-gray-950 border border-gray-300 dark:border-gray-800 rounded-2xl font-bold text-xs outline-none focus:border-[#FC7A00]"
                 />
+              </div>
+            </div>
+
+            {/* Title Length & Feature Icon Visibility Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                  Max Title Length (Characters)
+                </label>
+                <input
+                  type="number"
+                  min={10}
+                  max={200}
+                  required
+                  value={maxTitleLength}
+                  onChange={(e) => setMaxTitleLength(e.target.value)}
+                  placeholder="e.g. 100"
+                  className="w-full p-3.5 bg-gray-50 dark:bg-gray-950 border border-gray-300 dark:border-gray-800 rounded-2xl font-bold text-xs outline-none focus:border-[#FC7A00]"
+                />
+                <span className="text-[10px] text-gray-500 font-medium mt-1 block">
+                  Limits the maximum number of text characters agents can enter when titling properties.
+                </span>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border flex items-center justify-between self-start mt-0.5", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div>
+                  <span className="text-xs font-bold block">Hide Property Feature Icons</span>
+                  <span className="text-[10.5px] text-gray-500 font-medium block">
+                    ON/OFF switch to hide bedroom/bathroom/size icon badges on property cards
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHidePropertyIcons(!hidePropertyIcons)}
+                  className={cn("px-3.5 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", hidePropertyIcons ? "bg-amber-600 text-white" : "bg-gray-200 text-gray-700")}
+                >
+                  {hidePropertyIcons ? "ON (HIDDEN)" : "OFF (VISIBLE)"}
+                </button>
               </div>
             </div>
           </div>

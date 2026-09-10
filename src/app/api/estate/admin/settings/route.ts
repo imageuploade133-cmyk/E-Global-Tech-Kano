@@ -54,6 +54,8 @@ export async function POST(req: Request) {
       requireAgentKYC: Boolean(body.requireAgentKYC),
       maxActiveListingsPerAgent: Math.max(1, Number(body.maxActiveListingsPerAgent) || 20),
       platformCommissionPercent: Math.max(0, Number(body.platformCommissionPercent) || 0),
+      maxTitleLength: Math.max(10, Math.min(200, Number(body.maxTitleLength) || 100)),
+      hidePropertyIcons: Boolean(body.hidePropertyIcons),
       enableVoiceNotes: Boolean(body.enableVoiceNotes !== false),
       enableAutoResponses: Boolean(body.enableAutoResponses !== false),
       enableChat: Boolean(body.enableChat !== false),

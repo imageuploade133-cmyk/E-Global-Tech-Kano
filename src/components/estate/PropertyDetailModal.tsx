@@ -109,10 +109,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <span className="material-symbols-outlined text-[20px]">arrow_back</span>
               </button>
               <div className="min-w-0">
-                <h2 className="font-extrabold text-sm text-black truncate uppercase tracking-tight">
+                <h2 className="font-extrabold text-xs min-[375px]:text-sm text-black line-clamp-2 break-words uppercase tracking-tight leading-tight">
                   {property.title}
                 </h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">
                   For {property.purpose} • {property.propertyType}
                 </p>
               </div>
@@ -200,6 +200,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Full Property Title Displayed Prominently Above Price Listing */}
+            <div className="bg-white p-4 rounded-3xl border border-gray-150 shadow-2xs space-y-1">
+              <span className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider block">
+                Property Title
+              </span>
+              <h1 className="font-bodoni font-black text-base min-[375px]:text-lg text-black leading-snug break-words uppercase">
+                {property.title}
+              </h1>
             </div>
 
             {/* Price Card Container with Luxury Gradient Border */}

@@ -28,6 +28,7 @@ export default function EstateMarketplacePage() {
 
   const [properties, setProperties] = useState<EstateProperty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hideIcons, setHideIcons] = useState(false);
 
   // Filters
   const [selectedPurpose, setSelectedPurpose] = useState<PropertyPurpose | "ALL">("ALL");
@@ -168,6 +169,17 @@ export default function EstateMarketplacePage() {
       setIsLoadingFavorites(false);
     }
   };
+
+  useEffect(() => {
+    fetch("/api/estate/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setHideIcons(Boolean(data.settings.hidePropertyIcons));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchProperties();
@@ -489,6 +501,7 @@ export default function EstateMarketplacePage() {
                 <PropertyCard
                   key={prop.id}
                   property={prop}
+                  hideIcons={hideIcons}
                   onOpenDetails={(p) => {
                     lastScrollPosRef.current = window.scrollY;
                     setSelectedProperty(p);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
-import { EstateProperty } from "@/estate/types";
+import { EstateProperty, DEFAULT_ESTATE_SETTINGS } from "@/estate/types";
 
 // GET /api/estate/properties - Public & Authenticated search/filter properties
 export async function GET(req: Request) {
@@ -146,6 +146,24 @@ export async function POST(req: Request) {
     if (!title || !description || !purpose || !propertyType || !price || !location?.address) {
       return NextResponse.json(
         { error: "Missing required property fields (title, description, purpose, propertyType, price, address)." },
+        { status: 400 }
+      );
+    }
+
+    // Read marketplace settings for max title length check
+    const settingsDocSnap = await adminDb.collection("config").doc("estate_settings").get();
+    const activeSettings = settingsDocSnap.exists
+      ? { ...DEFAULT_ESTATE_SETTINGS, ...settingsDocSnap.data() }
+      : DEFAULT_ESTATE_SETTINGS;
+
+    const maxTitleLengthAllowed = Number(activeSettings.maxTitleLength) || 100;
+    const cleanTitle = String(title).trim();
+
+    if (cleanTitle.length > maxTitleLengthAllowed) {
+      return NextResponse.json(
+        {
+          error: `Property title exceeds the maximum allowed length of ${maxTitleLengthAllowed} characters. Please shorten the title.`,
+        },
         { status: 400 }
       );
     }
