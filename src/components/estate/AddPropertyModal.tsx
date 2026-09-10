@@ -99,21 +99,42 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [youtubeVideoUrl, setYoutubeVideoUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val.length >= maxTitleLength && title.length < maxTitleLength) {
+      toast.warning(`Maximum title length reached (${maxTitleLength} characters)!`);
+    }
+    setTitle(val);
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploadingImage(true);
+    setUploadProgress(5);
     try {
-      const uploadPromises = Array.from(files).map((file) => uploadImageSecurely(file, "estate_listing"));
-      const results = await Promise.all(uploadPromises);
+      const fileList = Array.from(files);
+      const totalFiles = fileList.length;
+      let completed = 0;
+      const successfulUrls: string[] = [];
 
-      const successfulUrls = results.filter((r) => r.success && r.url).map((r) => r.url as string);
+      for (const file of fileList) {
+        const res = await uploadImageSecurely(file, "estate_listing");
+        completed++;
+        setUploadProgress(Math.min(Math.round((completed / totalFiles) * 100), 99));
+        if (res.success && res.url) {
+          successfulUrls.push(res.url);
+        }
+      }
+
+      setUploadProgress(100);
 
       if (successfulUrls.length > 0) {
         setUploadedImages((prev) => [...prev, ...successfulUrls]);
@@ -124,7 +145,10 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
     } catch {
       toast.error("Network error during image upload.");
     } finally {
-      setIsUploadingImage(false);
+      setTimeout(() => {
+        setIsUploadingImage(false);
+        setUploadProgress(0);
+      }, 500);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -262,7 +286,7 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
                     required
                     maxLength={maxTitleLength}
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={handleTitleChange}
                     placeholder="e.g. Modern 3-Bedroom Duplex with Swimming Pool"
                     className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
                   />
@@ -402,6 +426,20 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
                   </div>
                 </div>
 
+                {/* Property Size */}
+                <div>
+                  <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                    Property Size (sqm / sqft / Plot Size)
+                  </label>
+                  <input
+                    type="text"
+                    value={propertySize}
+                    onChange={(e) => setPropertySize(e.target.value)}
+                    placeholder="e.g. 500 sqm, 400 sqft, or 50 x 100 ft"
+                    className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
+                  />
+                </div>
+
                 {/* Bedrooms, Bathrooms, Toilets */}
                 <div className="grid grid-cols-3 gap-2">
                   <div>
@@ -478,6 +516,25 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
                       className="hidden"
                     />
                   </div>
+
+                  {/* Upload Progress Bar (0-100%) */}
+                  {isUploadingImage && (
+                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-2xl space-y-1.5 my-2">
+                      <div className="flex items-center justify-between text-xs font-black text-[#FC7A00]">
+                        <span className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                          <span>Uploading Property Photos...</span>
+                        </span>
+                        <span className="font-mono">{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-orange-200/60 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-[#FC7A00] to-[#E06600] h-full rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Uploaded Gallery Preview */}
                   {uploadedImages.length > 0 ? (
