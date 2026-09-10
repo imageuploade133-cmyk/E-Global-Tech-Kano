@@ -11,7 +11,7 @@ interface SellerProfileModalProps {
   currentPhoto?: string;
   isEditable?: boolean;
   onClose: () => void;
-  onSaveProfile?: (updated: { agencyName: string; phone: string; address: string }) => Promise<void>;
+  onSaveProfile?: (updated: { agencyName: string; phone: string; address: string; autoResponseText?: string }) => Promise<void>;
   isSaving?: boolean;
 }
 
@@ -27,12 +27,14 @@ export function SellerProfileModal({
   const [agencyName, setAgencyName] = useState(seller?.agencyName || "");
   const [phone, setPhone] = useState(seller?.phone || "");
   const [address, setAddress] = useState(seller?.address || "");
+  const [autoResponseText, setAutoResponseText] = useState(seller?.autoResponseText || "");
 
   React.useEffect(() => {
     if (seller) {
       setAgencyName(seller.agencyName || "");
       setPhone(seller.phone || "");
       setAddress(seller.address || "");
+      setAutoResponseText(seller.autoResponseText || "");
     }
   }, [seller]);
 
@@ -46,7 +48,7 @@ export function SellerProfileModal({
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (onSaveProfile) {
-      await onSaveProfile({ agencyName, phone, address });
+      await onSaveProfile({ agencyName, phone, address, autoResponseText });
     }
   };
 
@@ -149,12 +151,28 @@ export function SellerProfileModal({
                         Office / Business Address
                       </label>
                       <textarea
-                        rows={3}
+                        rows={2}
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                         placeholder="e.g. Suite 12, Victoria Island Plaza, Lagos"
                         className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all resize-none shadow-2xs"
                       />
+                    </div>
+
+                    <div>
+                      <label className="text-[10.5px] font-black uppercase text-[#FC7A00] block mb-1.5 tracking-wider">
+                        Custom Auto-Response Message (Inquiry Chat)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={autoResponseText}
+                        onChange={(e) => setAutoResponseText(e.target.value)}
+                        placeholder="e.g. Thank you for your inquiry! I am currently inspecting properties. I will call you back within 15 minutes."
+                        className="w-full p-3.5 bg-orange-50/50 border border-orange-200 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all resize-none shadow-2xs"
+                      />
+                      <p className="text-[10px] text-gray-400 font-bold mt-1">
+                        This automated message is instantly sent to prospective buyers/tenants when they send an inquiry.
+                      </p>
                     </div>
                   </form>
                 ) : (

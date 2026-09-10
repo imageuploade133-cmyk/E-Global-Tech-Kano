@@ -75,6 +75,7 @@ export interface EstateSeller {
   banReason?: string;
   publishingRestricted?: boolean;
   restrictedUntil?: string | null;
+  autoResponseText?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,6 +90,9 @@ export interface EstateInquiry {
   userPhone: string;
   userEmail: string;
   message: string;
+  messageType?: "text" | "voice";
+  audioData?: string;
+  audioDuration?: number;
   status: "NEW" | "READ" | "CONTACTED";
   createdAt: string;
 }

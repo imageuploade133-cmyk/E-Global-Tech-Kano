@@ -208,7 +208,10 @@ export default function EstateMarketplacePage() {
     });
   };
 
-  const handleSubmitInquiry = async (message: string) => {
+  const handleSubmitInquiry = async (
+    message: string,
+    options?: { messageType?: "text" | "voice"; audioData?: string; audioDuration?: number }
+  ) => {
     if (!selectedProperty) return;
     try {
       let idToken = "";
@@ -227,6 +230,9 @@ export default function EstateMarketplacePage() {
           propertyTitle: selectedProperty.title,
           sellerId: selectedProperty.sellerId,
           message,
+          messageType: options?.messageType || "text",
+          audioData: options?.audioData || null,
+          audioDuration: options?.audioDuration || 0,
           userName: userData?.name || user?.displayName || "",
           userPhone: userData?.phoneNumber || "",
           userEmail: userData?.email || user?.email || "",
@@ -235,7 +241,11 @@ export default function EstateMarketplacePage() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success("Inquiry sent to property agent successfully!");
+        toast.success(
+          options?.messageType === "voice"
+            ? "Voice note sent to property agent!"
+            : "Inquiry sent to property agent successfully!"
+        );
       } else {
         toast.error(data.error || "Failed to send inquiry.");
       }
