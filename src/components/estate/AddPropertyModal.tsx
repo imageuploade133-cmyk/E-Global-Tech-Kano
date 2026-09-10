@@ -309,16 +309,37 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
                     <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
                       Price Period
                     </label>
-                    <select
-                      value={pricePeriod}
-                      onChange={(e) => setPricePeriod(e.target.value as any)}
-                      className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] transition-all shadow-2xs"
+                    <div
+                      onClick={() => {
+                        if (purpose === "Sale") {
+                          toast.info("Price Period is muted for 'For Sale' properties. To set a price period, please change Purpose to For Rent or Short-let.");
+                        }
+                      }}
                     >
-                      <option value="year">Per Year</option>
-                      <option value="month">Per Month</option>
-                      <option value="night">Per Night</option>
-                      <option value="total">Total Outright</option>
-                    </select>
+                      <select
+                        value={purpose === "Sale" ? "None" : pricePeriod}
+                        disabled={purpose === "Sale"}
+                        onChange={(e) => {
+                          if (purpose === "Sale") {
+                            toast.info("Price Period is muted for 'For Sale' properties. To set a price period, please change Purpose to For Rent or Short-let.");
+                            return;
+                          }
+                          setPricePeriod(e.target.value as any);
+                        }}
+                        className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] transition-all shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {purpose === "Sale" ? (
+                          <option value="None">Muted (For Sale Outright)</option>
+                        ) : (
+                          <>
+                            <option value="year">Per Year</option>
+                            <option value="month">Per Month</option>
+                            <option value="night">Per Night</option>
+                            <option value="total">Total Outright</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
