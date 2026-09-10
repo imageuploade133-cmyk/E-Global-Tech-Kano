@@ -150,10 +150,31 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify user seller profile & publishing permissions
+    // Verify user profile & KYC Status
+    const userDocRef = adminDb.collection("users").doc(uid);
+    const userDocSnap = await userDocRef.get();
+    const userData = userDocSnap.data() || {};
+
     const sellerDocRef = adminDb.collection("estate_sellers").doc(uid);
     const sellerDoc = await sellerDocRef.get();
     const sellerData = sellerDoc.data() || {};
+
+    // Strictly enforce approved KYC identity verification for publishing
+    const isKycApproved =
+      userData.kycStatus === "APPROVED" ||
+      userData.kycStatus === "VERIFIED" ||
+      sellerData.isVerified ||
+      sellerData.verificationStatus === "VERIFIED";
+
+    if (!isKycApproved) {
+      return NextResponse.json(
+        {
+          error:
+            "KYC Identity Verification Required: Only agents with approved identity verification can publish property listings.",
+        },
+        { status: 403 }
+      );
+    }
 
     // Check if banned from publishing
     if (sellerData.bannedFromPublishing) {

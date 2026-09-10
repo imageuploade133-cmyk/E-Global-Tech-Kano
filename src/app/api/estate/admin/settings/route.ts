@@ -4,6 +4,10 @@ import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export interface EstateSettingsData {
   estateLogoUrl?: string;
+  estateTitle?: string;
+  estateSubtitle?: string;
+  estateTitleColor?: string;
+  estateSubtitleColor?: string;
   autoApproveListings: boolean;
   requireAgentKYC: boolean;
   maxActiveListingsPerAgent: number;
@@ -17,8 +21,12 @@ export interface EstateSettingsData {
   updatedAt?: string;
 }
 
-const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
+export const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
   estateLogoUrl: "",
+  estateTitle: "E-Global Estate",
+  estateSubtitle: "Houses, Apartments & Land",
+  estateTitleColor: "#000000",
+  estateSubtitleColor: "#FC7A00",
   autoApproveListings: false,
   requireAgentKYC: true,
   maxActiveListingsPerAgent: 20,
@@ -76,6 +84,10 @@ export async function POST(req: Request) {
 
     const updatedSettings: EstateSettingsData = {
       estateLogoUrl: body.estateLogoUrl ? String(body.estateLogoUrl).trim() : "",
+      estateTitle: body.estateTitle ? String(body.estateTitle).trim() : DEFAULT_ESTATE_SETTINGS.estateTitle,
+      estateSubtitle: body.estateSubtitle ? String(body.estateSubtitle).trim() : DEFAULT_ESTATE_SETTINGS.estateSubtitle,
+      estateTitleColor: body.estateTitleColor ? String(body.estateTitleColor).trim() : DEFAULT_ESTATE_SETTINGS.estateTitleColor,
+      estateSubtitleColor: body.estateSubtitleColor ? String(body.estateSubtitleColor).trim() : DEFAULT_ESTATE_SETTINGS.estateSubtitleColor,
       autoApproveListings: Boolean(body.autoApproveListings),
       requireAgentKYC: Boolean(body.requireAgentKYC),
       maxActiveListingsPerAgent: Math.max(1, Number(body.maxActiveListingsPerAgent) || 20),

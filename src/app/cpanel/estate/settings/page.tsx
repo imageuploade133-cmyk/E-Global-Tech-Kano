@@ -10,6 +10,10 @@ export default function CpanelEstateSettingsPage() {
   const { isDark } = useCpanelTheme();
 
   const [estateLogoUrl, setEstateLogoUrl] = useState("");
+  const [estateTitle, setEstateTitle] = useState("E-Global Estate");
+  const [estateSubtitle, setEstateSubtitle] = useState("Houses, Apartments & Land");
+  const [estateTitleColor, setEstateTitleColor] = useState("#000000");
+  const [estateSubtitleColor, setEstateSubtitleColor] = useState("#FC7A00");
   const [autoApproveListings, setAutoApproveListings] = useState(false);
   const [requireAgentKYC, setRequireAgentKYC] = useState(true);
   const [maxActiveListingsPerAgent, setMaxActiveListingsPerAgent] = useState("20");
@@ -53,6 +57,10 @@ export default function CpanelEstateSettingsPage() {
       if (data.success && data.settings) {
         const s = data.settings;
         setEstateLogoUrl(s.estateLogoUrl || "");
+        setEstateTitle(s.estateTitle || "E-Global Estate");
+        setEstateSubtitle(s.estateSubtitle || "Houses, Apartments & Land");
+        setEstateTitleColor(s.estateTitleColor || "#000000");
+        setEstateSubtitleColor(s.estateSubtitleColor || "#FC7A00");
         setAutoApproveListings(Boolean(s.autoApproveListings));
         setRequireAgentKYC(Boolean(s.requireAgentKYC));
         setMaxActiveListingsPerAgent(String(s.maxActiveListingsPerAgent || 20));
@@ -84,6 +92,10 @@ export default function CpanelEstateSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           estateLogoUrl,
+          estateTitle,
+          estateSubtitle,
+          estateTitleColor,
+          estateSubtitleColor,
           autoApproveListings,
           requireAgentKYC,
           maxActiveListingsPerAgent: Number(maxActiveListingsPerAgent) || 20,
@@ -215,14 +227,14 @@ export default function CpanelEstateSettingsPage() {
             </div>
           </div>
 
-          {/* Section 0: E-Global Estate Logo Settings */}
+          {/* Section 0: E-Global Estate Logo & Branding Customization */}
           <div className={cn("p-5 sm:p-6 rounded-3xl border space-y-4 shadow-xs", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200")}>
             <div className="flex items-center gap-2 border-b pb-3 border-gray-100 dark:border-gray-800">
-              <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">photo_camera</span>
-              <h3 className="font-extrabold text-sm uppercase tracking-wide">E-Global Estate Branding Logo</h3>
+              <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">palette</span>
+              <h3 className="font-extrabold text-sm uppercase tracking-wide">E-Global Estate Branding & Header Customization</h3>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4 border-b pb-4 border-gray-100 dark:border-gray-800">
               <div className="w-20 h-20 rounded-2xl border-2 border-[#FC7A00] overflow-hidden bg-white flex items-center justify-center relative shadow-xs flex-shrink-0">
                 {estateLogoUrl ? (
                   <img src={estateLogoUrl} alt="Estate Logo" className="w-full h-full object-contain p-1" />
@@ -261,6 +273,53 @@ export default function CpanelEstateSettingsPage() {
                     accept="image/*"
                     onChange={handleLogoUpload}
                     className="hidden"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Header Title & Subtitle + Text Colors */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                  Header Main Title
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={estateTitle}
+                    onChange={(e) => setEstateTitle(e.target.value)}
+                    className="flex-1 p-3.5 bg-gray-50 dark:bg-gray-950 border border-gray-300 dark:border-gray-800 rounded-2xl font-bold text-xs outline-none focus:border-[#FC7A00]"
+                  />
+                  <input
+                    type="color"
+                    value={estateTitleColor}
+                    onChange={(e) => setEstateTitleColor(e.target.value)}
+                    className="w-12 h-12 p-1 rounded-2xl border border-gray-300 dark:border-gray-800 cursor-pointer bg-white"
+                    title="Select Title Color"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                  Header Subtitle / Tagline
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={estateSubtitle}
+                    onChange={(e) => setEstateSubtitle(e.target.value)}
+                    className="flex-1 p-3.5 bg-gray-50 dark:bg-gray-950 border border-gray-300 dark:border-gray-800 rounded-2xl font-bold text-xs outline-none focus:border-[#FC7A00]"
+                  />
+                  <input
+                    type="color"
+                    value={estateSubtitleColor}
+                    onChange={(e) => setEstateSubtitleColor(e.target.value)}
+                    className="w-12 h-12 p-1 rounded-2xl border border-gray-300 dark:border-gray-800 cursor-pointer bg-white"
+                    title="Select Subtitle Color"
                   />
                 </div>
               </div>
