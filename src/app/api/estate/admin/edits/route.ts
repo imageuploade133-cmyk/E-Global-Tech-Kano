@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
-// GET /api/estate/admin/edits - List property edit logs for admin review
+// GET /api/estate/admin/edits - List property edit logs and pending review items with search & cursor pagination
 export async function GET(req: Request) {
   try {
     const authResult = await requireAdminPermission(req, "estate.view");
@@ -12,15 +12,28 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") || "ALL";
+    const searchQuery = searchParams.get("search") ? searchParams.get("search")!.trim().toLowerCase() : "";
+    const limitNum = Math.min(50, Math.max(5, Number(searchParams.get("limit")) || 15));
+    const startAfterDocId = searchParams.get("startAfter") || "";
 
-    let queryRef: FirebaseFirestore.Query = adminDb.collection("estate_property_edits");
+    let editsRef: FirebaseFirestore.Query = adminDb.collection("estate_property_edits");
 
     if (status !== "ALL") {
-      queryRef = queryRef.where("status", "==", status);
+      editsRef = editsRef.where("status", "==", status);
     }
 
-    const snap = await queryRef.limit(100).get();
-    const edits: any[] = [];
+    editsRef = editsRef.orderBy("createdAt", "desc");
+
+    if (startAfterDocId) {
+      const startAfterSnap = await adminDb.collection("estate_property_edits").doc(startAfterDocId).get();
+      if (startAfterSnap.exists) {
+        editsRef = editsRef.startAfter(startAfterSnap);
+      }
+    }
+
+    // Fetch batch with +1 to check for hasNextPage
+    const snap = await editsRef.limit(limitNum + 1).get();
+    let edits: any[] = [];
 
     snap.forEach((docSnap) => {
       const data = docSnap.data();
@@ -30,9 +43,50 @@ export async function GET(req: Request) {
       });
     });
 
-    edits.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Client-side text filter if search query provided
+    if (searchQuery) {
+      edits = edits.filter((edit) => {
+        const title = (edit.propertyTitle || edit.newData?.title || "").toLowerCase();
+        const seller = (edit.sellerName || "").toLowerCase();
+        const propertyId = (edit.propertyId || "").toLowerCase();
+        const editId = (edit.id || "").toLowerCase();
+        return (
+          title.includes(searchQuery) ||
+          seller.includes(searchQuery) ||
+          propertyId.includes(searchQuery) ||
+          editId.includes(searchQuery)
+        );
+      });
+    }
 
-    return NextResponse.json({ success: true, edits });
+    const hasNextPage = edits.length > limitNum;
+    if (hasNextPage) {
+      edits = edits.slice(0, limitNum);
+    }
+
+    const lastDocId = edits.length > 0 ? edits[edits.length - 1].id : null;
+
+    // Also fetch pending properties count for header metric
+    const pendingPropsSnap = await adminDb
+      .collection("estate_properties")
+      .where("status", "==", "PENDING_REVIEW")
+      .count()
+      .get();
+
+    const pendingPropertiesCount = pendingPropsSnap.data().count || 0;
+
+    return NextResponse.json({
+      success: true,
+      edits,
+      pagination: {
+        hasNextPage,
+        lastDocId,
+        limit: limitNum,
+      },
+      metrics: {
+        pendingPropertiesCount,
+      },
+    });
   } catch (err: any) {
     console.error("[GET /api/estate/admin/edits Error]:", err.message);
     return NextResponse.json({ error: "Failed to fetch property edit logs." }, { status: 500 });

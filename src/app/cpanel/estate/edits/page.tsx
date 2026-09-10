@@ -10,19 +10,55 @@ export default function AdminPropertyEditsPage() {
   const [edits, setEdits] = useState<EstatePropertyEditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Pagination states
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [currentStartAfter, setCurrentStartAfter] = useState<string>("");
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [lastDocId, setLastDocId] = useState<string | null>(null);
+  const [pendingPropertiesCount, setPendingPropertiesCount] = useState(0);
 
   // Selected edit log for diff inspection drawer
   const [selectedEdit, setSelectedEdit] = useState<EstatePropertyEditLog | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const fetchEdits = async () => {
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const fetchEdits = async (startAfterOverride?: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/estate/admin/edits?status=${activeTab}`);
+      const params = new URLSearchParams();
+      params.append("status", activeTab);
+      params.append("limit", "12");
+
+      const targetCursor = startAfterOverride !== undefined ? startAfterOverride : currentStartAfter;
+      if (targetCursor) {
+        params.append("startAfter", targetCursor);
+      }
+      if (debouncedSearch) {
+        params.append("search", debouncedSearch);
+      }
+
+      const res = await fetch(`/api/estate/admin/edits?${params.toString()}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.edits)) {
         setEdits(data.edits);
+        if (data.pagination) {
+          setHasNextPage(Boolean(data.pagination.hasNextPage));
+          setLastDocId(data.pagination.lastDocId || null);
+        }
+        if (data.metrics?.pendingPropertiesCount !== undefined) {
+          setPendingPropertiesCount(data.metrics.pendingPropertiesCount);
+        }
       } else {
         toast.error(data.error || "Failed to load property edits.");
       }
@@ -34,8 +70,27 @@ export default function AdminPropertyEditsPage() {
   };
 
   useEffect(() => {
-    fetchEdits();
-  }, [activeTab]);
+    setCursorHistory([]);
+    setCurrentStartAfter("");
+    fetchEdits("");
+  }, [activeTab, debouncedSearch]);
+
+  const handleNextPage = () => {
+    if (!lastDocId) return;
+    setCursorHistory((prev) => [...prev, currentStartAfter]);
+    setCurrentStartAfter(lastDocId);
+    fetchEdits(lastDocId);
+  };
+
+  const handlePrevPage = () => {
+    if (cursorHistory.length === 0) return;
+    const prevCursor = cursorHistory[cursorHistory.length - 1];
+    setCursorHistory((prev) => prev.slice(0, prev.length - 1));
+    setCurrentStartAfter(prevCursor);
+    fetchEdits(prevCursor);
+  };
+
+  const currentPageNumber = cursorHistory.length + 1;
 
   const handleAction = async (action: "approve" | "reject" | "flag") => {
     if (!selectedEdit) return;
@@ -98,32 +153,74 @@ export default function AdminPropertyEditsPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={fetchEdits}
-          className="px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-xs font-black uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1.5 transition-all"
-        >
-          <span className="material-symbols-outlined text-[18px]">refresh</span>
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {pendingPropertiesCount > 0 && (
+            <span className="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px]">pending_actions</span>
+              <span>{pendingPropertiesCount} Pending Submissions</span>
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => fetchEdits()}
+            className="px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-xs font-black uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1.5 transition-all"
+          >
+            <span className="material-symbols-outlined text-[18px]">refresh</span>
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
-        {["ALL", "PENDING_REVIEW", "APPROVED", "REJECTED", "FLAGGED"].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
-              activeTab === tab
-                ? "bg-[#FC7A00] text-white shadow-2xs"
-                : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800"
-            }`}
-          >
-            {tab.replace("_", " ")}
-          </button>
-        ))}
+      {/* Search Bar & Filter Tabs */}
+      <div className="bg-white dark:bg-gray-900 p-5 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">search</span>
+            <h3 className="font-extrabold text-sm uppercase">Audit Search</h3>
+          </div>
+
+          <div className="relative flex-1 max-w-lg bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl shadow-xs">
+            <div className={`relative w-full rounded-[14.5px] flex items-center h-10 px-3 ${isDark ? "bg-[#111827]" : "bg-white"}`}>
+              <span className="material-symbols-outlined text-[#FC7A00] text-[18px] mr-2">search</span>
+              <input
+                type="text"
+                placeholder="Search property title, agent name, property ID, edit ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-full bg-transparent border-0 outline-none text-xs font-semibold placeholder-gray-400 truncate ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="ml-2 text-gray-400 hover:text-black dark:hover:text-white border-0 cursor-pointer text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
+          {["ALL", "PENDING_REVIEW", "APPROVED", "REJECTED", "FLAGGED"].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
+                activeTab === tab
+                  ? "bg-[#FC7A00] text-white shadow-2xs"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+              }`}
+            >
+              {tab.replace("_", " ")}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Edits List */}
@@ -134,62 +231,93 @@ export default function AdminPropertyEditsPage() {
       ) : edits.length === 0 ? (
         <div className="bg-white dark:bg-gray-900 p-12 rounded-3xl text-center space-y-2 border border-gray-200 dark:border-gray-800">
           <span className="material-symbols-outlined text-[48px] text-gray-300">find_in_page</span>
-          <h3 className="font-bold text-sm text-gray-700 dark:text-gray-300">No Property Edit Logs</h3>
-          <p className="text-xs text-gray-400">No edits recorded under {activeTab} filter.</p>
+          <h3 className="font-bold text-sm text-gray-700 dark:text-gray-300">No Property Edit Logs Found</h3>
+          <p className="text-xs text-gray-400">No edit logs matched your search or status filter.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {edits.map((edit) => (
-            <div
-              key={edit.id}
-              onClick={() => {
-                setSelectedEdit(edit);
-                setAdminNote(edit.adminNote || "");
-              }}
-              className="bg-white dark:bg-gray-900 p-5 rounded-3xl border border-gray-200 dark:border-gray-800 hover:border-[#FC7A00] transition-all cursor-pointer space-y-3 shadow-xs relative"
-            >
-              <div className="flex items-center justify-between">
-                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusBadge(edit.status)}`}>
-                  {edit.status}
-                </span>
-                <span className="text-[10px] text-gray-400 font-mono">
-                  {new Date(edit.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-
-              <div>
-                <h3 className="font-extrabold text-sm text-black dark:text-white truncate">
-                  {edit.propertyTitle || edit.newData?.title || "Property Listing"}
-                </h3>
-                <p className="text-xs text-[#FC7A00] font-black uppercase truncate mt-0.5">
-                  Agent: {edit.sellerName || "Partner Agent"}
-                </p>
-              </div>
-
-              <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl text-[11px] space-y-1 font-mono">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Prev Price:</span>
-                  <span className="font-bold text-gray-700 dark:text-gray-300">
-                    ₦{edit.previousData?.price?.toLocaleString() || "0"}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {edits.map((edit) => (
+              <div
+                key={edit.id}
+                onClick={() => {
+                  setSelectedEdit(edit);
+                  setAdminNote(edit.adminNote || "");
+                }}
+                className="bg-white dark:bg-gray-900 p-5 rounded-3xl border border-gray-200 dark:border-gray-800 hover:border-[#FC7A00] transition-all cursor-pointer space-y-3 shadow-xs relative"
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusBadge(edit.status)}`}>
+                    {edit.status}
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-mono">
+                    {new Date(edit.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-[#FC7A00]">New Price:</span>
-                  <span className="font-black text-[#FC7A00]">
-                    ₦{edit.newData?.price?.toLocaleString() || "0"}
-                  </span>
+
+                <div>
+                  <h3 className="font-extrabold text-sm text-black dark:text-white truncate">
+                    {edit.propertyTitle || edit.newData?.title || "Property Listing"}
+                  </h3>
+                  <p className="text-xs text-[#FC7A00] font-black uppercase truncate mt-0.5">
+                    Agent: {edit.sellerName || "Partner Agent"}
+                  </p>
                 </div>
+
+                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl text-[11px] space-y-1 font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Prev Price:</span>
+                    <span className="font-bold text-gray-700 dark:text-gray-300">
+                      ₦{edit.previousData?.price?.toLocaleString() || "0"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#FC7A00]">New Price:</span>
+                    <span className="font-black text-[#FC7A00]">
+                      ₦{edit.newData?.price?.toLocaleString() || "0"}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="w-full py-2 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-xs uppercase rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">visibility</span>
+                  <span>Inspect Edit Diffs</span>
+                </button>
               </div>
+            ))}
+          </div>
+
+          {/* Cursor Pagination Bar (Preview & Next) */}
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-semibold shadow-xs">
+            <span className="text-gray-400">
+              Page <strong className="text-black dark:text-white">{currentPageNumber}</strong> • Showing {edits.length} record{edits.length === 1 ? "" : "s"}
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={cursorHistory.length === 0 || isLoading}
+                onClick={handlePrevPage}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-black uppercase cursor-pointer disabled:opacity-40 border-0 flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                <span>Preview</span>
+              </button>
 
               <button
                 type="button"
-                className="w-full py-2 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-xs uppercase rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1"
+                disabled={!hasNextPage || isLoading}
+                onClick={handleNextPage}
+                className="px-4 py-2 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase cursor-pointer disabled:opacity-40 border-0 flex items-center gap-1 shadow-2xs"
               >
-                <span className="material-symbols-outlined text-[16px]">visibility</span>
-                <span>Inspect Edit Diffs</span>
+                <span>Next</span>
+                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
               </button>
             </div>
-          ))}
+          </div>
         </div>
       )}
 
