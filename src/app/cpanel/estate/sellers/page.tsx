@@ -28,6 +28,7 @@ export default function CpanelEstateSellersPage() {
   // Restrict publishing modal state
   const [selectedRestrictSeller, setSelectedRestrictSeller] = useState<EstateSeller | null>(null);
   const [restrictionHoursInput, setRestrictionHoursInput] = useState<number>(24);
+  const [customRestrictDateTime, setCustomRestrictDateTime] = useState<string>("");
 
   const fetchSellers = async () => {
     setIsLoading(true);
@@ -406,14 +407,14 @@ export default function CpanelEstateSellersPage() {
           {/* Restrict Publishing Modal */}
           {selectedRestrictSeller && (
             <div className="fixed inset-0 z-[100001] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className={cn("w-full max-w-sm p-5 space-y-3 rounded-3xl border shadow-2xl text-left", panelClass)}>
+              <div className={cn("w-full max-w-sm p-5 space-y-3.5 rounded-3xl border shadow-2xl text-left", panelClass)}>
                 <h3 className="font-extrabold text-sm uppercase text-amber-500">Restrict Publishing Privilege</h3>
                 <p className="text-xs text-gray-400 font-medium">
-                  Select timed restriction limit for &quot;{selectedRestrictSeller.displayName}&quot;. System will automatically unrestrict after timer expires.
+                  Select a quick duration or specify a custom date and time for restricting &quot;{selectedRestrictSeller.displayName}&quot;.
                 </p>
 
                 <div className="space-y-2 pt-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 block">Restriction Duration</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Quick Duration Presets</label>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { hours: 1, label: "1 Hour" },
@@ -425,10 +426,13 @@ export default function CpanelEstateSellersPage() {
                       <button
                         key={opt.hours}
                         type="button"
-                        onClick={() => setRestrictionHoursInput(opt.hours)}
+                        onClick={() => {
+                          setRestrictionHoursInput(opt.hours);
+                          setCustomRestrictDateTime("");
+                        }}
                         className={cn(
                           "py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer",
-                          restrictionHoursInput === opt.hours
+                          restrictionHoursInput === opt.hours && !customRestrictDateTime
                             ? "bg-[#FC7A00] text-white border-[#FC7A00]"
                             : isDark ? "bg-gray-900 border-gray-800 text-gray-300" : "bg-gray-100 border-gray-200 text-gray-800"
                         )}
@@ -439,10 +443,31 @@ export default function CpanelEstateSellersPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-3">
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">
+                    Or Custom Expiry Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={customRestrictDateTime}
+                    onChange={(e) => setCustomRestrictDateTime(e.target.value)}
+                    className={cn(
+                      "w-full p-3 rounded-xl text-xs font-bold outline-none border",
+                      isDark ? "bg-[#111827] border-gray-800 text-white" : "bg-gray-50 border-gray-200 text-black"
+                    )}
+                  />
+                  <p className="text-[9.5px] text-gray-400 font-medium">
+                    Setting a custom date & time overrides preset hours.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setSelectedRestrictSeller(null)}
+                    onClick={() => {
+                      setSelectedRestrictSeller(null);
+                      setCustomRestrictDateTime("");
+                    }}
                     className="w-1/2 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs uppercase rounded-xl cursor-pointer border-0"
                   >
                     Cancel
@@ -452,6 +477,7 @@ export default function CpanelEstateSellersPage() {
                     onClick={() =>
                       handleAdminSellerAction("restrict", selectedRestrictSeller.uid, {
                         restrictionHours: restrictionHoursInput,
+                        customUntilIso: customRestrictDateTime ? new Date(customRestrictDateTime).toISOString() : null,
                       })
                     }
                     className="w-1/2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase rounded-xl cursor-pointer border-0"

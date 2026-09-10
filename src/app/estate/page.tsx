@@ -254,7 +254,12 @@ export default function EstateMarketplacePage() {
     }
   };
 
-  const handleReportProperty = async (reason: string, details: string) => {
+  const handleReportProperty = async (
+    reason: string,
+    details: string,
+    evidenceUrl?: string,
+    reporterPhone?: string
+  ) => {
     if (!selectedProperty) return;
     try {
       let idToken = "";
@@ -262,8 +267,8 @@ export default function EstateMarketplacePage() {
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/estate/favorites", {
-        method: "PUT",
+      const res = await fetch("/api/estate/reports", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
@@ -271,8 +276,11 @@ export default function EstateMarketplacePage() {
         body: JSON.stringify({
           propertyId: selectedProperty.id,
           propertyTitle: selectedProperty.title,
+          sellerId: selectedProperty.sellerId,
           reason,
           details,
+          evidenceUrl,
+          reporterPhone,
         }),
       });
 
@@ -480,8 +488,8 @@ export default function EstateMarketplacePage() {
           isOpen={isReportOpen}
           property={selectedProperty}
           onClose={() => setIsReportOpen(false)}
-          onSubmitReport={async (reason, details) => {
-            await handleReportProperty(reason, details);
+          onSubmitReport={async (reason, details, evidenceUrl, reporterPhone) => {
+            await handleReportProperty(reason, details, evidenceUrl, reporterPhone);
           }}
         />
 

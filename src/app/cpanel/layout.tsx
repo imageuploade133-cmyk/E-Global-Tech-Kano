@@ -441,6 +441,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     { id: "estate_sellers", label: "Sellers & Agents", icon: "badge", href: "/cpanel/estate/sellers", permission: "estate.view" },
     { id: "estate_inquiries", label: "Customer Inquiries", icon: "contact_support", href: "/cpanel/estate/inquiries", permission: "estate.view" },
     { id: "estate_reports", label: "Flagged Reports", icon: "flag", href: "/cpanel/estate/reports", permission: "estate.view" },
+    { id: "estate_settings", label: "Property Settings", icon: "settings", href: "/cpanel/estate/settings", permission: "estate.view" },
   ];
 
   const checkItemPermission = (item: NavItem): boolean => {

@@ -44,6 +44,8 @@ export async function POST(req: Request) {
 
     const nowIso = new Date().toISOString();
 
+    const { customUntilIso } = body;
+
     if (action === "verify") {
       await docRef.update({
         isVerified: true,
@@ -73,8 +75,13 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({ success: true, message: "Seller agent unbanned successfully." });
     } else if (action === "restrict") {
-      const hours = Number(restrictionHours) || 24; // Default to 24 hours restriction if omitted
-      const restrictedUntilDate = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+      let restrictedUntilDate: string;
+      if (customUntilIso && !isNaN(new Date(customUntilIso).getTime())) {
+        restrictedUntilDate = new Date(customUntilIso).toISOString();
+      } else {
+        const hours = Number(restrictionHours) || 24;
+        restrictedUntilDate = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+      }
 
       await docRef.update({
         publishingRestricted: true,
@@ -83,7 +90,7 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({
         success: true,
-        message: `Seller agent publishing restricted for ${hours} hours (until ${new Date(restrictedUntilDate).toLocaleString()}).`,
+        message: `Seller agent publishing restricted until ${new Date(restrictedUntilDate).toLocaleString()}.`,
       });
     } else if (action === "unrestrict") {
       await docRef.update({

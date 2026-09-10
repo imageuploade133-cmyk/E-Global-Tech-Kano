@@ -6,11 +6,18 @@ import { toast } from "sonner";
 import { EstateProperty } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
+import { uploadImageSecurely } from "@/lib/image-upload";
+
 interface ReportPropertyModalProps {
   isOpen: boolean;
   property: EstateProperty | null;
   onClose: () => void;
-  onSubmitReport: (reason: string, details: string) => Promise<void>;
+  onSubmitReport: (
+    reason: string,
+    details: string,
+    evidenceUrl?: string,
+    reporterPhone?: string
+  ) => Promise<void>;
 }
 
 export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
@@ -21,11 +28,33 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
 }) => {
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
+  const [reporterPhone, setReporterPhone] = useState("");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useModalBackHandler(isOpen, onClose, "report-property-modal");
 
   if (!isOpen || !property) return null;
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const res = await uploadImageSecurely(file, "report_evidence");
+      if (res.success && res.url) {
+        setEvidenceUrl(res.url);
+        toast.success("Screenshot / Evidence uploaded successfully!");
+      } else {
+        toast.error(res.error || "Failed to upload evidence.");
+      }
+    } catch {
+      toast.error("Error uploading evidence photo.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,11 +62,17 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
       toast.error("Please select or enter a reason for reporting this listing.");
       return;
     }
+    if (!details.trim()) {
+      toast.error("Additional details are required for report verification.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await onSubmitReport(reason, details);
+      await onSubmitReport(reason, details.trim(), evidenceUrl, reporterPhone.trim());
       setReason("");
       setDetails("");
+      setReporterPhone("");
+      setEvidenceUrl("");
       onClose();
     } catch {
       toast.error("Failed to submit property report.");
@@ -131,15 +166,66 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
 
                 <div>
                   <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                    Additional Details (Optional)
+                    Additional Details *
                   </label>
                   <textarea
-                    rows={4}
+                    rows={3}
+                    required
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
-                    placeholder="Provide additional context to assist admin inspection..."
+                    placeholder="Provide required details explaining the violation or issue..."
                     className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-medium text-black text-xs outline-none focus:border-red-500 transition-all resize-none shadow-2xs"
                   />
+                </div>
+
+                {/* Emergency Phone Number */}
+                <div>
+                  <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                    Emergency Phone Number (Callback Verification)
+                  </label>
+                  <input
+                    type="tel"
+                    value={reporterPhone}
+                    onChange={(e) => setReporterPhone(e.target.value)}
+                    placeholder="e.g. 08012345678"
+                    className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-red-500 transition-all shadow-2xs"
+                  />
+                </div>
+
+                {/* Upload Screenshot / Evidence Image */}
+                <div>
+                  <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                    Upload Screenshot / Evidence Image
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <label className="px-4 py-3 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-2xl font-bold text-xs uppercase text-gray-800 cursor-pointer flex items-center gap-2 transition-all shadow-2xs">
+                      <span className="material-symbols-outlined text-[18px] text-red-500">
+                        add_photo_alternate
+                      </span>
+                      <span>{isUploading ? "Uploading..." : evidenceUrl ? "Change Photo" : "Upload Screenshot"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        disabled={isUploading}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {evidenceUrl && (
+                      <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl text-emerald-800 text-xs font-bold truncate">
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span className="truncate max-w-[140px]">Evidence Attached</span>
+                        <button
+                          type="button"
+                          onClick={() => setEvidenceUrl("")}
+                          className="text-red-500 hover:text-red-700 border-0 bg-transparent cursor-pointer font-bold ml-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </form>
             </div>
