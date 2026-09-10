@@ -229,7 +229,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "You are not authorized to edit this property." }, { status: 403 });
       }
 
-      const finalStatus = existingData.status === "PUBLISHED" ? "PUBLISHED" : status || existingData.status;
+      // If updating a draft, check if user requested to submit for review or keep as draft
+      let finalStatus = existingData.status;
+      if (existingData.status === "DRAFT") {
+        finalStatus = status === "PENDING_REVIEW" || status === "PUBLISHED" ? "PENDING_REVIEW" : "DRAFT";
+      } else if (existingData.status === "REJECTED") {
+        finalStatus = "PENDING_REVIEW";
+      }
 
       const updatedPayload = {
         title: String(title).trim(),
@@ -258,8 +264,8 @@ export async function POST(req: Request) {
 
       await propDocRef.set(updatedPayload, { merge: true });
 
-      // Create Admin Property Edit Snapshot Log
-      if (existingData.status === "PUBLISHED") {
+      // Create Admin Property Edit Snapshot Log for live or review properties
+      if (existingData.status === "PUBLISHED" || existingData.status === "APPROVED") {
         const editLogRef = adminDb.collection("estate_property_edits").doc();
         await editLogRef.set({
           id: editLogRef.id,
@@ -275,9 +281,16 @@ export async function POST(req: Request) {
         });
       }
 
+      const editMessage =
+        existingData.status === "DRAFT"
+          ? finalStatus === "DRAFT"
+            ? "Draft listing saved."
+            : "Draft listing submitted for admin approval!"
+          : "Property listing edits saved and submitted for review!";
+
       return NextResponse.json({
         success: true,
-        message: "Published property updated successfully and live!",
+        message: editMessage,
         property: { id: targetDocId, ...existingData, ...updatedPayload },
       });
     }

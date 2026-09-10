@@ -81,7 +81,10 @@ export async function GET(req: Request) {
 
     if (statusParam === "APPROVED") {
       query = query.where("status", "in", ["APPROVED", "PUBLISHED"]);
-    } else if (statusParam !== "ALL") {
+    } else if (statusParam === "ALL") {
+      // Exclude DRAFT items from admin directory so drafts remain strictly private to the seller
+      query = query.where("status", "in", ["PENDING_REVIEW", "APPROVED", "PUBLISHED", "REJECTED", "RENTED", "SOLD", "ARCHIVED"]);
+    } else {
       query = query.where("status", "==", statusParam);
     }
 

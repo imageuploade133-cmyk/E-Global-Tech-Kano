@@ -182,6 +182,26 @@ export async function POST(req: Request) {
       );
     }
 
+    // Read global estate marketplace communication settings for server-side enforcement
+    const settingsSnap = await adminDb.collection("config").doc("estate_settings").get();
+    const settingsData = settingsSnap.exists ? settingsSnap.data() || {} : {};
+    const enableChat = settingsData.enableChat !== false;
+    const enableVoiceNotes = settingsData.enableVoiceNotes !== false;
+
+    if (!enableChat) {
+      return NextResponse.json(
+        { error: "Messaging and chat inquiries are currently disabled by administrator settings." },
+        { status: 403 }
+      );
+    }
+
+    if (messageType === "voice" && !enableVoiceNotes) {
+      return NextResponse.json(
+        { error: "Voice note messaging is currently disabled by administrator settings." },
+        { status: 403 }
+      );
+    }
+
     const isVoice = messageType === "voice";
     const cleanText = isVoice ? "🎤 Voice Note" : String(message || "").trim();
     const encrypted = encryptText(cleanText);
