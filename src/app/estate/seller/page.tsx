@@ -277,28 +277,35 @@ export default function EstateSellerDashboard() {
             </div>
           </div>
 
-          {/* Status Tabs */}
+          {/* Status Tabs with Dynamic Counts */}
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 select-none">
-            {[
-              { id: "ALL" as const, label: `All (${properties.length})` },
-              { id: "PUBLISHED" as const, label: "Published" },
-              { id: "PENDING_REVIEW" as const, label: "Pending Review" },
-              { id: "DRAFT" as const, label: "Drafts" },
-              { id: "REJECTED" as const, label: "Rejected" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
-                  activeTab === tab.id
-                    ? "bg-[#FC7A00] text-white shadow-2xs"
-                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {(() => {
+              const publishedCount = properties.filter((p) => p.status === "PUBLISHED" || p.status === "APPROVED").length;
+              const pendingCount = properties.filter((p) => p.status === "PENDING_REVIEW").length;
+              const draftCount = properties.filter((p) => p.status === "DRAFT").length;
+              const rejectedCount = properties.filter((p) => p.status === "REJECTED").length;
+
+              return [
+                { id: "ALL" as const, label: `All (${properties.length})` },
+                { id: "PUBLISHED" as const, label: `Published (${publishedCount})` },
+                { id: "PENDING_REVIEW" as const, label: `Pending Review (${pendingCount})` },
+                { id: "DRAFT" as const, label: `Drafts (${draftCount})` },
+                { id: "REJECTED" as const, label: `Rejected (${rejectedCount})` },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3.5 py-2 rounded-xl text-[10.5px] font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
+                    activeTab === tab.id
+                      ? "bg-[#FC7A00] text-white shadow-2xs"
+                      : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ));
+            })()}
           </div>
 
           {/* My Properties Directory Grid */}

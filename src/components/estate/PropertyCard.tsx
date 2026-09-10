@@ -142,6 +142,21 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               </>
             )}
 
+            {/* Status Pill Badge (Draft, Pending Review, Rejected, Live) */}
+            {property.status === "DRAFT" ? (
+              <span className="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-amber-900 bg-amber-300 shadow-md z-10">
+                Draft (Private)
+              </span>
+            ) : property.status === "PENDING_REVIEW" ? (
+              <span className="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white bg-amber-600 shadow-md z-10">
+                Pending Review
+              </span>
+            ) : property.status === "REJECTED" ? (
+              <span className="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white bg-red-600 shadow-md z-10">
+                Rejected
+              </span>
+            ) : null}
+
             {/* Purpose Badge */}
             <span
               className={`absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-white shadow-md backdrop-blur-xs z-10 ${
