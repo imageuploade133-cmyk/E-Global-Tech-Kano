@@ -124,10 +124,20 @@ export async function GET(req: Request) {
           raw: data.message,
         });
 
+        let decryptedAudioData = data.audioData;
+        if (data.encryptedAudio) {
+          decryptedAudioData = decryptText({
+            encryptedData: data.encryptedAudio.data,
+            iv: data.encryptedAudio.iv,
+            tag: data.encryptedAudio.tag,
+          });
+        }
+
         inquiries.push({
           id: docSnap.id,
           ...data,
           message: decryptedMessage,
+          audioData: decryptedAudioData,
           // Expose calculated expiry timestamp for UI timer
           expiresAt: new Date(new Date(data.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         });
@@ -163,17 +173,28 @@ export async function POST(req: Request) {
     const uid = decoded.uid;
     const body = await req.json();
 
-    const { propertyId, propertyTitle, sellerId, message, userName, userPhone, userEmail } = body;
+    const { propertyId, propertyTitle, sellerId, message, messageType, audioData, audioDuration, userName, userPhone, userEmail } = body;
 
-    if (!propertyId || !sellerId || !message) {
+    if (!propertyId || !sellerId || (!message && !audioData)) {
       return NextResponse.json(
-        { error: "Property ID, Seller ID, and inquiry message are required." },
+        { error: "Property ID, Seller ID, and inquiry message/audio are required." },
         { status: 400 }
       );
     }
 
-    const cleanText = String(message).trim();
+    const isVoice = messageType === "voice";
+    const cleanText = isVoice ? "🎤 Voice Note" : String(message || "").trim();
     const encrypted = encryptText(cleanText);
+
+    let encryptedAudioObj = null;
+    if (isVoice && audioData) {
+      const encAudio = encryptText(String(audioData));
+      encryptedAudioObj = {
+        data: encAudio.encryptedData,
+        iv: encAudio.iv,
+        tag: encAudio.tag,
+      };
+    }
 
     // Non-blocking auto-purge background worker
     purgeExpiredInquiries().catch(() => {});
@@ -194,6 +215,9 @@ export async function POST(req: Request) {
       encryptedMessage: encrypted.encryptedData,
       iv: encrypted.iv,
       tag: encrypted.tag,
+      messageType: isVoice ? "voice" : "text",
+      encryptedAudio: encryptedAudioObj,
+      audioDuration: audioDuration ? Number(audioDuration) : 0,
       status: "NEW",
       createdAt: createdAtIso,
       expiresAt: expiresAtIso,

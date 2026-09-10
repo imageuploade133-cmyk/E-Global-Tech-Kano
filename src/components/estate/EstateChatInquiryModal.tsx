@@ -13,7 +13,10 @@ interface EstateChatInquiryModalProps {
   property: EstateProperty | null;
   publisherAgent: EstateSeller | null;
   onClose: () => void;
-  onSubmitInquiry: (message: string) => Promise<boolean | void> | void;
+  onSubmitInquiry: (
+    message: string,
+    options?: { messageType?: "text" | "voice"; audioData?: string; audioDuration?: number }
+  ) => Promise<boolean | void> | void;
 }
 
 interface ChatMessage {
@@ -21,6 +24,9 @@ interface ChatMessage {
   sender: "user" | "agent";
   text: string;
   time: string;
+  messageType?: "text" | "voice";
+  audioData?: string;
+  audioDuration?: number;
   status?: "sent" | "delivered" | "read";
 }
 
@@ -36,7 +42,17 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   useModalBackHandler(
     isOpen,
@@ -64,6 +80,9 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
           id: inq.id,
           sender: inq.userId === user.uid ? "user" : "agent",
           text: inq.message,
+          messageType: inq.messageType || "text",
+          audioData: inq.audioData,
+          audioDuration: inq.audioDuration || 0,
           time: new Date(inq.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           status: "read",
         }));
@@ -90,6 +109,151 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
       fetchChatHistory();
     }
   }, [isOpen, property?.id, user]);
+
+  // Start Voice Note Recording (Max 50 seconds)
+  const startRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error("Voice recording is not supported on your browser.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingDuration((prev) => {
+          if (prev >= 49) {
+            stopRecording(true);
+            return 50;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } catch {
+      toast.error("Microphone access denied. Please allow microphone permissions.");
+    }
+  };
+
+  // Stop Recording & Send Voice Note
+  const stopRecording = async (shouldSend = true) => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+
+    const finalDuration = recordingDuration;
+    setIsRecording(false);
+
+    recorder.onstop = async () => {
+      recorder.stream.getTracks().forEach((track) => track.stop());
+
+      if (!shouldSend) {
+        audioChunksRef.current = [];
+        setRecordingDuration(0);
+        return;
+      }
+
+      const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      audioChunksRef.current = [];
+      setRecordingDuration(0);
+
+      if (audioBlob.size === 0) return;
+
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+        const newVoiceMsg: ChatMessage = {
+          id: Date.now().toString(),
+          sender: "user",
+          text: "🎤 Voice Note",
+          messageType: "voice",
+          audioData: base64Audio,
+          audioDuration: finalDuration || 1,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          status: "sent",
+        };
+
+        setMessages((prev) => [...prev, newVoiceMsg]);
+        setIsSending(true);
+
+        try {
+          await onSubmitInquiry("🎤 Voice Note", {
+            messageType: "voice",
+            audioData: base64Audio,
+            audioDuration: finalDuration || 1,
+          });
+
+          setTimeout(() => {
+            const autoReply =
+              publisherAgent?.autoResponseText && publisherAgent.autoResponseText.trim()
+                ? publisherAgent.autoResponseText.trim()
+                : "Thank you for your voice note! Our agent has received it and will respond shortly.";
+
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                sender: "agent",
+                text: autoReply,
+                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              },
+            ]);
+          }, 800);
+        } catch {
+          toast.error("Failed to send voice note.");
+        } finally {
+          setIsSending(false);
+        }
+      };
+      reader.readAsDataURL(audioBlob);
+    };
+
+    recorder.stop();
+  };
+
+  // Play / Pause Voice Note
+  const togglePlayAudio = (msgId: string, audioDataUrl?: string) => {
+    if (!audioDataUrl) return;
+
+    if (playingAudioId === msgId) {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+      }
+      setPlayingAudioId(null);
+      return;
+    }
+
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+    }
+
+    const audio = new Audio(audioDataUrl);
+    audioElementRef.current = audio;
+    setPlayingAudioId(msgId);
+
+    audio.onended = () => {
+      setPlayingAudioId(null);
+    };
+
+    audio.play().catch(() => {
+      toast.error("Unable to play voice note.");
+      setPlayingAudioId(null);
+    });
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -126,12 +290,17 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
     try {
       await onSubmitInquiry(text.trim());
       setTimeout(() => {
+        const autoReply =
+          publisherAgent?.autoResponseText && publisherAgent.autoResponseText.trim()
+            ? publisherAgent.autoResponseText.trim()
+            : "Thank you for your message! Our agent has been notified and will respond shortly.";
+
         setMessages((prev) => [
           ...prev,
           {
             id: (Date.now() + 1).toString(),
             sender: "agent",
-            text: "Thank you for your message! Our agent has been notified and will respond shortly.",
+            text: autoReply,
             time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           },
         ]);
@@ -254,13 +423,47 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
                   className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[82%] p-3.5 rounded-2xl shadow-2xs space-y-1 ${
+                    className={`max-w-[82%] p-3.5 rounded-2xl shadow-2xs space-y-1.5 ${
                       msg.sender === "user"
                         ? "bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-br-none"
                         : "bg-white text-gray-900 border border-gray-200 rounded-bl-none"
                     }`}
                   >
-                    <p className="text-xs font-semibold leading-relaxed whitespace-pre-line">{msg.text}</p>
+                    {msg.messageType === "voice" ? (
+                      <div className="flex items-center gap-3 py-1 px-1">
+                        <button
+                          type="button"
+                          onClick={() => togglePlayAudio(msg.id, msg.audioData)}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all active:scale-90 border-0 flex-shrink-0 ${
+                            msg.sender === "user" ? "bg-white text-[#FC7A00]" : "bg-[#FC7A00] text-white"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[22px]">
+                            {playingAudioId === msg.id ? "pause" : "play_arrow"}
+                          </span>
+                        </button>
+
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-1 h-5">
+                            {[40, 70, 30, 90, 50, 80, 40, 60, 100, 40].map((height, i) => (
+                              <span
+                                key={i}
+                                style={{ height: `${playingAudioId === msg.id ? Math.max(25, (height + (i % 3) * 20) % 100) : 40}%` }}
+                                className={`w-1 rounded-full transition-all duration-300 ${
+                                  msg.sender === "user" ? "bg-white/90" : "bg-[#FC7A00]"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className={`text-[10px] font-mono font-bold block ${msg.sender === "user" ? "text-orange-100" : "text-gray-500"}`}>
+                            00:{String(msg.audioDuration || 0).padStart(2, "0")} • Voice Note
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-semibold leading-relaxed whitespace-pre-line">{msg.text}</p>
+                    )}
+
                     <div
                       className={`flex items-center justify-end gap-1 text-[9px] font-bold ${
                         msg.sender === "user" ? "text-orange-100" : "text-gray-400"
@@ -295,36 +498,76 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
             </div>
 
             {/* Input area */}
-            <div className="bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl">
-              <div className="bg-white rounded-[14.5px] p-1.5 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder="Type your inquiry or message..."
-                  className="flex-1 bg-transparent px-3 py-1.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
-                />
+            {isRecording ? (
+              <div className="bg-gradient-to-r from-red-500 to-red-600 p-[1.5px] rounded-2xl animate-pulse">
+                <div className="bg-white rounded-[14.5px] p-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-600 animate-ping" />
+                    <span className="font-mono text-xs font-black text-red-600">
+                      Recording Voice... 00:{String(recordingDuration).padStart(2, "0")} / 00:50
+                    </span>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleSend()}
-                  disabled={isSending || !inputText.trim()}
-                  className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white flex items-center justify-center cursor-pointer border-0 disabled:opacity-50 transition-all active:scale-90 flex-shrink-0 shadow-2xs"
-                >
-                  {isSending ? (
-                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
-                  ) : (
-                    <span className="material-symbols-outlined text-[18px]">send</span>
-                  )}
-                </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => stopRecording(false)}
+                      className="px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold border-0 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => stopRecording(true)}
+                      className="w-9 h-9 rounded-xl bg-red-600 hover:bg-red-700 text-white flex items-center justify-center cursor-pointer border-0 shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">send</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] p-[1.5px] rounded-2xl">
+                <div className="bg-white rounded-[14.5px] p-1.5 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Type your inquiry or message..."
+                    className="flex-1 bg-transparent px-3 py-1.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+                  />
+
+                  {/* Mic Button */}
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="w-9 h-9 rounded-xl bg-orange-100 hover:bg-orange-200 text-[#FC7A00] flex items-center justify-center cursor-pointer border-0 transition-all active:scale-90 flex-shrink-0"
+                    title="Record Voice Note (Max 50s)"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">mic</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSend()}
+                    disabled={isSending || !inputText.trim()}
+                    className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white flex items-center justify-center cursor-pointer border-0 disabled:opacity-50 transition-all active:scale-90 flex-shrink-0 shadow-2xs"
+                  >
+                    {isSending ? (
+                      <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-[18px]">send</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       )}

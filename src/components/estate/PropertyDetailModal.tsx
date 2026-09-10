@@ -12,7 +12,10 @@ interface PropertyDetailModalProps {
   isOpen: boolean;
   property: EstateProperty | null;
   onClose: () => void;
-  onSubmitInquiry: (message: string) => Promise<boolean | void> | void;
+  onSubmitInquiry: (
+    message: string,
+    options?: { messageType?: "text" | "voice"; audioData?: string; audioDuration?: number }
+  ) => Promise<boolean | void> | void;
   onReportProperty: (reason: string, details: string) => void;
   onInspectAgent?: () => void;
   onOpenReportDrawer?: () => void;

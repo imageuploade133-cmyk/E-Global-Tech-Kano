@@ -65,6 +65,34 @@ describe("Estate Marketplace Architectural Suite", () => {
     expect(seller.restrictedUntil).toBeDefined();
   });
 
+  test("Estate seller supports custom auto-response message and voice note fields", () => {
+    const seller: EstateSeller = {
+      uid: "seller_999",
+      displayName: "John Smith Realty",
+      phone: "08011223344",
+      email: "john@smithrealty.com",
+      isVerified: true,
+      verificationStatus: "VERIFIED",
+      autoResponseText: "Thank you for reaching out! I will call you back within 10 minutes.",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    expect(seller.autoResponseText).toContain("call you back");
+
+    const voiceInquiry = {
+      propertyId: "prop_123",
+      sellerId: seller.uid,
+      message: "🎤 Voice Note",
+      messageType: "voice" as const,
+      audioData: "data:audio/webm;base64,GkXfo59ChoEBQveBAULygQRC...",
+      audioDuration: 35,
+    };
+
+    expect(voiceInquiry.messageType).toBe("voice");
+    expect(voiceInquiry.audioDuration).toBeLessThanOrEqual(50);
+  });
+
   test("Timed restriction logic evaluates expired timestamps accurately", () => {
     const expiredRestrictionDate = new Date(Date.now() - 1000).toISOString();
     const isExpired = new Date(expiredRestrictionDate).getTime() < Date.now();
