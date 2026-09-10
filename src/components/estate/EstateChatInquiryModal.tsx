@@ -354,9 +354,15 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
               </button>
 
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FC7A00] to-[#E06600] text-white font-black text-sm flex items-center justify-center flex-shrink-0 shadow-2xs">
-                  {agentName[0]}
-                </div>
+                {publisherAgent?.avatarUrl && !publisherAgent.mutedFields?.includes("avatar") ? (
+                  <div className="w-10 h-10 rounded-full overflow-hidden relative border border-[#FC7A00] flex-shrink-0 shadow-2xs">
+                    <Image src={publisherAgent.avatarUrl} alt="Agent" fill className="object-cover" unoptimized />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FC7A00] to-[#E06600] text-white font-black text-sm flex items-center justify-center flex-shrink-0 shadow-2xs">
+                    {agentName[0]}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h3 className="font-extrabold text-xs text-black truncate">{agentName}</h3>

@@ -22,7 +22,7 @@ import { useModalBackHandler } from "@/lib/useModalBackHandler";
 export default function EstateSellerDashboard() {
   const { userData, user } = useAuth();
   const userName = (userData?.name || user?.displayName || "Captain") as string;
-  const currentPhoto = (userData?.photoURL ||
+  const walletPhoto = (userData?.photoURL ||
     user?.photoURL ||
     "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M") as string;
 
@@ -243,7 +243,7 @@ export default function EstateSellerDashboard() {
           >
             <div className="flex items-center gap-3.5 min-w-0">
               <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-xs flex-shrink-0 bg-white">
-                <img src={currentPhoto} alt={userName} className="w-full h-full object-cover" />
+                <img src={sellerProfile?.avatarUrl || walletPhoto} alt={userName} className="w-full h-full object-cover" />
                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
               </div>
 
@@ -366,7 +366,7 @@ export default function EstateSellerDashboard() {
         <SellerProfileModal
           isOpen={isProfileModalOpen}
           seller={sellerProfile}
-          currentPhoto={currentPhoto}
+          currentPhoto={sellerProfile?.avatarUrl || walletPhoto}
           isEditable={true}
           onClose={() => setIsProfileModalOpen(false)}
           onSaveProfile={handleSaveSellerProfile}

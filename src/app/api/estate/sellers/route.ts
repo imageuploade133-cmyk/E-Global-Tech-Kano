@@ -102,6 +102,27 @@ export async function POST(req: Request) {
 
     await docRef.set(sellerPayload, { merge: true });
 
+    // Propagate updated avatarUrl and seller details to existing seller properties
+    if (sellerPayload.avatarUrl || sellerPayload.agencyName || sellerPayload.phone) {
+      try {
+        const propsSnap = await adminDb.collection("estate_properties").where("sellerId", "==", uid).get();
+        const batch = adminDb.batch();
+        propsSnap.forEach((propDoc) => {
+          batch.update(propDoc.ref, {
+            sellerAvatarUrl: sellerPayload.avatarUrl || "",
+            sellerName: sellerPayload.agencyName || sellerPayload.displayName,
+            sellerPhone: sellerPayload.phone,
+            updatedAt: nowIso,
+          });
+        });
+        if (!propsSnap.empty) {
+          await batch.commit();
+        }
+      } catch (err: any) {
+        console.warn("[Propagate Seller Avatar Error]:", err.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Seller/Agent profile saved successfully.",
