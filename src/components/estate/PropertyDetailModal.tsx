@@ -283,7 +283,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               </div>
             )}
 
-            {/* Property Location & Area Card with Gradient Border (Moved to bottom) */}
+            {/* Property Location & Area Card with Mobile-Friendly Design */}
             <div className="bg-gradient-to-r from-[#FC7A00]/40 via-amber-200/50 to-[#E06600]/40 p-[1.5px] rounded-3xl shadow-2xs">
               <div className="bg-white p-4.5 rounded-[22.5px] space-y-3.5">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -301,36 +301,62 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleOpenGoogleMaps}
-                    className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[10px] uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1 shadow-2xs transition-all active:scale-95"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">map</span>
-                    <span>Open Maps</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (fullLocationString) {
+                          navigator.clipboard.writeText(fullLocationString);
+                          toast.success("Property address copied!");
+                        }
+                      }}
+                      className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[10px] uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1 transition-all active:scale-95"
+                      title="Copy Address"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                      <span className="hidden sm:inline">Copy</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenGoogleMaps}
+                      className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-[10px] uppercase rounded-xl cursor-pointer border-0 flex items-center gap-1 shadow-2xs transition-all active:scale-95"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">map</span>
+                      <span>Open Maps</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-semibold">
-                  <div className="p-3 bg-gray-50/80 rounded-2xl border border-gray-150 space-y-0.5">
-                    <span className="text-[9.5px] font-black uppercase text-gray-400 block">Street Address</span>
-                    <span className="font-bold text-gray-900 block truncate">
-                      {property.location?.address || "Address details on request"}
+                {/* Clean, Mobile-Optimized Location Layout */}
+                <div className="p-4 bg-orange-50/40 rounded-2xl border border-orange-100/70 space-y-3 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[18px] mt-0.5 flex-shrink-0">
+                      pin_drop
                     </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
+                        Street Address
+                      </span>
+                      <p className="font-extrabold text-gray-900 leading-snug break-words">
+                        {property.location?.address || "Address details on request"}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="p-3 bg-gray-50/80 rounded-2xl border border-gray-150 space-y-0.5">
-                    <span className="text-[9.5px] font-black uppercase text-gray-400 block">City / Town</span>
-                    <span className="font-bold text-gray-900 block truncate">
-                      {property.location?.city || "Local City"}
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-gray-50/80 rounded-2xl border border-gray-150 space-y-0.5">
-                    <span className="text-[9.5px] font-black uppercase text-gray-400 block">State / Region</span>
-                    <span className="font-bold text-gray-900 block truncate">
-                      {property.location?.state || "State"}
-                    </span>
+                  <div className="pt-2 border-t border-orange-200/40 flex items-center gap-2 flex-wrap">
+                    {property.location?.city && (
+                      <span className="px-3 py-1 rounded-xl bg-white border border-orange-200/80 text-[10.5px] font-extrabold text-gray-800 flex items-center gap-1 shadow-2xs">
+                        <span className="material-symbols-outlined text-[13px] text-[#FC7A00]">location_city</span>
+                        <span>{property.location.city}</span>
+                      </span>
+                    )}
+                    {property.location?.state && (
+                      <span className="px-3 py-1 rounded-xl bg-white border border-orange-200/80 text-[10.5px] font-extrabold text-[#FC7A00] flex items-center gap-1 shadow-2xs">
+                        <span className="material-symbols-outlined text-[13px]">map</span>
+                        <span>{property.location.state}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
