@@ -43,6 +43,23 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
+  // Security Notice Modal Agreement State
+  const isAgentUser = user?.uid === property?.sellerId || user?.uid === publisherAgent?.uid;
+  const agreementStorageKey = isAgentUser ? "estate_chat_agent_agreed" : "estate_chat_user_agreed";
+  const [hasAgreedSecurityNotice, setHasAgreedSecurityNotice] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem(agreementStorageKey) === "true";
+    }
+    return false;
+  });
+
+  const handleAgreeSecurityNotice = () => {
+    setHasAgreedSecurityNotice(true);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(agreementStorageKey, "true");
+    }
+  };
+
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -407,8 +424,55 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
           {/* User-Friendly Privacy & Security Banner */}
           <div className="px-4 py-1.5 bg-emerald-50/80 border-y border-emerald-100/60 flex items-center justify-center gap-1.5 text-[10px] font-extrabold text-emerald-800 flex-shrink-0">
             <span className="material-symbols-outlined text-[14px] text-emerald-600">lock</span>
-            <span>End-to-End Private Messaging • Cleared after 30 days for your privacy</span>
+            <span>End-to-End Private Messaging • Wallet Payment Security Active</span>
           </div>
+
+          {/* Attention / Security Warning Overlay Modal */}
+          <AnimatePresence>
+            {!hasAgreedSecurityNotice && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-[100025] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
+              >
+                <div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center space-y-4 shadow-2xl border border-gray-100">
+                  <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+                    <span className="material-symbols-outlined text-[36px]">shield_lock</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <h3 className="font-bodoni font-bold text-lg text-black leading-tight">
+                      {isAgentUser ? "Agent Compliance Notice" : "Important Security Notice"}
+                    </h3>
+                    <p className="text-[11px] font-extrabold text-[#FC7A00] uppercase tracking-wider">
+                      {isAgentUser ? `Welcome ${publisherAgent?.displayName || "Agent"}` : `Dear ${user?.displayName || "Valued User"}`}
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-orange-50/80 rounded-2xl border border-orange-200/80 text-left text-xs font-medium text-gray-800 leading-relaxed space-y-2">
+                    {isAgentUser ? (
+                      <p>
+                        Do <strong>NOT</strong> request or instruct customers to transfer funds directly to your external personal bank account. To maintain transaction security and keep your live agent status active, provide <strong>ONLY your E-Global Wallet Account</strong> to receive funds.
+                      </p>
+                    ) : (
+                      <p>
+                        Do <strong>NOT</strong> deposit or transfer funds directly to an agent&apos;s personal bank account. For high security and transaction control, fund your <strong>E-Global Wallet</strong> account and transfer directly to the agent&apos;s wallet account.
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAgreeSecurityNotice}
+                    className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] via-amber-500 to-[#E06600] text-white font-black text-xs uppercase rounded-2xl border-0 cursor-pointer shadow-md hover:brightness-105 transition-all"
+                  >
+                    I Agree & Continue Chat
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Chat Stream Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar bg-[#F8F9FA]">

@@ -142,7 +142,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           {/* Main Scrollable Body */}
-          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-5 custom-scrollbar pb-44">
+          <div className="flex-1 overflow-y-auto p-4 min-[425px]:p-6 space-y-5 custom-scrollbar pb-24 sm:pb-28">
             {/* Main Featured Image Gallery Viewer */}
             <div className="space-y-2">
               <div
@@ -422,8 +422,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Generous Bottom Spacer to guarantee Published by Agent is never cut off */}
-            <div className="h-32 sm:h-40 flex-shrink-0" />
+            {/* Standard Bottom Spacer */}
+            <div className="h-6 sm:h-10 flex-shrink-0" />
           </div>
 
           {/* Static Fixed Bottom Action Bar */}
@@ -455,7 +455,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               className="flex-1 py-3.5 px-4 bg-gradient-to-r from-[#FC7A00] via-amber-500 to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:brightness-105 active:scale-95 transition-all cursor-pointer border-0 shadow-md flex items-center justify-center gap-2 relative overflow-hidden"
             >
               <span className="material-symbols-outlined text-[20px]">forum</span>
-              <span>Send Direct Inquiry to Agent</span>
+              <span>Chat Agent</span>
 
               {inquiryCount > 0 && (
                 <span className="ml-1 px-2 py-0.5 rounded-full bg-white text-[#FC7A00] font-black text-[10px] shadow-2xs">
