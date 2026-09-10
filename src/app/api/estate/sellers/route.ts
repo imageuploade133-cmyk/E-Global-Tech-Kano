@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     const uid = decoded.uid;
     const body = await req.json();
 
-    const { displayName, agencyName, phone, email, address, avatarUrl, idDocumentUrl, autoResponseText } = body;
+    const { displayName, agencyName, phone, email, address, avatarUrl, idDocumentUrl, autoResponseText, mutedFields } = body;
 
     if (!displayName || !phone || !email) {
       return NextResponse.json(
@@ -93,6 +93,7 @@ export async function POST(req: Request) {
       avatarUrl: avatarUrl || existingData.avatarUrl || "",
       idDocumentUrl: idDocumentUrl || existingData.idDocumentUrl || "",
       autoResponseText: autoResponseText !== undefined ? String(autoResponseText).trim() : (existingData.autoResponseText || ""),
+      mutedFields: Array.isArray(mutedFields) ? mutedFields : (existingData.mutedFields || []),
       isVerified: existingData.isVerified || false,
       verificationStatus: existingData.verificationStatus || "PENDING",
       createdAt: existingData.createdAt || nowIso,

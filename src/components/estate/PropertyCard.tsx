@@ -208,7 +208,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
             <span className="font-mono font-black text-sm text-[#FC7A00]">
               ₦{property.price.toLocaleString()}
             </span>
-            {property.purpose !== "Sale" && property.pricePeriod && (
+            {property.purpose !== "Sale" && property.pricePeriod && property.pricePeriod !== "None" && (
               <span className="text-[9px] text-gray-400 font-bold"> /{property.pricePeriod}</span>
             )}
           </div>

@@ -2,8 +2,10 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { EstateSeller } from "@/estate/types";
+import { uploadImageSecurely } from "@/lib/image-upload";
 
 interface SellerProfileModalProps {
   isOpen: boolean;
@@ -11,7 +13,15 @@ interface SellerProfileModalProps {
   currentPhoto?: string;
   isEditable?: boolean;
   onClose: () => void;
-  onSaveProfile?: (updated: { agencyName: string; phone: string; address: string; autoResponseText?: string }) => Promise<void>;
+  onSaveProfile?: (updated: {
+    agencyName: string;
+    phone: string;
+    email?: string;
+    address: string;
+    avatarUrl?: string;
+    autoResponseText?: string;
+    mutedFields?: ("phone" | "email" | "address" | "avatar")[];
+  }) => Promise<void>;
   isSaving?: boolean;
 }
 
@@ -26,21 +36,56 @@ export function SellerProfileModal({
 }: SellerProfileModalProps) {
   const [agencyName, setAgencyName] = useState(seller?.agencyName || "");
   const [phone, setPhone] = useState(seller?.phone || "");
+  const [email, setEmail] = useState(seller?.email || "");
   const [address, setAddress] = useState(seller?.address || "");
+  const [avatarUrl, setAvatarUrl] = useState(seller?.avatarUrl || "");
   const [autoResponseText, setAutoResponseText] = useState(seller?.autoResponseText || "");
+  const [mutedFields, setMutedFields] = useState<("phone" | "email" | "address" | "avatar")[]>(
+    seller?.mutedFields || []
+  );
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   React.useEffect(() => {
     if (seller) {
       setAgencyName(seller.agencyName || "");
       setPhone(seller.phone || "");
+      setEmail(seller.email || "");
       setAddress(seller.address || "");
+      setAvatarUrl(seller.avatarUrl || "");
       setAutoResponseText(seller.autoResponseText || "");
+      setMutedFields(seller.mutedFields || []);
     }
   }, [seller]);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingAvatar(true);
+    try {
+      const result = await uploadImageSecurely(file);
+      if (result.success && result.url) {
+        setAvatarUrl(result.url);
+        toast.success("Agent profile picture uploaded successfully!");
+      } else {
+        toast.error(result.error || "Failed to upload agent profile picture.");
+      }
+    } catch {
+      toast.error("Failed to upload agent profile picture.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const toggleMutedField = (field: "phone" | "email" | "address" | "avatar") => {
+    setMutedFields((prev) =>
+      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]
+    );
+  };
+
   if (!isOpen || !seller) return null;
 
-  const avatarUrl =
+  const currentDisplayAvatar =
+    avatarUrl ||
     seller.avatarUrl ||
     currentPhoto ||
     "https://lh3.googleusercontent.com/aida-public/AB6AXuAhqRElSxFDYR0JkLrL3BmoTHpcQpwcpM8xiEOnGtTcV8dqv0FIMYVAxgz7tMMChcZxMlTa2-2ynaI3jIWoLsyt_hfOq8ILk52eJHTc0Ot0_rEl9aA6fYqKikhCmWGkw82ljlEttOLSEHGqM_XrwGNTAqYcnAliKIqqx6JvmHYxWU4vMcWp1WvRiDQDhCuSfoHxXfGhX0UQSjcA9sP2F2lVFfu9_7meiyzKguVTqcrOQ7LGww0OPJgP1b8eBW81_BBVIhpF2GzeT3M";
@@ -48,7 +93,15 @@ export function SellerProfileModal({
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (onSaveProfile) {
-      await onSaveProfile({ agencyName, phone, address, autoResponseText });
+      await onSaveProfile({
+        agencyName,
+        phone,
+        email,
+        address,
+        avatarUrl,
+        autoResponseText,
+        mutedFields,
+      });
     }
   };
 
@@ -90,9 +143,29 @@ export function SellerProfileModal({
 
               {/* Premium Gradient Profile Card */}
               <div className="mt-5 p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#FFF5EB] via-[#FFEADB] to-[#FFE0CC] border border-[#FFD0A1]/80 flex flex-col items-center text-center space-y-3 shadow-xs">
-                <div className="relative w-20 h-20 sm:w-24 sm:h-22 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-sm bg-white">
-                  <img src={avatarUrl} alt={seller.displayName} className="w-full h-full object-cover" />
+                <div className="relative w-20 h-20 sm:w-24 sm:h-22 rounded-2xl overflow-hidden border-2 border-[#FC7A00] shadow-sm bg-white group">
+                  {!isEditable && seller.mutedFields?.includes("avatar") ? (
+                    <div className="w-full h-full bg-[#FC7A00] text-white font-black text-2xl flex items-center justify-center">
+                      {seller.displayName[0]}
+                    </div>
+                  ) : (
+                    <img src={currentDisplayAvatar} alt={seller.displayName} className="w-full h-full object-cover" />
+                  )}
                   <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+
+                  {isEditable && (
+                    <label className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-[10px] font-black uppercase cursor-pointer transition-opacity">
+                      <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+                      <span>{isUploadingAvatar ? "Uploading..." : "Change"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        disabled={isUploadingAvatar}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
 
                 <div className="min-w-0 space-y-1">
@@ -111,7 +184,9 @@ export function SellerProfileModal({
                   <p className="text-xs font-black text-[#FC7A00] uppercase tracking-wider">
                     {seller.agencyName || "Independent Property Agent"}
                   </p>
-                  <p className="text-xs text-gray-500 font-mono">{seller.email}</p>
+                  {(!seller.mutedFields?.includes("email") || isEditable) && (
+                    <p className="text-xs text-gray-500 font-mono">{seller.email}</p>
+                  )}
                 </div>
               </div>
 
@@ -133,9 +208,25 @@ export function SellerProfileModal({
                     </div>
 
                     <div>
-                      <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                        Contact Phone Number *
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10.5px] font-black uppercase text-gray-500 block tracking-wider">
+                          Contact Phone Number *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleMutedField("phone")}
+                          className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase border-0 cursor-pointer flex items-center gap-1 transition-all ${
+                            mutedFields.includes("phone")
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[13px]">
+                            {mutedFields.includes("phone") ? "visibility_off" : "visibility"}
+                          </span>
+                          <span>{mutedFields.includes("phone") ? "Muted (Hidden)" : "Visible"}</span>
+                        </button>
+                      </div>
                       <input
                         type="tel"
                         required
@@ -147,9 +238,55 @@ export function SellerProfileModal({
                     </div>
 
                     <div>
-                      <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
-                        Office / Business Address
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10.5px] font-black uppercase text-gray-500 block tracking-wider">
+                          Agent Email Address *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleMutedField("email")}
+                          className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase border-0 cursor-pointer flex items-center gap-1 transition-all ${
+                            mutedFields.includes("email")
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[13px]">
+                            {mutedFields.includes("email") ? "visibility_off" : "visibility"}
+                          </span>
+                          <span>{mutedFields.includes("email") ? "Muted (Hidden)" : "Visible"}</span>
+                        </button>
+                      </div>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="e.g. agent@domain.com"
+                        className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10.5px] font-black uppercase text-gray-500 block tracking-wider">
+                          Office / Business Address
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleMutedField("address")}
+                          className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase border-0 cursor-pointer flex items-center gap-1 transition-all ${
+                            mutedFields.includes("address")
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[13px]">
+                            {mutedFields.includes("address") ? "visibility_off" : "visibility"}
+                          </span>
+                          <span>{mutedFields.includes("address") ? "Muted (Hidden)" : "Visible"}</span>
+                        </button>
+                      </div>
                       <textarea
                         rows={2}
                         value={address}
@@ -157,6 +294,26 @@ export function SellerProfileModal({
                         placeholder="e.g. Suite 12, Victoria Island Plaza, Lagos"
                         className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-semibold text-black text-xs outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all resize-none shadow-2xs"
                       />
+                    </div>
+
+                    <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-black block">Mute Profile Picture</span>
+                        <span className="text-[10px] text-gray-500 font-medium block">
+                          Hide photo from public users and display initial emblem instead
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleMutedField("avatar")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all ${
+                          mutedFields.includes("avatar")
+                            ? "bg-red-500 text-white shadow-2xs"
+                            : "bg-gray-200 text-gray-700"
+                        }`}
+                      >
+                        {mutedFields.includes("avatar") ? "Muted" : "Visible"}
+                      </button>
                     </div>
 
                     <div>
@@ -183,37 +340,53 @@ export function SellerProfileModal({
                           Phone Number
                         </span>
                         <span className="font-mono font-extrabold text-black text-sm">
-                          {seller.phone || "Not specified"}
+                          {seller.mutedFields?.includes("phone")
+                            ? "Contact via Direct Inquiry"
+                            : seller.phone || "Not specified"}
                         </span>
                       </div>
+                      {!seller.mutedFields?.includes("email") && (
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
+                            Email Address
+                          </span>
+                          <span className="font-mono font-semibold text-gray-800">
+                            {seller.email}
+                          </span>
+                        </div>
+                      )}
                       <div>
                         <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider mb-0.5">
                           Office Address
                         </span>
                         <span className="font-medium text-gray-700 leading-relaxed">
-                          {seller.address || "Location not provided"}
+                          {seller.mutedFields?.includes("address")
+                            ? "Location details available on request"
+                            : seller.address || "Location not provided"}
                         </span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <a
-                        href={`tel:${seller.phone}`}
-                        className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">call</span>
-                        <span>Call Agent</span>
-                      </a>
-                      <a
-                        href={`https://wa.me/${(seller.phone || "").replace(/[^0-9]/g, "")}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="py-3.5 bg-black hover:bg-gray-900 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">chat</span>
-                        <span>WhatsApp</span>
-                      </a>
-                    </div>
+                    {!seller.mutedFields?.includes("phone") && seller.phone && (
+                      <div className="grid grid-cols-2 gap-3 pt-2">
+                        <a
+                          href={`tel:${seller.phone}`}
+                          className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">call</span>
+                          <span>Call Agent</span>
+                        </a>
+                        <a
+                          href={`https://wa.me/${(seller.phone || "").replace(/[^0-9]/g, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="py-3.5 bg-black hover:bg-gray-900 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">chat</span>
+                          <span>WhatsApp</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

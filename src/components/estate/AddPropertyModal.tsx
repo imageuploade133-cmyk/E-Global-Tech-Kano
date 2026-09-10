@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 interface AddPropertyModalProps {
   isOpen: boolean;
+  editingProperty?: EstateProperty | null;
   onClose: () => void;
   onSubmitProperty: (payload: Partial<EstateProperty>) => void;
   isSubmitting: boolean;
@@ -15,6 +16,7 @@ interface AddPropertyModalProps {
 
 export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
   isOpen,
+  editingProperty = null,
   onClose,
   onSubmitProperty,
   isSubmitting,
@@ -24,7 +26,53 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
   const [purpose, setPurpose] = useState<PropertyPurpose>("Rent");
   const [propertyType, setPropertyType] = useState<PropertyType>("Apartment");
   const [price, setPrice] = useState("");
-  const [pricePeriod, setPricePeriod] = useState<"year" | "month" | "night" | "total">("year");
+  const [pricePeriod, setPricePeriod] = useState<"year" | "month" | "night" | "total" | "None">("year");
+
+  React.useEffect(() => {
+    if (editingProperty) {
+      setTitle(editingProperty.title || "");
+      setDescription(editingProperty.description || "");
+      setPurpose(editingProperty.purpose || "Rent");
+      setPropertyType(editingProperty.propertyType || "Apartment");
+      setPrice(editingProperty.price ? String(editingProperty.price) : "");
+      setPricePeriod(
+        editingProperty.purpose === "Sale"
+          ? "None"
+          : (editingProperty.pricePeriod as any) || "year"
+      );
+      setAddress(editingProperty.location?.address || "");
+      setCity(editingProperty.location?.city || "Lagos");
+      setState(editingProperty.location?.state || "Lagos");
+      setBedrooms(editingProperty.bedrooms ? String(editingProperty.bedrooms) : "2");
+      setBathrooms(editingProperty.bathrooms ? String(editingProperty.bathrooms) : "2");
+      setToilets(editingProperty.toilets ? String(editingProperty.toilets) : "2");
+      setPropertySize(editingProperty.propertySize || "");
+      setFurnished(editingProperty.furnished || "Unfurnished");
+      setAmenitiesText(
+        editingProperty.amenities ? editingProperty.amenities.join(", ") : ""
+      );
+      setUploadedImages(editingProperty.images || []);
+      setYoutubeVideoUrl(editingProperty.videos?.[0] || "");
+    } else {
+      setTitle("");
+      setDescription("");
+      setPurpose("Rent");
+      setPropertyType("Apartment");
+      setPrice("");
+      setPricePeriod("year");
+      setAddress("");
+      setCity("Lagos");
+      setState("Lagos");
+      setBedrooms("2");
+      setBathrooms("2");
+      setToilets("2");
+      setPropertySize("");
+      setFurnished("Unfurnished");
+      setAmenitiesText("24/7 Power, Water Supply, Security");
+      setUploadedImages([]);
+      setYoutubeVideoUrl("");
+    }
+  }, [editingProperty, isOpen]);
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("Lagos");
   const [state, setState] = useState("Lagos");
@@ -78,7 +126,37 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
     }
   };
 
-  const handleSubmit = (targetStatus: "DRAFT" | "PENDING_REVIEW") => {
+  const handlePurposeChange = (newPurpose: PropertyPurpose) => {
+    setPurpose(newPurpose);
+    if (newPurpose === "Sale") {
+      setPricePeriod("None");
+    } else if (pricePeriod === "None") {
+      setPricePeriod("year");
+    }
+  };
+
+  const handleSubmit = (targetStatus: "DRAFT" | "PENDING_REVIEW" | "PUBLISHED") => {
+    if (!title.trim()) {
+      toast.error("Property title is required.");
+      return;
+    }
+    if (!price || Number(price) <= 0) {
+      toast.error("Valid listing price is required.");
+      return;
+    }
+    if (!address.trim()) {
+      toast.error("Street address is required.");
+      return;
+    }
+    if (!description.trim()) {
+      toast.error("Property description is required.");
+      return;
+    }
+    if (uploadedImages.length === 0) {
+      toast.error("At least 1 photo is required.");
+      return;
+    }
+
     const amenities = amenitiesText
       .split(",")
       .map((s) => s.trim())
@@ -94,26 +172,27 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
     const videos = youtubeVideoUrl.trim() ? [youtubeVideoUrl.trim()] : [];
 
     onSubmitProperty({
-      title,
-      description,
+      id: editingProperty?.id,
+      title: title.trim(),
+      description: description.trim(),
       purpose,
       propertyType,
       price: Number(price) || 0,
-      pricePeriod,
+      pricePeriod: purpose === "Sale" ? "None" : pricePeriod,
       location: {
-        address,
-        city,
-        state,
+        address: address.trim(),
+        city: city.trim() || "Lagos",
+        state: state.trim() || "Lagos",
       },
       bedrooms: Number(bedrooms) || 0,
       bathrooms: Number(bathrooms) || 0,
       toilets: Number(toilets) || 0,
-      propertySize,
+      propertySize: propertySize.trim(),
       furnished,
       amenities,
       images: finalImages,
       videos,
-      status: targetStatus,
+      status: editingProperty?.status === "PUBLISHED" ? "PUBLISHED" : targetStatus,
     });
   };
 
@@ -138,10 +217,10 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
                   </span>
                   <div>
                     <h3 className="font-bodoni text-base sm:text-lg font-bold text-black leading-tight">
-                      Add Property Listing
+                      {editingProperty ? "Edit Property Listing" : "Add Property Listing"}
                     </h3>
                     <p className="text-[11px] text-gray-500 font-medium">
-                      Create new listing for rent, sale, or short-let
+                      {editingProperty ? "Update listing details" : "Create new listing for rent, sale, or short-let"}
                     </p>
                   </div>
                 </div>
@@ -179,7 +258,7 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
                     </label>
                     <select
                       value={purpose}
-                      onChange={(e) => setPurpose(e.target.value as PropertyPurpose)}
+                      onChange={(e) => handlePurposeChange(e.target.value as PropertyPurpose)}
                       className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-2xl font-bold text-black text-xs outline-none focus:border-[#FC7A00] transition-all shadow-2xs"
                     >
                       <option value="Rent">For Rent</option>

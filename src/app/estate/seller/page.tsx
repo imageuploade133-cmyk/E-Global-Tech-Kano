@@ -36,11 +36,15 @@ export default function EstateSellerDashboard() {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<EstateProperty | null>(null);
+  const [editingProperty, setEditingProperty] = useState<EstateProperty | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSavingSeller, setIsSavingSeller] = useState(false);
   const [isSubmittingProperty, setIsSubmittingProperty] = useState(false);
 
-  useModalBackHandler(isAddModalOpen, () => setIsAddModalOpen(false), "seller-add-modal");
+  useModalBackHandler(isAddModalOpen, () => {
+    setIsAddModalOpen(false);
+    setEditingProperty(null);
+  }, "seller-add-modal");
   useModalBackHandler(Boolean(selectedProperty), () => setSelectedProperty(null), "seller-detail-modal");
   useModalBackHandler(isProfileModalOpen, () => setIsProfileModalOpen(false), "seller-edit-profile-modal");
 
@@ -98,7 +102,15 @@ export default function EstateSellerDashboard() {
     }
   }, [user]);
 
-  const handleSaveSellerProfile = async (updated: { agencyName: string; phone: string; address: string }) => {
+  const handleSaveSellerProfile = async (updated: {
+    agencyName: string;
+    phone: string;
+    email?: string;
+    address: string;
+    avatarUrl?: string;
+    autoResponseText?: string;
+    mutedFields?: ("phone" | "email" | "address" | "avatar")[];
+  }) => {
     setIsSavingSeller(true);
     try {
       let idToken = "";
@@ -116,8 +128,11 @@ export default function EstateSellerDashboard() {
           displayName: userName,
           agencyName: updated.agencyName,
           phone: updated.phone,
-          email: userData?.email || user?.email || "",
+          email: updated.email || userData?.email || user?.email || "",
           address: updated.address,
+          avatarUrl: updated.avatarUrl || sellerProfile?.avatarUrl || "",
+          autoResponseText: updated.autoResponseText,
+          mutedFields: updated.mutedFields || [],
         }),
       });
 
@@ -209,7 +224,10 @@ export default function EstateSellerDashboard() {
 
               <button
                 type="button"
-                onClick={() => setIsAddModalOpen(true)}
+                onClick={() => {
+                  setEditingProperty(null);
+                  setIsAddModalOpen(true);
+                }}
                 className="px-3.5 py-2.5 rounded-xl bg-[#FC7A00] hover:bg-[#e06600] text-white text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer border-0 shadow-2xs flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[17px]">add</span>
@@ -308,20 +326,38 @@ export default function EstateSellerDashboard() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               {filteredProperties.map((prop) => (
-                <PropertyCard
-                  key={prop.id}
-                  property={prop}
-                  onOpenDetails={(p) => setSelectedProperty(p)}
-                />
+                <div key={prop.id} className="relative group">
+                  <PropertyCard
+                    property={prop}
+                    onOpenDetails={(p) => setSelectedProperty(p)}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingProperty(prop);
+                      setIsAddModalOpen(true);
+                    }}
+                    className="absolute top-2.5 left-2.5 z-20 px-2.5 py-1 rounded-full bg-black/80 hover:bg-black text-white text-[9.5px] font-black uppercase border-0 cursor-pointer flex items-center gap-1 shadow-md transition-all active:scale-90"
+                    title="Edit Property Listing"
+                  >
+                    <span className="material-symbols-outlined text-[13px] text-[#FC7A00]">edit</span>
+                    <span>Edit</span>
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </main>
 
-        {/* Add Property Sheet Modal */}
+        {/* Add / Edit Property Sheet Modal */}
         <AddPropertyModal
           isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
+          editingProperty={editingProperty}
+          onClose={() => {
+            setIsAddModalOpen(false);
+            setEditingProperty(null);
+          }}
           onSubmitProperty={handleCreateProperty}
           isSubmitting={isSubmittingProperty}
         />
