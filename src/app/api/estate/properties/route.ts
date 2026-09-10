@@ -122,6 +122,8 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const {
+      id,
+      propertyId,
       title,
       description,
       purpose,
@@ -137,7 +139,7 @@ export async function POST(req: Request) {
       amenities,
       images,
       videos,
-      status, // DRAFT or PENDING_REVIEW
+      status, // DRAFT, PENDING_REVIEW, or PUBLISHED
     } = body;
 
     if (!title || !description || !purpose || !propertyType || !price || !location?.address) {
@@ -188,9 +190,78 @@ export async function POST(req: Request) {
       }
     }
 
-    const requestedStatus = status === "DRAFT" ? "DRAFT" : "PENDING_REVIEW";
+    const targetDocId = id || propertyId;
     const nowIso = new Date().toISOString();
 
+    if (targetDocId) {
+      // Edit Existing Property
+      const propDocRef = adminDb.collection("estate_properties").doc(targetDocId);
+      const propSnap = await propDocRef.get();
+
+      if (!propSnap.exists) {
+        return NextResponse.json({ error: "Property listing not found." }, { status: 404 });
+      }
+
+      const existingData = propSnap.data() || {};
+      if (existingData.sellerId !== uid) {
+        return NextResponse.json({ error: "You are not authorized to edit this property." }, { status: 403 });
+      }
+
+      const finalStatus = existingData.status === "PUBLISHED" ? "PUBLISHED" : status || existingData.status;
+
+      const updatedPayload = {
+        title: String(title).trim(),
+        description: String(description).trim(),
+        purpose: purpose,
+        propertyType: propertyType,
+        price: Number(price) || 0,
+        currency: "NGN",
+        pricePeriod: purpose === "Sale" ? "None" : pricePeriod || "year",
+        location: {
+          address: String(location.address).trim(),
+          city: String(location.city || "").trim(),
+          state: String(location.state || "").trim(),
+        },
+        bedrooms: bedrooms ? Number(bedrooms) : 0,
+        bathrooms: bathrooms ? Number(bathrooms) : 0,
+        toilets: toilets ? Number(toilets) : 0,
+        propertySize: propertySize || "",
+        furnished: furnished || "Unfurnished",
+        amenities: Array.isArray(amenities) ? amenities : [],
+        images: Array.isArray(images) ? images : [],
+        videos: Array.isArray(videos) ? videos : [],
+        status: finalStatus,
+        updatedAt: nowIso,
+      };
+
+      await propDocRef.set(updatedPayload, { merge: true });
+
+      // Create Admin Property Edit Snapshot Log
+      if (existingData.status === "PUBLISHED") {
+        const editLogRef = adminDb.collection("estate_property_edits").doc();
+        await editLogRef.set({
+          id: editLogRef.id,
+          propertyId: targetDocId,
+          sellerId: uid,
+          sellerName: sellerData.agencyName || sellerData.displayName || "Agent",
+          propertyTitle: String(title).trim(),
+          previousData: existingData,
+          newData: updatedPayload,
+          status: "PENDING_REVIEW",
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Published property updated successfully and live!",
+        property: { id: targetDocId, ...existingData, ...updatedPayload },
+      });
+    }
+
+    // Create New Property Listing
+    const requestedStatus = status === "DRAFT" ? "DRAFT" : "PENDING_REVIEW";
     const newPropertyRef = adminDb.collection("estate_properties").doc();
     const newProperty = {
       propertyId: newPropertyRef.id,
@@ -204,7 +275,7 @@ export async function POST(req: Request) {
       propertyType: propertyType,
       price: Number(price) || 0,
       currency: "NGN",
-      pricePeriod: pricePeriod || "year",
+      pricePeriod: purpose === "Sale" ? "None" : pricePeriod || "year",
       location: {
         address: String(location.address).trim(),
         city: String(location.city || "").trim(),

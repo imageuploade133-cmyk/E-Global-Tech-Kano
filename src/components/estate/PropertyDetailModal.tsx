@@ -210,7 +210,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   <span className="font-mono text-2xl font-black text-[#FC7A00]">
                     ₦{property.price.toLocaleString()}
                   </span>
-                  {property.purpose !== "Sale" && property.pricePeriod && (
+                  {property.purpose !== "Sale" && property.pricePeriod && property.pricePeriod !== "None" && (
                     <span className="text-xs text-gray-600 font-extrabold"> /{property.pricePeriod}</span>
                   )}
                 </div>
@@ -365,9 +365,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FC7A00] to-[#E06600] text-white font-black text-lg flex items-center justify-center flex-shrink-0 shadow-2xs">
-                        {(publisherAgent?.displayName || property.sellerName || "A")[0]}
-                      </div>
+                      {publisherAgent?.avatarUrl && !publisherAgent.mutedFields?.includes("avatar") ? (
+                        <div className="w-12 h-12 rounded-2xl overflow-hidden relative border border-gray-200 shadow-2xs flex-shrink-0">
+                          <Image src={publisherAgent.avatarUrl} alt="Agent" fill className="object-cover" unoptimized />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FC7A00] to-[#E06600] text-white font-black text-lg flex items-center justify-center flex-shrink-0 shadow-2xs">
+                          {(publisherAgent?.displayName || property.sellerName || "A")[0]}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h5 className="font-extrabold text-sm text-black truncate">
@@ -389,23 +395,27 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-gray-400 uppercase">Phone</span>
                         <span className="font-mono font-extrabold text-black">
-                          {publisherAgent?.phone || property.sellerPhone || "Contact via Inquiry"}
+                          {publisherAgent?.mutedFields?.includes("phone")
+                            ? "Contact via Direct Inquiry"
+                            : publisherAgent?.phone || property.sellerPhone || "Contact via Inquiry"}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">Email</span>
-                        <span className="font-mono text-gray-700 truncate max-w-[180px]">
-                          {publisherAgent?.email || property.sellerEmail || "agent@eglobal.pay"}
-                        </span>
-                      </div>
-                      {publisherAgent?.address && (
+                      {!publisherAgent?.mutedFields?.includes("email") && (
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase">Office</span>
-                          <span className="font-medium text-gray-700 truncate max-w-[180px]">
-                            {publisherAgent.address}
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">Email</span>
+                          <span className="font-mono text-gray-700 truncate max-w-[180px]">
+                            {publisherAgent?.email || property.sellerEmail || "agent@eglobal.pay"}
                           </span>
                         </div>
                       )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Office</span>
+                        <span className="font-medium text-gray-700 truncate max-w-[180px]">
+                          {publisherAgent?.mutedFields?.includes("address")
+                            ? "Address available on request"
+                            : publisherAgent?.address || "Location not provided"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}

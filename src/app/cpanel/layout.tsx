@@ -437,6 +437,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
 
   const estateNavItems: NavItem[] = [
     { id: "estate_properties", label: "Property Listings", icon: "home_work", href: "/cpanel/estate", exact: true, permission: "estate.view" },
+    { id: "estate_edits", label: "Property Edits & Audit", icon: "rate_review", href: "/cpanel/estate/edits", permission: "estate.view" },
     { id: "estate_sellers", label: "Sellers & Agents", icon: "badge", href: "/cpanel/estate/sellers", permission: "estate.view" },
     { id: "estate_inquiries", label: "Customer Inquiries", icon: "contact_support", href: "/cpanel/estate/inquiries", permission: "estate.view" },
     { id: "estate_reports", label: "Flagged Reports", icon: "flag", href: "/cpanel/estate/reports", permission: "estate.view" },

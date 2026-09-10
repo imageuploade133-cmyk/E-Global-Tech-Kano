@@ -33,7 +33,7 @@ export interface EstateProperty {
   propertyType: PropertyType;
   price: number;
   currency: string;
-  pricePeriod?: "year" | "month" | "night" | "total";
+  pricePeriod?: "year" | "month" | "night" | "total" | "None" | null;
   location: {
     address: string;
     city: string;
@@ -76,6 +76,21 @@ export interface EstateSeller {
   publishingRestricted?: boolean;
   restrictedUntil?: string | null;
   autoResponseText?: string;
+  mutedFields?: ("phone" | "email" | "address" | "avatar")[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EstatePropertyEditLog {
+  id: string;
+  propertyId: string;
+  sellerId: string;
+  sellerName?: string;
+  propertyTitle: string;
+  previousData: Partial<EstateProperty>;
+  newData: Partial<EstateProperty>;
+  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "FLAGGED";
+  adminNote?: string;
   createdAt: string;
   updatedAt: string;
 }
