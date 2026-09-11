@@ -66,6 +66,8 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
   let apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
   let instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
+  let adminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
+  let adminPassword = process.env.EMAIL_ADMIN_PASSWORD || process.env.WHATSAPP_ADMIN_PASSWORD || "";
   let senderName = "E-Global Pay";
   let senderEmail = "no-reply@eglobalpay.com";
 
@@ -84,40 +86,112 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
     if (data.emailInstanceId) instanceId = data.emailInstanceId;
     else if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
 
+    if (data.emailAdminUsername) adminUsername = data.emailAdminUsername;
+    else if (data.whatsappAdminUsername) adminUsername = data.whatsappAdminUsername;
+
+    if (data.emailAdminPassword) adminPassword = data.emailAdminPassword;
+    else if (data.whatsappAdminPassword) adminPassword = data.whatsappAdminPassword;
+
     if (data.senderName) senderName = data.senderName;
     if (data.senderEmail) senderEmail = data.senderEmail;
   }
 
-  try {
+  const buildHeaders = (keyToUse: string, cookieToUse?: string) => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "X-API-Key": keyToUse,
+      "x-api-key": keyToUse,
+      "apikey": keyToUse,
+      "Authorization": `Bearer ${keyToUse}`,
+      "X-Instance-ID": instanceId,
+      "X-Email-ID": instanceId,
+      "X-Project-ID": instanceId,
+    };
+    if (cookieToUse) {
+      headers["Cookie"] = cookieToUse;
+    }
+    return headers;
+  };
+
+  const dispatch = async (keyToUse: string, cookieToUse?: string) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
+    try {
+      const res = await fetch(emailApiUrl, {
+        method: "POST",
+        headers: buildHeaders(keyToUse, cookieToUse),
+        body: JSON.stringify({
+          to: params.to,
+          subject: params.subject,
+          html: params.html,
+          text: params.text || "",
+          replyTo: params.replyTo || "",
+          fromName: senderName,
+          fromEmail: senderEmail,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return res;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
+  };
 
-    const res = await fetch(emailApiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": apiKey,
-        "Authorization": `Bearer ${apiKey}`,
-        "X-Instance-ID": instanceId,
-      },
-      body: JSON.stringify({
-        to: params.to,
-        subject: params.subject,
-        html: params.html,
-        text: params.text || "",
-        replyTo: params.replyTo || "",
-        fromName: senderName,
-        fromEmail: senderEmail,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+  try {
+    const res = await dispatch(apiKey);
 
     if (res.ok) {
       return true;
     }
+
     const errText = await res.text();
+
+    // Retry with admin session authentication if HTTP 401 Unauthorized occurs and credentials are available
+    if ((res.status === 401 || errText.includes("Unauthorized")) && adminUsername && adminPassword) {
+      console.log("[sendEmail] 401 Unauthorized detected. Attempting gateway admin session login...");
+      try {
+        const urlObj = new URL(emailApiUrl);
+        const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+        const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+
+        let sessionCookie = "";
+        let acquiredToken = "";
+
+        for (const ep of loginEndpoints) {
+          try {
+            const loginRes = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username: adminUsername,
+                email: adminUsername,
+                password: adminPassword,
+              }),
+            });
+
+            if (loginRes.ok) {
+              const setCookieHeader = loginRes.headers.get("set-cookie");
+              if (setCookieHeader) sessionCookie = setCookieHeader;
+
+              const loginData = await loginRes.json().catch(() => ({}));
+              acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
+              console.log(`[sendEmail] Gateway admin login succeeded at ${ep}`);
+              break;
+            }
+          } catch {}
+        }
+
+        if (acquiredToken || sessionCookie) {
+          const retryRes = await dispatch(acquiredToken || apiKey, sessionCookie);
+          if (retryRes.ok) return true;
+        }
+      } catch (loginErr: any) {
+        console.warn("[sendEmail] Session retry exception:", loginErr.message);
+      }
+    }
+
     console.warn(`[sendEmail] Dispatch failed with status ${res.status}:`, errText);
     return false;
   } catch (err: any) {

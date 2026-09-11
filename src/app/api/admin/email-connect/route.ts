@@ -19,6 +19,7 @@ export async function GET(req: Request) {
     let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
     let emailApiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
     let emailInstanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
+    let emailAdminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
     let senderName = "E-Global Pay";
     let senderEmail = "no-reply@eglobalpay.com";
     let status = "CONNECTED";
@@ -35,6 +36,7 @@ export async function GET(req: Request) {
         if (data?.emailApiUrl) emailApiUrl = data.emailApiUrl;
         if (data?.emailApiKey) emailApiKey = data.emailApiKey;
         if (data?.emailInstanceId) emailInstanceId = data.emailInstanceId;
+        if (data?.emailAdminUsername) emailAdminUsername = data.emailAdminUsername;
         if (data?.senderName) senderName = data.senderName;
         if (data?.senderEmail) senderEmail = data.senderEmail;
         if (data?.status) status = data.status;
@@ -54,6 +56,7 @@ export async function GET(req: Request) {
         emailApiKeyMasked: maskApiKey(emailApiKey),
         hasApiKeyConfigured: Boolean(emailApiKey),
         emailInstanceId,
+        emailAdminUsername,
         senderName,
         senderEmail,
         status,
@@ -91,6 +94,8 @@ export async function POST(req: Request) {
         emailApiUrl,
         emailApiKey,
         emailInstanceId,
+        emailAdminUsername,
+        emailAdminPassword,
         senderName,
         senderEmail,
         grantedScopes,
@@ -109,6 +114,14 @@ export async function POST(req: Request) {
 
       if (emailApiKey && String(emailApiKey).trim()) {
         updateData.emailApiKey = String(emailApiKey).trim();
+      }
+
+      if (emailAdminUsername && String(emailAdminUsername).trim()) {
+        updateData.emailAdminUsername = String(emailAdminUsername).trim();
+      }
+
+      if (emailAdminPassword && String(emailAdminPassword).trim()) {
+        updateData.emailAdminPassword = String(emailAdminPassword).trim();
       }
 
       if (Array.isArray(grantedScopes)) {
@@ -184,6 +197,8 @@ export async function POST(req: Request) {
       let targetApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
       let targetApiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
       let targetInstanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
+      let targetAdminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
+      let targetAdminPassword = process.env.EMAIL_ADMIN_PASSWORD || process.env.WHATSAPP_ADMIN_PASSWORD || "";
       let targetSenderName = "E-Global Pay";
       let targetSenderEmail = "no-reply@eglobalpay.com";
 
@@ -194,6 +209,8 @@ export async function POST(req: Request) {
           if (data?.emailApiUrl) targetApiUrl = data.emailApiUrl;
           if (data?.emailApiKey) targetApiKey = data.emailApiKey;
           if (data?.emailInstanceId) targetInstanceId = data.emailInstanceId;
+          if (data?.emailAdminUsername) targetAdminUsername = data.emailAdminUsername;
+          if (data?.emailAdminPassword) targetAdminPassword = data.emailAdminPassword;
           if (data?.senderName) targetSenderName = data.senderName;
           if (data?.senderEmail) targetSenderEmail = data.senderEmail;
         }
@@ -234,35 +251,105 @@ export async function POST(req: Request) {
       `;
 
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-        const apiRes = await fetch(targetApiUrl, {
-          method: "POST",
-          headers: {
+        const buildHeaders = (key: string, sessionCookie?: string) => {
+          const headers: Record<string, string> = {
             "Content-Type": "application/json",
-            "X-API-Key": targetApiKey,
-            "Authorization": `Bearer ${targetApiKey}`,
+            "X-API-Key": key,
+            "x-api-key": key,
+            "apikey": key,
+            "Authorization": `Bearer ${key}`,
             "X-Instance-ID": targetInstanceId,
-          },
-          body: JSON.stringify({
-            to: recipient,
-            subject,
-            html: htmlContent,
-            text: messageBody,
-            fromName: targetSenderName,
-            fromEmail: targetSenderEmail,
-          }),
-          signal: controller.signal,
-        });
+            "X-Email-ID": targetInstanceId,
+            "X-Project-ID": targetInstanceId,
+          };
+          if (sessionCookie) {
+            headers["Cookie"] = sessionCookie;
+          }
+          return headers;
+        };
 
-        clearTimeout(timeoutId);
+        const executeDispatch = async (keyToUse: string, cookieToUse?: string) => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000);
+          try {
+            const res = await fetch(targetApiUrl, {
+              method: "POST",
+              headers: buildHeaders(keyToUse, cookieToUse),
+              body: JSON.stringify({
+                to: recipient,
+                subject,
+                html: htmlContent,
+                text: messageBody,
+                fromName: targetSenderName,
+                fromEmail: targetSenderEmail,
+              }),
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            return res;
+          } catch (e) {
+            clearTimeout(timeoutId);
+            throw e;
+          }
+        };
+
+        let apiRes = await executeDispatch(targetApiKey);
 
         let responseData: any = {};
         try {
           responseData = await apiRes.json();
         } catch {
           responseData = { rawText: await apiRes.text() };
+        }
+
+        // If 401 Unauthorized or session error, attempt session login if admin credentials are set
+        if ((apiRes.status === 401 || (responseData && typeof responseData === "object" && JSON.stringify(responseData).includes("Unauthorized"))) && targetAdminUsername && targetAdminPassword) {
+          console.log("[Email Connect Test] 401 detected. Attempting gateway admin session login...");
+          try {
+            const urlObj = new URL(targetApiUrl);
+            const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+            const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+
+            let sessionCookie = "";
+            let acquiredToken = "";
+
+            for (const ep of loginEndpoints) {
+              try {
+                const loginRes = await fetch(ep, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    username: targetAdminUsername,
+                    email: targetAdminUsername,
+                    password: targetAdminPassword,
+                  }),
+                });
+
+                if (loginRes.ok) {
+                  const setCookieHeader = loginRes.headers.get("set-cookie");
+                  if (setCookieHeader) sessionCookie = setCookieHeader;
+
+                  const loginData = await loginRes.json().catch(() => ({}));
+                  acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
+
+                  console.log(`[Email Connect Test] Admin session login successful at ${ep}`);
+                  break;
+                }
+              } catch {}
+            }
+
+            if (acquiredToken || sessionCookie) {
+              const retryKey = acquiredToken || targetApiKey;
+              apiRes = await executeDispatch(retryKey, sessionCookie);
+              try {
+                responseData = await apiRes.json();
+              } catch {
+                responseData = { rawText: await apiRes.text() };
+              }
+            }
+          } catch (loginErr: any) {
+            console.warn("[Email Connect Test] Session login retry failed:", loginErr.message);
+          }
         }
 
         // Update last activity & increment count in Firestore
