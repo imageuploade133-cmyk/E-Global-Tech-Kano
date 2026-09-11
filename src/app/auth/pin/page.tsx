@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 
@@ -739,35 +740,87 @@ export default function PinPage() {
                       </p>
                     </div>
 
-                    <div className="w-full space-y-3.5 pt-2">
-                      <div className="space-y-1 text-left">
-                        <label htmlFor="newPinInput" className="text-[10px] font-black uppercase tracking-widest text-gray-400">New 4-Digit PIN</label>
-                        <input
-                          id="newPinInput"
-                          type="password"
-                          pattern="[0-9]*"
-                          inputMode="numeric"
-                          maxLength={4}
-                          value={newPin}
-                          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-center text-xs font-extrabold tracking-widest text-black placeholder-gray-400 outline-none shadow-sm"
-                          placeholder="••••"
-                        />
+                    <div className="w-full space-y-5 pt-2">
+                      {/* New 4-Digit PIN Cell Display */}
+                      <div className="space-y-1.5 text-left w-full">
+                        <label htmlFor="newPinInput" className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                          New 4-Digit PIN
+                        </label>
+                        <div className="relative w-full cursor-pointer" onClick={() => document.getElementById("newPinInput")?.focus()}>
+                          <input
+                            id="newPinInput"
+                            type="password"
+                            pattern="[0-9]*"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={newPin}
+                            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                            className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                            autoComplete="off"
+                          />
+                          <div className="grid grid-cols-4 gap-3 w-full">
+                            {[0, 1, 2, 3].map((idx) => {
+                              const isFilled = newPin.length > idx;
+                              const isActive = newPin.length === idx;
+                              return (
+                                <div
+                                  key={idx}
+                                  className={cn(
+                                    "h-14 sm:h-16 rounded-2xl border-2 flex items-center justify-center text-2xl font-black font-hanken transition-all shadow-2xs",
+                                    isFilled
+                                      ? "border-[#FC7A00] bg-[#FC7A00]/5 text-[#FC7A00]"
+                                      : isActive
+                                      ? "border-black bg-white ring-2 ring-black/10 scale-[1.02]"
+                                      : "border-gray-200 bg-gray-50 text-gray-400"
+                                  )}
+                                >
+                                  {isFilled ? "•" : ""}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="space-y-1 text-left">
-                        <label htmlFor="confirmNewPinInput" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm New PIN</label>
-                        <input
-                          id="confirmNewPinInput"
-                          type="password"
-                          pattern="[0-9]*"
-                          inputMode="numeric"
-                          maxLength={4}
-                          value={confirmNewPin}
-                          onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                          className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-center text-xs font-extrabold tracking-widest text-black placeholder-gray-400 outline-none shadow-sm"
-                          placeholder="••••"
-                        />
+                      {/* Confirm New PIN Cell Display */}
+                      <div className="space-y-1.5 text-left w-full">
+                        <label htmlFor="confirmNewPinInput" className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                          Confirm New PIN
+                        </label>
+                        <div className="relative w-full cursor-pointer" onClick={() => document.getElementById("confirmNewPinInput")?.focus()}>
+                          <input
+                            id="confirmNewPinInput"
+                            type="password"
+                            pattern="[0-9]*"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={confirmNewPin}
+                            onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                            className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                            autoComplete="off"
+                          />
+                          <div className="grid grid-cols-4 gap-3 w-full">
+                            {[0, 1, 2, 3].map((idx) => {
+                              const isFilled = confirmNewPin.length > idx;
+                              const isActive = confirmNewPin.length === idx;
+                              return (
+                                <div
+                                  key={idx}
+                                  className={cn(
+                                    "h-14 sm:h-16 rounded-2xl border-2 flex items-center justify-center text-2xl font-black font-hanken transition-all shadow-2xs",
+                                    isFilled
+                                      ? "border-[#FC7A00] bg-[#FC7A00]/5 text-[#FC7A00]"
+                                      : isActive
+                                      ? "border-black bg-white ring-2 ring-black/10 scale-[1.02]"
+                                      : "border-gray-200 bg-gray-50 text-gray-400"
+                                  )}
+                                >
+                                  {isFilled ? "•" : ""}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
