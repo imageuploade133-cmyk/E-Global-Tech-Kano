@@ -82,8 +82,8 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                   <Image src={property.sellerAvatarUrl} alt="Agent" fill className="object-cover" unoptimized />
                 </div>
               ) : (
-                <div className="w-5 h-5 rounded-full bg-[#FC7A00] text-white text-[9.5px] font-black flex items-center justify-center flex-shrink-0">
-                  {(property.sellerName || "A")[0]}
+                <div className="w-5 h-5 rounded-full bg-[#FC7A00] text-white flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[15px] text-white">account_circle</span>
                 </div>
               )}
               <span className="text-[9.5px] font-black text-black uppercase tracking-tight truncate">
