@@ -83,6 +83,8 @@ function CpanelStoreSettingsPageContent() {
   const [enableProductSharing, setEnableProductSharing] = useState(true);
   const [productPageHeaderAlignment, setProductPageHeaderAlignment] = useState<"left" | "center" | "right">("left");
   const [enableProductVideo, setEnableProductVideo] = useState(true);
+  const [hideCardPayment, setHideCardPayment] = useState(false);
+  const [enablePickup, setEnablePickup] = useState(false);
   const [isUploadingStoreLogo, setIsUploadingStoreLogo] = useState(false);
   const [borderColor, setBorderColor] = useState("#FC7A00");
   const [borderOpacity, setBorderOpacity] = useState(100);
@@ -184,6 +186,8 @@ function CpanelStoreSettingsPageContent() {
             : "left"
         );
         setEnableProductVideo(data.settings.enableProductVideo !== false);
+        setHideCardPayment(Boolean(data.settings.hideCardPayment));
+        setEnablePickup(Boolean(data.settings.enablePickup));
         setBorderColor(data.settings.borderColor || "#FC7A00");
         setBorderOpacity(data.settings.borderOpacity ?? 100);
         setHideBorders(Boolean(data.settings.hideBorders));
@@ -263,6 +267,8 @@ function CpanelStoreSettingsPageContent() {
             enableProductSharing,
             productPageHeaderAlignment,
             enableProductVideo,
+            hideCardPayment,
+            enablePickup,
             borderColor,
             borderOpacity,
             hideBorders,
@@ -409,6 +415,57 @@ function CpanelStoreSettingsPageContent() {
                       <span>{align}</span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Hide Card Payment & Enable Store Pickup Toggles */}
+              <div className="p-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 space-y-3">
+                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">credit_card_off</span>
+                      Store Card Payment Channel Toggle
+                    </label>
+                    <span className="text-[10px] text-gray-500 font-medium block mt-0.5">
+                      ON/OFF switch to hide or show card payment checkout option on public storefront
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHideCardPayment(!hideCardPayment)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
+                      hideCardPayment
+                        ? "bg-red-500/10 text-red-500 border-red-500/30"
+                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                    )}
+                  >
+                    {hideCardPayment ? "CARD HIDDEN" : "CARD VISIBLE"}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <label className="text-xs font-extrabold uppercase text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[18px]">storefront</span>
+                      In-Store Pickup Option Toggle
+                    </label>
+                    <span className="text-[10px] text-gray-500 font-medium block mt-0.5">
+                      ON/OFF switch to allow customers to choose In-Store Pickup during checkout
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEnablePickup(!enablePickup)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer border transition-all",
+                      enablePickup
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                        : "bg-gray-200/50 text-gray-500 border-gray-300/40"
+                    )}
+                  >
+                    {enablePickup ? "PICKUP ON" : "PICKUP OFF"}
+                  </button>
                 </div>
               </div>
 
