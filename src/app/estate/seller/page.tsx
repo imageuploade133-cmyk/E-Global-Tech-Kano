@@ -333,23 +333,22 @@ export default function EstateSellerDashboard() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
               {filteredProperties.map((prop) => (
-                <div key={prop.id} className="relative group">
+                <div key={prop.id} className="flex flex-col gap-2">
                   <PropertyCard
                     property={prop}
                     onOpenDetails={(p) => setSelectedProperty(p)}
                   />
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setEditingProperty(prop);
                       setIsAddModalOpen(true);
                     }}
-                    className="absolute top-2.5 left-2.5 z-20 px-2.5 py-1 rounded-full bg-black/80 hover:bg-black text-white text-[9.5px] font-black uppercase border-0 cursor-pointer flex items-center gap-1 shadow-md transition-all active:scale-90"
+                    className="w-full py-2 px-3 rounded-xl bg-gray-900 hover:bg-black text-white text-[10.5px] font-black uppercase tracking-wider border border-gray-800 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-98"
                     title="Edit Property Listing"
                   >
-                    <span className="material-symbols-outlined text-[13px] text-[#FC7A00]">edit</span>
-                    <span>Edit</span>
+                    <span className="material-symbols-outlined text-[14px] text-[#FC7A00]">edit</span>
+                    <span>Edit Property</span>
                   </button>
                 </div>
               ))}

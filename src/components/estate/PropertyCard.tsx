@@ -74,7 +74,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                   onOpenDetails(property);
                 }
               }}
-              className="absolute top-2.5 left-2.5 h-8 px-2.5 rounded-full bg-white/95 backdrop-blur-md flex items-center gap-1.5 text-black shadow-md z-10 hover:scale-105 active:scale-95 transition-all border border-white/40 cursor-pointer overflow-hidden max-w-[60%]"
+              className="absolute top-2.5 left-2.5 h-8 px-2.5 rounded-full bg-white/65 hover:bg-white/90 backdrop-blur-md flex items-center gap-1.5 text-black shadow-xs z-10 hover:scale-105 active:scale-95 transition-all border border-white/50 cursor-pointer overflow-hidden max-w-[60%]"
               title="View Agent Profile"
             >
               {property.sellerAvatarUrl ? (
