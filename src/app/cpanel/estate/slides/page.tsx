@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { UploadProgressBar } from "@/components/UploadProgressBar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
@@ -55,6 +56,7 @@ function AdminEstateSlidesPageContent() {
   const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate">("estate");
   const [link, setLink] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
 
   // Banner customize states
@@ -164,8 +166,11 @@ function AdminEstateSlidesPageContent() {
     setIsUploading(true);
     toast.loading("Uploading estate slide image securely...");
 
+    setUploadProgress(5);
     try {
-      const result = await uploadImageSecurely(file, "estate_banner");
+      const result = await uploadImageSecurely(file, "estate_banner", (percent) => {
+        setUploadProgress(percent);
+      });
       toast.dismiss();
 
       if (result.success && result.url) {
@@ -178,7 +183,10 @@ function AdminEstateSlidesPageContent() {
       toast.dismiss();
       toast.error(err.message || "Slide image upload failed.");
     } finally {
-      setIsUploading(false);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 400);
     }
   };
 
@@ -189,8 +197,11 @@ function AdminEstateSlidesPageContent() {
     setIsUploading(true);
     toast.loading("Uploading new slide image...");
 
+    setUploadProgress(5);
     try {
-      const result = await uploadImageSecurely(file, "estate_banner");
+      const result = await uploadImageSecurely(file, "estate_banner", (percent) => {
+        setUploadProgress(percent);
+      });
       toast.dismiss();
 
       if (result.success && result.url) {
@@ -203,7 +214,10 @@ function AdminEstateSlidesPageContent() {
       toast.dismiss();
       toast.error(err.message || "Image upload failed.");
     } finally {
-      setIsUploading(false);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 400);
     }
   };
 
@@ -587,6 +601,12 @@ function AdminEstateSlidesPageContent() {
               </div>
 
               <form onSubmit={handleAddSlide} className="space-y-4">
+                <UploadProgressBar
+                  isUploading={isUploading}
+                  progress={uploadProgress}
+                  label="Uploading Estate Slide Banner..."
+                />
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Slide Image <span className="text-red-500">*</span></label>
                   <div className="flex gap-2">
@@ -980,6 +1000,12 @@ function AdminEstateSlidesPageContent() {
                   </div>
 
                   <div className="flex items-center justify-between p-3.5 bg-gray-50 border rounded-xl border-gray-200/50">
+                  <UploadProgressBar
+                    isUploading={isUploading}
+                    progress={uploadProgress}
+                    label="Uploading Slide Image..."
+                  />
+
                     <div>
                       <p className="text-xs font-black uppercase tracking-wider">Hide Slide</p>
                       <p className="text-[10px] text-gray-400 font-semibold">Temporarily disable slide without deleting</p>

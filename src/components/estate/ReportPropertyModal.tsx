@@ -7,6 +7,7 @@ import { EstateProperty } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { UploadProgressBar } from "@/components/UploadProgressBar";
 
 interface ReportPropertyModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
   const [reporterPhone, setReporterPhone] = useState("");
   const [evidenceUrl, setEvidenceUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useModalBackHandler(isOpen, onClose, "report-property-modal");
@@ -41,8 +43,11 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
+    setUploadProgress(5);
     try {
-      const res = await uploadImageSecurely(file, "report_evidence");
+      const res = await uploadImageSecurely(file, "report_evidence", (percent) => {
+        setUploadProgress(percent);
+      });
       if (res.success && res.url) {
         setEvidenceUrl(res.url);
         toast.success("Screenshot / Evidence uploaded successfully!");
@@ -52,7 +57,10 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
     } catch {
       toast.error("Error uploading evidence photo.");
     } finally {
-      setIsUploading(false);
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 400);
     }
   };
 
@@ -197,6 +205,13 @@ export const ReportPropertyModal: React.FC<ReportPropertyModalProps> = ({
                   <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
                     Upload Screenshot / Evidence Image
                   </label>
+
+                  <UploadProgressBar
+                    isUploading={isUploading}
+                    progress={uploadProgress}
+                    label="Uploading Evidence Screenshot..."
+                  />
+
                   <div className="flex items-center gap-3">
                     <label className="px-4 py-3 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-2xl font-bold text-xs uppercase text-gray-800 cursor-pointer flex items-center gap-2 transition-all shadow-2xs">
                       <span className="material-symbols-outlined text-[18px] text-red-500">

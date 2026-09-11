@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { UploadProgressBar } from "@/components/UploadProgressBar";
 
 interface ProfileHeaderSectionProps {
   userName: string;
@@ -26,6 +27,8 @@ export function ProfileHeaderSection({
 }: ProfileHeaderSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imgError, setImgError] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const isCustomAvatar = (url?: string) => {
     if (!url) return false;
@@ -44,11 +47,13 @@ export function ProfileHeaderSection({
       return;
     }
 
-    toast.loading("Uploading profile avatar securely...");
+    setIsUploading(true);
+    setUploadProgress(5);
 
     try {
-      const result = await uploadImageSecurely(file, "profile_avatar");
-      toast.dismiss();
+      const result = await uploadImageSecurely(file, "profile_avatar", (percent) => {
+        setUploadProgress(percent);
+      });
 
       if (result.success && result.url) {
         await onPhotoUploaded(result.url);
@@ -57,8 +62,12 @@ export function ProfileHeaderSection({
         toast.error(result.error || "Failed to upload avatar image!");
       }
     } catch (err: any) {
-      toast.dismiss();
       toast.error(err.message || "Avatar image upload failed.");
+    } finally {
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 400);
     }
   };
 
@@ -82,6 +91,12 @@ export function ProfileHeaderSection({
           <span className="material-symbols-outlined text-[48px] font-bold">person</span>
         </div>
       )}
+
+      <UploadProgressBar
+        isUploading={isUploading}
+        progress={uploadProgress}
+        label="Uploading Profile Avatar..."
+      />
 
       <div className="mt-4 flex gap-2.5">
         <input

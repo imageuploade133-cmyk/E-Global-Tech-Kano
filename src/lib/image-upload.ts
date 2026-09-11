@@ -145,35 +145,79 @@ export function extractImgBbDirectUrls(json: any): { url?: string; backupUrl?: s
 /**
  * Client helper to safely upload an image file via the backend upload route.
  */
-export async function uploadImageSecurely(file: File, purpose = "general"): Promise<UploadResult> {
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("purpose", purpose);
+export async function uploadImageSecurely(
+  file: File,
+  purpose = "general",
+  onProgress?: (percent: number) => void
+): Promise<UploadResult> {
+  return new Promise((resolve) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("purpose", purpose);
 
-    const res = await fetch("/api/upload-image", {
-      method: "POST",
-      body: formData,
-    });
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload-image");
 
-    const json = await res.json();
-    if (!res.ok || !json.success) {
-      return {
-        success: false,
-        error: json.error || "Image upload failed",
+      if (xhr.upload && onProgress) {
+        onProgress(5);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.min(Math.round((e.loaded / e.total) * 100), 99);
+            onProgress(percent);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const json = JSON.parse(xhr.responseText || "{}");
+            if (json.success) {
+              if (onProgress) onProgress(100);
+              resolve({
+                success: true,
+                url: json.url,
+                backupUrl: json.backupUrl,
+                metadata: json.metadata,
+              });
+              return;
+            } else {
+              resolve({
+                success: false,
+                error: json.error || "Image upload failed",
+              });
+              return;
+            }
+          } else {
+            const json = JSON.parse(xhr.responseText || "{}");
+            resolve({
+              success: false,
+              error: json.error || `Upload failed with status ${xhr.status}`,
+            });
+            return;
+          }
+        } catch {
+          resolve({
+            success: false,
+            error: "Failed to parse image upload response",
+          });
+        }
       };
-    }
 
-    return {
-      success: true,
-      url: json.url,
-      backupUrl: json.backupUrl,
-      metadata: json.metadata,
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      error: err.message || "Network error uploading image",
-    };
-  }
+      xhr.onerror = () => {
+        resolve({
+          success: false,
+          error: "Network error during image upload",
+        });
+      };
+
+      xhr.send(formData);
+    } catch (err: any) {
+      resolve({
+        success: false,
+        error: err.message || "Network error uploading image",
+      });
+    }
+  });
 }

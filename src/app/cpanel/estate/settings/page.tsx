@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 import { cn } from "@/lib/utils";
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { UploadProgressBar } from "@/components/UploadProgressBar";
 
 export default function CpanelEstateSettingsPage() {
   const { isDark } = useCpanelTheme();
@@ -35,14 +36,18 @@ export default function CpanelEstateSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadProgress, setLogoUploadProgress] = useState(0);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploadingLogo(true);
+    setLogoUploadProgress(5);
     try {
-      const res = await uploadImageSecurely(file, "estate_logo");
+      const res = await uploadImageSecurely(file, "estate_logo", (percent) => {
+        setLogoUploadProgress(percent);
+      });
       if (res.success && res.url) {
         setEstateLogoUrl(res.url);
         toast.success("E-Global Estate Logo uploaded successfully!");
@@ -52,7 +57,10 @@ export default function CpanelEstateSettingsPage() {
     } catch {
       toast.error("Error uploading logo image.");
     } finally {
-      setIsUploadingLogo(false);
+      setTimeout(() => {
+        setIsUploadingLogo(false);
+        setLogoUploadProgress(0);
+      }, 400);
     }
   };
 
@@ -292,6 +300,12 @@ export default function CpanelEstateSettingsPage() {
               <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">palette</span>
               <h3 className="font-extrabold text-sm uppercase tracking-wide">E-Global Estate Branding & Header Customization</h3>
             </div>
+
+            <UploadProgressBar
+              isUploading={isUploadingLogo}
+              progress={logoUploadProgress}
+              label="Uploading Marketplace Logo..."
+            />
 
             <div className="flex flex-col sm:flex-row items-center gap-4 border-b pb-4 border-gray-100 dark:border-gray-800">
               <div className="w-20 h-20 rounded-2xl border-2 border-[#FC7A00] overflow-hidden bg-white flex items-center justify-center relative shadow-xs flex-shrink-0">
