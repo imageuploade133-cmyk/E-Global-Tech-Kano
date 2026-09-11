@@ -140,7 +140,7 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   };
 
   try {
-    let res = await dispatch(apiKey);
+    const res = await dispatch(apiKey);
 
     if (res.ok) {
       return true;
