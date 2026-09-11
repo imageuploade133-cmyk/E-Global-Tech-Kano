@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
+import { ensureEmailApiKeyOnGateway } from "@/lib/email-service";
 
 function maskApiKey(key: string): string {
   if (!key) return "";
@@ -164,6 +165,16 @@ export async function POST(req: Request) {
       };
 
       try {
+        // Automatically ensure/provision the API key on the WhatsAPI HUB gateway database
+        await ensureEmailApiKeyOnGateway({
+          emailApiUrl: cleanUrl,
+          emailApiKey: cleanKey,
+          emailInstanceId: cleanInst,
+          adminUsername: newKeyRecord.emailAdminUsername,
+          adminPassword: newKeyRecord.emailAdminPassword,
+          senderName: newKeyRecord.senderName,
+        });
+
         const docRef = adminDb.collection("config").doc("email_connect");
         const docSnap = await docRef.get();
         let existingKeys: any[] = [];
@@ -478,53 +489,77 @@ export async function POST(req: Request) {
           responseData = { rawText: await apiRes.text() };
         }
 
-        // If 401 Unauthorized or session error, attempt session login if admin credentials are set
-        if ((apiRes.status === 401 || (responseData && typeof responseData === "object" && JSON.stringify(responseData).includes("Unauthorized"))) && targetAdminUsername && targetAdminPassword) {
-          console.log("[Email Connect Test] 401 detected. Attempting gateway admin session login...");
-          try {
-            const urlObj = new URL(targetApiUrl);
-            const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
-            const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+        // If 401 Unauthorized or API key error, attempt auto-provisioning key on WhatsAPI HUB gateway and retry
+        const errTextStr = JSON.stringify(responseData);
+        if (apiRes.status === 401 || apiRes.status === 403 || errTextStr.includes("Unauthorized") || errTextStr.includes("Invalid API Key")) {
+          console.log("[Email Connect Test] Auth/Key error detected. Attempting to ensure/provision API key on WhatsAPI HUB gateway...");
+          const createdOnGateway = await ensureEmailApiKeyOnGateway({
+            emailApiUrl: targetApiUrl,
+            emailApiKey: targetApiKey,
+            emailInstanceId: targetInstanceId,
+            adminUsername: targetAdminUsername,
+            adminPassword: targetAdminPassword,
+            senderName: targetSenderName,
+          });
 
-            let sessionCookie = "";
-            let acquiredToken = "";
-
-            for (const ep of loginEndpoints) {
-              try {
-                const loginRes = await fetch(ep, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    username: targetAdminUsername,
-                    email: targetAdminUsername,
-                    password: targetAdminPassword,
-                  }),
-                });
-
-                if (loginRes.ok) {
-                  const setCookieHeader = loginRes.headers.get("set-cookie");
-                  if (setCookieHeader) sessionCookie = setCookieHeader;
-
-                  const loginData = await loginRes.json().catch(() => ({}));
-                  acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
-
-                  console.log(`[Email Connect Test] Admin session login successful at ${ep}`);
-                  break;
-                }
-              } catch {}
+          if (createdOnGateway) {
+            console.log("[Email Connect Test] API key provisioned on gateway. Retrying test dispatch...");
+            apiRes = await executeDispatch(targetApiKey);
+            try {
+              responseData = await apiRes.json();
+            } catch {
+              responseData = { rawText: await apiRes.text() };
             }
+          }
 
-            if (acquiredToken || sessionCookie) {
-              const retryKey = acquiredToken || targetApiKey;
-              apiRes = await executeDispatch(retryKey, sessionCookie);
-              try {
-                responseData = await apiRes.json();
-              } catch {
-                responseData = { rawText: await apiRes.text() };
+          // Fallback: Attempt session login if admin credentials are set
+          if (!apiRes.ok && targetAdminUsername && targetAdminPassword) {
+            console.log("[Email Connect Test] Attempting gateway admin session login fallback...");
+            try {
+              const urlObj = new URL(targetApiUrl);
+              const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+              const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+
+              let sessionCookie = "";
+              let acquiredToken = "";
+
+              for (const ep of loginEndpoints) {
+                try {
+                  const loginRes = await fetch(ep, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      username: targetAdminUsername,
+                      email: targetAdminUsername,
+                      password: targetAdminPassword,
+                    }),
+                  });
+
+                  if (loginRes.ok) {
+                    const setCookieHeader = loginRes.headers.get("set-cookie");
+                    if (setCookieHeader) sessionCookie = setCookieHeader;
+
+                    const loginData = await loginRes.json().catch(() => ({}));
+                    acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
+
+                    console.log(`[Email Connect Test] Admin session login successful at ${ep}`);
+                    break;
+                  }
+                } catch {}
               }
+
+              if (acquiredToken || sessionCookie) {
+                const retryKey = acquiredToken || targetApiKey;
+                apiRes = await executeDispatch(retryKey, sessionCookie);
+                try {
+                  responseData = await apiRes.json();
+                } catch {
+                  responseData = { rawText: await apiRes.text() };
+                }
+              }
+            } catch (loginErr: any) {
+              console.warn("[Email Connect Test] Session login retry failed:", loginErr.message);
             }
-          } catch (loginErr: any) {
-            console.warn("[Email Connect Test] Session login retry failed:", loginErr.message);
           }
         }
 
