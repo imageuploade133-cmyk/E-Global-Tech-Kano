@@ -177,26 +177,8 @@ export async function POST(req: Request) {
     };
 
     if (isCardCheckout) {
-      // Resolve Flutterwave Secret Key multi-tier lookup: env vars -> config/app_config -> config/app
-      let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
-      try {
-        if (!flutterwaveSecretKey) {
-          const configDoc = await adminDb.collection("config").doc("app_config").get();
-          if (configDoc.exists) {
-            const cfg = configDoc.data() || {};
-            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
-          }
-        }
-        if (!flutterwaveSecretKey) {
-          const appDoc = await adminDb.collection("config").doc("app").get();
-          if (appDoc.exists) {
-            const cfg = appDoc.data() || {};
-            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
-          }
-        }
-      } catch (err: any) {
-        console.warn("[Store Order POST] Flutterwave config lookup warning:", err.message);
-      }
+      const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
+      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
       const txRef = `TX-STORE-${orderId}`;
       const requestHost = req.headers.get("host") || "";
@@ -208,15 +190,19 @@ export async function POST(req: Request) {
       let paymentUrl = "";
       let flwErrorMessage = "";
 
-      if (flutterwaveSecretKey) {
-        try {
-          const flwRes = await fetch("https://api.flutterwave.com/v3/payments", {
+      // 1. Primary: Request backend VM proxy S2S payment initialization via secure VM .env configuration
+      try {
+        const vmProxyRes = await fetch(`${gatewayUrl}/api/flutterwave/proxy`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": gatewayApiKey,
+            "Authorization": `Bearer ${gatewayApiKey}`,
+          },
+          body: JSON.stringify({
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${flutterwaveSecretKey}`,
-            },
-            body: JSON.stringify({
+            endpoint: "/payments",
+            body: {
               tx_ref: txRef,
               amount: totalAmount,
               currency: "NGN",
@@ -236,23 +222,119 @@ export async function POST(req: Request) {
                 description: `Payment for Order ${orderId}`,
                 logo: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
               },
+            },
+          }),
+        });
+
+        const vmProxyData = await vmProxyRes.json().catch(() => ({}));
+        if (vmProxyRes.ok && vmProxyData.status === "success" && vmProxyData.data?.link) {
+          paymentUrl = vmProxyData.data.link;
+        } else if (vmProxyRes.ok && vmProxyData.link) {
+          paymentUrl = vmProxyData.link;
+        } else if (vmProxyData.message) {
+          flwErrorMessage = vmProxyData.message;
+        }
+      } catch (err: any) {
+        console.warn("[Store Order POST] VM proxy call exception:", err.message);
+      }
+
+      // 2. Secondary: Fallback to backend VM /api/flutterwave/initialize endpoint
+      if (!paymentUrl) {
+        try {
+          const vmInitRes = await fetch(`${gatewayUrl}/api/flutterwave/initialize`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": gatewayApiKey,
+              "Authorization": `Bearer ${gatewayApiKey}`,
+            },
+            body: JSON.stringify({
+              amount: totalAmount,
+              currency: "NGN",
+              email: customerEmail || userEmail || "customer@e-tech-store.com",
+              name: customerName,
+              userId: uid,
+              redirectUrl,
+              phone: customerPhone,
             }),
           });
 
-          const flwData = await flwRes.json();
-          if (flwRes.ok && flwData.status === "success" && flwData.data?.link) {
-            paymentUrl = flwData.data.link;
-          } else {
-            flwErrorMessage = flwData.message || flwData.error || "Flutterwave payment gateway rejected payment initialization.";
-            console.error("[Store Order POST] Flutterwave payment creation failed:", flwData);
+          const vmInitData = await vmInitRes.json().catch(() => ({}));
+          if (vmInitRes.ok && vmInitData.data?.link) {
+            paymentUrl = vmInitData.data.link;
+          } else if (vmInitRes.ok && vmInitData.link) {
+            paymentUrl = vmInitData.link;
+          } else if (!flwErrorMessage && vmInitData.message) {
+            flwErrorMessage = vmInitData.message;
           }
-        } catch (flwErr: any) {
-          flwErrorMessage = flwErr.message || "Failed to reach Flutterwave payment gateway server.";
-          console.error("[Store Order POST] Flutterwave API call exception:", flwErr.message);
+        } catch (err: any) {
+          console.warn("[Store Order POST] VM initialize exception:", err.message);
         }
-      } else {
-        flwErrorMessage = "Flutterwave secret key is not configured on the server.";
-        console.error("[Store Order POST] Cannot initialize hosted payment: FLW_SECRET_KEY is missing.");
+      }
+
+      // 3. Fallback: Check local env / Firestore config if direct key exists locally
+      if (!paymentUrl) {
+        let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
+        if (!flutterwaveSecretKey) {
+          try {
+            const configDoc = await adminDb.collection("config").doc("app_config").get();
+            if (configDoc.exists) {
+              const cfg = configDoc.data() || {};
+              flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
+            }
+            if (!flutterwaveSecretKey) {
+              const appDoc = await adminDb.collection("config").doc("app").get();
+              if (appDoc.exists) {
+                const cfg = appDoc.data() || {};
+                flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
+              }
+            }
+          } catch (err: any) {
+            console.warn("[Store Order POST] Local config lookup warning:", err.message);
+          }
+        }
+
+        if (flutterwaveSecretKey) {
+          try {
+            const flwRes = await fetch("https://api.flutterwave.com/v3/payments", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${flutterwaveSecretKey}`,
+              },
+              body: JSON.stringify({
+                tx_ref: txRef,
+                amount: totalAmount,
+                currency: "NGN",
+                redirect_url: redirectUrl,
+                meta: {
+                  orderId,
+                  userId: uid,
+                  customerPhone,
+                },
+                customer: {
+                  email: customerEmail || userEmail || "customer@e-tech-store.com",
+                  phonenumber: customerPhone,
+                  name: customerName,
+                },
+                customizations: {
+                  title: "E-Tech Store Order Payment",
+                  description: `Payment for Order ${orderId}`,
+                  logo: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+                },
+              }),
+            });
+
+            const flwData = await flwRes.json();
+            if (flwRes.ok && flwData.status === "success" && flwData.data?.link) {
+              paymentUrl = flwData.data.link;
+            } else if (!flwErrorMessage) {
+              flwErrorMessage = flwData.message || flwData.error;
+            }
+          } catch (flwErr: any) {
+            if (!flwErrorMessage) flwErrorMessage = flwErr.message;
+          }
+        }
       }
 
       if (!paymentUrl) {
