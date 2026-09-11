@@ -26,50 +26,116 @@ export async function GET(req: Request) {
       return NextResponse.redirect(new URL(`/store?orderSuccess=${orderId}`, req.url));
     }
 
-    // Resolve Flutterwave Secret Key
-    let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
-    if (!flutterwaveSecretKey) {
-      try {
-        const configDoc = await adminDb.collection("config").doc("app_config").get();
-        if (configDoc.exists) {
-          const cfg = configDoc.data() || {};
-          flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
-        }
-        if (!flutterwaveSecretKey) {
-          const appDoc = await adminDb.collection("config").doc("app").get();
-          if (appDoc.exists) {
-            const cfg = appDoc.data() || {};
-            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
-          }
-        }
-      } catch (err: any) {
-        console.warn("[Store Order Verify] Flutterwave config lookup warning:", err.message);
-      }
-    }
+    const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const txRef = url.searchParams.get("tx_ref") || orderData?.txRef || `TX-STORE-${orderId}`;
 
     let isVerified = false;
     let flwTxRef = "";
 
-    if (transactionId && flutterwaveSecretKey) {
+    // 1. Primary Verification: Query backend VM S2S verify route using secure VM .env configuration
+    if (transactionId || txRef) {
       try {
-        const verifyRes = await fetch(`https://api.flutterwave.com/v3/transactions/${transactionId}/verify`, {
+        const vmVerifyRes = await fetch(`${gatewayUrl}/api/flutterwave/verify`, {
+          method: "POST",
           headers: {
-            Authorization: `Bearer ${flutterwaveSecretKey}`,
+            "Content-Type": "application/json",
+            "X-API-Key": gatewayApiKey,
+            "Authorization": `Bearer ${gatewayApiKey}`,
           },
+          body: JSON.stringify({
+            transaction_id: transactionId,
+            tx_ref: txRef,
+          }),
         });
-        const verifyData = await verifyRes.json();
 
+        const vmData = await vmVerifyRes.json().catch(() => ({}));
         if (
-          verifyRes.ok &&
-          verifyData.status === "success" &&
-          verifyData.data?.status === "successful" &&
-          Number(verifyData.data?.amount) >= Number(orderData?.totalAmount || 0)
+          vmVerifyRes.ok &&
+          (vmData.status === "SUCCESS" || vmData.status === "success" || vmData.credited === true || vmData.data?.status === "successful")
         ) {
           isVerified = true;
-          flwTxRef = verifyData.data?.tx_ref || transactionId;
+          flwTxRef = vmData.txRef || vmData.data?.tx_ref || transactionId || txRef;
         }
       } catch (err: any) {
-        console.error("[Store Order Verify] Flutterwave transaction verification exception:", err.message);
+        console.warn("[Store Order Verify] VM verify route call exception:", err.message);
+      }
+    }
+
+    // 2. Secondary Verification: Query backend VM proxy S2S route (/api/flutterwave/proxy)
+    if (!isVerified && transactionId) {
+      try {
+        const vmProxyRes = await fetch(`${gatewayUrl}/api/flutterwave/proxy`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": gatewayApiKey,
+            "Authorization": `Bearer ${gatewayApiKey}`,
+          },
+          body: JSON.stringify({
+            method: "GET",
+            endpoint: `/transactions/${transactionId}/verify`,
+          }),
+        });
+
+        const proxyData = await vmProxyRes.json().catch(() => ({}));
+        if (
+          vmProxyRes.ok &&
+          proxyData.status === "success" &&
+          proxyData.data?.status === "successful" &&
+          Number(proxyData.data?.amount) >= Number(orderData?.totalAmount || 0)
+        ) {
+          isVerified = true;
+          flwTxRef = proxyData.data?.tx_ref || transactionId;
+        }
+      } catch (err: any) {
+        console.warn("[Store Order Verify] VM proxy verify exception:", err.message);
+      }
+    }
+
+    // 3. Fallback Verification: Check local env / Firestore config if direct key exists locally
+    if (!isVerified && transactionId) {
+      let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
+      if (!flutterwaveSecretKey) {
+        try {
+          const configDoc = await adminDb.collection("config").doc("app_config").get();
+          if (configDoc.exists) {
+            const cfg = configDoc.data() || {};
+            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
+          }
+          if (!flutterwaveSecretKey) {
+            const appDoc = await adminDb.collection("config").doc("app").get();
+            if (appDoc.exists) {
+              const cfg = appDoc.data() || {};
+              flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
+            }
+          }
+        } catch (err: any) {
+          console.warn("[Store Order Verify] Local config lookup warning:", err.message);
+        }
+      }
+
+      if (flutterwaveSecretKey) {
+        try {
+          const verifyRes = await fetch(`https://api.flutterwave.com/v3/transactions/${transactionId}/verify`, {
+            headers: {
+              Authorization: `Bearer ${flutterwaveSecretKey}`,
+            },
+          });
+          const verifyData = await verifyRes.json();
+
+          if (
+            verifyRes.ok &&
+            verifyData.status === "success" &&
+            verifyData.data?.status === "successful" &&
+            Number(verifyData.data?.amount) >= Number(orderData?.totalAmount || 0)
+          ) {
+            isVerified = true;
+            flwTxRef = verifyData.data?.tx_ref || transactionId;
+          }
+        } catch (err: any) {
+          console.error("[Store Order Verify] Flutterwave transaction verification exception:", err.message);
+        }
       }
     }
 
