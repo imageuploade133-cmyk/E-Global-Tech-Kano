@@ -177,14 +177,21 @@ export async function POST(req: Request) {
     };
 
     if (isCardCheckout) {
-      // Resolve Flutterwave Secret Key from FLW_SECRET_KEY, FLUTTERWAVE_SECRET_KEY, or Firestore app_config
+      // Resolve Flutterwave Secret Key multi-tier lookup: env vars -> config/app_config -> config/app
       let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
       try {
         if (!flutterwaveSecretKey) {
           const configDoc = await adminDb.collection("config").doc("app_config").get();
           if (configDoc.exists) {
             const cfg = configDoc.data() || {};
-            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || "";
+            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
+          }
+        }
+        if (!flutterwaveSecretKey) {
+          const appDoc = await adminDb.collection("config").doc("app").get();
+          if (appDoc.exists) {
+            const cfg = appDoc.data() || {};
+            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
           }
         }
       } catch (err: any) {

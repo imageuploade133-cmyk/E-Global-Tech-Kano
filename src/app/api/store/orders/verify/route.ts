@@ -33,7 +33,14 @@ export async function GET(req: Request) {
         const configDoc = await adminDb.collection("config").doc("app_config").get();
         if (configDoc.exists) {
           const cfg = configDoc.data() || {};
-          flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || "";
+          flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
+        }
+        if (!flutterwaveSecretKey) {
+          const appDoc = await adminDb.collection("config").doc("app").get();
+          if (appDoc.exists) {
+            const cfg = appDoc.data() || {};
+            flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
+          }
         }
       } catch (err: any) {
         console.warn("[Store Order Verify] Flutterwave config lookup warning:", err.message);
