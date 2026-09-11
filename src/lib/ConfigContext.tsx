@@ -8,6 +8,9 @@ export interface AppConfig {
   logoUrl: string;
   receiptLogoUrl?: string;
   receiptName?: string;
+  statementLogoUrl?: string;
+  statementSignatureUrl?: string;
+  statementStampUrl?: string;
   supportPhone1: string;
   supportPhone2: string;
   supportEmail: string;

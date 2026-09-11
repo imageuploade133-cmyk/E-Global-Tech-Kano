@@ -27,6 +27,9 @@ function CpanelSettingsPageContent() {
   const [logoInput, setLogoInput] = useState(config.logoUrl);
   const [receiptLogoInput, setReceiptLogoInput] = useState(config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
   const [receiptNameInput, setReceiptNameInput] = useState(config.receiptName || "E-TECH GLOBAL HUB");
+  const [statementLogoInput, setStatementLogoInput] = useState(config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
+  const [statementSignatureInput, setStatementSignatureInput] = useState(config.statementSignatureUrl || "");
+  const [statementStampInput, setStatementStampInput] = useState(config.statementStampUrl || "");
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
   const [emailInput, setEmailInput] = useState(config.supportEmail);
@@ -38,6 +41,9 @@ function CpanelSettingsPageContent() {
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingReceiptLogo, setIsUploadingReceiptLogo] = useState(false);
+  const [isUploadingStatementLogo, setIsUploadingStatementLogo] = useState(false);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+  const [isUploadingStamp, setIsUploadingStamp] = useState(false);
 
 
 
@@ -47,6 +53,9 @@ function CpanelSettingsPageContent() {
     setLogoInput(config.logoUrl);
     setReceiptLogoInput(config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
     setReceiptNameInput(config.receiptName || "E-TECH GLOBAL HUB");
+    setStatementLogoInput(config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
+    setStatementSignatureInput(config.statementSignatureUrl || "");
+    setStatementStampInput(config.statementStampUrl || "");
     setPhone1Input(config.supportPhone1);
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
@@ -64,6 +73,9 @@ function CpanelSettingsPageContent() {
         logoUrl: logoInput,
         receiptLogoUrl: receiptLogoInput,
         receiptName: receiptNameInput,
+        statementLogoUrl: statementLogoInput,
+        statementSignatureUrl: statementSignatureInput,
+        statementStampUrl: statementStampInput,
         supportPhone1: phone1Input,
         supportPhone2: phone2Input,
         supportEmail: emailInput,
@@ -72,7 +84,7 @@ function CpanelSettingsPageContent() {
         whatsappPollingEnabled,
         whatsappPollingIntervalMinutes,
       });
-      toast.success("Branding, Receipt, Support and API configurations applied!");
+      toast.success("Global branding, Statement logo, Signature, and Stamp settings applied!");
     } catch (err: unknown) {
       console.error(err);
       toast.error("Failed to commit settings updates to system storage.");
@@ -135,6 +147,87 @@ function CpanelSettingsPageContent() {
     }
   };
 
+  const handleStatementLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingStatementLogo(true);
+    toast.loading("Uploading statement logo securely...");
+
+    try {
+      const result = await uploadImageSecurely(file, "statement_logo");
+      toast.dismiss();
+
+      if (result.success && result.url) {
+        const uploadedUrl = result.url;
+        setStatementLogoInput(uploadedUrl);
+        updateConfig({ statementLogoUrl: uploadedUrl });
+        toast.success("Statement logo successfully uploaded and updated!");
+      } else {
+        toast.error(result.error || "Failed to upload statement logo!");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Statement logo upload failed.");
+    } finally {
+      setIsUploadingStatementLogo(false);
+    }
+  };
+
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingSignature(true);
+    toast.loading("Uploading authorized signature securely...");
+
+    try {
+      const result = await uploadImageSecurely(file, "statement_signature");
+      toast.dismiss();
+
+      if (result.success && result.url) {
+        const uploadedUrl = result.url;
+        setStatementSignatureInput(uploadedUrl);
+        updateConfig({ statementSignatureUrl: uploadedUrl });
+        toast.success("Authorized signature successfully uploaded and updated!");
+      } else {
+        toast.error(result.error || "Failed to upload signature!");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Signature upload failed.");
+    } finally {
+      setIsUploadingSignature(false);
+    }
+  };
+
+  const handleStampUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingStamp(true);
+    toast.loading("Uploading official stamp securely...");
+
+    try {
+      const result = await uploadImageSecurely(file, "statement_stamp");
+      toast.dismiss();
+
+      if (result.success && result.url) {
+        const uploadedUrl = result.url;
+        setStatementStampInput(uploadedUrl);
+        updateConfig({ statementStampUrl: uploadedUrl });
+        toast.success("Official stamp successfully uploaded and updated!");
+      } else {
+        toast.error(result.error || "Failed to upload stamp!");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Stamp upload failed.");
+    } finally {
+      setIsUploadingStamp(false);
+    }
+  };
+
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
   const panelClass = isDark
     ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
@@ -158,11 +251,11 @@ function CpanelSettingsPageContent() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-orange-500 text-[22px]">diamond</span>
-                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Branding & Support Settings</h1>
+                <span className="material-symbols-outlined text-orange-500 text-[22px]">settings_suggest</span>
+                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Global Settings</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Configure platform brand logo, ImgBB API key, document limits, and customer support contacts.
+                Configure platform brand logo, statement logo, signature, official stamp, ImgBB API key, document limits, and support contacts.
               </p>
             </div>
           </div>
@@ -261,6 +354,96 @@ function CpanelSettingsPageContent() {
                     </select>
                   </div>
                 )}
+              </div>
+
+              {/* Statement of Account Branding (Logo, Signature, Stamp) */}
+              <div className={cn("p-4 rounded-xl border space-y-4 transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px]">description</span>
+                    Statement of Account Branding (Logo, Signature & Stamp)
+                  </label>
+                  <p className="text-[9px] text-gray-400 mt-0.5">Configure the official statement logo, authorized signature, and official stamp rendered when users download or email statements.</p>
+                </div>
+
+                {/* Statement Logo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Statement Logo URL</label>
+                    <input
+                      type="url"
+                      value={statementLogoInput}
+                      onChange={(e) => setStatementLogoInput(e.target.value)}
+                      placeholder="https://i.ibb.co/..."
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Upload Statement Logo File</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingStatementLogo}
+                      onChange={handleStatementLogoUpload}
+                      className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-[#FC7A00]/10 file:text-[#FC7A00]")}
+                    />
+                  </div>
+                </div>
+
+                {/* Signature & Stamp */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-200/30 dark:border-gray-800 pt-3">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-blue-500">draw</span>
+                      Authorized Signature Image
+                    </label>
+                    <input
+                      type="url"
+                      value={statementSignatureInput}
+                      onChange={(e) => setStatementSignatureInput(e.target.value)}
+                      placeholder="Signature image URL"
+                      className={inputClass}
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingSignature}
+                      onChange={handleSignatureUpload}
+                      className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-blue-500/10 file:text-blue-600")}
+                    />
+                    {statementSignatureInput && (
+                      <div className="p-2 bg-white rounded-lg border border-gray-200 inline-block max-w-[120px]">
+                        <img src={statementSignatureInput} alt="Signature Preview" className="h-10 object-contain" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-purple-500">approval</span>
+                      Official Stamp Image
+                    </label>
+                    <input
+                      type="url"
+                      value={statementStampInput}
+                      onChange={(e) => setStatementStampInput(e.target.value)}
+                      placeholder="Stamp image URL"
+                      className={inputClass}
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingStamp}
+                      onChange={handleStampUpload}
+                      className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-purple-500/10 file:text-purple-600")}
+                    />
+                    {statementStampInput && (
+                      <div className="p-2 bg-white rounded-lg border border-gray-200 inline-block max-w-[120px]">
+                        <img src={statementStampInput} alt="Stamp Preview" className="h-10 object-contain" />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Receipt Branding Settings */}
