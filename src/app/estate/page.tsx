@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import {
   EstateProperty,
   EstateSeller,
+  EstateSettingsData,
   PropertyPurpose,
   PropertyType,
 } from "@/estate/types";
@@ -29,6 +30,7 @@ export default function EstateMarketplacePage() {
   const [properties, setProperties] = useState<EstateProperty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hideIcons, setHideIcons] = useState(false);
+  const [estateSettings, setEstateSettings] = useState<EstateSettingsData | null>(null);
 
   // Filters
   const [selectedPurpose, setSelectedPurpose] = useState<PropertyPurpose | "ALL">("ALL");
@@ -175,6 +177,7 @@ export default function EstateMarketplacePage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.settings) {
+          setEstateSettings(data.settings);
           setHideIcons(Boolean(data.settings.hidePropertyIcons));
         }
       })
@@ -521,6 +524,7 @@ export default function EstateMarketplacePage() {
         <PropertyDetailModal
           isOpen={Boolean(selectedProperty)}
           property={selectedProperty}
+          settings={estateSettings}
           onClose={() => setSelectedProperty(null)}
           onSubmitInquiry={handleSubmitInquiry}
           onReportProperty={handleReportProperty}
