@@ -34,8 +34,16 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
         if (data.success && data.settings) {
           const s = data.settings;
           if (s.estateLogoUrl) setLogoUrl(s.estateLogoUrl);
-          if (!title && s.estateTitle) setHeaderTitle(s.estateTitle);
-          if (!subtitle && s.estateSubtitle) setHeaderSubtitle(s.estateSubtitle);
+          if (s.estateTitle && (!title || title === "E-Global Estate")) {
+            setHeaderTitle(s.estateTitle);
+          } else if (title) {
+            setHeaderTitle(title);
+          }
+          if (s.estateSubtitle && (!subtitle || subtitle === "Houses, Apartments & Land")) {
+            setHeaderSubtitle(s.estateSubtitle);
+          } else if (subtitle) {
+            setHeaderSubtitle(subtitle);
+          }
           if (s.estateTitleColor) setTitleColor(s.estateTitleColor);
           if (s.estateSubtitleColor) setSubtitleColor(s.estateSubtitleColor);
         }

@@ -379,6 +379,7 @@ export async function POST(req: Request) {
         message: "Card checkout link generated! Redirecting to Flutterwave...",
         order: newOrder,
         paymentUrl,
+        paymentLink: paymentUrl,
         requiresPaymentRedirect: true,
       });
 

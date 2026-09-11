@@ -365,8 +365,6 @@ export default function EstateMarketplacePage() {
 
         {/* Dedicated Estate Top Bar */}
         <EstateHeader
-          title="E-Global Estate"
-          subtitle="Houses, Apartments & Land"
           favoritesCount={favorites.length}
           onOpenFavorites={() => {
             fetchUserFavorites();
