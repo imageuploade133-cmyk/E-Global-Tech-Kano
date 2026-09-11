@@ -4,13 +4,14 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { EstateProperty, EstateSeller } from "@/estate/types";
+import { EstateProperty, EstateSeller, EstateSettingsData } from "@/estate/types";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { EstateChatInquiryModal } from "./EstateChatInquiryModal";
 
 interface PropertyDetailModalProps {
   isOpen: boolean;
   property: EstateProperty | null;
+  settings?: EstateSettingsData | null;
   onClose: () => void;
   onSubmitInquiry: (
     message: string,
@@ -25,6 +26,7 @@ interface PropertyDetailModalProps {
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   isOpen,
   property,
+  settings,
   onClose,
   onSubmitInquiry,
   onReportProperty,
@@ -35,8 +37,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [enableChat, setEnableChat] = useState(true);
-  const [enableShare, setEnableShare] = useState(true);
+
+  const [enableChat, setEnableChat] = useState<boolean>(settings ? settings.enableChat !== false : true);
+  const [enableShare, setEnableShare] = useState<boolean>(settings ? settings.enableShare !== false : true);
+  const [enableReport, setEnableReport] = useState<boolean>(settings ? settings.enableReport !== false : true);
+  const [enableCalls, setEnableCalls] = useState<boolean>(settings ? settings.enableCalls !== false : true);
 
   // Publisher full agent state
   const [publisherAgent, setPublisherAgent] = useState<EstateSeller | null>(null);
@@ -44,15 +49,22 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   useModalBackHandler(isOpen, onClose, property ? `property-detail-${property.id}` : "property-detail");
 
-  // Fetch estate settings and agent full details when property opens
+  // Sync estate settings and fetch agent details when property opens
   useEffect(() => {
-    if (isOpen) {
+    if (settings) {
+      setEnableChat(settings.enableChat !== false);
+      setEnableShare(settings.enableShare !== false);
+      setEnableReport(settings.enableReport !== false);
+      setEnableCalls(settings.enableCalls !== false);
+    } else if (isOpen) {
       fetch("/api/estate/settings")
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.settings) {
             setEnableChat(data.settings.enableChat !== false);
             setEnableShare(data.settings.enableShare !== false);
+            setEnableReport(data.settings.enableReport !== false);
+            setEnableCalls(data.settings.enableCalls !== false);
           }
         })
         .catch(() => {});
@@ -141,7 +153,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
-              {onOpenReportDrawer && (
+              {enableReport && onOpenReportDrawer && (
                 <button
                   type="button"
                   onClick={onOpenReportDrawer}
@@ -515,7 +527,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
           {/* Static Fixed Bottom Action Bar */}
           <div className="fixed bottom-0 left-0 right-0 z-30 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-2xl flex items-center gap-2.5">
-            {agentPhone && (
+            {enableCalls && agentPhone && (
               <>
                 <a
                   href={`tel:${agentPhone}`}

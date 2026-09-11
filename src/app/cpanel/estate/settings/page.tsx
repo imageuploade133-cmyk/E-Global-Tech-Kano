@@ -25,6 +25,7 @@ export default function CpanelEstateSettingsPage() {
   const [enableChat, setEnableChat] = useState(true);
   const [enableCalls, setEnableCalls] = useState(true);
   const [enableShare, setEnableShare] = useState(true);
+  const [enableReport, setEnableReport] = useState(true);
   const [enableCardBorder, setEnableCardBorder] = useState(true);
   const [cardBorderStyle, setCardBorderStyle] = useState<"gradient" | "solid" | "none">("gradient");
   const [cardBorderColor, setCardBorderColor] = useState("#FC7A00");
@@ -78,6 +79,7 @@ export default function CpanelEstateSettingsPage() {
         setEnableChat(s.enableChat !== false);
         setEnableCalls(s.enableCalls !== false);
         setEnableShare(s.enableShare !== false);
+        setEnableReport(s.enableReport !== false);
         setEnableCardBorder(s.enableCardBorder !== false);
         setCardBorderStyle(s.cardBorderStyle === "solid" ? "solid" : s.cardBorderStyle === "none" ? "none" : "gradient");
         setCardBorderColor(s.cardBorderColor || "#FC7A00");
@@ -119,6 +121,7 @@ export default function CpanelEstateSettingsPage() {
           enableChat,
           enableCalls,
           enableShare,
+          enableReport,
           enableCardBorder,
           cardBorderStyle,
           cardBorderColor,
@@ -435,6 +438,22 @@ export default function CpanelEstateSettingsPage() {
                   className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableShare ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
                 >
                   {enableShare ? "ENABLED" : "DISABLED"}
+                </button>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div>
+                  <span className="text-xs font-bold block">Property Page Report Button</span>
+                  <span className="text-[10.5px] text-gray-500 font-medium block">
+                    Global ON/OFF switch to show or hide the Report Flag button on property detail pages
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEnableReport(!enableReport)}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableReport ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
+                >
+                  {enableReport ? "ENABLED" : "DISABLED"}
                 </button>
               </div>
 

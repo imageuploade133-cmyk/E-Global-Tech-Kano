@@ -156,6 +156,7 @@ export interface EstateSettingsData {
   enableChat: boolean;
   enableCalls: boolean;
   enableShare: boolean;
+  enableReport: boolean;
   enableCardBorder: boolean;
   cardBorderStyle: "gradient" | "solid" | "none";
   cardBorderColor: string;
@@ -181,6 +182,7 @@ export const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
   enableChat: true,
   enableCalls: true,
   enableShare: true,
+  enableReport: true,
   enableCardBorder: true,
   cardBorderStyle: "gradient",
   cardBorderColor: "#FC7A00",

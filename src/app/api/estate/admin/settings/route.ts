@@ -61,6 +61,7 @@ export async function POST(req: Request) {
       enableChat: Boolean(body.enableChat !== false),
       enableCalls: Boolean(body.enableCalls !== false),
       enableShare: Boolean(body.enableShare !== false),
+      enableReport: Boolean(body.enableReport !== false),
       enableCardBorder: Boolean(body.enableCardBorder !== false),
       cardBorderStyle: body.cardBorderStyle === "solid" ? "solid" : body.cardBorderStyle === "none" ? "none" : "gradient",
       cardBorderColor: body.cardBorderColor ? String(body.cardBorderColor).trim() : DEFAULT_ESTATE_SETTINGS.cardBorderColor,
