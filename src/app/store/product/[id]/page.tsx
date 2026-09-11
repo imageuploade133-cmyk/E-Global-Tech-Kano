@@ -391,12 +391,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.requiresPaymentRedirect && data.paymentUrl) {
+        const targetPaymentUrl = data.paymentUrl || data.paymentLink || data.link;
+        if (data.requiresPaymentRedirect && targetPaymentUrl) {
           toast.success("Redirecting to secured card gateway...", { id: "place-order" });
           updateCart([]);
           setIsCheckoutStep(false);
           setIsCartOpen(false);
-          window.location.href = data.paymentUrl;
+          window.location.assign(targetPaymentUrl);
         } else {
           toast.success("Order placed successfully!", { id: "place-order" });
           setConfirmedOrder(data.order);
