@@ -16,6 +16,8 @@ interface StoreCartModalProps {
   customerDeliveryPhone: string;
   customerDeliveryAddress: string;
   isPlacingOrder: boolean;
+  hideCardPayment?: boolean;
+  enablePickup?: boolean;
   onClose: () => void;
   onUpdateCartQuantity: (productId: string, delta: number) => void;
   onRemoveFromCart: (productId: string) => void;
@@ -39,6 +41,8 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
   customerDeliveryPhone,
   customerDeliveryAddress,
   isPlacingOrder,
+  hideCardPayment,
+  enablePickup,
   onClose,
   onUpdateCartQuantity,
   onRemoveFromCart,
@@ -189,7 +193,7 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
                     Payment Method / Checkout Channel
                   </label>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={`grid ${hideCardPayment ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
                     <button
                       type="button"
                       onClick={() => onSetSelectedPaymentMethod("WALLET_NGN")}
@@ -212,27 +216,29 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
                       )}
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => onSetSelectedPaymentMethod("CARD_CHECKOUT")}
-                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                        selectedPaymentMethod === "CARD_CHECKOUT"
-                          ? "border-emerald-500 bg-emerald-50/90 text-black font-extrabold"
-                          : "border-gray-200 bg-white text-gray-600 font-bold"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="material-symbols-outlined text-[18px] text-emerald-600">
-                          credit_card
-                        </span>
-                        <span className="text-[10px] uppercase truncate">Pay with Card</span>
-                      </div>
-                      {selectedPaymentMethod === "CARD_CHECKOUT" && (
-                        <span className="material-symbols-outlined text-[16px] text-emerald-600">
-                          check_circle
-                        </span>
-                      )}
-                    </button>
+                    {!hideCardPayment && (
+                      <button
+                        type="button"
+                        onClick={() => onSetSelectedPaymentMethod("CARD_CHECKOUT")}
+                        className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                          selectedPaymentMethod === "CARD_CHECKOUT"
+                            ? "border-emerald-500 bg-emerald-50/90 text-black font-extrabold"
+                            : "border-gray-200 bg-white text-gray-600 font-bold"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="material-symbols-outlined text-[18px] text-emerald-600">
+                            credit_card
+                          </span>
+                          <span className="text-[10px] uppercase truncate">Pay with Card</span>
+                        </div>
+                        {selectedPaymentMethod === "CARD_CHECKOUT" && (
+                          <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                            check_circle
+                          </span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -379,14 +385,14 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
 
                     <div>
                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
-                        Full Delivery Address *
+                        {enablePickup ? "Delivery Address or In-Store Pickup Details *" : "Full Delivery Address *"}
                       </label>
                       <textarea
                         rows={3}
                         required
                         value={customerDeliveryAddress}
                         onChange={(e) => onSetCustomerDeliveryAddress(e.target.value)}
-                        placeholder="e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"
+                        placeholder={enablePickup ? "Enter delivery address OR write 'IN-STORE PICKUP'" : "e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"}
                         className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00] resize-none"
                       />
                     </div>

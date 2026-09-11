@@ -167,10 +167,16 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
 
           <span
             className={`text-[8px] font-black uppercase ${
-              item.inStock ? "text-emerald-600" : "text-red-500"
+              item.inStock && (item.unlimitedStock || typeof item.stockQuantity !== "number" || item.stockQuantity > 0)
+                ? "text-emerald-600"
+                : "text-red-500"
             }`}
           >
-            {item.inStock ? "In Stock" : "Out of Stock"}
+            {item.inStock
+              ? (!item.unlimitedStock && typeof item.stockQuantity === "number"
+                  ? (item.stockQuantity > 0 ? `${item.stockQuantity} Left` : "Out of Stock")
+                  : "In Stock")
+              : "Out of Stock"}
           </span>
         </div>
 

@@ -95,6 +95,8 @@ export interface StoreSettings {
   bannerHeightDesktop?: number;
   productPageHeaderAlignment?: "left" | "center" | "right";
   enableProductVideo?: boolean;
+  hideCardPayment?: boolean;
+  enablePickup?: boolean;
 }
 
 export interface CartItem {

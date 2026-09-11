@@ -285,7 +285,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const targetTotalQty = existingQty + qty;
 
     if (targetTotalQty > maxStockAllowed) {
-      toast.error(`Only ${maxStockAllowed} unit${maxStockAllowed === 1 ? "" : "s"} available in stock!`);
+      toast.error(`Only ${maxStockAllowed} unit${maxStockAllowed === 1 ? "" : "s"} available in stock! ${existingQty > 0 ? `You already have ${existingQty} in your cart.` : ""}`);
       return;
     }
 
@@ -313,7 +313,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const updatedCart = cart
       .map((item) => {
         if (item.product.id === pId) {
+          const maxStockAllowed = !item.product.unlimitedStock && typeof item.product.stockQuantity === "number" ? item.product.stockQuantity : Infinity;
           const newQty = item.quantity + delta;
+          if (delta > 0 && newQty > maxStockAllowed) {
+            toast.error(`Only ${maxStockAllowed} unit${maxStockAllowed === 1 ? "" : "s"} available in stock!`);
+            return item;
+          }
           return newQty > 0 ? { ...item, quantity: newQty } : null;
         }
         return item;
