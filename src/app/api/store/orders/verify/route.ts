@@ -143,12 +143,50 @@ export async function GET(req: Request) {
 
     if (isVerified) {
       // Payment Verified: Mark order as PAID and status as Pending (Fulfillment Pending)
+      const txId = `TX-CARD-STORE-${orderId}`;
+
       await orderRef.update({
         status: "Pending", // Pending Fulfillment by Admin in CPanel
         paymentStatus: "PAID",
         paymentVerificationRef: flwTxRef || `FLW-VERIFIED-${Date.now()}`,
+        transactionId: txId,
         updatedAt: now,
       });
+
+      // Record in transactions ledger collection for user history transparency
+      try {
+        const txDocRef = adminDb.collection("transactions").doc(txId);
+        const txSnap = await txDocRef.get();
+        if (!txSnap.exists) {
+          await txDocRef.set({
+            id: txId,
+            userId: orderData?.userId || "",
+            type: "STORE_PURCHASE",
+            category: "DEBIT",
+            direction: "DEBIT",
+            title: "Store Order",
+            description: `Store Order ${orderId} (${Array.isArray(orderData?.items) ? orderData.items.length : 1} items)`,
+            amount: Number(orderData?.totalAmount) || 0,
+            totalDebited: Number(orderData?.totalAmount) || 0,
+            fee: 0,
+            vat: 0,
+            currency: "NGN",
+            status: "SUCCESS",
+            reference: orderId,
+            orderId: orderId,
+            transactionId: txId,
+            paymentStatus: "PAID",
+            orderStatus: "Pending",
+            items: orderData?.items || [],
+            recipientName: "E-Tech Store",
+            narration: `Store Order ${orderId}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } catch (err: any) {
+        console.warn("[Store Order Verify] Transaction write warning:", err.message);
+      }
 
       return NextResponse.redirect(new URL(`/store?orderSuccess=${orderId}`, req.url));
     } else {

@@ -413,31 +413,56 @@ export async function POST(req: Request) {
 
         const newBalance = freshBal - totalAmount;
 
-        // Update wallet balance
+        // Update wallet balance in wallets collection
         transaction.update(walletRef, {
           balance: newBalance,
           updatedAt: now,
         });
 
-        // Write wallet ledger transaction
+        // Also update user balance in users collection for 100% app-wide balance synchronization
+        const userRef = adminDb.collection("users").doc(uid);
+        transaction.update(userRef, {
+          balance: newBalance,
+          updatedAt: now,
+        });
+
+        // Write wallet ledger transaction with complete order and item metadata
         const txRef = adminDb.collection("transactions").doc();
+        const txId = txRef.id;
         transaction.set(txRef, {
-          id: txRef.id,
+          id: txId,
           userId: uid,
           type: "STORE_PURCHASE",
+          category: "DEBIT",
+          direction: "DEBIT",
+          title: "Store Order",
+          description: `Store Order ${orderId} (${orderItems.length} items)`,
           amount: totalAmount,
+          totalDebited: totalAmount,
+          fee: 0,
+          vat: 0,
           currency: "NGN",
           balanceBefore: freshBal,
           balanceAfter: newBalance,
           status: "SUCCESS",
           reference: orderId,
+          orderId: orderId,
+          transactionId: txId,
+          paymentStatus: "PAID",
+          orderStatus: "Pending",
+          items: orderItems,
+          recipientName: "E-Tech Store",
           narration: `Store Order ${orderId} (${orderItems.length} items)`,
           createdAt: now,
+          updatedAt: now,
         });
 
-        // Write store order
+        // Write store order with associated transactionId
         const orderRef = adminDb.collection("store_orders").doc(orderId);
-        transaction.set(orderRef, newOrder);
+        transaction.set(orderRef, {
+          ...newOrder,
+          transactionId: txId,
+        });
 
         // Deduct stock inside transaction
         if (currentStoreItems.length > 0) {
