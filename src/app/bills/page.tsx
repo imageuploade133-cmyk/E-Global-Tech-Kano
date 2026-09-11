@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
 import {
@@ -867,14 +868,14 @@ export default function GenericBillPage() {
               </div>
             </div>
 
-            <a
+            <Link
               href="/bills/history"
               className="px-3 py-1.5 rounded-xl border border-[#FC7A00]/30 bg-[#FC7A00]/10 text-[#FC7A00] hover:bg-[#FC7A00] hover:text-white transition-all text-xs font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer flex-shrink-0"
               title="View Bills History"
             >
               <span className="material-symbols-outlined text-[16px]">receipt_long</span>
               <span className="hidden min-[360px]:inline">History</span>
-            </a>
+            </Link>
           </div>
 
           {/* Marketing Slide Banners - displayed below page title and back history */}

@@ -85,8 +85,10 @@ export default function BillsHistoryPage() {
           const data = docSnap.data();
           const typeUpper = (data.type || "").toUpperCase();
           const descLower = (data.description || "").toLowerCase();
+          const isNonBillType = ["DEPOSIT", "TRANSFER", "WITHDRAWAL", "CASHOUT", "CARD_ISSUANCE", "CARD_FUND", "SWAP", "CURRENCY_SWAP", "REFUND"].includes(typeUpper);
           const isBill =
-            BILL_TYPES.includes(typeUpper) ||
+            !isNonBillType &&
+            (BILL_TYPES.includes(typeUpper) ||
             descLower.includes("airtime") ||
             descLower.includes("data") ||
             descLower.includes("recharge") ||
@@ -95,7 +97,7 @@ export default function BillsHistoryPage() {
             descLower.includes("waec") ||
             descLower.includes("meter") ||
             descLower.includes("betting") ||
-            descLower.includes("vtu");
+            descLower.includes("vtu"));
 
           if (isBill) {
             list.push({
