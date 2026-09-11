@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
+import { useAppConfig } from "@/lib/ConfigContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import jsPDF from "jspdf";
@@ -17,8 +18,21 @@ interface StatementModalProps {
   onClose: () => void;
 }
 
+// Helper to load image as HTMLImageElement
+const loadImage = (url: string): Promise<HTMLImageElement | null> => {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+};
+
 export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose }) => {
   const { user, userData } = useAuth();
+  const { config } = useAppConfig();
 
   // Intercept hardware and browser back button presses to close full-screen modal cleanly
   useModalBackHandler(isOpen, onClose, "statement-modal-drawer");
@@ -94,6 +108,17 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         const userName = userData?.name || user.displayName || "E-Global Pay Customer";
         const userEmail = userData?.email || user.email || "";
 
+        // Resolve images for PDF statement
+        const statementLogoUrl = config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
+        const signatureUrl = config.statementSignatureUrl || "";
+        const stampUrl = config.statementStampUrl || "";
+
+        const [logoImg, sigImg, stampImg] = await Promise.all([
+          loadImage(statementLogoUrl),
+          loadImage(signatureUrl),
+          loadImage(stampUrl),
+        ]);
+
         // Generate PDF
         const doc = new jsPDF();
 
@@ -101,14 +126,22 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         doc.setFillColor(252, 122, 0); // #FC7A00
         doc.rect(0, 0, 210, 28, "F");
 
+        if (logoImg) {
+          try {
+            doc.addImage(logoImg, "PNG", 12, 4, 20, 20);
+          } catch {
+            // Fallback text if addImage fails
+          }
+        }
+
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(18);
         doc.setFont("helvetica", "bold");
-        doc.text("E-GLOBAL PAY", 14, 18);
+        doc.text("E-GLOBAL PAY", logoImg ? 36 : 14, 18);
 
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text("STATEMENT OF ACCOUNT", 135, 18);
+        doc.text("OFFICIAL STATEMENT OF ACCOUNT", 130, 18);
 
         // Account & Statement Details Summary Card
         doc.setTextColor(30, 41, 59);
@@ -139,7 +172,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         doc.setTextColor(15, 23, 42);
 
         txList.forEach((tx) => {
-          if (yPos > 270) {
+          if (yPos > 240) {
             doc.addPage();
             yPos = 20;
           }
@@ -166,6 +199,40 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
           doc.setTextColor(15, 23, 42);
           yPos += 7;
         });
+
+        // Add Signature and Official Stamp if present
+        if (yPos > 240) {
+          doc.addPage();
+          yPos = 30;
+        } else {
+          yPos += 12;
+        }
+
+        if (sigImg || stampImg) {
+          doc.setDrawColor(226, 232, 240);
+          doc.line(14, yPos, 196, yPos);
+          yPos += 10;
+
+          if (sigImg) {
+            try {
+              doc.setFontSize(8);
+              doc.setFont("helvetica", "bold");
+              doc.setTextColor(100, 116, 139);
+              doc.text("AUTHORIZED SIGNATORY", 16, yPos);
+              doc.addImage(sigImg, "PNG", 16, yPos + 2, 35, 18);
+            } catch {}
+          }
+
+          if (stampImg) {
+            try {
+              doc.setFontSize(8);
+              doc.setFont("helvetica", "bold");
+              doc.setTextColor(100, 116, 139);
+              doc.text("OFFICIAL STAMP", 145, yPos);
+              doc.addImage(stampImg, "PNG", 145, yPos + 2, 25, 25);
+            } catch {}
+          }
+        }
 
         // Footer
         doc.setFontSize(7);

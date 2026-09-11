@@ -36,6 +36,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Statements are limited to a maximum range of 6 months at a time." }, { status: 400 });
     }
 
+    // Fetch app config for statement logo, signature, and stamp
+    let statementLogoUrl = "https://i.ibb.co/WWjZrtC7/E-Tech.png";
+    let statementSignatureUrl = "";
+    let statementStampUrl = "";
+
+    try {
+      const appConfigSnap = await adminDb.collection("config").doc("app").get();
+      if (appConfigSnap.exists) {
+        const cfg = appConfigSnap.data() || {};
+        statementLogoUrl = cfg.statementLogoUrl || cfg.logoUrl || statementLogoUrl;
+        statementSignatureUrl = cfg.statementSignatureUrl || "";
+        statementStampUrl = cfg.statementStampUrl || "";
+      }
+    } catch (cfgErr: any) {
+      console.warn("[Statement Email Route] Config lookup warning:", cfgErr.message);
+    }
+
     // Fetch user profile name
     const userDocSnap = await adminDb.collection("users").doc(uid).get();
     const userData = userDocSnap.exists ? userDocSnap.data() || {} : {};
@@ -62,8 +79,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No transactions found for the selected date range." }, { status: 404 });
     }
 
-    const logoUrl = "https://i.ibb.co/WWjZrtC7/E-Tech.png";
-
     const tableRows = txList
       .map((tx) => {
         const { dateTime } = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
@@ -83,15 +98,32 @@ export async function POST(req: Request) {
       })
       .join("");
 
+    const signatureStampSection = (statementSignatureUrl || statementStampUrl) ? `
+      <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;">
+        ${statementSignatureUrl ? `
+          <div style="text-align: left;">
+            <p style="margin: 0 0 6px 0; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #94a3b8;">Authorized Signatory</p>
+            <img src="${statementSignatureUrl}" alt="Authorized Signature" style="max-height: 44px; width: auto;" />
+          </div>
+        ` : `<div></div>`}
+        ${statementStampUrl ? `
+          <div style="text-align: right;">
+            <p style="margin: 0 0 6px 0; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #94a3b8;">Official Verification Stamp</p>
+            <img src="${statementStampUrl}" alt="Official Stamp" style="max-height: 52px; width: auto;" />
+          </div>
+        ` : `<div></div>`}
+      </div>
+    ` : "";
+
     const emailHtml = `
       <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; max-width: 680px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
         <!-- Brand Header -->
         <div style="background: linear-gradient(135deg, #FC7A00 0%, #E06600 100%); padding: 20px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <img src="${logoUrl}" alt="E-Global Pay" style="height: 40px; width: auto; background: #ffffff; padding: 4px; border-radius: 8px;" />
+            <img src="${statementLogoUrl}" alt="E-Global Pay" style="height: 40px; width: auto; background: #ffffff; padding: 4px; border-radius: 8px;" />
             <div>
               <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #ffffff; letter-spacing: 0.5px;">E-GLOBAL PAY</h1>
-              <p style="margin: 2px 0 0 0; font-size: 10px; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Financial Statement</p>
+              <p style="margin: 2px 0 0 0; font-size: 10px; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Official Financial Statement</p>
             </div>
           </div>
         </div>
@@ -129,6 +161,8 @@ export async function POST(req: Request) {
             ${tableRows}
           </tbody>
         </table>
+
+        ${signatureStampSection}
 
         <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 11px; font-weight: 700; color: #64748b;">E-Global Pay Automated Electronic Financial Statement</p>
