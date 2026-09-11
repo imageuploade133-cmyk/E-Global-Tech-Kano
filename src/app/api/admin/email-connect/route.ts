@@ -27,6 +27,7 @@ export async function GET(req: Request) {
     let dailyLimit = "2,000,000";
     let dailyUsed = 1;
     let lastActivity = new Date().toISOString();
+    let apiKeysList: any[] = [];
 
     try {
       const docRef = adminDb.collection("config").doc("email_connect");
@@ -44,9 +45,38 @@ export async function GET(req: Request) {
         if (data?.dailyLimit) dailyLimit = data.dailyLimit;
         if (typeof data?.dailyUsed === "number") dailyUsed = data.dailyUsed;
         if (data?.lastActivity) lastActivity = data.lastActivity;
+        if (Array.isArray(data?.apiKeys)) apiKeysList = data.apiKeys;
       }
     } catch (dbErr) {
       console.warn("[Email Connect GET] Firestore config/email_connect read failed:", dbErr);
+    }
+
+    // Default primary key entry if list is empty
+    if (apiKeysList.length === 0) {
+      apiKeysList = [
+        {
+          id: "key-primary-default",
+          name: senderName || "Global Email Gateway Key",
+          emailApiUrl,
+          emailApiKeyMasked: maskApiKey(emailApiKey),
+          emailInstanceId,
+          senderName,
+          senderEmail,
+          status,
+          grantedScopes,
+          dailyLimit,
+          dailyUsed,
+          lastActivity,
+          createdAt: new Date().toISOString(),
+          isActive: status === "CONNECTED",
+        },
+      ];
+    } else {
+      apiKeysList = apiKeysList.map((k, idx) => ({
+        ...k,
+        id: k.id || `key-${idx + 1}`,
+        emailApiKeyMasked: maskApiKey(k.emailApiKey || emailApiKey),
+      }));
     }
 
     return NextResponse.json({
@@ -64,6 +94,7 @@ export async function GET(req: Request) {
         dailyLimit,
         dailyUsed,
         lastActivity,
+        apiKeys: apiKeysList,
       },
       isMock: uid === "mock-admin-uid",
     });
@@ -86,6 +117,151 @@ export async function POST(req: Request) {
 
     if (!action) {
       return NextResponse.json({ error: "Missing required parameter: action" }, { status: 400 });
+    }
+
+    // 0. CREATE NEW EMAIL API KEY
+    if (action === "create_key") {
+      const {
+        keyName,
+        emailApiUrl,
+        emailApiKey,
+        emailInstanceId,
+        emailAdminUsername,
+        emailAdminPassword,
+        senderName,
+        senderEmail,
+        grantedScopes,
+        dailyLimit,
+      } = body;
+
+      if (!emailApiKey || !String(emailApiKey).trim()) {
+        return NextResponse.json({ error: "API Key is required to create a key entry." }, { status: 400 });
+      }
+
+      const newKeyId = `key-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const cleanKey = String(emailApiKey).trim();
+      const cleanUrl = String(emailApiUrl || process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send").trim();
+      const cleanInst = String(emailInstanceId || process.env.EMAIL_INSTANCE_ID || "inst_33647102").trim();
+
+      const newKeyRecord = {
+        id: newKeyId,
+        name: keyName?.trim() || senderName?.trim() || "New Email API Key",
+        emailApiUrl: cleanUrl,
+        emailApiKey: cleanKey,
+        emailApiKeyMasked: maskApiKey(cleanKey),
+        emailInstanceId: cleanInst,
+        emailAdminUsername: emailAdminUsername?.trim() || "",
+        emailAdminPassword: emailAdminPassword?.trim() || "",
+        senderName: senderName?.trim() || "E-Global Pay",
+        senderEmail: senderEmail?.trim() || "no-reply@eglobalpay.com",
+        status: "CONNECTED",
+        grantedScopes: Array.isArray(grantedScopes) && grantedScopes.length > 0 ? grantedScopes : ["email.send", "email.otp", "email.templates", "email.logs"],
+        dailyLimit: dailyLimit?.trim() || "2,000,000",
+        dailyUsed: 0,
+        lastActivity: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        isActive: true,
+      };
+
+      try {
+        const docRef = adminDb.collection("config").doc("email_connect");
+        const docSnap = await docRef.get();
+        let existingKeys: any[] = [];
+        if (docSnap.exists && Array.isArray(docSnap.data()?.apiKeys)) {
+          existingKeys = docSnap.data()!.apiKeys;
+        }
+
+        // Avoid duplicate exact keys
+        const updatedKeys = [newKeyRecord, ...existingKeys.filter((k) => k.emailApiKey !== cleanKey)];
+
+        await docRef.set(
+          {
+            emailApiUrl: cleanUrl,
+            emailApiKey: cleanKey,
+            emailInstanceId: cleanInst,
+            senderName: newKeyRecord.senderName,
+            senderEmail: newKeyRecord.senderEmail,
+            status: "CONNECTED",
+            apiKeys: updatedKeys,
+            updatedAt: new Date().toISOString(),
+            updatedBy: adminEmail || uid,
+          },
+          { merge: true }
+        );
+
+        await adminDb.collection("admin_audit_logs").add({
+          action: "CREATE_EMAIL_API_KEY",
+          performedBy: adminEmail || uid,
+          details: { keyId: newKeyId, keyName: newKeyRecord.name, instanceId: cleanInst },
+          timestamp: new Date().toISOString(),
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: "New Email API Key created and connected successfully!",
+          key: newKeyRecord,
+          apiKeys: updatedKeys,
+        });
+      } catch (dbErr: any) {
+        console.error("[Email Connect POST CreateKey] Exception:", dbErr.message);
+        return NextResponse.json({ error: "Failed to create API key: " + dbErr.message }, { status: 500 });
+      }
+    }
+
+    // DELETE EMAIL API KEY
+    if (action === "delete_key") {
+      const { keyId } = body;
+      if (!keyId) {
+        return NextResponse.json({ error: "Key ID is required for deletion." }, { status: 400 });
+      }
+
+      try {
+        const docRef = adminDb.collection("config").doc("email_connect");
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+          const existingKeys = Array.isArray(docSnap.data()?.apiKeys) ? docSnap.data()!.apiKeys : [];
+          const updatedKeys = existingKeys.filter((k: any) => k.id !== keyId);
+          await docRef.set({ apiKeys: updatedKeys, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: "Email API Key deleted successfully.",
+        });
+      } catch (dbErr: any) {
+        return NextResponse.json({ error: "Failed to delete API key: " + dbErr.message }, { status: 500 });
+      }
+    }
+
+    // TOGGLE INDIVIDUAL KEY STATUS
+    if (action === "toggle_key_status") {
+      const { keyId, newStatus } = body;
+      if (!keyId) {
+        return NextResponse.json({ error: "Key ID is required." }, { status: 400 });
+      }
+
+      try {
+        const docRef = adminDb.collection("config").doc("email_connect");
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+          const existingKeys = Array.isArray(docSnap.data()?.apiKeys) ? docSnap.data()!.apiKeys : [];
+          const updatedKeys = existingKeys.map((k: any) => {
+            if (k.id === keyId) {
+              const active = newStatus === "CONNECTED";
+              return { ...k, status: active ? "CONNECTED" : "DISCONNECTED", isActive: active };
+            }
+            return k;
+          });
+          await docRef.set({ apiKeys: updatedKeys, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Key status set to ${newStatus}`,
+        });
+      } catch (dbErr: any) {
+        return NextResponse.json({ error: "Failed to update key status: " + dbErr.message }, { status: 500 });
+      }
     }
 
     // 1. SAVE EMAIL CONNECT CONFIGURATION
@@ -352,13 +528,55 @@ export async function POST(req: Request) {
           }
         }
 
-        // Update last activity & increment count in Firestore
+        // Update last activity & increment count in Firestore + register/update tested key in apiKeys list
         try {
-          await adminDb.collection("config").doc("email_connect").set(
+          const docRef = adminDb.collection("config").doc("email_connect");
+          const docSnap = await docRef.get();
+          let existingKeys: any[] = [];
+          if (docSnap.exists && Array.isArray(docSnap.data()?.apiKeys)) {
+            existingKeys = docSnap.data()!.apiKeys;
+          }
+
+          const existingKeyIndex = existingKeys.findIndex((k) => k.emailApiKey === targetApiKey);
+          let updatedKeys = [...existingKeys];
+
+          if (existingKeyIndex >= 0) {
+            updatedKeys[existingKeyIndex] = {
+              ...updatedKeys[existingKeyIndex],
+              status: "CONNECTED",
+              isActive: true,
+              lastActivity: new Date().toISOString(),
+              dailyUsed: (updatedKeys[existingKeyIndex].dailyUsed || 0) + 1,
+            };
+          } else {
+            const newKeyRecord = {
+              id: `key-${Date.now()}`,
+              name: targetSenderName || "Connected Test Email Key",
+              emailApiUrl: targetApiUrl,
+              emailApiKey: targetApiKey,
+              emailApiKeyMasked: maskApiKey(targetApiKey),
+              emailInstanceId: targetInstanceId,
+              emailAdminUsername: targetAdminUsername,
+              emailAdminPassword: targetAdminPassword,
+              senderName: targetSenderName,
+              senderEmail: targetSenderEmail,
+              status: "CONNECTED",
+              grantedScopes: ["email.send", "email.otp", "email.templates", "email.logs"],
+              dailyLimit: "2,000,000",
+              dailyUsed: 1,
+              lastActivity: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+              isActive: true,
+            };
+            updatedKeys = [newKeyRecord, ...existingKeys];
+          }
+
+          await docRef.set(
             {
               lastActivity: new Date().toISOString(),
               dailyUsed: (body.dailyUsed || 0) + 1,
               status: "CONNECTED",
+              apiKeys: updatedKeys,
             },
             { merge: true }
           );
