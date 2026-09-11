@@ -155,6 +155,10 @@ export interface EstateSettingsData {
   enableAutoResponses: boolean;
   enableChat: boolean;
   enableCalls: boolean;
+  enableShare: boolean;
+  enableCardBorder: boolean;
+  cardBorderStyle: "gradient" | "solid" | "none";
+  cardBorderColor: string;
   chatSecurityNoticeUser: string;
   chatSecurityNoticeAgent: string;
   updatedAt?: string;
@@ -176,6 +180,10 @@ export const DEFAULT_ESTATE_SETTINGS: EstateSettingsData = {
   enableAutoResponses: true,
   enableChat: true,
   enableCalls: true,
+  enableShare: true,
+  enableCardBorder: true,
+  cardBorderStyle: "gradient",
+  cardBorderColor: "#FC7A00",
   chatSecurityNoticeUser:
     "Do NOT deposit or transfer funds directly to an agent's personal bank account. Fund your E-Global Wallet account and transfer directly to the agent's wallet account.",
   chatSecurityNoticeAgent:

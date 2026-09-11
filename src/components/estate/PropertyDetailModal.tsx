@@ -36,6 +36,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [fullscreenImageIndex, setFullscreenImageIndex] = useState<number | null>(null);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [enableChat, setEnableChat] = useState(true);
+  const [enableShare, setEnableShare] = useState(true);
 
   // Publisher full agent state
   const [publisherAgent, setPublisherAgent] = useState<EstateSeller | null>(null);
@@ -51,6 +52,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         .then((data) => {
           if (data.success && data.settings) {
             setEnableChat(data.settings.enableChat !== false);
+            setEnableShare(data.settings.enableShare !== false);
           }
         })
         .catch(() => {});
@@ -150,14 +152,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={handleShare}
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-all cursor-pointer border-0 active:scale-90"
-                title="Share Property"
-              >
-                <span className="material-symbols-outlined text-[18px]">share</span>
-              </button>
+              {enableShare && (
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-all cursor-pointer border-0 active:scale-90"
+                  title="Share Property"
+                >
+                  <span className="material-symbols-outlined text-[18px]">share</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -249,8 +253,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               )}
             </div>
 
-            {/* Full Property Title Displayed Prominently Above Price Listing */}
-            <div className="bg-white p-4 rounded-3xl border border-gray-150 shadow-2xs space-y-1">
+            {/* Full Property Title Displayed Prominently with Gradient Background & Border Removed */}
+            <div className="p-4.5 rounded-3xl bg-gradient-to-r from-orange-50/80 via-amber-50 to-orange-100/60 shadow-2xs space-y-1 border-0">
               <span className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider block">
                 Property Title
               </span>

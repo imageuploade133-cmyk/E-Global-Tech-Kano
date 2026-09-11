@@ -60,6 +60,10 @@ export async function POST(req: Request) {
       enableAutoResponses: Boolean(body.enableAutoResponses !== false),
       enableChat: Boolean(body.enableChat !== false),
       enableCalls: Boolean(body.enableCalls !== false),
+      enableShare: Boolean(body.enableShare !== false),
+      enableCardBorder: Boolean(body.enableCardBorder !== false),
+      cardBorderStyle: body.cardBorderStyle === "solid" ? "solid" : body.cardBorderStyle === "none" ? "none" : "gradient",
+      cardBorderColor: body.cardBorderColor ? String(body.cardBorderColor).trim() : DEFAULT_ESTATE_SETTINGS.cardBorderColor,
       chatSecurityNoticeUser: String(
         body.chatSecurityNoticeUser || DEFAULT_ESTATE_SETTINGS.chatSecurityNoticeUser
       ).trim(),
