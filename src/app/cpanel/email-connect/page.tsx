@@ -33,13 +33,25 @@ function CpanelEmailConnectContent() {
   const [dailyLimit, setDailyLimit] = useState("2,000,000");
   const [dailyUsed, setDailyUsed] = useState(1);
   const [lastActivity, setLastActivity] = useState<string>(new Date().toLocaleString());
+  const [apiKeysList, setApiKeysList] = useState<any[]>([]);
 
-  // UI States
+  // UI & Modal States
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isCreatingKey, setIsCreatingKey] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
-  const [showRawKey, setShowRawKey] = useState(false);
-  const [isEditingLimit, setIsEditingLimit] = useState(false);
+  const [showRawKey, setShowRawKey] = useState<Record<string, boolean>>({});
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // New Key Form States
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyUrl, setNewKeyUrl] = useState("https://whatsapp-5fda.onrender.com/api/email/send");
+  const [newKeySecret, setNewKeySecret] = useState("");
+  const [newKeyInstanceId, setNewKeyInstanceId] = useState("inst_33647102");
+  const [newKeyAdminUsername, setNewKeyAdminUsername] = useState("");
+  const [newKeyAdminPassword, setNewKeyAdminPassword] = useState("");
+  const [newKeySenderName, setNewKeySenderName] = useState("E-Global Pay");
+  const [newKeySenderEmail, setNewKeySenderEmail] = useState("no-reply@eglobalpay.com");
 
   // Test Email Form
   const [testRecipient, setTestRecipient] = useState("");
@@ -84,6 +96,7 @@ function CpanelEmailConnectContent() {
         if (c.dailyLimit) setDailyLimit(c.dailyLimit);
         if (typeof c.dailyUsed === "number") setDailyUsed(c.dailyUsed);
         if (c.lastActivity) setLastActivity(new Date(c.lastActivity).toLocaleString());
+        if (Array.isArray(c.apiKeys)) setApiKeysList(c.apiKeys);
 
         addLog(`Status refreshed: ${c.status || "CONNECTED"}. Gateway active.`);
       }
@@ -222,6 +235,7 @@ function CpanelEmailConnectContent() {
         addLog(`[SUCCESS] Test email delivered to ${testRecipient.trim()}`);
         setDailyUsed((prev) => prev + 1);
         setLastActivity(new Date().toLocaleString());
+        fetchConfig();
       } else {
         toast.error(data.error || "Test dispatch failed.");
         addLog(`[ERROR] Test dispatch failed: ${data.error}`);
@@ -238,6 +252,97 @@ function CpanelEmailConnectContent() {
     setGrantedScopes((prev) =>
       prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]
     );
+  };
+
+  const handleCreateApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKeySecret.trim()) {
+      toast.error("Please enter an API Secret Key.");
+      return;
+    }
+
+    setIsCreatingKey(true);
+    addLog("Creating and registering new Email API Key credential...");
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/email-connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "create_key",
+          keyName: newKeyName.trim() || newKeySenderName.trim() || "New Email API Key",
+          emailApiUrl: newKeyUrl.trim(),
+          emailApiKey: newKeySecret.trim(),
+          emailInstanceId: newKeyInstanceId.trim(),
+          emailAdminUsername: newKeyAdminUsername.trim(),
+          emailAdminPassword: newKeyAdminPassword.trim(),
+          senderName: newKeySenderName.trim(),
+          senderEmail: newKeySenderEmail.trim(),
+          grantedScopes,
+          dailyLimit,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("New Email API Key registered and connected!");
+        addLog(`[SUCCESS] Registered Email API key: ${newKeyName.trim() || newKeySenderName.trim()}`);
+        setIsCreateModalOpen(false);
+        setNewKeySecret("");
+        setNewKeyName("");
+        fetchConfig();
+      } else {
+        toast.error(data.error || "Failed to create Email API Key.");
+        addLog(`[ERROR] Create key failed: ${data.error}`);
+      }
+    } catch (err: any) {
+      toast.error("Network error creating Email API Key.");
+      addLog(`[ERROR] Create key exception: ${err.message}`);
+    } finally {
+      setIsCreatingKey(false);
+    }
+  };
+
+  const handleDeleteApiKey = async (keyId: string) => {
+    if (!confirm("Are you sure you want to delete this Email API Key entry?")) return;
+
+    addLog(`Deleting Email API Key [${keyId}]...`);
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/email-connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "delete_key", keyId }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Email API Key deleted.");
+        addLog(`[SUCCESS] Key [${keyId}] deleted.`);
+        fetchConfig();
+      } else {
+        toast.error(data.error || "Failed to delete key.");
+      }
+    } catch (err: any) {
+      toast.error("Error deleting API key.");
+    }
   };
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
@@ -304,14 +409,11 @@ function CpanelEmailConnectContent() {
           </div>
           <button
             type="button"
-            onClick={() => {
-              const el = document.getElementById("api-config-section");
-              if (el) el.scrollIntoView({ behavior: "smooth" });
-            }}
+            onClick={() => setIsCreateModalOpen(true)}
             className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs uppercase rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             <span className="material-symbols-outlined text-[18px]">add_circle</span>
-            <span>Configure Email API Key</span>
+            <span>Create Email API Key</span>
           </button>
         </div>
 
@@ -324,7 +426,7 @@ function CpanelEmailConnectContent() {
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Total Email API Keys</span>
-                <span className="text-xl font-black">1</span>
+                <span className="text-xl font-black">{apiKeysList.length || 1}</span>
               </div>
             </div>
           </div>
@@ -336,7 +438,9 @@ function CpanelEmailConnectContent() {
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Active Keys</span>
-                <span className="text-xl font-black text-emerald-500">{status === "CONNECTED" ? "1" : "0"}</span>
+                <span className="text-xl font-black text-emerald-500">
+                  {apiKeysList.filter((k) => k.status === "CONNECTED" || k.isActive !== false).length || (status === "CONNECTED" ? 1 : 0)}
+                </span>
               </div>
             </div>
           </div>
@@ -348,147 +452,149 @@ function CpanelEmailConnectContent() {
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">Inactive Keys</span>
-                <span className="text-xl font-black text-gray-400">{status === "DISCONNECTED" ? "1" : "0"}</span>
+                <span className="text-xl font-black text-gray-400">
+                  {apiKeysList.filter((k) => k.status === "DISCONNECTED" || k.isActive === false).length}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Configured Email API Keys Card (Exact visual replica of screenshot) */}
+        {/* Configured Email API Keys Card */}
         <div className={cn("p-6 rounded-2xl border space-y-5", panelClass)}>
           <div className="flex items-center justify-between border-b pb-4 flex-wrap gap-2">
             <div>
               <h3 className="font-extrabold text-sm uppercase tracking-wider text-gray-900 dark:text-white">
-                Configured Email API Keys
+                Configured Email API Keys ({apiKeysList.length || 1})
               </h3>
               <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">
                 Each key generates an independent <code className="text-[#FC7A00]">email_live_[id]</code> credential bound to its project tenant.
               </p>
             </div>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={fetchConfig}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              {isLoading ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
-              <span>Refresh</span>
-            </button>
-          </div>
-
-          {/* Key Item Card */}
-          <div className="border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-4 bg-gray-50/50 dark:bg-gray-900/40">
-            {/* Top Row: Icon, Name, Status Badge, Instance Tag */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[22px]">sim_card</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">1. {senderNameInput || "Global Pay1"}</h4>
-                    <span className={cn(
-                      "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
-                      status === "CONNECTED"
-                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                        : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                    )}>
-                      {status === "CONNECTED" ? "• Connected" : "• Disconnected"}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-mono text-gray-400 font-medium">
-                    email_live_haf... <span className="text-gray-500">({emailInstanceIdInput || "in inst_33647102"})</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Masked API Key Input with View Button */}
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type={showRawKey ? "text" : "password"}
-                  readOnly
-                  value={showRawKey ? (emailApiKeyInput || "email_live_4a7t998273xkw129837") : emailApiKeyMasked}
-                  className={cn(inputClass, "font-mono font-bold bg-white dark:bg-gray-950 text-gray-800 dark:text-gray-200 select-all")}
-                />
-              </div>
               <button
                 type="button"
-                onClick={() => setShowRawKey(!showRawKey)}
-                className="px-4 h-10 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">
-                  {showRawKey ? "visibility_off" : "visibility"}
-                </span>
-                <span>{showRawKey ? "Hide Key" : "View Key"}</span>
+                <span className="material-symbols-outlined text-[16px]">add</span>
+                <span>Create Key</span>
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={fetchConfig}
+                className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {isLoading ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">refresh</span>}
+                <span>Refresh</span>
               </button>
             </div>
-
-            {/* Daily Usage & Last Activity Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-950 p-4 rounded-xl border border-gray-200/60 dark:border-gray-800/80">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Daily Today / Limit</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingLimit(!isEditingLimit)}
-                    className="text-[10px] font-bold text-[#FC7A00] hover:underline cursor-pointer uppercase"
-                  >
-                    Edit Limit
-                  </button>
-                </div>
-                <strong className="font-extrabold text-sm text-gray-900 dark:text-white block mt-0.5 font-mono">
-                  {dailyUsed} ({dailyLimit})
-                </strong>
-              </div>
-
-              <div>
-                <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Last Activity</span>
-                <strong className="font-extrabold text-xs text-gray-700 dark:text-gray-300 block mt-0.5 font-mono">
-                  {lastActivity}
-                </strong>
-              </div>
-            </div>
-
-            {/* Granted Scopes Badges */}
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Granted Scopes</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                {grantedScopes.map((scope) => (
-                  <span
-                    key={scope}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20"
-                  >
-                    {scope}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Action Footer Buttons */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800 flex-wrap gap-2">
-              <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg text-[10px] font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">shield</span>
-                <span>Quota Limit Active</span>
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleToggleStatus}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border",
-                    status === "CONNECTED"
-                      ? "bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20"
-                      : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20"
-                  )}
-                >
-                  {status === "CONNECTED" ? "Deactivate" : "Activate"}
-                </button>
-              </div>
-            </div>
           </div>
+
+          {/* Directory of Keys */}
+          {apiKeysList.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-xs">No keys found. Click Create Key above to add one.</div>
+          ) : (
+            apiKeysList.map((keyItem, index) => {
+              const keyId = keyItem.id || `key-${index}`;
+              const isVisible = Boolean(showRawKey[keyId]);
+
+              return (
+                <div key={keyId} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-5 space-y-4 bg-gray-50/50 dark:bg-gray-900/40">
+                  {/* Top Row: Icon, Name, Status Badge, Instance Tag */}
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[22px]">sim_card</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">
+                            {index + 1}. {keyItem.name || keyItem.senderName || senderNameInput || "Global Email Key"}
+                          </h4>
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                            keyItem.status === "CONNECTED" || keyItem.isActive !== false
+                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                          )}>
+                            {keyItem.status === "CONNECTED" || keyItem.isActive !== false ? "• Connected" : "• Disconnected"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-mono text-gray-400 font-medium">
+                          {keyItem.emailApiKeyMasked || emailApiKeyMasked} <span className="text-gray-500">({keyItem.emailInstanceId || emailInstanceIdInput || "inst_33647102"})</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApiKey(keyId)}
+                      className="px-2.5 py-1 text-xs font-extrabold text-rose-500 hover:text-rose-600 bg-rose-500/10 border border-rose-500/20 rounded-xl cursor-pointer transition-all"
+                      title="Delete Key"
+                    >
+                      Delete
+                    </button>
+                  </div>
+
+                  {/* Masked API Key Input with View Button */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type={isVisible ? "text" : "password"}
+                        readOnly
+                        value={isVisible ? (keyItem.emailApiKey || emailApiKeyInput || "email_live_4a7t998273xkw129837") : (keyItem.emailApiKeyMasked || emailApiKeyMasked)}
+                        className={cn(inputClass, "font-mono font-bold bg-white dark:bg-gray-950 text-gray-800 dark:text-gray-200 select-all")}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowRawKey((prev) => ({ ...prev, [keyId]: !prev[keyId] }))}
+                      className="px-4 h-10 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        {isVisible ? "visibility_off" : "visibility"}
+                      </span>
+                      <span>{isVisible ? "Hide Key" : "View Key"}</span>
+                    </button>
+                  </div>
+
+                  {/* Daily Usage & Last Activity Bar */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-gray-950 p-4 rounded-xl border border-gray-200/60 dark:border-gray-800/80">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Daily Today / Limit</span>
+                      <strong className="font-extrabold text-sm text-gray-900 dark:text-white block mt-0.5 font-mono">
+                        {keyItem.dailyUsed ?? dailyUsed} ({keyItem.dailyLimit || dailyLimit})
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Last Activity</span>
+                      <strong className="font-extrabold text-xs text-gray-700 dark:text-gray-300 block mt-0.5 font-mono">
+                        {keyItem.lastActivity ? new Date(keyItem.lastActivity).toLocaleString() : lastActivity}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Granted Scopes Badges */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Granted Scopes</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {(keyItem.grantedScopes || grantedScopes).map((scope: string) => (
+                        <span
+                          key={scope}
+                          className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                        >
+                          {scope}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Test Email Connection Diagnostic Card */}
@@ -716,6 +822,137 @@ function CpanelEmailConnectContent() {
         </div>
 
       </div>
+
+      {/* Create Email API Key Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-[100005] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className={cn("w-[94vw] sm:w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto no-scrollbar", panelClass)}>
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">add_circle</span>
+                <h3 className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">Create Email API Key</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer border-0"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateApiKey} className="space-y-4 text-left">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">Key Name / Description</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mobile App Email Key or Gateway Sender 2"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 block">EMAIL_API_KEY Secret *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. email_live_4a7t998273xkw129837 or inst_33647102"
+                  value={newKeySecret}
+                  onChange={(e) => setNewKeySecret(e.target.value)}
+                  className={cn(inputClass, "font-mono font-bold")}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">API Endpoint URL</label>
+                  <input
+                    type="url"
+                    value={newKeyUrl}
+                    onChange={(e) => setNewKeyUrl(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Instance ID / Project ID</label>
+                  <input
+                    type="text"
+                    value={newKeyInstanceId}
+                    onChange={(e) => setNewKeyInstanceId(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Admin Username</label>
+                  <input
+                    type="text"
+                    placeholder="Gateway Username"
+                    value={newKeyAdminUsername}
+                    onChange={(e) => setNewKeyAdminUsername(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Admin Password</label>
+                  <input
+                    type="password"
+                    placeholder="Gateway Password"
+                    value={newKeyAdminPassword}
+                    onChange={(e) => setNewKeyAdminPassword(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Sender Name</label>
+                  <input
+                    type="text"
+                    value={newKeySenderName}
+                    onChange={(e) => setNewKeySenderName(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block">Sender Email</label>
+                  <input
+                    type="email"
+                    value={newKeySenderEmail}
+                    onChange={(e) => setNewKeySenderEmail(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black uppercase cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingKey}
+                  className="flex-1 py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isCreatingKey ? <ButtonSpinner /> : "Create & Connect"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
