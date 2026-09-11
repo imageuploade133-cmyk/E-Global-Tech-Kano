@@ -60,6 +60,103 @@ async function getCachedBrandingConfig() {
 }
 
 /**
+ * Ensures an Email API key and Instance ID are registered on the WhatsAPI HUB gateway database.
+ * Uses customSecret and customId to re-create/provision pre-existing keys (e.g. after database resets).
+ */
+export async function ensureEmailApiKeyOnGateway(params: {
+  emailApiUrl: string;
+  emailApiKey: string;
+  emailInstanceId: string;
+  adminUsername?: string;
+  adminPassword?: string;
+  senderName?: string;
+}): Promise<boolean> {
+  const { emailApiUrl, emailApiKey, emailInstanceId, adminUsername, adminPassword, senderName } = params;
+
+  if (!emailApiKey || !emailApiUrl) return false;
+
+  try {
+    const urlObj = new URL(emailApiUrl);
+    const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+    const createApiKeyEndpoint = `${baseUrl}/api/email/apikeys`;
+
+    const createBody = {
+      name: senderName || "E-Global Pay Gateway Key",
+      customSecret: emailApiKey,
+      customId: emailInstanceId || emailApiKey,
+      scopes: ["email.send", "email.otp", "email.templates", "email.logs"],
+      daily_quota: 2000000,
+    };
+
+    const sendCreateReq = async (cookie?: string, token?: string) => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (cookie) headers["Cookie"] = cookie;
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      return await fetch(createApiKeyEndpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(createBody),
+      });
+    };
+
+    const res = await sendCreateReq();
+
+    if (res.ok) {
+      console.log(`[ensureEmailApiKeyOnGateway] Successfully registered API key ${emailApiKey} on gateway.`);
+      return true;
+    }
+
+    // If 401 Unauthorized, attempt gateway admin session login first
+    if ((res.status === 401 || res.status === 403) && adminUsername && adminPassword) {
+      console.log("[ensureEmailApiKeyOnGateway] Auth required. Attempting gateway admin session login...");
+      const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+
+      let sessionCookie = "";
+      let acquiredToken = "";
+
+      for (const ep of loginEndpoints) {
+        try {
+          const loginRes = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: adminUsername,
+              email: adminUsername,
+              password: adminPassword,
+            }),
+          });
+
+          if (loginRes.ok) {
+            const setCookieHeader = loginRes.headers.get("set-cookie");
+            if (setCookieHeader) sessionCookie = setCookieHeader;
+
+            const loginData = await loginRes.json().catch(() => ({}));
+            acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
+            break;
+          }
+        } catch {}
+      }
+
+      if (acquiredToken || sessionCookie) {
+        const retryRes = await sendCreateReq(sessionCookie, acquiredToken);
+        if (retryRes.ok) {
+          console.log(`[ensureEmailApiKeyOnGateway] Registered API key ${emailApiKey} via admin session.`);
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch (err: any) {
+    console.warn("[ensureEmailApiKeyOnGateway] Exception registering API key on gateway:", err.message);
+    return false;
+  }
+}
+
+/**
  * Server-side Email Service calling the WhatsAPI Email API Gateway.
  */
 export async function sendEmail(params: SendEmailParams): Promise<boolean> {
@@ -148,47 +245,66 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
 
     const errText = await res.text();
 
-    // Retry with admin session authentication if HTTP 401 Unauthorized occurs and credentials are available
-    if ((res.status === 401 || errText.includes("Unauthorized")) && adminUsername && adminPassword) {
-      console.log("[sendEmail] 401 Unauthorized detected. Attempting gateway admin session login...");
-      try {
-        const urlObj = new URL(emailApiUrl);
-        const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
-        const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+    // If 401 / Unauthorized or key not found occurs, attempt auto-creation on gateway and retry
+    if (res.status === 401 || res.status === 403 || errText.includes("Unauthorized") || errText.includes("Invalid API Key")) {
+      console.log("[sendEmail] Auth failure detected. Attempting to ensure/provision Email API key on gateway...");
+      const createdOnGateway = await ensureEmailApiKeyOnGateway({
+        emailApiUrl,
+        emailApiKey: apiKey,
+        emailInstanceId: instanceId,
+        adminUsername,
+        adminPassword,
+        senderName,
+      });
 
-        let sessionCookie = "";
-        let acquiredToken = "";
+      if (createdOnGateway) {
+        console.log("[sendEmail] API key auto-provisioned on gateway. Retrying email dispatch...");
+        const retryRes = await dispatch(apiKey);
+        if (retryRes.ok) return true;
+      }
 
-        for (const ep of loginEndpoints) {
-          try {
-            const loginRes = await fetch(ep, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                username: adminUsername,
-                email: adminUsername,
-                password: adminPassword,
-              }),
-            });
+      // Fallback: Retry with admin session authentication if credentials are available
+      if (adminUsername && adminPassword) {
+        console.log("[sendEmail] Attempting gateway admin session login fallback...");
+        try {
+          const urlObj = new URL(emailApiUrl);
+          const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+          const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
 
-            if (loginRes.ok) {
-              const setCookieHeader = loginRes.headers.get("set-cookie");
-              if (setCookieHeader) sessionCookie = setCookieHeader;
+          let sessionCookie = "";
+          let acquiredToken = "";
 
-              const loginData = await loginRes.json().catch(() => ({}));
-              acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
-              console.log(`[sendEmail] Gateway admin login succeeded at ${ep}`);
-              break;
-            }
-          } catch {}
+          for (const ep of loginEndpoints) {
+            try {
+              const loginRes = await fetch(ep, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  username: adminUsername,
+                  email: adminUsername,
+                  password: adminPassword,
+                }),
+              });
+
+              if (loginRes.ok) {
+                const setCookieHeader = loginRes.headers.get("set-cookie");
+                if (setCookieHeader) sessionCookie = setCookieHeader;
+
+                const loginData = await loginRes.json().catch(() => ({}));
+                acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
+                console.log(`[sendEmail] Gateway admin login succeeded at ${ep}`);
+                break;
+              }
+            } catch {}
+          }
+
+          if (acquiredToken || sessionCookie) {
+            const retryRes = await dispatch(acquiredToken || apiKey, sessionCookie);
+            if (retryRes.ok) return true;
+          }
+        } catch (loginErr: any) {
+          console.warn("[sendEmail] Session retry exception:", loginErr.message);
         }
-
-        if (acquiredToken || sessionCookie) {
-          const retryRes = await dispatch(acquiredToken || apiKey, sessionCookie);
-          if (retryRes.ok) return true;
-        }
-      } catch (loginErr: any) {
-        console.warn("[sendEmail] Session retry exception:", loginErr.message);
       }
     }
 
