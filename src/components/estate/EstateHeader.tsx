@@ -34,22 +34,14 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
         if (data.success && data.settings) {
           const s = data.settings;
           if (s.estateLogoUrl) setLogoUrl(s.estateLogoUrl);
-          if (s.estateTitle && (!title || title === "E-Global Estate")) {
-            setHeaderTitle(s.estateTitle);
-          } else if (title) {
-            setHeaderTitle(title);
-          }
-          if (s.estateSubtitle && (!subtitle || subtitle === "Houses, Apartments & Land")) {
-            setHeaderSubtitle(s.estateSubtitle);
-          } else if (subtitle) {
-            setHeaderSubtitle(subtitle);
-          }
+          if (s.estateTitle) setHeaderTitle(s.estateTitle);
+          if (s.estateSubtitle) setHeaderSubtitle(s.estateSubtitle);
           if (s.estateTitleColor) setTitleColor(s.estateTitleColor);
           if (s.estateSubtitleColor) setSubtitleColor(s.estateSubtitleColor);
         }
       })
       .catch(() => {});
-  }, [title, subtitle]);
+  }, []);
 
   return (
     <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md pt-3.5 pb-2.5 px-4 md:px-8 shadow-2xs">
