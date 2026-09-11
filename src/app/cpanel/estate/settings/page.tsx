@@ -24,6 +24,10 @@ export default function CpanelEstateSettingsPage() {
   const [enableAutoResponses, setEnableAutoResponses] = useState(true);
   const [enableChat, setEnableChat] = useState(true);
   const [enableCalls, setEnableCalls] = useState(true);
+  const [enableShare, setEnableShare] = useState(true);
+  const [enableCardBorder, setEnableCardBorder] = useState(true);
+  const [cardBorderStyle, setCardBorderStyle] = useState<"gradient" | "solid" | "none">("gradient");
+  const [cardBorderColor, setCardBorderColor] = useState("#FC7A00");
   const [chatSecurityNoticeUser, setChatSecurityNoticeUser] = useState("");
   const [chatSecurityNoticeAgent, setChatSecurityNoticeAgent] = useState("");
 
@@ -73,6 +77,10 @@ export default function CpanelEstateSettingsPage() {
         setEnableAutoResponses(s.enableAutoResponses !== false);
         setEnableChat(s.enableChat !== false);
         setEnableCalls(s.enableCalls !== false);
+        setEnableShare(s.enableShare !== false);
+        setEnableCardBorder(s.enableCardBorder !== false);
+        setCardBorderStyle(s.cardBorderStyle === "solid" ? "solid" : s.cardBorderStyle === "none" ? "none" : "gradient");
+        setCardBorderColor(s.cardBorderColor || "#FC7A00");
         setChatSecurityNoticeUser(s.chatSecurityNoticeUser || "");
         setChatSecurityNoticeAgent(s.chatSecurityNoticeAgent || "");
       }
@@ -110,6 +118,10 @@ export default function CpanelEstateSettingsPage() {
           enableAutoResponses,
           enableChat,
           enableCalls,
+          enableShare,
+          enableCardBorder,
+          cardBorderStyle,
+          cardBorderColor,
           chatSecurityNoticeUser,
           chatSecurityNoticeAgent,
         }),
@@ -412,6 +424,22 @@ export default function CpanelEstateSettingsPage() {
 
               <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
                 <div>
+                  <span className="text-xs font-bold block">Property Page Share Button</span>
+                  <span className="text-[10.5px] text-gray-500 font-medium block">
+                    Global ON/OFF switch to show or hide the Share button on property detail pages
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEnableShare(!enableShare)}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableShare ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
+                >
+                  {enableShare ? "ENABLED" : "DISABLED"}
+                </button>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div>
                   <span className="text-xs font-bold block">50s Encrypted Voice Notes</span>
                   <span className="text-[10.5px] text-gray-500 font-medium block">
                     Allow buyers & agents to record and exchange 50s voice notes in chat
@@ -442,6 +470,72 @@ export default function CpanelEstateSettingsPage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Section 2.5: Card & Section Border Style Controls */}
+          <div className={cn("p-5 sm:p-6 rounded-3xl border space-y-4 shadow-xs", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200")}>
+            <div className="flex items-center gap-2 border-b pb-3 border-gray-100 dark:border-gray-800">
+              <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">crop_square</span>
+              <h3 className="font-extrabold text-sm uppercase tracking-wide">Card & Section Border Styling</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div>
+                  <span className="text-xs font-bold block">Card Borders (Cof / Uncoff)</span>
+                  <span className="text-[10.5px] text-gray-500 font-medium block">
+                    ON/OFF toggle to enable (Cof) or disable (Uncoff) outer borders on property cards
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEnableCardBorder(!enableCardBorder)}
+                  className={cn("px-3.5 py-1.5 rounded-xl text-xs font-black uppercase border-0 cursor-pointer transition-all", enableCardBorder ? "bg-emerald-600 text-white" : "bg-red-600 text-white")}
+                >
+                  {enableCardBorder ? "ENABLED (COFFED)" : "DISABLED (UNCOFFED)"}
+                </button>
+              </div>
+
+              <div className={cn("p-4 rounded-2xl border flex items-center justify-between", isDark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200")}>
+                <div>
+                  <span className="text-xs font-bold block">Border Type / Style</span>
+                  <span className="text-[10.5px] text-gray-500 font-medium block">
+                    Choose between Gradient border, Solid border color, or Borderless
+                  </span>
+                </div>
+                <select
+                  value={cardBorderStyle}
+                  onChange={(e) => setCardBorderStyle(e.target.value as any)}
+                  className="p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl font-black text-xs outline-none cursor-pointer"
+                >
+                  <option value="gradient">Gradient Border</option>
+                  <option value="solid">Solid Color Border</option>
+                  <option value="none">Borderless (Clean)</option>
+                </select>
+              </div>
+            </div>
+
+            {cardBorderStyle === "solid" && (
+              <div className="pt-2">
+                <label className="text-[10.5px] font-black uppercase text-gray-500 block mb-1.5 tracking-wider">
+                  Solid Border Color Picker
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={cardBorderColor}
+                    onChange={(e) => setCardBorderColor(e.target.value)}
+                    className="w-12 h-12 p-1 rounded-2xl border border-gray-300 dark:border-gray-800 cursor-pointer bg-white"
+                  />
+                  <input
+                    type="text"
+                    value={cardBorderColor}
+                    onChange={(e) => setCardBorderColor(e.target.value)}
+                    className="p-3 bg-gray-50 dark:bg-gray-950 border border-gray-300 dark:border-gray-800 rounded-2xl font-mono font-bold text-xs uppercase"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 3: Chat Security Disclaimer Notices */}
