@@ -247,11 +247,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "You are not authorized to edit this property." }, { status: 403 });
       }
 
-      // If updating a draft, check if user requested to submit for review or keep as draft
+      // Determine status based on autoApproveListings setting and requested status
+      const autoApprove = activeSettings.autoApproveListings === true;
       let finalStatus = existingData.status;
-      if (existingData.status === "DRAFT") {
-        finalStatus = status === "PENDING_REVIEW" || status === "PUBLISHED" ? "PENDING_REVIEW" : "DRAFT";
-      } else if (existingData.status === "REJECTED") {
+
+      if (status === "DRAFT") {
+        finalStatus = "DRAFT";
+      } else if (existingData.status === "DRAFT" || existingData.status === "REJECTED") {
+        finalStatus = autoApprove ? "PUBLISHED" : "PENDING_REVIEW";
+      } else if (existingData.status === "PUBLISHED" || existingData.status === "APPROVED") {
+        finalStatus = autoApprove ? "PUBLISHED" : "PENDING_REVIEW";
+      } else if (status === "PENDING_REVIEW") {
         finalStatus = "PENDING_REVIEW";
       }
 

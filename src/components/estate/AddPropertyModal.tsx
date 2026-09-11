@@ -228,7 +228,7 @@ export const AddPropertyModal: React.FC<AddPropertyModalProps> = ({
       amenities,
       images: finalImages,
       videos,
-      status: editingProperty?.status === "PUBLISHED" ? "PUBLISHED" : targetStatus,
+      status: targetStatus,
     });
   };
 
