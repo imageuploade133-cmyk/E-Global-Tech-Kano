@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { toast } from "sonner";
 import { getTransactionLedgerStatus, isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
+import { StatementModal } from "@/components/history/StatementModal";
 
 export const ActivityLogContainer: React.FC = () => {
   const { userData, user } = useAuth();
@@ -19,6 +20,10 @@ export const ActivityLogContainer: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<"all" | "deposit" | "transfer" | "bills" | "swap" | "card">("all");
   const [selectedCurrencyFilter, setSelectedCurrencyFilter] = useState<"ALL" | "NGN" | "USD">("ALL");
   const hasPushedState = useRef(false);
+
+  // Total Fund Received This Month state
+  const [monthlyCreditTotal, setMonthlyCreditTotal] = useState<number>(0);
+  const [isStatementModalOpen, setIsStatementModalOpen] = useState<boolean>(false);
 
   // Pagination states for low read operations
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -147,8 +152,41 @@ export const ActivityLogContainer: React.FC = () => {
   useEffect(() => {
     fetchInitialTransactions();
 
+    const fetchMonthlyTotal = async () => {
+      if (!user) return;
+      try {
+        const now = new Date();
+        const startOfMonthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+        const qMonth = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          where("createdAt", ">=", startOfMonthIso)
+        );
+
+        const monthSnap = await getDocs(qMonth);
+        let total = 0;
+        monthSnap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const txObj = { ...data } as Transaction;
+          const statusUpper = (data.status || "").toUpperCase();
+          const isSuccess = statusUpper === "SUCCESS" || statusUpper === "COMPLETED" || data.credited === true || data.alreadyCredited === true;
+          if (isSuccess && isCreditTransaction(txObj)) {
+            total += getTransactionDisplayAmount(txObj);
+          }
+        });
+
+        setMonthlyCreditTotal(total);
+      } catch (err) {
+        console.warn("[Monthly Total Credit Fetch Warning]:", err);
+      }
+    };
+
+    fetchMonthlyTotal();
+
     const handleAppRefresh = () => {
       fetchInitialTransactions(true);
+      fetchMonthlyTotal();
     };
 
     window.addEventListener("app-refresh", handleAppRefresh);
@@ -246,17 +284,45 @@ export const ActivityLogContainer: React.FC = () => {
       className="max-w-md mx-auto space-y-5"
     >
       {/* Header Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => window.history.back()}
+            className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
+            title="Go Back"
+          >
+            <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+          </button>
+          <div>
+            <h2 className="font-hanken font-extrabold text-lg text-black leading-tight">Activity Log</h2>
+            <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider">Historical Transactions</p>
+          </div>
+        </div>
+
         <button
-          onClick={() => window.history.back()}
-          className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
-          title="Go Back"
+          type="button"
+          onClick={() => setIsStatementModalOpen(true)}
+          className="px-3 py-1.5 rounded-xl border border-black/20 bg-black text-white hover:bg-gray-800 transition-all text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer flex-shrink-0 shadow-3xs active:scale-95"
+          title="Statement of Account"
         >
-          <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+          <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+          <span className="hidden min-[360px]:inline">Statement</span>
         </button>
-        <div>
-          <h2 className="font-hanken font-extrabold text-lg text-black leading-tight">Activity Log</h2>
-          <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider">Historical Transactions</p>
+      </div>
+
+      {/* Summary Card: Total Fund Received This Month */}
+      <div className="w-full p-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 text-white shadow-md relative overflow-hidden flex items-center justify-between">
+        <div className="relative z-10">
+          <p className="font-hanken text-[10px] font-extrabold text-emerald-200 uppercase tracking-widest flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">calendar_month</span>
+            <span>Total Fund Received This Month</span>
+          </p>
+          <p className="font-mono text-xl sm:text-2xl font-black mt-1">
+            ₦{monthlyCreditTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-emerald-100 shrink-0 border border-white/20">
+          <span className="material-symbols-outlined text-[28px]">south_west</span>
         </div>
       </div>
 
@@ -489,6 +555,11 @@ export const ActivityLogContainer: React.FC = () => {
           <TransactionReceipt transaction={selectedTx} onClose={() => setSelectedTx(null)} />
         )}
       </AnimatePresence>
+
+      <StatementModal
+        isOpen={isStatementModalOpen}
+        onClose={() => setIsStatementModalOpen(false)}
+      />
     </motion.div>
   );
 };
