@@ -24,6 +24,8 @@ function CpanelEmailConnectContent() {
   const [emailApiKeyInput, setEmailApiKeyInput] = useState("");
   const [emailApiKeyMasked, setEmailApiKeyMasked] = useState("email_live_4a7t...*******");
   const [emailInstanceIdInput, setEmailInstanceIdInput] = useState("inst_33647102");
+  const [emailAdminUsernameInput, setEmailAdminUsernameInput] = useState("");
+  const [emailAdminPasswordInput, setEmailAdminPasswordInput] = useState("");
   const [senderNameInput, setSenderNameInput] = useState("E-Global Pay");
   const [senderEmailInput, setSenderEmailInput] = useState("no-reply@eglobalpay.com");
   const [status, setStatus] = useState<"CONNECTED" | "DISCONNECTED">("CONNECTED");
@@ -74,6 +76,7 @@ function CpanelEmailConnectContent() {
         if (c.emailApiUrl) setEmailApiUrlInput(c.emailApiUrl);
         if (c.emailApiKeyMasked) setEmailApiKeyMasked(c.emailApiKeyMasked);
         if (c.emailInstanceId) setEmailInstanceIdInput(c.emailInstanceId);
+        if (c.emailAdminUsername) setEmailAdminUsernameInput(c.emailAdminUsername);
         if (c.senderName) setSenderNameInput(c.senderName);
         if (c.senderEmail) setSenderEmailInput(c.senderEmail);
         if (c.status) setStatus(c.status);
@@ -119,6 +122,8 @@ function CpanelEmailConnectContent() {
           emailApiUrl: emailApiUrlInput.trim(),
           emailApiKey: emailApiKeyInput.trim(),
           emailInstanceId: emailInstanceIdInput.trim(),
+          emailAdminUsername: emailAdminUsernameInput.trim(),
+          emailAdminPassword: emailAdminPasswordInput.trim(),
           senderName: senderNameInput.trim(),
           senderEmail: senderEmailInput.trim(),
           grantedScopes,
@@ -598,6 +603,29 @@ function CpanelEmailConnectContent() {
                   placeholder="Enter new Email API Secret Key"
                   className={inputClass}
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:col-span-2">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-400 block">Admin Username</label>
+                  <input
+                    type="text"
+                    value={emailAdminUsernameInput}
+                    onChange={(e) => setEmailAdminUsernameInput(e.target.value)}
+                    placeholder="Gateway Admin Username"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-gray-400 block">Admin Password</label>
+                  <input
+                    type="password"
+                    value={emailAdminPasswordInput}
+                    onChange={(e) => setEmailAdminPasswordInput(e.target.value)}
+                    placeholder="Gateway Admin Password"
+                    className={inputClass}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
