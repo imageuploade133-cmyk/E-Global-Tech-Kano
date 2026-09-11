@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { EstateSeller } from "@/estate/types";
 import { uploadImageSecurely } from "@/lib/image-upload";
+import { UploadProgressBar } from "@/components/UploadProgressBar";
 
 interface SellerProfileModalProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export function SellerProfileModal({
     seller?.mutedFields || []
   );
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
 
   React.useEffect(() => {
     if (seller) {
@@ -61,8 +63,11 @@ export function SellerProfileModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploadingAvatar(true);
+    setAvatarUploadProgress(5);
     try {
-      const result = await uploadImageSecurely(file);
+      const result = await uploadImageSecurely(file, "agent_avatar", (percent) => {
+        setAvatarUploadProgress(percent);
+      });
       if (result.success && result.url) {
         setAvatarUrl(result.url);
         toast.success("Agent profile picture uploaded successfully!");
@@ -72,7 +77,10 @@ export function SellerProfileModal({
     } catch {
       toast.error("Failed to upload agent profile picture.");
     } finally {
-      setIsUploadingAvatar(false);
+      setTimeout(() => {
+        setIsUploadingAvatar(false);
+        setAvatarUploadProgress(0);
+      }, 400);
     }
   };
 
@@ -140,6 +148,12 @@ export function SellerProfileModal({
                   <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
+
+              <UploadProgressBar
+                isUploading={isUploadingAvatar}
+                progress={avatarUploadProgress}
+                label="Uploading Profile Picture..."
+              />
 
               {/* Premium Gradient Profile Card */}
               <div className="mt-5 p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#FFF5EB] via-[#FFEADB] to-[#FFE0CC] border border-[#FFD0A1]/80 flex flex-col items-center text-center space-y-3 shadow-xs">
