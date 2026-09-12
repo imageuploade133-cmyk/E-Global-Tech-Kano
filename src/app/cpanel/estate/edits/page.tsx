@@ -92,15 +92,22 @@ export default function AdminPropertyEditsPage() {
 
   const currentPageNumber = cursorHistory.length + 1;
 
-  const handleAction = async (action: "approve" | "reject" | "flag") => {
-    if (!selectedEdit) return;
+  const handleAction = async (action: "approve" | "reject" | "flag" | "delete", targetEditLogId?: string) => {
+    const editId = targetEditLogId || selectedEdit?.id;
+    if (!editId) return;
+
+    if (action === "delete") {
+      const confirmed = window.confirm("Are you sure you want to delete this agent property edit audit record?");
+      if (!confirmed) return;
+    }
+
     setIsProcessing(true);
     try {
       const res = await fetch("/api/estate/admin/edits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          editLogId: selectedEdit.id,
+          editLogId: editId,
           action,
           adminNote: adminNote.trim() || undefined,
         }),
@@ -109,8 +116,10 @@ export default function AdminPropertyEditsPage() {
       const data = await res.json();
       if (data.success) {
         toast.success(data.message || `Action ${action} executed successfully.`);
-        setSelectedEdit(null);
-        setAdminNote("");
+        if (selectedEdit?.id === editId) {
+          setSelectedEdit(null);
+          setAdminNote("");
+        }
         fetchEdits();
       } else {
         toast.error(data.error || "Failed to execute action.");
@@ -279,13 +288,26 @@ export default function AdminPropertyEditsPage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="w-full py-2 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-xs uppercase rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[16px]">visibility</span>
-                  <span>Inspect Edit Diffs</span>
-                </button>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    className="flex-1 py-2 bg-[#FC7A00]/10 hover:bg-[#FC7A00]/20 text-[#FC7A00] font-black text-xs uppercase rounded-xl cursor-pointer border-0 transition-all flex items-center justify-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">visibility</span>
+                    <span>Inspect Diffs</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete Agent Audit Record"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAction("delete", edit.id);
+                    }}
+                    className="w-9 h-9 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center border-0 cursor-pointer transition-all shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -403,7 +425,7 @@ export default function AdminPropertyEditsPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-3 gap-2.5 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
               <button
                 type="button"
                 disabled={isProcessing}
@@ -426,7 +448,16 @@ export default function AdminPropertyEditsPage() {
                 onClick={() => handleAction("flag")}
                 className="py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase rounded-2xl border-0 cursor-pointer disabled:opacity-50 transition-all"
               >
-                Flag & Contact Support
+                Flag & Contact
+              </button>
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={() => handleAction("delete")}
+                className="py-3 bg-gray-900 dark:bg-gray-800 hover:bg-black text-red-400 font-black text-xs uppercase rounded-2xl border border-red-500/30 cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                <span>Delete Audit</span>
               </button>
             </div>
           </div>

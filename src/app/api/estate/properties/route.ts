@@ -288,19 +288,23 @@ export async function POST(req: Request) {
 
       await propDocRef.set(updatedPayload, { merge: true });
 
-      // Create Admin Property Edit Snapshot Log for live or review properties
+      // Overwrite/upsert Admin Property Edit Snapshot Log keyed by targetDocId (propertyId) to prevent separate audit documents and reduce reads
       if (existingData.status === "PUBLISHED" || existingData.status === "APPROVED") {
-        const editLogRef = adminDb.collection("estate_property_edits").doc();
+        const editLogRef = adminDb.collection("estate_property_edits").doc(targetDocId);
+        const existingEditSnap = await editLogRef.get();
+        const existingEditData = existingEditSnap.exists ? existingEditSnap.data() || {} : {};
+        const originalPreviousData = existingEditData.previousData || existingData;
+
         await editLogRef.set({
-          id: editLogRef.id,
+          id: targetDocId,
           propertyId: targetDocId,
           sellerId: uid,
           sellerName: sellerData.agencyName || sellerData.displayName || "Agent",
           propertyTitle: String(title).trim(),
-          previousData: existingData,
+          previousData: originalPreviousData,
           newData: updatedPayload,
           status: "PENDING_REVIEW",
-          createdAt: nowIso,
+          createdAt: existingEditData.createdAt || nowIso,
           updatedAt: nowIso,
         });
       }
