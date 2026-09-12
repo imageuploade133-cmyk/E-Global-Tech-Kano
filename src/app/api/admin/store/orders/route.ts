@@ -156,12 +156,12 @@ export async function POST(req: Request) {
 
     const orderData = orderSnap.data() || {};
     const oldStatus = orderData.status;
+    const userId = orderData.userId;
     const now = new Date().toISOString();
 
     const isRefundAction = (newStatus === "Refunded" || newStatus === "Canceled") && (oldStatus !== "Refunded" && oldStatus !== "Canceled");
 
     if (isRefundAction) {
-      const userId = orderData.userId;
       const refundAmount = Number(orderData.totalAmount) || 0;
 
       if (userId && refundAmount > 0) {
