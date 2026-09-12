@@ -66,7 +66,7 @@ export async function GET(req: Request) {
 
     const lastDocId = edits.length > 0 ? edits[edits.length - 1].id : null;
 
-    // Also fetch pending properties count for header metric
+    // Also fetch pending properties count for header metric and tab status counts
     const pendingPropsSnap = await adminDb
       .collection("estate_properties")
       .where("status", "==", "PENDING_REVIEW")
@@ -74,6 +74,34 @@ export async function GET(req: Request) {
       .get();
 
     const pendingPropertiesCount = pendingPropsSnap.data().count || 0;
+
+    let statusCounts = {
+      ALL: 0,
+      PENDING_REVIEW: 0,
+      APPROVED: 0,
+      REJECTED: 0,
+      FLAGGED: 0,
+    };
+
+    try {
+      const [allSnap, pendingSnap, approvedSnap, rejectedSnap, flaggedSnap] = await Promise.all([
+        adminDb.collection("estate_property_edits").count().get(),
+        adminDb.collection("estate_property_edits").where("status", "==", "PENDING_REVIEW").count().get(),
+        adminDb.collection("estate_property_edits").where("status", "==", "APPROVED").count().get(),
+        adminDb.collection("estate_property_edits").where("status", "==", "REJECTED").count().get(),
+        adminDb.collection("estate_property_edits").where("status", "==", "FLAGGED").count().get(),
+      ]);
+
+      statusCounts = {
+        ALL: allSnap.data().count || 0,
+        PENDING_REVIEW: pendingSnap.data().count || 0,
+        APPROVED: approvedSnap.data().count || 0,
+        REJECTED: rejectedSnap.data().count || 0,
+        FLAGGED: flaggedSnap.data().count || 0,
+      };
+    } catch (countErr: any) {
+      console.warn("[GET /api/estate/admin/edits] Status count aggregation warning:", countErr.message);
+    }
 
     return NextResponse.json({
       success: true,
@@ -86,6 +114,7 @@ export async function GET(req: Request) {
       metrics: {
         pendingPropertiesCount,
       },
+      statusCounts,
     });
   } catch (err: any) {
     console.error("[GET /api/estate/admin/edits Error]:", err.message);

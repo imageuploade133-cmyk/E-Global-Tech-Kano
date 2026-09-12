@@ -25,6 +25,19 @@ export default function AdminPropertyEditsPage() {
   const [adminNote, setAdminNote] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Status counts per tab
+  const [statusCounts, setStatusCounts] = useState<{ [key: string]: number }>({
+    ALL: 0,
+    PENDING_REVIEW: 0,
+    APPROVED: 0,
+    REJECTED: 0,
+    FLAGGED: 0,
+  });
+
+  // Dedicated Delete Confirmation Modal state
+  const [auditToDelete, setAuditToDelete] = useState<EstatePropertyEditLog | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Debounce search input
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -58,6 +71,9 @@ export default function AdminPropertyEditsPage() {
         }
         if (data.metrics?.pendingPropertiesCount !== undefined) {
           setPendingPropertiesCount(data.metrics.pendingPropertiesCount);
+        }
+        if (data.statusCounts) {
+          setStatusCounts(data.statusCounts);
         }
       } else {
         toast.error(data.error || "Failed to load property edits.");
@@ -97,8 +113,11 @@ export default function AdminPropertyEditsPage() {
     if (!editId) return;
 
     if (action === "delete") {
-      const confirmed = window.confirm("Are you sure you want to delete this agent property edit audit record?");
-      if (!confirmed) return;
+      const editObj = edits.find((e) => e.id === editId) || selectedEdit;
+      if (editObj) {
+        setAuditToDelete(editObj);
+      }
+      return;
     }
 
     setIsProcessing(true);
@@ -215,20 +234,28 @@ export default function AdminPropertyEditsPage() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 select-none">
-          {["ALL", "PENDING_REVIEW", "APPROVED", "REJECTED", "FLAGGED"].map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all ${
-                activeTab === tab
-                  ? "bg-[#FC7A00] text-white shadow-2xs"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-              }`}
-            >
-              {tab.replace("_", " ")}
-            </button>
-          ))}
+          {["ALL", "PENDING_REVIEW", "APPROVED", "REJECTED", "FLAGGED"].map((tab) => {
+            const count = statusCounts[tab] !== undefined ? statusCounts[tab] : 0;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap border-0 cursor-pointer transition-all flex items-center gap-1.5 ${
+                  activeTab === tab
+                    ? "bg-[#FC7A00] text-white shadow-2xs"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                }`}
+              >
+                <span>{tab.replace("_", " ")}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  activeTab === tab ? "bg-white/20 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -458,6 +485,99 @@ export default function AdminPropertyEditsPage() {
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
                 <span>Delete Audit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal Overlay */}
+      {auditToDelete && (
+        <div className="fixed inset-0 z-[100080] bg-black/65 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl p-6 space-y-4 border border-gray-200 dark:border-gray-800 text-black dark:text-white shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base uppercase leading-tight">Delete Agent Audit Record?</h3>
+                <p className="text-[11px] text-gray-400 font-mono mt-0.5">Property ID: {auditToDelete.propertyId}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs text-gray-600 dark:text-gray-300">
+              <p className="leading-relaxed font-medium">
+                Are you sure you want to permanently delete this property edit audit record?
+              </p>
+              <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700 space-y-1">
+                <p className="font-bold text-black dark:text-white truncate">
+                  Property: {auditToDelete.propertyTitle || auditToDelete.newData?.title || "Property Listing"}
+                </p>
+                <p className="text-gray-500 text-[11px]">
+                  Agent: <strong className="text-[#FC7A00]">{auditToDelete.sellerName || "Partner Agent"}</strong>
+                </p>
+              </div>
+              <p className="text-[10.5px] text-red-500 font-bold">
+                ⚠️ This action will permanently remove the audit record and cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setAuditToDelete(null)}
+                className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-800 dark:text-gray-200 font-black text-xs uppercase rounded-2xl border-0 cursor-pointer transition-all"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={async () => {
+                  setIsDeleting(true);
+                  try {
+                    const res = await fetch("/api/estate/admin/edits", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        editLogId: auditToDelete.id,
+                        action: "delete",
+                      }),
+                    });
+
+                    const data = await res.json();
+                    if (data.success) {
+                      toast.success(data.message || "Property edit audit record deleted successfully.");
+                      if (selectedEdit?.id === auditToDelete.id) {
+                        setSelectedEdit(null);
+                        setAdminNote("");
+                      }
+                      setAuditToDelete(null);
+                      fetchEdits();
+                    } else {
+                      toast.error(data.error || "Failed to delete audit record.");
+                    }
+                  } catch {
+                    toast.error("Network error deleting audit record.");
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase rounded-2xl border-0 cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    <span>Confirm Delete</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
