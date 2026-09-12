@@ -122,9 +122,12 @@ export const StoreOrderHistoryModal: React.FC<StoreOrderHistoryModalProps> = ({
                       </div>
 
                       {ord.adminNotes && (
-                        <div className="p-2.5 rounded-xl bg-orange-50/80 border border-orange-200/80 text-[10.5px] text-orange-900 font-medium">
-                          <strong className="text-[#FC7A00] font-extrabold uppercase text-[9px] block">Support Note:</strong>
-                          <span>{ord.adminNotes}</span>
+                        <div className="p-2.5 rounded-xl bg-red-50 border border-red-300 text-[10.5px] text-red-700 font-medium animate-pulse">
+                          <strong className="text-red-600 font-black uppercase text-[9px] block flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px] text-red-600">error</span>
+                            Support Note:
+                          </strong>
+                          <span className="font-bold text-red-700">{ord.adminNotes}</span>
                         </div>
                       )}
                     </div>
@@ -297,17 +300,17 @@ export const StoreOrderHistoryModal: React.FC<StoreOrderHistoryModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Support Notes Gradient Card */}
+                      {/* Support Notes Gradient Card - Red & Blinking */}
                       {selectedOrder.adminNotes && (
-                        <div className="bg-gradient-to-r from-[#FC7A00]/30 to-[#E06600]/30 p-[1.5px] rounded-2xl shadow-xs">
-                          <div className="p-3.5 bg-orange-50/90 rounded-[14px] text-xs text-orange-900 space-y-1">
+                        <div className="bg-gradient-to-r from-red-500/40 via-red-600/30 to-red-500/40 p-[1.5px] rounded-2xl shadow-xs animate-pulse">
+                          <div className="p-3.5 bg-red-50/95 rounded-[14px] text-xs text-red-900 space-y-1 border border-red-200">
                             <div className="flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">support_agent</span>
-                              <span className="font-black uppercase tracking-wider text-[10px] text-[#FC7A00]">
+                              <span className="material-symbols-outlined text-[18px] text-red-600">support_agent</span>
+                              <span className="font-black uppercase tracking-wider text-[10px] text-red-600">
                                 Support Dispatch Note
                               </span>
                             </div>
-                            <p className="font-medium leading-relaxed pl-5 text-[11px]">{selectedOrder.adminNotes}</p>
+                            <p className="font-bold leading-relaxed pl-6 text-[11.5px] text-red-700">{selectedOrder.adminNotes}</p>
                           </div>
                         </div>
                       )}
