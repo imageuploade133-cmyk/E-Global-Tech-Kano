@@ -9,7 +9,7 @@ export interface Notification {
   title: string;
   message: string;
   time: string;
-  type: "transaction" | "security" | "promo";
+  type: "transaction" | "security" | "promo" | "order" | "chat" | "system";
   read: boolean;
   amount?: number;
   currency?: string;
@@ -17,6 +17,7 @@ export interface Notification {
   recipientName?: string;
   bankName?: string;
   channel?: string;
+  url?: string;
 }
 
 interface NotificationItemProps {
@@ -52,11 +53,17 @@ export function NotificationItem({
         {/* Interactive type icons */}
         <div
           className={cn(
-            "w-11 h-11 rounded-full flex items-center justify-center shrink-0",
+            "w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-xs",
             n.type === "transaction"
               ? "bg-[#0b513d]/10 text-[#0b513d]"
               : n.type === "security"
               ? "bg-[#dc3545]/10 text-[#dc3545]"
+              : n.type === "order"
+              ? "bg-purple-500/10 text-purple-600"
+              : n.type === "chat"
+              ? "bg-blue-500/10 text-blue-600"
+              : n.type === "system"
+              ? "bg-indigo-500/10 text-indigo-600"
               : "bg-[#FC7A00]/10 text-[#FC7A00]"
           )}
         >
@@ -65,6 +72,12 @@ export function NotificationItem({
               ? "payments"
               : n.type === "security"
               ? "gpp_maybe"
+              : n.type === "order"
+              ? "shopping_bag"
+              : n.type === "chat"
+              ? "chat_bubble"
+              : n.type === "system"
+              ? "settings_suggest"
               : "campaign"}
           </span>
         </div>

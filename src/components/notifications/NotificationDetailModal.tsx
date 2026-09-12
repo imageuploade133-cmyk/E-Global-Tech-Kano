@@ -77,11 +77,17 @@ export function NotificationDetailModal({
           <div className="flex flex-col items-center text-center mt-2 mb-6">
             <div
               className={cn(
-                "w-16 h-16 rounded-full flex items-center justify-center mb-4",
+                "w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-xs",
                 notification.type === "transaction"
                   ? "bg-[#0b513d]/10 text-[#0b513d]"
                   : notification.type === "security"
                   ? "bg-[#dc3545]/10 text-[#dc3545]"
+                  : notification.type === "order"
+                  ? "bg-purple-500/10 text-purple-600"
+                  : notification.type === "chat"
+                  ? "bg-blue-500/10 text-blue-600"
+                  : notification.type === "system"
+                  ? "bg-indigo-500/10 text-indigo-600"
                   : "bg-[#FC7A00]/10 text-[#FC7A00]"
               )}
             >
@@ -90,19 +96,75 @@ export function NotificationDetailModal({
                   ? "payments"
                   : notification.type === "security"
                   ? "gpp_maybe"
+                  : notification.type === "order"
+                  ? "shopping_bag"
+                  : notification.type === "chat"
+                  ? "chat_bubble"
+                  : notification.type === "system"
+                  ? "settings_suggest"
                   : "campaign"}
               </span>
             </div>
-            <h4 className="font-hanken font-bold text-lg text-black mb-1">
+            <h4 className="font-hanken font-extrabold text-lg text-black mb-1">
               {notification.title}
             </h4>
-            <p className="text-[12px] text-gray-400 font-mono">
+            <p className="text-[11px] text-gray-400 font-mono font-medium">
               Received: {notification.time}
             </p>
           </div>
 
           {/* Conditional rendering based on Type */}
-          {notification.type === "transaction" ? (
+          {notification.type === "order" ? (
+            <div className="bg-purple-50/60 rounded-2xl p-5 border border-purple-200/80 space-y-4 text-left">
+              <div className="flex items-center justify-between border-b border-purple-200/60 pb-3">
+                <span className="text-[10px] text-purple-700 uppercase font-extrabold tracking-wider">
+                  Store Order Update
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-purple-100 text-purple-800">
+                  Store Notice
+                </span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs text-gray-800 leading-relaxed font-medium">
+                  {notification.message}
+                </p>
+                {notification.reference && (
+                  <div className="pt-2 border-t border-purple-200/50 flex justify-between items-center text-xs">
+                    <span className="text-gray-500 font-bold">Order Reference:</span>
+                    <span className="font-mono font-black text-purple-700">{notification.reference}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : notification.type === "chat" ? (
+            <div className="bg-blue-50/60 rounded-2xl p-5 border border-blue-200/80 space-y-4 text-left">
+              <div className="flex items-center justify-between border-b border-blue-200/60 pb-3">
+                <span className="text-[10px] text-blue-700 uppercase font-extrabold tracking-wider">
+                  Direct Message / Support Chat
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-100 text-blue-800">
+                  Chat Alert
+                </span>
+              </div>
+              <p className="text-xs text-gray-800 leading-relaxed font-medium">
+                {notification.message}
+              </p>
+            </div>
+          ) : notification.type === "system" ? (
+            <div className="bg-indigo-50/60 rounded-2xl p-5 border border-indigo-200/80 space-y-4 text-left">
+              <div className="flex items-center justify-between border-b border-indigo-200/60 pb-3">
+                <span className="text-[10px] text-indigo-700 uppercase font-extrabold tracking-wider">
+                  System Notification
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-indigo-100 text-indigo-800">
+                  System Notice
+                </span>
+              </div>
+              <p className="text-xs text-gray-800 leading-relaxed font-medium">
+                {notification.message}
+              </p>
+            </div>
+          ) : notification.type === "transaction" ? (
             (() => {
               const msg = notification.message || "";
               const title = notification.title || "";
@@ -222,7 +284,7 @@ export function NotificationDetailModal({
           )}
 
           <div className="mt-8 flex flex-col gap-3">
-            {notification.type === "transaction" && (
+            {notification.type === "transaction" ? (
               <Link
                 href="/history"
                 onClick={() => {
@@ -234,7 +296,20 @@ export function NotificationDetailModal({
                 <span className="material-symbols-outlined text-[16px]">receipt_long</span>
                 <span>View Full History Ledger</span>
               </Link>
-            )}
+            ) : notification.type === "order" ? (
+              <Link
+                href="/store"
+                onClick={() => {
+                  onClose();
+                  onCloseParentTray();
+                }}
+                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-none text-center cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
+                <span>Open Store Orders</span>
+              </Link>
+            ) : null}
+
             <button
               type="button"
               onClick={onClose}
