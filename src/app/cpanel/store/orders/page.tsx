@@ -2,6 +2,7 @@
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 import React, { useState, useEffect } from "react";
+import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -648,24 +649,41 @@ function CpanelStoreOrdersPageContent() {
                       </td>
 
                       <td className="p-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => openInspectModal(order)}
-                            className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-[#FC7A00] hover:text-white text-gray-700 dark:text-gray-200 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">visibility</span>
-                            Inspect
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteOrder(order.id)}
-                            className="p-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-all cursor-pointer"
-                            title="Delete Order Record"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
+                        <div className="flex items-center justify-end">
+                          <CpanelActionDropdown
+                            isDark={isDark}
+                            actions={[
+                              {
+                                label: "Inspect Order",
+                                icon: "visibility",
+                                onClick: () => openInspectModal(order),
+                              },
+                              {
+                                label: "Mark Delivered",
+                                icon: "check_circle",
+                                variant: "emerald",
+                                onClick: () => {
+                                  openInspectModal(order);
+                                  handleUpdateOrderStatus(undefined, "Delivered");
+                                },
+                              },
+                              {
+                                label: "Refund & Cancel",
+                                icon: "undo",
+                                variant: "danger",
+                                onClick: () => {
+                                  openInspectModal(order);
+                                  handleUpdateOrderStatus(undefined, "Refunded");
+                                },
+                              },
+                              {
+                                label: "Delete Order",
+                                icon: "delete",
+                                variant: "danger",
+                                onClick: () => handleDeleteOrder(order.id),
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
