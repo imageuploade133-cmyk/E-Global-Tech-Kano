@@ -7,6 +7,7 @@ interface StoreHeaderProps {
   settings: StoreSettings;
   wishlistCount: number;
   cartCount: number;
+  orderCount?: number;
   onClearCache: () => void;
   onOpenWishlist: () => void;
   onOpenMyOrders: () => void;
@@ -97,7 +98,7 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
           <button
             type="button"
             onClick={onOpenMyOrders}
-            className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
+            className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             title="Order History"
           >
             <span
@@ -106,6 +107,11 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
             >
               history
             </span>
+            {orderCount !== undefined && orderCount > 0 && (
+              <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-[#FC7A00] text-white text-[8px] font-bold rounded-full flex items-center justify-center border border-white">
+                {orderCount}
+              </span>
+            )}
           </button>
 
           {/* Shopping Cart Icon Button */}
