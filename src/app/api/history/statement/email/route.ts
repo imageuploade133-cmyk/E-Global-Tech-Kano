@@ -374,7 +374,7 @@ export async function POST(req: Request) {
         ]
       : undefined;
 
-    const sent = await sendEmail({
+    let sent = await sendEmail({
       to: targetEmail,
       subject: `Statement of Account (${fromDate} to ${toDate}) - E-Global Pay`,
       html: emailHtml,
