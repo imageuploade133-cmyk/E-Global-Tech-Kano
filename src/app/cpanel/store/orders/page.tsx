@@ -79,6 +79,41 @@ function CpanelStoreOrdersPageContent() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isPurging, setIsPurging] = useState(false);
 
+  // Reusable Confirmation Modal Overlay State
+  const [confirmModalData, setConfirmModalData] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  });
+
+  const promptAdminConfirmation = (opts: {
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }) => {
+    setConfirmModalData({
+      isOpen: true,
+      title: opts.title,
+      description: opts.description,
+      confirmText: opts.confirmText || "Confirm Action",
+      cancelText: opts.cancelText || "Cancel",
+      isDanger: opts.isDanger !== false,
+      onConfirm: opts.onConfirm,
+    });
+  };
+
   // Check Admin Unlock Session via /api/admin/auth/session
   useEffect(() => {
     async function checkSession() {
@@ -168,71 +203,76 @@ function CpanelStoreOrdersPageContent() {
     setAdminNotes(order.adminNotes || "");
   };
 
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm(`Are you sure you want to permanently delete order record ${orderId}?`)) {
-      return;
-    }
+  const handleDeleteOrder = (orderId: string) => {
+    promptAdminConfirmation({
+      title: "Delete Order Record",
+      description: `Are you sure you want to permanently delete order record ${orderId}? This document will be purged from Firestore storage.`,
+      confirmText: "Delete Order",
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+          const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+          const res = await fetch("/api/admin/store/orders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader },
+            body: JSON.stringify({ action: "delete_order", orderId }),
+          });
 
-      const res = await fetch("/api/admin/store/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ action: "delete_order", orderId }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(data.message || "Order record deleted!");
-        if (activeOrder?.id === orderId) setActiveProductOrder(null);
-        fetchOrders();
-      } else {
-        toast.error(data.error || "Failed to delete order record.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Network error deleting order.");
-    }
+          const data = await res.json();
+          if (res.ok && data.success) {
+            toast.success(data.message || "Order record deleted!");
+            if (activeOrder?.id === orderId) setActiveProductOrder(null);
+            fetchOrders();
+          } else {
+            toast.error(data.error || "Failed to delete order record.");
+          }
+        } catch (err: any) {
+          toast.error(err.message || "Network error deleting order.");
+        }
+      },
+    });
   };
 
-  const handlePurgeFailedOrders = async () => {
-    if (!confirm("Are you sure you want to bulk-purge all failed, abandoned, and canceled store order records from system storage?")) {
-      return;
-    }
+  const handlePurgeFailedOrders = () => {
+    promptAdminConfirmation({
+      title: "Purge Abandoned & Canceled Orders",
+      description: "Are you sure you want to bulk-purge all failed, abandoned, and canceled store order records from system storage? Active and delivered orders will not be affected.",
+      confirmText: "Purge Failed Orders",
+      isDanger: true,
+      onConfirm: async () => {
+        setIsPurging(true);
+        toast.loading("Purging abandoned and canceled order records...", { id: "purge-orders" });
 
-    setIsPurging(true);
-    toast.loading("Purging abandoned and canceled order records...", { id: "purge-orders" });
+        try {
+          const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+          const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
 
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const authHeader: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
+          const res = await fetch("/api/admin/store/orders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader },
+            body: JSON.stringify({ action: "purge_failed_orders" }),
+          });
 
-      const res = await fetch("/api/admin/store/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader },
-        body: JSON.stringify({ action: "purge_failed_orders" }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(data.message || "Purged abandoned order records!", { id: "purge-orders" });
-        fetchOrders();
-      } else {
-        toast.error(data.error || "Failed to purge order records.", { id: "purge-orders" });
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Network error purging order records.", { id: "purge-orders" });
-    } finally {
-      setIsPurging(false);
-    }
+          const data = await res.json();
+          if (res.ok && data.success) {
+            toast.success(data.message || "Purged abandoned order records!", { id: "purge-orders" });
+            fetchOrders();
+          } else {
+            toast.error(data.error || "Failed to purge order records.", { id: "purge-orders" });
+          }
+        } catch (err: any) {
+          toast.error(err.message || "Network error purging order records.", { id: "purge-orders" });
+        } finally {
+          setIsPurging(false);
+        }
+      },
+    });
   };
 
-  const handleUpdateOrderStatus = async (e?: React.FormEvent, quickStatus?: string) => {
-    if (e) e.preventDefault();
+  const executeUpdateOrderStatus = async (targetStatus: string) => {
     if (!activeOrder) return;
-
-    const targetStatus = quickStatus || newStatus;
 
     setIsUpdatingStatus(true);
     toast.loading(`Updating order ${activeOrder.id} to "${targetStatus}"...`, { id: "update-order" });
@@ -265,6 +305,51 @@ function CpanelStoreOrdersPageContent() {
     } finally {
       setIsUpdatingStatus(false);
     }
+  };
+
+  const handleUpdateOrderStatus = (e?: React.FormEvent, quickStatus?: string) => {
+    if (e) e.preventDefault();
+    if (!activeOrder) return;
+
+    const targetStatus = quickStatus || newStatus;
+    const oldStatus = activeOrder.status;
+
+    // Direct confirmation prompt if status is changing to Refunded or Canceled
+    if ((targetStatus === "Refunded" || targetStatus === "Canceled") && (oldStatus !== "Refunded" && oldStatus !== "Canceled")) {
+      promptAdminConfirmation({
+        title: `Confirm ${targetStatus} & Refund Order`,
+        description: `Updating status to "${targetStatus}" will automatically credit ₦${activeOrder.totalAmount.toLocaleString()} NGN back to customer's wallet (${activeOrder.customerName}). Are you sure you want to proceed?`,
+        confirmText: `Refund ₦${activeOrder.totalAmount.toLocaleString()} & ${targetStatus}`,
+        isDanger: true,
+        onConfirm: () => executeUpdateOrderStatus(targetStatus),
+      });
+      return;
+    }
+
+    if (targetStatus === "Delivered" && oldStatus !== "Delivered") {
+      promptAdminConfirmation({
+        title: "Mark Order Delivered",
+        description: `Are you sure you want to update order ${activeOrder.id} status to "Delivered"?`,
+        confirmText: "Mark Delivered",
+        isDanger: false,
+        onConfirm: () => executeUpdateOrderStatus("Delivered"),
+      });
+      return;
+    }
+
+    // Default status update prompt if changing status
+    if (targetStatus !== oldStatus) {
+      promptAdminConfirmation({
+        title: "Update Order Status",
+        description: `Are you sure you want to change order ${activeOrder.id} status from "${oldStatus}" to "${targetStatus}"?`,
+        confirmText: "Update Status",
+        isDanger: false,
+        onConfirm: () => executeUpdateOrderStatus(targetStatus),
+      });
+      return;
+    }
+
+    executeUpdateOrderStatus(targetStatus);
   };
 
   const getStatusBadge = (status: string) => {
@@ -743,11 +828,7 @@ function CpanelStoreOrdersPageContent() {
                   <button
                     type="button"
                     disabled={isUpdatingStatus}
-                    onClick={() => {
-                      if (confirm(`Are you sure you want to Cancel & Refund ₦${activeOrder.totalAmount.toLocaleString()} to customer's wallet?`)) {
-                        handleUpdateOrderStatus(undefined, "Refunded");
-                      }
-                    }}
+                    onClick={() => handleUpdateOrderStatus(undefined, "Refunded")}
                     className="px-3 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">undo</span>
@@ -776,6 +857,58 @@ function CpanelStoreOrdersPageContent() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal Dialog Overlay */}
+      {confirmModalData.isOpen && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className={cn("w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 text-center", panelClass)}>
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center mx-auto",
+              confirmModalData.isDanger ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-[#FC7A00]/10 text-[#FC7A00] border border-[#FC7A00]/20"
+            )}>
+              <span className="material-symbols-outlined text-[28px]">
+                {confirmModalData.isDanger ? "warning" : "info"}
+              </span>
+            </div>
+
+            <div>
+              <h3 className="text-base font-black uppercase text-black dark:text-white tracking-tight">
+                {confirmModalData.title}
+              </h3>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-relaxed mt-1">
+                {confirmModalData.description}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModalData((prev) => ({ ...prev, isOpen: false }))}
+                className="flex-1 py-3 rounded-2xl border border-gray-200 dark:border-gray-800 text-xs font-black uppercase text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer"
+              >
+                {confirmModalData.cancelText || "Cancel"}
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const fn = confirmModalData.onConfirm;
+                  setConfirmModalData((prev) => ({ ...prev, isOpen: false }));
+                  await fn();
+                }}
+                className={cn(
+                  "flex-1 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm",
+                  confirmModalData.isDanger
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-[#FC7A00] hover:opacity-95"
+                )}
+              >
+                {confirmModalData.confirmText || "Confirm Action"}
+              </button>
+            </div>
           </div>
         </div>
       )}
