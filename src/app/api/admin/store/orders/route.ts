@@ -159,6 +159,15 @@ export async function POST(req: Request) {
     const userId = orderData.userId;
     const now = new Date().toISOString();
 
+    // Prevent modifying status if order has already been Refunded or Canceled
+    const isAlreadySettled = String(oldStatus || "").toLowerCase() === "refunded" || String(oldStatus || "").toLowerCase() === "canceled" || String(oldStatus || "").toLowerCase() === "cancelled";
+    if (isAlreadySettled) {
+      return NextResponse.json(
+        { error: "This order has already been refunded/canceled. Its status cannot be modified further; administrators may only delete the record." },
+        { status: 400 }
+      );
+    }
+
     const isRefundAction = (newStatus === "Refunded" || newStatus === "Canceled") && (oldStatus !== "Refunded" && oldStatus !== "Canceled");
 
     if (isRefundAction) {

@@ -772,93 +772,121 @@ function CpanelStoreOrdersPageContent() {
                 </div>
               </div>
 
-              {/* Order Status & Admin Notes Form Inputs */}
-              <form id="order-inspect-form" onSubmit={(e) => handleUpdateOrderStatus(e)} className="space-y-3 pt-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                      Order Processing Status
-                    </label>
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value)}
-                      className={cn("w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none cursor-pointer", inputClass)}
-                    >
-                      {availableStatuses.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {/* Lock Banner if order is already Refunded or Canceled */}
+              {(() => {
+                const st = String(activeOrder.status || "").toLowerCase();
+                const isSettled = st === "refunded" || st === "canceled" || st === "cancelled";
 
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                      Order Total Amount
-                    </label>
-                    <div className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-xs sm:text-sm font-black text-emerald-600">
-                      ₦{activeOrder.totalAmount?.toLocaleString()} NGN
-                    </div>
-                  </div>
-                </div>
+                return (
+                  <>
+                    {isSettled && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-2 text-amber-700 dark:text-amber-300 text-xs">
+                        <span className="material-symbols-outlined text-[20px] text-amber-500 shrink-0">lock</span>
+                        <p className="font-semibold leading-relaxed text-[11px]">
+                          This order has already been <strong className="uppercase">{activeOrder.status}</strong>. All status modifications are locked to prevent duplicate refunds. Only record deletion is permitted.
+                        </p>
+                      </div>
+                    )}
 
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                    Admin Dispatch & Fulfillment Notes
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={adminNotes}
-                    onChange={(e) => setAdminNotes(e.target.value)}
-                    placeholder="e.g. Dispatched via Courier Tracking #98234..."
-                    className={cn("w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none resize-none", inputClass)}
-                  />
-                </div>
-              </form>
+                    {/* Order Status & Admin Notes Form Inputs */}
+                    <form id="order-inspect-form" onSubmit={(e) => handleUpdateOrderStatus(e)} className="space-y-3 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
+                            Order Processing Status
+                          </label>
+                          <select
+                            disabled={isSettled}
+                            value={newStatus}
+                            onChange={(e) => setNewStatus(e.target.value)}
+                            className={cn("w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed", inputClass)}
+                          >
+                            {availableStatuses.map((stItem) => (
+                              <option key={stItem} value={stItem}>
+                                {stItem}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
+                            Order Total Amount
+                          </label>
+                          <div className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-xs sm:text-sm font-black text-emerald-600">
+                            ₦{activeOrder.totalAmount?.toLocaleString()} NGN
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
+                          Admin Dispatch & Fulfillment Notes
+                        </label>
+                        <textarea
+                          disabled={isSettled}
+                          rows={2}
+                          value={adminNotes}
+                          onChange={(e) => setAdminNotes(e.target.value)}
+                          placeholder="e.g. Dispatched via Courier Tracking #98234..."
+                          className={cn("w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none resize-none disabled:opacity-60 disabled:cursor-not-allowed", inputClass)}
+                        />
+                      </div>
+                    </form>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Modal Responsive Action Bar */}
             <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 space-y-2">
-              <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-2">
-                <button
-                  type="button"
-                  disabled={isUpdatingStatus}
-                  onClick={() => handleUpdateOrderStatus(undefined, "Delivered")}
-                  className="py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center justify-center gap-1 cursor-pointer border-0 shadow-xs"
-                >
-                  <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                  Mark Delivered
-                </button>
+              {(() => {
+                const st = String(activeOrder.status || "").toLowerCase();
+                const isSettled = st === "refunded" || st === "canceled" || st === "cancelled";
 
-                <button
-                  type="button"
-                  disabled={isUpdatingStatus}
-                  onClick={() => handleUpdateOrderStatus(undefined, "Refunded")}
-                  className="py-2.5 px-3 rounded-xl bg-rose-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center justify-center gap-1 cursor-pointer border-0 shadow-xs"
-                >
-                  <span className="material-symbols-outlined text-[15px]">undo</span>
-                  Refund & Cancel
-                </button>
+                return (
+                  <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-2">
+                    <button
+                      type="button"
+                      disabled={isSettled || isUpdatingStatus}
+                      onClick={() => handleUpdateOrderStatus(undefined, "Delivered")}
+                      className="py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center justify-center gap-1 cursor-pointer border-0 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                      Mark Delivered
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleDeleteOrder(activeOrder.id)}
-                  className="py-2.5 px-3 rounded-xl bg-red-500/10 text-red-500 font-bold text-[10px] sm:text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all flex items-center justify-center gap-1 cursor-pointer border border-red-500/20"
-                >
-                  <span className="material-symbols-outlined text-[15px]">delete</span>
-                  Delete Order
-                </button>
+                    <button
+                      type="button"
+                      disabled={isSettled || isUpdatingStatus}
+                      onClick={() => handleUpdateOrderStatus(undefined, "Refunded")}
+                      className="py-2.5 px-3 rounded-xl bg-rose-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center justify-center gap-1 cursor-pointer border-0 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">undo</span>
+                      Refund & Cancel
+                    </button>
 
-                <button
-                  type="submit"
-                  form="order-inspect-form"
-                  disabled={isUpdatingStatus}
-                  className="py-2.5 px-4 rounded-xl bg-[#FC7A00] text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer border-0 shadow-xs"
-                >
-                  {isUpdatingStatus && <ButtonSpinner />}
-                  Save Status
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOrder(activeOrder.id)}
+                      className="py-2.5 px-3 rounded-xl bg-red-500/10 text-red-500 font-bold text-[10px] sm:text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all flex items-center justify-center gap-1 cursor-pointer border border-red-500/20"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">delete</span>
+                      Delete Order
+                    </button>
+
+                    <button
+                      type="submit"
+                      form="order-inspect-form"
+                      disabled={isSettled || isUpdatingStatus}
+                      className="py-2.5 px-4 rounded-xl bg-[#FC7A00] text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer border-0 shadow-xs"
+                    >
+                      {isUpdatingStatus && <ButtonSpinner />}
+                      Save Status
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
