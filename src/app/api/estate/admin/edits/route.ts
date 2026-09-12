@@ -178,6 +178,15 @@ export async function POST(req: Request) {
       });
     }
 
+    if (action === "delete") {
+      await editLogRef.delete();
+
+      return NextResponse.json({
+        success: true,
+        message: "Property edit audit record deleted successfully.",
+      });
+    }
+
     return NextResponse.json({ error: "Invalid action type." }, { status: 400 });
   } catch (err: any) {
     console.error("[POST /api/estate/admin/edits Error]:", err.message);
