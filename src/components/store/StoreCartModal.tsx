@@ -18,6 +18,7 @@ interface StoreCartModalProps {
   isPlacingOrder: boolean;
   hideCardPayment?: boolean;
   enablePickup?: boolean;
+  userBalance?: number;
   onClose: () => void;
   onUpdateCartQuantity: (productId: string, delta: number) => void;
   onRemoveFromCart: (productId: string) => void;
@@ -43,6 +44,7 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
   isPlacingOrder,
   hideCardPayment,
   enablePickup,
+  userBalance,
   onClose,
   onUpdateCartQuantity,
   onRemoveFromCart,
@@ -191,9 +193,16 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
               <div className="p-5 bg-white border-t border-gray-100 space-y-3 shadow-lg z-20 flex-shrink-0">
                 {/* Payment Method Selector Bar directly in Cart */}
                 <div className="space-y-1.5 bg-gray-50 p-3 rounded-2xl border border-gray-150">
-                  <label className="text-[9.5px] font-black uppercase text-gray-400 block">
-                    Payment Method / Checkout Channel
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9.5px] font-black uppercase text-gray-400 block">
+                      Payment Method / Checkout Channel
+                    </label>
+                    {userBalance !== undefined && (
+                      <span className="text-[9.5px] font-bold text-gray-500 font-mono">
+                        Bal: ₦{userBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
 
                   <div className={`grid ${hideCardPayment ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
                     <button
@@ -201,15 +210,22 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
                       onClick={() => onSetSelectedPaymentMethod("WALLET_NGN")}
                       className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                         selectedPaymentMethod === "WALLET_NGN"
-                          ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold"
-                          : "border-gray-200 bg-white text-gray-600 font-bold"
+                          ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
+                          : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
                       }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">
                           account_balance_wallet
                         </span>
-                        <span className="text-[10px] uppercase truncate">Main Wallet</span>
+                        <div className="min-w-0 flex flex-col">
+                          <span className="text-[10px] uppercase truncate">Main Wallet</span>
+                          {userBalance !== undefined && (
+                            <span className="text-[8.5px] text-gray-400 font-mono font-semibold truncate">
+                              ₦{userBalance.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {selectedPaymentMethod === "WALLET_NGN" && (
                         <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">
@@ -224,15 +240,20 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
                         onClick={() => onSetSelectedPaymentMethod("CARD_CHECKOUT")}
                         className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                           selectedPaymentMethod === "CARD_CHECKOUT"
-                            ? "border-emerald-500 bg-emerald-50/90 text-black font-extrabold"
-                            : "border-gray-200 bg-white text-gray-600 font-bold"
+                            ? "border-emerald-500 bg-emerald-50/90 text-black font-extrabold shadow-3xs"
+                            : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
                         }`}
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="material-symbols-outlined text-[18px] text-emerald-600">
                             credit_card
                           </span>
-                          <span className="text-[10px] uppercase truncate">Pay with Card</span>
+                          <div className="min-w-0 flex flex-col">
+                            <span className="text-[10px] uppercase truncate">Pay with Card</span>
+                            <span className="text-[8.5px] text-gray-400 font-semibold truncate">
+                              Flutterwave
+                            </span>
+                          </div>
                         </div>
                         {selectedPaymentMethod === "CARD_CHECKOUT" && (
                           <span className="material-symbols-outlined text-[16px] text-emerald-600">
@@ -376,11 +397,18 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
 
                     {/* Prominent Payment Method Selector at Top of Checkout Form */}
                     <div className="space-y-1.5 bg-gray-50 p-3 rounded-2xl border border-gray-200">
-                      <label className="text-[10px] font-black uppercase text-gray-500 block">
-                        Select Payment Method *
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase text-gray-500 block">
+                          Select Payment Method *
+                        </label>
+                        {userBalance !== undefined && (
+                          <span className="text-[9.5px] font-bold text-gray-500 font-mono">
+                            Available: ₦{userBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className={`grid ${hideCardPayment ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
                         <button
                           type="button"
                           onClick={() => onSetSelectedPaymentMethod("WALLET_NGN")}
@@ -405,39 +433,43 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
                               Main Wallet
                             </span>
                             <span className="text-[9px] text-gray-400 font-semibold block">
-                              Deduct from NGN balance
+                              {userBalance !== undefined
+                                ? `Balance: ₦${userBalance.toLocaleString()}`
+                                : "Deduct from NGN balance"}
                             </span>
                           </div>
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => onSetSelectedPaymentMethod("CARD_CHECKOUT")}
-                          className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                            selectedPaymentMethod === "CARD_CHECKOUT"
-                              ? "border-emerald-500 bg-emerald-50/80 shadow-xs"
-                              : "border-gray-200 bg-white hover:bg-gray-100"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="material-symbols-outlined text-[20px] text-emerald-600">
-                              credit_card
-                            </span>
-                            {selectedPaymentMethod === "CARD_CHECKOUT" && (
-                              <span className="material-symbols-outlined text-[16px] text-emerald-600">
-                                check_circle
+                        {!hideCardPayment && (
+                          <button
+                            type="button"
+                            onClick={() => onSetSelectedPaymentMethod("CARD_CHECKOUT")}
+                            className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                              selectedPaymentMethod === "CARD_CHECKOUT"
+                                ? "border-emerald-500 bg-emerald-50/80 shadow-xs"
+                                : "border-gray-200 bg-white hover:bg-gray-100"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="material-symbols-outlined text-[20px] text-emerald-600">
+                                credit_card
                               </span>
-                            )}
-                          </div>
-                          <div className="mt-2">
-                            <span className="font-extrabold text-[11px] uppercase block text-black">
-                              Pay with Card
-                            </span>
-                            <span className="text-[9px] text-gray-400 font-semibold block">
-                              Pay securely using Flutterwave card
-                            </span>
-                          </div>
-                        </button>
+                              {selectedPaymentMethod === "CARD_CHECKOUT" && (
+                                <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                                  check_circle
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2">
+                              <span className="font-extrabold text-[11px] uppercase block text-black">
+                                Pay with Card
+                              </span>
+                              <span className="text-[9px] text-gray-400 font-semibold block">
+                                Direct Card Checkout
+                              </span>
+                            </div>
+                          </button>
+                        )}
                       </div>
                     </div>
 
