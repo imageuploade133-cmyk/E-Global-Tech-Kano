@@ -6,6 +6,24 @@ import { formatTransactionDateTime } from "@/lib/date-utils";
 import { isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import jsPDF from "jspdf";
 
+async function fetchImageAsDataUri(url: string): Promise<string | null> {
+  if (!url || !url.startsWith("http")) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = res.headers.get("content-type") || "image/png";
+    return `data:${contentType};base64,${buffer.toString("base64")}`;
+  } catch (err: any) {
+    console.warn(`[fetchImageAsDataUri] Warning fetching image ${url}:`, err.message);
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     let uid = "";
@@ -196,8 +214,13 @@ export async function POST(req: Request) {
         format: "a4",
       });
 
+      // Pre-fetch Data URIs for remote images so jsPDF doc.addImage never fails on raw HTTP URLs
+      const watermarkDataUri = statementWatermarkUrl ? await fetchImageAsDataUri(statementWatermarkUrl) : null;
+      const signatureDataUri = statementSignatureUrl ? await fetchImageAsDataUri(statementSignatureUrl) : null;
+      const stampDataUri = statementStampUrl ? await fetchImageAsDataUri(statementStampUrl) : null;
+
       // Background watermark opacity
-      if (statementWatermarkUrl) {
+      if (watermarkDataUri) {
         try {
           doc.saveGraphicsState();
           (doc as any).setGState(new (doc as any).GState({ opacity: statementWatermarkOpacity }));
@@ -205,7 +228,7 @@ export async function POST(req: Request) {
           const wmHeight = statementWatermarkSize;
           const wmX = (210 - wmWidth) / 2;
           const wmY = (297 - wmHeight) / 2;
-          doc.addImage(statementWatermarkUrl, "PNG", wmX, wmY, wmWidth, wmHeight);
+          doc.addImage(watermarkDataUri, "PNG", wmX, wmY, wmWidth, wmHeight);
           doc.restoreGraphicsState();
         } catch {}
       }
@@ -309,22 +332,22 @@ export async function POST(req: Request) {
 
       // Signature & Stamp
       if (yPos + 25 < 280) {
-        if (statementSignatureUrl) {
+        if (signatureDataUri) {
           try {
             doc.setFontSize(7);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(148, 163, 184);
             doc.text("AUTHORIZED SIGNATORY", 18, yPos + 6);
-            doc.addImage(statementSignatureUrl, "PNG", 18, yPos + 8, 30, 12);
+            doc.addImage(signatureDataUri, "PNG", 18, yPos + 8, 30, 12);
           } catch {}
         }
-        if (statementStampUrl) {
+        if (stampDataUri) {
           try {
             doc.setFontSize(7);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(148, 163, 184);
             doc.text("OFFICIAL STAMP", 150, yPos + 6);
-            doc.addImage(statementStampUrl, "PNG", 150, yPos + 8, 20, 20);
+            doc.addImage(stampDataUri, "PNG", 150, yPos + 8, 20, 20);
           } catch {}
         }
       }
@@ -358,6 +381,16 @@ export async function POST(req: Request) {
       attachments,
     });
 
+    // Fallback: If sending with attachment fails, retry dispatching pure HTML table email
+    if (!sent && attachments) {
+      console.warn("[Statement Email Route] Attachment dispatch failed. Retrying dispatch as pure HTML table email...");
+      sent = await sendEmail({
+        to: targetEmail,
+        subject: `Statement of Account (${fromDate} to ${toDate}) - E-Global Pay`,
+        html: emailHtml,
+      });
+    }
+
     if (sent) {
       return NextResponse.json({
         success: true,
@@ -365,7 +398,7 @@ export async function POST(req: Request) {
       });
     } else {
       return NextResponse.json({
-        error: "Failed to dispatch email statement. Please try PDF download option.",
+        error: "Failed to dispatch email statement. Please check your email configuration.",
       }, { status: 502 });
     }
 
