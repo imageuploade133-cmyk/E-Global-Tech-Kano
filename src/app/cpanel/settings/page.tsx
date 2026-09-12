@@ -30,6 +30,9 @@ function CpanelSettingsPageContent() {
   const [statementLogoInput, setStatementLogoInput] = useState(config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
   const [statementSignatureInput, setStatementSignatureInput] = useState(config.statementSignatureUrl || "");
   const [statementStampInput, setStatementStampInput] = useState(config.statementStampUrl || "");
+  const [statementWatermarkInput, setStatementWatermarkInput] = useState(config.statementWatermarkUrl || "");
+  const [statementWatermarkSizeInput, setStatementWatermarkSizeInput] = useState(config.statementWatermarkSize || 100);
+  const [statementWatermarkOpacityInput, setStatementWatermarkOpacityInput] = useState(config.statementWatermarkOpacity ?? 0.15);
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
   const [emailInput, setEmailInput] = useState(config.supportEmail);
@@ -44,6 +47,7 @@ function CpanelSettingsPageContent() {
   const [isUploadingStatementLogo, setIsUploadingStatementLogo] = useState(false);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const [isUploadingStamp, setIsUploadingStamp] = useState(false);
+  const [isUploadingWatermark, setIsUploadingWatermark] = useState(false);
 
 
 
@@ -56,6 +60,9 @@ function CpanelSettingsPageContent() {
     setStatementLogoInput(config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png");
     setStatementSignatureInput(config.statementSignatureUrl || "");
     setStatementStampInput(config.statementStampUrl || "");
+    setStatementWatermarkInput(config.statementWatermarkUrl || "");
+    setStatementWatermarkSizeInput(config.statementWatermarkSize || 100);
+    setStatementWatermarkOpacityInput(config.statementWatermarkOpacity ?? 0.15);
     setPhone1Input(config.supportPhone1);
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
@@ -76,6 +83,9 @@ function CpanelSettingsPageContent() {
         statementLogoUrl: statementLogoInput,
         statementSignatureUrl: statementSignatureInput,
         statementStampUrl: statementStampInput,
+        statementWatermarkUrl: statementWatermarkInput,
+        statementWatermarkSize: statementWatermarkSizeInput,
+        statementWatermarkOpacity: statementWatermarkOpacityInput,
         supportPhone1: phone1Input,
         supportPhone2: phone2Input,
         supportEmail: emailInput,
@@ -225,6 +235,33 @@ function CpanelSettingsPageContent() {
       toast.error(err.message || "Stamp upload failed.");
     } finally {
       setIsUploadingStamp(false);
+    }
+  };
+
+  const handleWatermarkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingWatermark(true);
+    toast.loading("Uploading traditional watermark logo securely...");
+
+    try {
+      const result = await uploadImageSecurely(file, "statement_watermark");
+      toast.dismiss();
+
+      if (result.success && result.url) {
+        const uploadedUrl = result.url;
+        setStatementWatermarkInput(uploadedUrl);
+        updateConfig({ statementWatermarkUrl: uploadedUrl });
+        toast.success("Traditional watermark logo successfully uploaded and updated!");
+      } else {
+        toast.error(result.error || "Failed to upload watermark logo!");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Watermark upload failed.");
+    } finally {
+      setIsUploadingWatermark(false);
     }
   };
 
@@ -444,6 +481,87 @@ function CpanelSettingsPageContent() {
                     )}
                   </div>
                 </div>
+
+                {/* Traditional Watermark Logo (Middle of A4 Statement) */}
+                <div className="border-t border-gray-200/30 dark:border-gray-800 pt-4 space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">watermark</span>
+                      A4 Traditional Background Watermark Logo (Middle of Statement)
+                    </label>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      Upload an official traditional logo watermark displayed in the exact center of A4 size statements. Adjust size and transparency.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Watermark Logo URL</label>
+                      <input
+                        type="url"
+                        value={statementWatermarkInput}
+                        onChange={(e) => setStatementWatermarkInput(e.target.value)}
+                        placeholder="https://i.ibb.co/..."
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400">Upload Watermark File</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingWatermark}
+                        onChange={handleWatermarkUpload}
+                        className={cn(inputClass, "cursor-pointer py-1.5 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-[#FC7A00]/10 file:text-[#FC7A00]")}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Size and Opacity Controls */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/80 dark:bg-gray-900/40 p-3.5 rounded-xl border border-gray-200/50 dark:border-gray-800">
+                    {/* Size slider & input */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-black uppercase text-gray-500 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px] text-orange-500">aspect_ratio</span>
+                          Watermark Size (MM)
+                        </label>
+                        <span className="font-mono text-xs font-black text-[#FC7A00]">{statementWatermarkSizeInput} mm</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={40}
+                        max={180}
+                        step={5}
+                        value={statementWatermarkSizeInput}
+                        onChange={(e) => setStatementWatermarkSizeInput(Number(e.target.value))}
+                        className="w-full accent-[#FC7A00] cursor-pointer"
+                      />
+                      <p className="text-[8.5px] text-gray-400">Controls width/height of centered watermark on 210mm A4 page (40mm - 180mm).</p>
+                    </div>
+
+                    {/* Opacity slider & input */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-black uppercase text-gray-500 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px] text-[#FC7A00]">opacity</span>
+                          Watermark Transparency / Opacity
+                        </label>
+                        <span className="font-mono text-xs font-black text-[#FC7A00]">{Math.round(statementWatermarkOpacityInput * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.05}
+                        max={0.80}
+                        step={0.01}
+                        value={statementWatermarkOpacityInput}
+                        onChange={(e) => setStatementWatermarkOpacityInput(Number(e.target.value))}
+                        className="w-full accent-[#FC7A00] cursor-pointer"
+                      />
+                      <p className="text-[8.5px] text-gray-400">Controls background transparency (5% is subtle, 15% standard, 80% high visibility).</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Receipt Branding Settings */}
@@ -568,6 +686,65 @@ function CpanelSettingsPageContent() {
                   <p className="text-[11px] text-gray-400 uppercase font-black tracking-wide leading-none">Support contact details</p>
                   <p className={cn("text-xs font-black mt-1.5", isDark ? "text-white" : "text-gray-900")}>{emailInput}</p>
                   <p className="text-[11px] font-mono text-gray-400 mt-1">{phone1Input}</p>
+                </div>
+              </div>
+
+              {/* Live A4 Statement Watermark Preview Card */}
+              <div className={cn("border p-4 rounded-xl space-y-3 transition-colors duration-300", isDark ? "bg-gray-900/80 border-gray-800" : "bg-white/80 border-gray-150")}>
+                <div className="flex justify-between items-center">
+                  <p className="text-[11px] text-gray-400 uppercase font-black tracking-wide leading-none">A4 Statement Watermark Preview</p>
+                  <span className="text-[9px] font-mono font-black text-[#FC7A00] bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">A4 PAGE</span>
+                </div>
+                <div className="relative w-full aspect-[210/297] bg-white border border-gray-200 rounded-lg shadow-inner overflow-hidden p-3 flex flex-col justify-between text-black">
+                  {/* Top Bar Representation */}
+                  <div className="border-b border-gray-100 pb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-4 h-4 rounded bg-[#FC7A00]/20 flex items-center justify-center text-[8px] font-bold text-[#FC7A00]">E</div>
+                      <span className="text-[9px] font-black tracking-wider text-gray-800">E-GLOBAL PAY</span>
+                    </div>
+                    <span className="text-[7px] font-bold text-gray-400">STATEMENT OF ACCOUNT</span>
+                  </div>
+
+                  {/* Middle Content Placeholder Lines with Centered Watermark Layer */}
+                  <div className="relative flex-1 py-2 flex flex-col justify-between">
+                    {/* Centered Watermark Image Layer */}
+                    {statementWatermarkInput ? (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                        <img
+                          src={statementWatermarkInput}
+                          alt="Watermark Preview"
+                          style={{
+                            width: `${(statementWatermarkSizeInput / 210) * 100}%`,
+                            opacity: statementWatermarkOpacityInput,
+                            maxHeight: "80%",
+                            objectFit: "contain",
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                        <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest text-center px-4">
+                          No Watermark Uploaded
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Mock Table Content Lines */}
+                    <div className="relative z-10 space-y-1.5 opacity-70">
+                      <div className="h-1.5 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-1 bg-gray-100 rounded w-full"></div>
+                      <div className="h-1 bg-gray-100 rounded w-5/6"></div>
+                      <div className="h-1 bg-gray-100 rounded w-full"></div>
+                      <div className="h-1 bg-gray-100 rounded w-2/3"></div>
+                      <div className="h-1 bg-gray-100 rounded w-full"></div>
+                      <div className="h-1 bg-gray-100 rounded w-4/5"></div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Footer Line */}
+                  <div className="relative z-10 border-t border-gray-100 pt-1 text-[6.5px] text-gray-400 text-center font-semibold">
+                    Confidential Electronic Statement • E-Global Pay
+                  </div>
                 </div>
               </div>
             </div>

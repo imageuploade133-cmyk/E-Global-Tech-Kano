@@ -27,7 +27,10 @@ export async function GET() {
         bannerSlideEffect: data?.bannerSlideEffect || "fade",
         bannerImagePosition: data?.bannerImagePosition || "center",
         bannerHeightMobile: data?.bannerHeightMobile || 150,
-        bannerHeightDesktop: data?.bannerHeightDesktop || 220
+        bannerHeightDesktop: data?.bannerHeightDesktop || 220,
+        statementWatermarkUrl: data?.statementWatermarkUrl || "",
+        statementWatermarkSize: data?.statementWatermarkSize || 100,
+        statementWatermarkOpacity: data?.statementWatermarkOpacity ?? 0.15
       };
       return NextResponse.json({ success: true, config: publicConfig });
     }
@@ -51,7 +54,10 @@ export async function GET() {
       bannerSlideEffect: "fade",
       bannerImagePosition: "center",
       bannerHeightMobile: 150,
-      bannerHeightDesktop: 220
+      bannerHeightDesktop: 220,
+      statementWatermarkUrl: "",
+      statementWatermarkSize: 100,
+      statementWatermarkOpacity: 0.15
     };
     return NextResponse.json({ success: true, config: defaultPublicConfig });
   }
