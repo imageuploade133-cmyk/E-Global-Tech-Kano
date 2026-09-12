@@ -65,6 +65,13 @@ export function ContactHotlinesSection({ contacts }: ContactHotlinesSectionProps
               </button>
               <a
                 href={`tel:${contact.phone.replace(/\s+/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.open(`tel:${contact.phone.replace(/\s+/g, "")}`, "_system");
+                  }
+                }}
                 className="w-8 h-8 rounded-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] flex items-center justify-center text-white active:scale-90 transition-all cursor-pointer"
                 title="Call Now"
               >

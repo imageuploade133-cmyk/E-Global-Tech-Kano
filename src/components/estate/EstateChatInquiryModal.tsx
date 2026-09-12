@@ -384,6 +384,13 @@ export const EstateChatInquiryModal: React.FC<EstateChatInquiryModalProps> = ({
               <div className="flex items-center gap-2 flex-shrink-0">
                 <a
                   href={`tel:${agentPhone}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.open(`tel:${agentPhone}`, "_system");
+                    }
+                  }}
                   className="w-9 h-9 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-600 flex items-center justify-center cursor-pointer border border-emerald-200 transition-all active:scale-90"
                   title="Call Agent"
                 >

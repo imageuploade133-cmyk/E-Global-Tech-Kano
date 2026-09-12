@@ -117,7 +117,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const handleOpenGoogleMaps = () => {
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocationString)}`;
-    window.open(mapsUrl, "_blank");
+    if (typeof window !== "undefined") {
+      window.open(mapsUrl, "_blank", "noopener,noreferrer");
+    }
   };
 
   const agentPhone = publisherAgent?.phone || property.sellerPhone;
@@ -537,6 +539,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <>
                 <a
                   href={`tel:${agentPhone}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.open(`tel:${agentPhone}`, "_system");
+                    }
+                  }}
                   className="w-12 h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center cursor-pointer border-0 transition-all active:scale-90 flex-shrink-0 shadow-xs"
                   title="Call Agent"
                 >
