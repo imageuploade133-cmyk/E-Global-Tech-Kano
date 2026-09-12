@@ -678,19 +678,20 @@ function CpanelStoreOrdersPageContent() {
 
       </div>
 
-      {/* Inspect & Manage Order Details Modal */}
+      {/* Inspect & Manage Order Details Modal (Responsive for Small Screens) */}
       {activeOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className={cn("w-full max-w-2xl p-6 rounded-3xl border shadow-2xl space-y-5 my-8", panelClass)}>
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4">
-              <div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-fade-in overflow-hidden">
+          <div className={cn("w-full max-w-2xl max-h-[92vh] flex flex-col p-4 sm:p-6 rounded-3xl border shadow-2xl space-y-4 my-auto overflow-hidden", panelClass)}>
+            {/* Header Bar */}
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3 flex-shrink-0">
+              <div className="min-w-0 pr-2">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#FC7A00] text-[24px]">local_shipping</span>
-                  <h2 className="text-base font-black uppercase tracking-tight">
-                    Order Dispatch Inspector: <span className="font-mono text-[#FC7A00]">{activeOrder.id}</span>
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px] flex-shrink-0">local_shipping</span>
+                  <h2 className="text-sm sm:text-base font-black uppercase tracking-tight truncate">
+                    Inspector: <span className="font-mono text-[#FC7A00]">{activeOrder.id}</span>
                   </h2>
                 </div>
-                <p className="text-[11px] font-bold text-gray-400 mt-0.5">
+                <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 mt-0.5 truncate">
                   Placed on {new Date(activeOrder.createdAt).toLocaleString()}
                 </p>
               </div>
@@ -698,165 +699,167 @@ function CpanelStoreOrdersPageContent() {
               <button
                 type="button"
                 onClick={() => setActiveProductOrder(null)}
-                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white cursor-pointer"
+                className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white cursor-pointer flex-shrink-0"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
-            {/* Customer & Address Details */}
-            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#FC7A00] block">Customer Delivery Profile</span>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-gray-400 block text-[10px]">Name:</span>
-                  <strong className="font-black text-black dark:text-white">{activeOrder.customerName}</strong>
-                </div>
-
-                <div>
-                  <span className="text-gray-400 block text-[10px]">Phone Number:</span>
-                  <strong className="font-mono font-black text-black dark:text-white">{activeOrder.customerPhone}</strong>
-                </div>
-
-                {activeOrder.customerEmail && (
+            {/* Scrollable Modal Content Body */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+              {/* Customer & Delivery Details */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#FC7A00] block">Customer Delivery Profile</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                   <div>
-                    <span className="text-gray-400 block text-[10px]">Email Address:</span>
-                    <strong className="font-mono text-gray-700 dark:text-gray-300">{activeOrder.customerEmail}</strong>
+                    <span className="text-gray-400 block text-[9.5px]">Name:</span>
+                    <strong className="font-black text-black dark:text-white break-words">{activeOrder.customerName}</strong>
                   </div>
-                )}
 
-                <div>
-                  <span className="text-gray-400 block text-[10px]">Payment Channel & Verification:</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="px-2 py-0.5 rounded text-[9.5px] font-black uppercase bg-purple-500/10 text-purple-600 border border-purple-500/20">
-                      {activeOrder.paymentChannel || (activeOrder.paymentMethod === "CARD_CHECKOUT" ? "Checkout with Card Payment" : "Main NGN Wallet")}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[9.5px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[12px]">verified</span>
-                      <span>{activeOrder.paymentStatus || "PAID"}</span>
-                    </span>
+                  <div>
+                    <span className="text-gray-400 block text-[9.5px]">Phone Number:</span>
+                    <strong className="font-mono font-black text-black dark:text-white">{activeOrder.customerPhone}</strong>
                   </div>
-                  {activeOrder.paymentVerificationRef && (
-                    <span className="text-[9px] font-mono text-gray-400 block mt-1">Ref: {activeOrder.paymentVerificationRef}</span>
-                  )}
-                </div>
 
-                <div className="col-span-1 md:col-span-2 border-t border-gray-200 dark:border-gray-800 pt-2">
-                  <span className="text-gray-400 block text-[10px]">Delivery Address:</span>
-                  <p className="font-bold text-gray-800 dark:text-gray-200 mt-0.5">{activeOrder.deliveryAddress}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Purchased Items List */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Purchased Items Breakdown</span>
-              <div className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
-                {activeOrder.items?.map((item, idx) => (
-                  <div key={idx} className="p-3 bg-white dark:bg-gray-900 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      {item.imageUrl && (
-                        <img src={item.imageUrl} alt={item.title} className="w-10 h-10 object-contain rounded-lg border p-1" />
-                      )}
-                      <div>
-                        <h4 className="font-black text-xs text-black dark:text-white">{item.title}</h4>
-                        <span className="text-[10px] text-gray-400">Qty: x{item.quantity} • ₦{item.price.toLocaleString()} each</span>
-                      </div>
+                  {activeOrder.customerEmail && (
+                    <div>
+                      <span className="text-gray-400 block text-[9.5px]">Email Address:</span>
+                      <strong className="font-mono text-gray-700 dark:text-gray-300 break-all">{activeOrder.customerEmail}</strong>
                     </div>
-                    <strong className="font-black text-xs text-emerald-600">₦{(item.price * item.quantity).toLocaleString()}</strong>
+                  )}
+
+                  <div>
+                    <span className="text-gray-400 block text-[9.5px]">Payment Channel & Verification:</span>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-purple-500/10 text-purple-600 border border-purple-500/20">
+                        {activeOrder.paymentChannel || (activeOrder.paymentMethod === "CARD_CHECKOUT" ? "Card Payment" : "Main NGN Wallet")}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[11px]">verified</span>
+                        <span>{activeOrder.paymentStatus || "PAID"}</span>
+                      </span>
+                    </div>
+                    {activeOrder.paymentVerificationRef && (
+                      <span className="text-[8.5px] font-mono text-gray-400 block mt-1 truncate">Ref: {activeOrder.paymentVerificationRef}</span>
+                    )}
                   </div>
-                ))}
+
+                  <div className="col-span-1 sm:col-span-2 border-t border-gray-200 dark:border-gray-800 pt-2">
+                    <span className="text-gray-400 block text-[9.5px]">Delivery Address:</span>
+                    <p className="font-bold text-gray-800 dark:text-gray-200 mt-0.5 leading-relaxed break-words">{activeOrder.deliveryAddress}</p>
+                  </div>
+                </div>
               </div>
+
+              {/* Purchased Items List */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Purchased Items Breakdown</span>
+                <div className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+                  {activeOrder.items?.map((item, idx) => (
+                    <div key={idx} className="p-3 bg-white dark:bg-gray-900 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {item.imageUrl && (
+                          <img src={item.imageUrl} alt={item.title} className="w-9 h-9 object-contain rounded-lg border p-1 flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <h4 className="font-black text-xs text-black dark:text-white truncate">{item.title}</h4>
+                          <span className="text-[9.5px] text-gray-400 block">Qty: x{item.quantity} • ₦{item.price.toLocaleString()} each</span>
+                        </div>
+                      </div>
+                      <strong className="font-black text-xs text-emerald-600 flex-shrink-0">₦{(item.price * item.quantity).toLocaleString()}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order Status & Admin Notes Form Inputs */}
+              <form id="order-inspect-form" onSubmit={(e) => handleUpdateOrderStatus(e)} className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
+                      Order Processing Status
+                    </label>
+                    <select
+                      value={newStatus}
+                      onChange={(e) => setNewStatus(e.target.value)}
+                      className={cn("w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none cursor-pointer", inputClass)}
+                    >
+                      {availableStatuses.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
+                      Order Total Amount
+                    </label>
+                    <div className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-xs sm:text-sm font-black text-emerald-600">
+                      ₦{activeOrder.totalAmount?.toLocaleString()} NGN
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
+                    Admin Dispatch & Fulfillment Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={adminNotes}
+                    onChange={(e) => setAdminNotes(e.target.value)}
+                    placeholder="e.g. Dispatched via Courier Tracking #98234..."
+                    className={cn("w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none resize-none", inputClass)}
+                  />
+                </div>
+              </form>
             </div>
 
-            {/* Order Status & Admin Notes Form */}
-            <form onSubmit={(e) => handleUpdateOrderStatus(e)} className="space-y-4 pt-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                    Order Processing Status
-                  </label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                    className={cn("w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold outline-none cursor-pointer", inputClass)}
-                  >
-                    {availableStatuses.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Modal Responsive Action Bar */}
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 space-y-2">
+              <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-between gap-2">
+                <button
+                  type="button"
+                  disabled={isUpdatingStatus}
+                  onClick={() => handleUpdateOrderStatus(undefined, "Delivered")}
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center justify-center gap-1 cursor-pointer border-0 shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                  Mark Delivered
+                </button>
 
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                    Order Total Amount
-                  </label>
-                  <div className="px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 text-sm font-black text-emerald-600">
-                    ₦{activeOrder.totalAmount?.toLocaleString()} NGN
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  disabled={isUpdatingStatus}
+                  onClick={() => handleUpdateOrderStatus(undefined, "Refunded")}
+                  className="py-2.5 px-3 rounded-xl bg-rose-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center justify-center gap-1 cursor-pointer border-0 shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[15px]">undo</span>
+                  Refund & Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteOrder(activeOrder.id)}
+                  className="py-2.5 px-3 rounded-xl bg-red-500/10 text-red-500 font-bold text-[10px] sm:text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all flex items-center justify-center gap-1 cursor-pointer border border-red-500/20"
+                >
+                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                  Delete Order
+                </button>
+
+                <button
+                  type="submit"
+                  form="order-inspect-form"
+                  disabled={isUpdatingStatus}
+                  className="py-2.5 px-4 rounded-xl bg-[#FC7A00] text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer border-0 shadow-xs"
+                >
+                  {isUpdatingStatus && <ButtonSpinner />}
+                  Save Status
+                </button>
               </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                  Admin Dispatch & Fulfillment Notes
-                </label>
-                <textarea
-                  rows={2}
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                  placeholder="e.g. Dispatched via Logistics Courier Tracking #98234..."
-                  className={cn("w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold outline-none resize-none", inputClass)}
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={isUpdatingStatus}
-                    onClick={() => handleUpdateOrderStatus(undefined, "Delivered")}
-                    className="px-3 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                    Mark Delivered
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isUpdatingStatus}
-                    onClick={() => handleUpdateOrderStatus(undefined, "Refunded")}
-                    className="px-3 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">undo</span>
-                    Refund & Cancel
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteOrder(activeOrder.id)}
-                    className="px-3 py-2 rounded-xl bg-red-500/10 text-red-500 font-bold text-xs uppercase tracking-wider hover:bg-red-500/20 transition-all flex items-center gap-1 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
-                    Delete Order
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isUpdatingStatus}
-                    className="px-5 py-2.5 rounded-xl bg-[#FC7A00] text-white font-black text-xs uppercase tracking-wider hover:opacity-95 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                  >
-                    {isUpdatingStatus && <ButtonSpinner />}
-                    Save Status & Notes
-                  </button>
-                </div>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
