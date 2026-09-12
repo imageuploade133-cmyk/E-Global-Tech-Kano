@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ import { getTransactionLedgerStatus, isCreditTransaction, getTransactionDisplayA
 import { StatementModal } from "@/components/history/StatementModal";
 
 export const ActivityLogContainer: React.FC = () => {
+  const router = useRouter();
   const { userData, user } = useAuth();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -284,11 +286,12 @@ export const ActivityLogContainer: React.FC = () => {
       const hasActiveSession = Boolean(sessionStorage.getItem("active_funding_session"));
 
       if (hasReturnToFunding || hasActiveSession) {
-        window.location.href = "/?fromHistoryReturn=true";
+        router.push("/?fromHistoryReturn=true");
         return;
       }
     }
-    window.history.back();
+    // Safely navigate back to home page dashboard without popping history back into /auth/pin or /auth/login
+    router.push("/");
   };
 
   return (
