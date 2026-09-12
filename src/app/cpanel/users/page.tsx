@@ -4,6 +4,7 @@ import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 
 import React, { useState, useEffect } from "react";
+import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
@@ -499,13 +500,22 @@ function CpanelUsersPageContent() {
                               )}
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setEditingUser(u)}
-                              className="px-3 py-1 bg-[#FC7A00] text-white text-[10px] font-extrabold uppercase rounded-lg hover:bg-[#e06600] transition-all cursor-pointer"
-                            >
-                              Manage User
-                            </button>
+                            <CpanelActionDropdown
+                              isDark={isDark}
+                              actions={[
+                                {
+                                  label: "Manage User",
+                                  icon: "admin_panel_settings",
+                                  onClick: () => setEditingUser(u),
+                                },
+                                {
+                                  label: "Cash Deposit",
+                                  icon: "payments",
+                                  variant: "emerald",
+                                  onClick: () => setEditingUser(u),
+                                },
+                              ]}
+                            />
                           </div>
                         )}
 
