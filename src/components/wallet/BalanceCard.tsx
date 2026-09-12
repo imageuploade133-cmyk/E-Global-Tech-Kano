@@ -1317,22 +1317,48 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }, 300);
   };
 
-  const handleIHavePaidClick = () => {
-    if (activeTxRef && typeof window !== "undefined") {
-      const sessionData = {
-        txRef: activeTxRef,
-        wizardStep,
-        addAmount,
-        selectedBank,
-        ussdCode,
-        transferDetails,
-        timestamp: Date.now(),
-      };
-      sessionStorage.setItem("active_funding_session", JSON.stringify(sessionData));
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+
+  const handleVerifyPaymentClick = async () => {
+    if (!activeTxRef || !user) {
+      toast.error("No active payment session found.");
+      return;
     }
-    setIsAddMoneyOpen(false);
-    toast.info("Navigating to Transaction History. Click Back on history to return to payment waiting status.");
-    router.push("/history?returnToFunding=true");
+
+    setIsVerifyingPayment(true);
+    const toastId = toast.loading("Checking payment status...");
+
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/payments/status?txRef=${encodeURIComponent(activeTxRef)}`, {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      const data = await res.json();
+      toast.dismiss(toastId);
+
+      if (data.status === "SUCCESS" || data.credited === true || data.alreadyCredited === true) {
+        const creditedAmt = Number(data.totalCredited ?? data.fundedAmount ?? data.amount ?? addAmount ?? 0);
+        setConfirmedCreditedAmount(creditedAmt > 0 ? creditedAmt : null);
+        setPaymentStatus("PAID");
+        stopPolling();
+        if (timerRef.current) clearInterval(timerRef.current);
+        setWizardStep("success");
+        toast.success(`Payment received: ₦${creditedAmt.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+        fetchWalletBalances();
+        fetchInvestmentBalance();
+        window.dispatchEvent(new Event("app-refresh"));
+      } else {
+        toast.info("Payment not received yet");
+      }
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error("Failed to verify payment. Please try again.");
+    } finally {
+      setIsVerifyingPayment(false);
+    }
   };
 
   // Restore active funding session when returning from history or on page mount
@@ -2789,7 +2815,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   )}
 
-                  <div className="max-h-[400px] overflow-y-auto space-y-2.5 px-1 pr-1.5 pt-2.5 no-scrollbar pb-2">
+                  <div className="flex-1 overflow-y-auto space-y-2.5 px-1 pr-1.5 pt-2.5 pb-20 custom-scrollbar max-h-[60vh] min-h-[300px]">
                     {isBanksLoading ? (
                       <div className="p-4 space-y-3.5">
                         {[1, 2, 3, 4].map((i) => (
@@ -2900,14 +2926,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   </div>
 
-                  {/* "I Have Made Payment" Button */}
+                  {/* "Verify Payment" Button */}
                   <button
                     type="button"
-                    onClick={handleIHavePaidClick}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl font-hanken text-xs font-black uppercase tracking-wider cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
+                    disabled={isVerifyingPayment}
+                    onClick={handleVerifyPaymentClick}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl font-hanken text-xs font-black uppercase tracking-wider cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm border-0 disabled:opacity-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">history</span>
-                    <span>I Have Made Payment</span>
+                    {isVerifyingPayment ? (
+                      <>
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Verifying Payment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[18px]">verified</span>
+                        <span>Verify Payment</span>
+                      </>
+                    )}
                   </button>
                 </motion.div>
               )}
@@ -2992,14 +3028,24 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   </div>
 
-                  {/* "I Have Made Payment" Button */}
+                  {/* "Verify Payment" Button */}
                   <button
                     type="button"
-                    onClick={handleIHavePaidClick}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl font-hanken text-xs font-black uppercase tracking-wider cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
+                    disabled={isVerifyingPayment}
+                    onClick={handleVerifyPaymentClick}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl font-hanken text-xs font-black uppercase tracking-wider cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm border-0 disabled:opacity-50"
                   >
-                    <span className="material-symbols-outlined text-[18px]">history</span>
-                    <span>I Have Made Payment</span>
+                    {isVerifyingPayment ? (
+                      <>
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Verifying Payment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[18px]">verified</span>
+                        <span>Verify Payment</span>
+                      </>
+                    )}
                   </button>
                 </motion.div>
               )}
@@ -3710,7 +3756,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                   <p className="font-hanken text-xs font-semibold">Loading banks directory...</p>
                                 </div>
                               ) : (
-                                <div className="flex-1 overflow-y-auto space-y-2.5 px-1 pr-1.5 pt-2.5 no-scrollbar pb-6">
+                                <div className="flex-1 overflow-y-auto space-y-2.5 px-1 pr-1.5 pt-2.5 pb-16 custom-scrollbar min-h-0">
                                   {filteredTrfBanks.map((bank) => {
                                     return (
                                       <button
