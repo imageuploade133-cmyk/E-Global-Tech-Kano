@@ -489,7 +489,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   {receiptHeaderName}
                 </p>
                 <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug mt-0.5">
-                  {isRefund
+                  {txType === "STORE_ORDER_REFUND" || desc.includes("order cancel") || desc.includes("cancel & refund")
+                    ? "Order Cancel & Refund"
+                    : isRefund
                     ? (isCardRefund
                         ? `Refund for Failed ${transaction.beneficiaryName || transaction.recipientName || "Virtual Card Issuing"}`
                         : `Reversal for Failed ${transaction.beneficiaryName || transaction.recipientName ? `Transfer to ${transaction.beneficiaryName || transaction.recipientName}` : "Transaction"}`)
@@ -617,8 +619,64 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </>
                 )}
 
+                {/* 0. STORE ORDER CANCELLATION REFUND */}
+                {(txType === "STORE_ORDER_REFUND" || (isRefund && (isStore || desc.includes("store order") || desc.includes("order cancel")))) && (
+                  <>
+                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                      <span>Canceled Order ID</span>
+                      <span className="font-mono text-black font-bold uppercase select-all">
+                        {(transaction as any).canceledOrderId || (transaction as any).orderId || transaction.reference.replace("REFUND-", "")}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Total Amount Deducted</span>
+                      <span className="text-black font-bold">{currencySymbol}{(Number(transaction.totalDebited) || transaction.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Total Amount Refunded</span>
+                      <span className="text-emerald-600 font-black">{currencySymbol}{(Number(transaction.totalCredited) || transaction.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
+                      <span>Credited To</span>
+                      <span className="text-black font-bold">Available Balance</span>
+                    </div>
+
+                    {/* Canceled Purchased Items Breakdown */}
+                    {Array.isArray((transaction as any).items) && ((transaction as any).items as any[]).length > 0 && (
+                      <div className="p-3 bg-gray-50/80 border border-gray-100 rounded-2xl space-y-2.5 my-1">
+                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Canceled Items List</span>
+                        <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                          {((transaction as any).items as any[]).map((item: any, idx: number) => (
+                            <div key={idx} className="flex justify-between items-center text-xs pb-2 border-b border-gray-100 last:border-0 last:pb-0">
+                              <div className="flex items-center gap-2 min-w-0 pr-2">
+                                {item.imageUrl && (
+                                  <img src={item.imageUrl} alt={item.title} className="w-7 h-7 object-contain rounded-lg border border-gray-200 bg-white shrink-0" />
+                                )}
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-bold text-black text-[11px] truncate">
+                                    {item.title}
+                                  </span>
+                                  <span className="text-gray-500 text-[10px]">
+                                    {item.quantity} x {currencySymbol}{Number(item.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="font-mono text-black font-bold text-right shrink-0">
+                                {currencySymbol}{Number((item.price || 0) * (item.quantity || 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 {/* 7. STORE ORDER PURCHASE */}
-                {isStore && (
+                {isStore && !isRefund && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Order ID</span>

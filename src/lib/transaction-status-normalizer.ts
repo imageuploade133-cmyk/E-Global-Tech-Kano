@@ -52,6 +52,7 @@ export const getTransactionLedgerStatus = (tx?: {
     s === "REVERSED" ||
     s === "REVERSAL" ||
     type === "REFUND" ||
+    type === "STORE_ORDER_REFUND" ||
     cat === "REFUND" ||
     desc.includes("refund") ||
     desc.includes("reversal") ||
@@ -199,6 +200,7 @@ export const isCreditTransaction = (tx?: {
     s === "REVERSED" ||
     s === "REVERSAL" ||
     type === "REFUND" ||
+    type === "STORE_ORDER_REFUND" ||
     cat === "REFUND" ||
     desc.includes("refund") ||
     desc.includes("reversal") ||

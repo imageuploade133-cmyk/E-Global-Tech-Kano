@@ -166,6 +166,7 @@ export async function POST(req: Request) {
 
       if (userId && refundAmount > 0) {
         const walletRef = adminDb.collection("wallets").doc(`${userId}_NGN`);
+        const userRef = adminDb.collection("users").doc(userId);
 
         await adminDb.runTransaction(async (transaction) => {
           const wSnap = await transaction.get(walletRef);
@@ -173,25 +174,52 @@ export async function POST(req: Request) {
             const currentBal = Number(wSnap.data()?.balance) || 0;
             const newBal = currentBal + refundAmount;
 
+            // 1. Update wallet balance in wallets collection
             transaction.update(walletRef, {
               balance: newBal,
               updatedAt: now,
             });
 
-            // Write refund ledger entry
+            // 2. ALSO update user balance in users collection so app-wide available balance increases immediately
+            const userSnap = await transaction.get(userRef);
+            if (userSnap.exists) {
+              transaction.update(userRef, {
+                balance: newBal,
+                updatedAt: now,
+              });
+            }
+
+            // 3. Write structured refund ledger entry for normalization & receipts
             const txRef = adminDb.collection("transactions").doc();
             transaction.set(txRef, {
               id: txRef.id,
               userId,
               type: "STORE_ORDER_REFUND",
+              category: "REFUND",
+              direction: "CREDIT",
+              title: "Order Cancel & Refund",
+              description: `Order Cancel & Refund - Order ID: ${orderId}`,
               amount: refundAmount,
+              totalCredited: refundAmount,
+              totalDebited: refundAmount,
+              totalDeducted: refundAmount,
+              totalRefunded: refundAmount,
+              fee: 0,
+              vat: 0,
+              markup: 0,
               currency: "NGN",
               balanceBefore: currentBal,
               balanceAfter: newBal,
               status: "SUCCESS",
               reference: `REFUND-${orderId}`,
-              narration: `Refund for Store Order ${orderId}`,
+              orderId: orderId,
+              canceledOrderId: orderId,
+              recipientName: "E-Tech Store",
+              beneficiaryName: "E-Tech Store",
+              items: Array.isArray(orderData.items) ? orderData.items : [],
+              narration: `Order Cancel & Refund for Store Order ${orderId}`,
               createdAt: now,
+              updatedAt: now,
             });
           }
         });
