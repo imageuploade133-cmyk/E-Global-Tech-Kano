@@ -2897,10 +2897,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </button>
                     </div>
 
-                    {/* Direct dial anchor */}
+                    {/* Direct dial anchor for external phone dialer */}
                     <a
-                      href={`tel:${ussdCode.replace("#", "%23")}`}
-                      className="w-full inline-flex py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl font-hanken text-xs font-black uppercase tracking-widest active:scale-98 transition-all items-center justify-center gap-1.5"
+                      href={`tel:${ussdCode.replace(/#/g, "%23")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.open(`tel:${ussdCode.replace(/#/g, "%23")}`, "_system");
+                        }
+                      }}
+                      className="w-full inline-flex py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-xl font-hanken text-xs font-black uppercase tracking-widest active:scale-98 transition-all items-center justify-center gap-1.5 cursor-pointer shadow-3xs"
                     >
                       <span className="material-symbols-outlined text-[16px] font-bold">call</span>
                       Dial Instantly

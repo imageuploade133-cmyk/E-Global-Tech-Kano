@@ -385,6 +385,13 @@ export function SellerProfileModal({
                       <div className="grid grid-cols-2 gap-3 pt-2">
                         <a
                           href={`tel:${seller.phone}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            if (typeof window !== "undefined") {
+                              window.open(`tel:${seller.phone}`, "_system");
+                            }
+                          }}
                           className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-2xl text-center cursor-pointer border-0 flex items-center justify-center gap-2 shadow-2xs"
                         >
                           <span className="material-symbols-outlined text-[18px]">call</span>
