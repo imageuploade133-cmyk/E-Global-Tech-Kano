@@ -62,7 +62,7 @@ export const StoreOrderHistoryModal: React.FC<StoreOrderHistoryModalProps> = ({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar pb-24">
+            <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar pb-16">
               {isLoadingMyOrders ? (
                 <div className="py-16 text-center text-xs font-bold uppercase tracking-wider text-gray-400">
                   Loading Order History...
@@ -176,7 +176,7 @@ export const StoreOrderHistoryModal: React.FC<StoreOrderHistoryModalProps> = ({
                     </div>
 
                     {/* Scrollable Details Body */}
-                    <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar pb-28">
+                    <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar pb-16">
                       {/* Order & Payment Status Gradient Card */}
                       <div className="bg-gradient-to-r from-[#FC7A00]/25 via-orange-400/15 to-[#E06600]/25 p-[1.5px] rounded-2xl shadow-xs">
                         <div className="p-4 bg-white rounded-[14px] space-y-2.5">

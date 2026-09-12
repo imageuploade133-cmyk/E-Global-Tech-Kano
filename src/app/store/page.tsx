@@ -381,7 +381,7 @@ export default function StorePage() {
 
   return (
     <RouteGuard>
-      <div id="store-page-root" className="min-h-dvh bg-background text-on-background pb-32">
+      <div id="store-page-root" className="min-h-dvh bg-background text-on-background pb-20">
         {/* Sticky App Top Bar */}
         <StoreHeader
           settings={settings}
@@ -400,7 +400,7 @@ export default function StorePage() {
           onOpenCart={() => setIsCartOpen(true)}
         />
 
-        <main className="max-w-md mx-auto pt-3 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black">
+        <main className="max-w-md mx-auto pt-3 px-margin-mobile flex-grow pb-16 text-black">
           {/* Robust Dynamic Store Slideshow */}
           <BannerSlideshow
             page="store"

@@ -7,6 +7,11 @@ export interface SendEmailParams {
   html: string;
   text?: string;
   replyTo?: string;
+  attachments?: Array<{
+    filename: string;
+    content: string; // base64 string
+    contentType?: string;
+  }>;
 }
 
 // 5-Minute In-Memory Server Cache for System Configs to minimize Firestore Reads
@@ -225,6 +230,7 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
           replyTo: params.replyTo || "",
           fromName: senderName,
           fromEmail: senderEmail,
+          attachments: params.attachments || [],
         }),
         signal: controller.signal,
       });

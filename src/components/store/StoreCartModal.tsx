@@ -105,7 +105,7 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
             </div>
 
             {/* Cart Drawer Items */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar pb-32">
+            <div className="flex-1 overflow-y-auto p-5 space-y-3.5 custom-scrollbar pb-16">
               {cart.length === 0 ? (
                 <div className="py-20 flex flex-col items-center text-center space-y-3">
                   <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center">
