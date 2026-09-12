@@ -108,19 +108,54 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         const userName = userData?.name || user.displayName || "E-Global Pay Customer";
         const userEmail = userData?.email || user.email || "";
 
-        // Resolve images for PDF statement
+        // Resolve images and watermark configs for PDF statement
         const statementLogoUrl = config.statementLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
         const signatureUrl = config.statementSignatureUrl || "";
         const stampUrl = config.statementStampUrl || "";
+        const watermarkUrl = config.statementWatermarkUrl || "";
+        const watermarkSize = config.statementWatermarkSize || 100;
+        const watermarkOpacity = config.statementWatermarkOpacity ?? 0.15;
 
-        const [logoImg, sigImg, stampImg] = await Promise.all([
+        const [logoImg, sigImg, stampImg, watermarkImg] = await Promise.all([
           loadImage(statementLogoUrl),
           loadImage(signatureUrl),
           loadImage(stampUrl),
+          loadImage(watermarkUrl),
         ]);
 
         // Generate PDF
         const doc = new jsPDF();
+
+        // Helper to render centered traditional background watermark logo on A4 page
+        const renderPageWatermark = (pdfDoc: jsPDF) => {
+          if (!watermarkImg) return;
+          try {
+            const naturalWidth = watermarkImg.naturalWidth || watermarkImg.width || 100;
+            const naturalHeight = watermarkImg.naturalHeight || watermarkImg.height || 100;
+            const aspectRatio = naturalHeight / naturalWidth;
+
+            let w = watermarkSize; // size in mm on A4 210mm page
+            let h = watermarkSize * aspectRatio;
+
+            if (h > 240) {
+              h = 240;
+              w = 240 / aspectRatio;
+            }
+
+            const x = (210 - w) / 2;
+            const y = (297 - h) / 2;
+
+            const gState = new (pdfDoc as any).GState({ opacity: watermarkOpacity });
+            pdfDoc.setGState(gState);
+            pdfDoc.addImage(watermarkImg, "PNG", x, y, w, h);
+            pdfDoc.setGState(new (pdfDoc as any).GState({ opacity: 1.0 }));
+          } catch (err) {
+            console.warn("[Statement Watermark Render Warning]:", err);
+          }
+        };
+
+        // Render Watermark for Page 1
+        renderPageWatermark(doc);
 
         // Brand Banner Bar
         doc.setFillColor(252, 122, 0); // #FC7A00
@@ -174,6 +209,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         txList.forEach((tx) => {
           if (yPos > 240) {
             doc.addPage();
+            renderPageWatermark(doc);
             yPos = 20;
           }
 
@@ -203,6 +239,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         // Add Signature and Official Stamp if present
         if (yPos > 240) {
           doc.addPage();
+          renderPageWatermark(doc);
           yPos = 30;
         } else {
           yPos += 12;

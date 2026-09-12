@@ -11,6 +11,9 @@ export interface AppConfig {
   statementLogoUrl?: string;
   statementSignatureUrl?: string;
   statementStampUrl?: string;
+  statementWatermarkUrl?: string;
+  statementWatermarkSize?: number;
+  statementWatermarkOpacity?: number;
   supportPhone1: string;
   supportPhone2: string;
   supportEmail: string;
@@ -83,6 +86,9 @@ const DEFAULT_CONFIG: AppConfig = {
   bannerMarginBottom: 24,
   whatsappPollingEnabled: true,
   whatsappPollingIntervalMinutes: 1,
+  statementWatermarkUrl: "",
+  statementWatermarkSize: 100,
+  statementWatermarkOpacity: 0.15,
 };
 
 interface ConfigContextProps {

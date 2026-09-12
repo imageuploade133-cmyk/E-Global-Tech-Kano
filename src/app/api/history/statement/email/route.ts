@@ -36,10 +36,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Statements are limited to a maximum range of 6 months at a time." }, { status: 400 });
     }
 
-    // Fetch app config for statement logo, signature, and stamp
+    // Fetch app config for statement logo, signature, stamp, and traditional watermark
     let statementLogoUrl = "https://i.ibb.co/WWjZrtC7/E-Tech.png";
     let statementSignatureUrl = "";
     let statementStampUrl = "";
+    let statementWatermarkUrl = "";
+    let statementWatermarkSize = 100;
+    let statementWatermarkOpacity = 0.15;
 
     try {
       const appConfigSnap = await adminDb.collection("config").doc("app").get();
@@ -48,6 +51,9 @@ export async function POST(req: Request) {
         statementLogoUrl = cfg.statementLogoUrl || cfg.logoUrl || statementLogoUrl;
         statementSignatureUrl = cfg.statementSignatureUrl || "";
         statementStampUrl = cfg.statementStampUrl || "";
+        statementWatermarkUrl = cfg.statementWatermarkUrl || "";
+        statementWatermarkSize = cfg.statementWatermarkSize || 100;
+        statementWatermarkOpacity = cfg.statementWatermarkOpacity ?? 0.15;
       }
     } catch (cfgErr: any) {
       console.warn("[Statement Email Route] Config lookup warning:", cfgErr.message);
@@ -115,8 +121,16 @@ export async function POST(req: Request) {
       </div>
     ` : "";
 
+    const watermarkSectionHtml = statementWatermarkUrl ? `
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: ${statementWatermarkOpacity}; width: ${Math.min(500, Math.max(120, statementWatermarkSize * 2.5))}px; max-width: 80%; pointer-events: none; z-index: 0; text-align: center;">
+        <img src="${statementWatermarkUrl}" alt="Watermark" style="width: 100%; height: auto; max-height: 500px; object-fit: contain;" />
+      </div>
+    ` : "";
+
     const emailHtml = `
-      <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; max-width: 680px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+      <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; max-width: 680px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.03); position: relative; overflow: hidden;">
+        ${watermarkSectionHtml}
+        <div style="position: relative; z-index: 1;">
         <!-- Brand Header -->
         <div style="background: linear-gradient(135deg, #FC7A00 0%, #E06600 100%); padding: 20px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -167,6 +181,7 @@ export async function POST(req: Request) {
         <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 11px; font-weight: 700; color: #64748b;">E-Global Pay Automated Electronic Financial Statement</p>
           <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8;">Generated automatically on ${new Date().toLocaleString()} • Confidential & Private</p>
+        </div>
         </div>
       </div>
     `;
