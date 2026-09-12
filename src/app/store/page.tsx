@@ -517,6 +517,7 @@ export default function StorePage() {
           isPlacingOrder={isPlacingOrder}
           hideCardPayment={settings.hideCardPayment}
           enablePickup={settings.enablePickup}
+          userBalance={userData?.balance ?? 0}
           onClose={() => setIsCartOpen(false)}
           onUpdateCartQuantity={handleUpdateCartQuantity}
           onRemoveFromCart={handleRemoveFromCart}

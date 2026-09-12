@@ -2551,13 +2551,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </div>
 
             {/* Scrollable Modal Body Container */}
-            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-24">
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-28">
 
             <AnimatePresence mode="wait">
               {/* STEP 1: Enter Amount */}
               {wizardStep === "amount" && (
                 <motion.form
                   key="step-amount"
+                  id="add-money-amount-form"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
@@ -2675,15 +2676,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         +₦{preset / 1000}K
                       </button>
                     ))}
-                  </div>
-
-                  <div className="flex flex-col gap-2.5 pt-3">
-                    <button
-                      type="submit"
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-xs"
-                    >
-                      Choose Payment Method
-                    </button>
                   </div>
                 </motion.form>
               )}
@@ -3103,6 +3095,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               )}
             </AnimatePresence>
             </div>
+
+            {/* Static Bottom Action Bar for Fund Wallet */}
+            {wizardStep === "amount" && (
+              <div className="p-5 bg-white border-t border-gray-100 flex-shrink-0 shadow-lg z-20">
+                <button
+                  type="submit"
+                  form="add-money-amount-form"
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all border-0 shadow-sm flex items-center justify-center gap-2"
+                >
+                  <span>Choose Payment Method</span>
+                  <span className="material-symbols-outlined text-[16px] font-bold">arrow_forward</span>
+                </button>
+              </div>
+            )}
           </motion.div>
         </>
       )}
@@ -3138,8 +3144,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-            className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] p-6 pb-8 shadow-none text-black overflow-y-auto no-scrollbar flex flex-col will-change-transform"
+            className="fixed inset-0 w-full h-full max-w-md mx-auto bg-white z-[99999] text-black overflow-hidden flex flex-col will-change-transform"
           >
+            <div className="p-6 pb-0 flex flex-col flex-1 overflow-hidden">
             {/* Header row */}
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5 flex-shrink-0">
               {trfStep !== "input" && trfStep !== "completion" ? (
@@ -3171,6 +3178,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </button>
             </div>
 
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-28">
             {!isTrfContentReady ? (
               <div className="flex-1 flex flex-col items-center justify-center my-auto py-12">
                 <div className="w-9 h-9 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin mb-3" />
@@ -3537,25 +3545,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </motion.div>
                       )}
 
-                      {/* Continue Button (TASK 1) */}
-                      {trfAccountName && (() => {
-                        const activeMinTransfer = Number(config.minTransferAmount ?? (config as any).globalMinTransferAmount) || 100;
-                        const amt = parseFloat(trfAmount) || 0;
-                        const isInvalidAmount = !trfAmount || isNaN(amt) || amt < activeMinTransfer;
-
-                        return (
-                          <div className="pt-2">
-                            <button
-                              type="button"
-                              disabled={isInvalidAmount || trfTotalDebit > balance || isFeeLoading}
-                              onClick={() => setTrfStep("confirm")}
-                              className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                            >
-                              Continue
-                            </button>
-                          </div>
-                        );
-                      })()}
                     </div>
                   ) : (
                     // --- BULK BATCH RECIPIENT ADDER FORM ---
@@ -3701,14 +3690,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setTrfStep("confirm")}
-                        disabled={bulkRecipients.length === 0}
-                        className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
-                      >
-                        Confirm Batch Details
-                      </button>
                     </div>
                   )}
 
@@ -3894,17 +3875,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   </div>
 
-                  {/* Proceed to PIN Button */}
-                  <div className="w-full px-4 mt-2 pb-2">
-                    <button
-                      type="button"
-                      onClick={() => setTrfStep("pin")}
-                      className="w-full py-3.5 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
-                    >
-                      <span>Confirm and Proceed</span>
-                      <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
-                    </button>
-                  </div>
                 </motion.div>
               )}
 
@@ -4163,6 +4133,64 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               )}
             </AnimatePresence>
             )}
+            </div>
+            </div>
+
+            {/* Static Bottom Action Bar for Transfer Steps */}
+            {isTrfContentReady && (trfStep === "input" || trfStep === "confirm") && (
+              <div className="p-5 bg-white border-t border-gray-100 flex-shrink-0 shadow-lg z-20">
+                {trfStep === "input" && (
+                  !isBulkMode ? (
+                    trfAccountName ? (
+                      (() => {
+                        const activeMinTransfer = Number(config.minTransferAmount ?? (config as any).globalMinTransferAmount) || 100;
+                        const amt = parseFloat(trfAmount) || 0;
+                        const isInvalidAmount = !trfAmount || isNaN(amt) || amt < activeMinTransfer;
+
+                        return (
+                          <button
+                            type="button"
+                            disabled={isInvalidAmount || trfTotalDebit > balance || isFeeLoading}
+                            onClick={() => setTrfStep("confirm")}
+                            className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 border-0 shadow-sm"
+                          >
+                            Continue
+                          </button>
+                        );
+                      })()
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-4 bg-gray-200 text-gray-400 text-xs font-black uppercase tracking-widest rounded-2xl border-0"
+                      >
+                        Enter Account Details
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setTrfStep("confirm")}
+                      disabled={bulkRecipients.length === 0}
+                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50 border-0 shadow-sm"
+                    >
+                      Confirm Batch Details
+                    </button>
+                  )
+                )}
+
+                {trfStep === "confirm" && (
+                  <button
+                    type="button"
+                    onClick={() => setTrfStep("pin")}
+                    className="w-full py-4 bg-black hover:bg-black/90 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 border-0"
+                  >
+                    <span>Confirm and Proceed</span>
+                    <span className="material-symbols-outlined text-[16px] font-black">arrow_forward</span>
+                  </button>
+                )}
+              </div>
+            )}
           </motion.div>
         </>
       )}
@@ -4334,9 +4362,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </div>
 
           {/* Body Content */}
-          <div className="flex-1 overflow-y-auto px-5 py-6 max-w-md mx-auto w-full no-scrollbar space-y-5">
+          <div className="flex-1 overflow-y-auto px-5 py-6 pb-28 max-w-md mx-auto w-full no-scrollbar space-y-5">
             {swapStep === "form" ? (
-              <form onSubmit={handleSwapFormContinue} className="space-y-5 text-left">
+              <form id="currency-swap-form" onSubmit={handleSwapFormContinue} className="space-y-5 text-left">
                 {/* Dynamic Swap Direction & Currency pill selector */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -4469,23 +4497,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   )
                 )}
-
-                {(() => {
-                  const avail = swapFromCurrency === "NGN" ? walletBalances.NGN : (swapFromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
-                  const parsedAmt = parseFloat(swapAmount);
-                  const isExceeded = !isNaN(parsedAmt) && parsedAmt > avail;
-
-                  return (
-                    <button
-                      type="submit"
-                      disabled={isSwapping || isRatesLoading || !swapAmount || isNaN(parsedAmt) || parsedAmt <= 0 || isExceeded}
-                      className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                      {isExceeded ? "Insufficient Wallet Balance" : "Authorize Swap"}
-                    </button>
-                  );
-                })()}
               </form>
             ) : (
               /* PIN Authorization Step */
@@ -4613,6 +4624,29 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </div>
             )}
           </div>
+
+          {/* Static Bottom Action Bar for Swap Form Step */}
+          {swapStep === "form" && (
+            <div className="p-5 bg-white border-t border-gray-100 max-w-md mx-auto w-full flex-shrink-0 shadow-lg z-20">
+              {(() => {
+                const avail = swapFromCurrency === "NGN" ? walletBalances.NGN : (swapFromCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
+                const parsedAmt = parseFloat(swapAmount);
+                const isExceeded = !isNaN(parsedAmt) && parsedAmt > avail;
+
+                return (
+                  <button
+                    type="submit"
+                    form="currency-swap-form"
+                    disabled={isSwapping || isRatesLoading || !swapAmount || isNaN(parsedAmt) || parsedAmt <= 0 || isExceeded}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                    {isExceeded ? "Insufficient Wallet Balance" : "Authorize Swap"}
+                  </button>
+                );
+              })()}
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>
