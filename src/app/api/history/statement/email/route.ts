@@ -4,6 +4,7 @@ import { authenticateUserRequest } from "@/lib/auth-util";
 import { sendEmail } from "@/lib/email-service";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
+import jsPDF from "jspdf";
 
 export async function POST(req: Request) {
   try {
@@ -186,10 +187,175 @@ export async function POST(req: Request) {
       </div>
     `;
 
+    // Generate server-side PDF attachment using jsPDF
+    let pdfBase64 = "";
+    try {
+      const doc = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: "a4",
+      });
+
+      // Background watermark opacity
+      if (statementWatermarkUrl) {
+        try {
+          doc.saveGraphicsState();
+          (doc as any).setGState(new (doc as any).GState({ opacity: statementWatermarkOpacity }));
+          const wmWidth = statementWatermarkSize;
+          const wmHeight = statementWatermarkSize;
+          const wmX = (210 - wmWidth) / 2;
+          const wmY = (297 - wmHeight) / 2;
+          doc.addImage(statementWatermarkUrl, "PNG", wmX, wmY, wmWidth, wmHeight);
+          doc.restoreGraphicsState();
+        } catch {}
+      }
+
+      // Brand Header
+      doc.setFillColor(252, 122, 0); // #FC7A00
+      doc.rect(14, 12, 182, 22, "F");
+
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("E-GLOBAL PAY", 22, 23);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text("OFFICIAL FINANCIAL STATEMENT OF ACCOUNT", 22, 28);
+
+      // Account Overview Box
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(14, 38, 182, 20, 3, 3, "F");
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("ACCOUNT HOLDER", 20, 45);
+      doc.text("STATEMENT PERIOD", 85, 45);
+      doc.text("TOTAL TRANSACTIONS", 145, 45);
+
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(userName).slice(0, 30), 20, 52);
+      doc.text(`${fromDate} to ${toDate}`, 85, 52);
+      doc.text(`${txList.length} Record(s)`, 145, 52);
+
+      // Table Header
+      let yPos = 66;
+      doc.setFillColor(241, 245, 249);
+      doc.rect(14, yPos, 182, 7, "F");
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(71, 85, 105);
+      doc.text("DATE & TIME", 18, yPos + 5);
+      doc.text("DESCRIPTION", 60, yPos + 5);
+      doc.text("TYPE", 130, yPos + 5);
+      doc.text("AMOUNT (NGN)", 188, yPos + 5, { align: "right" });
+
+      yPos += 11;
+
+      // Table Rows
+      txList.forEach((tx) => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+
+          // Header on new page
+          doc.setFillColor(241, 245, 249);
+          doc.rect(14, yPos, 182, 7, "F");
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(71, 85, 105);
+          doc.text("DATE & TIME", 18, yPos + 5);
+          doc.text("DESCRIPTION", 60, yPos + 5);
+          doc.text("TYPE", 130, yPos + 5);
+          doc.text("AMOUNT (NGN)", 188, yPos + 5, { align: "right" });
+          yPos += 11;
+        }
+
+        const { dateTime } = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
+        const isCredit = isCreditTransaction(tx);
+        const displayAmt = getTransactionDisplayAmount(tx);
+
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(51, 65, 85);
+        doc.text(dateTime, 18, yPos);
+
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(String(tx.description || tx.title || "Transaction").slice(0, 38), 60, yPos);
+
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text(String(tx.type || "PAYMENT").toUpperCase(), 130, yPos);
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        if (isCredit) {
+          doc.setTextColor(16, 185, 129); // green
+          doc.text(`+N${displayAmt.toLocaleString()}`, 188, yPos, { align: "right" });
+        } else {
+          doc.setTextColor(15, 23, 42); // dark
+          doc.text(`-N${displayAmt.toLocaleString()}`, 188, yPos, { align: "right" });
+        }
+
+        doc.setDrawColor(241, 245, 249);
+        doc.line(14, yPos + 2, 196, yPos + 2);
+
+        yPos += 7.5;
+      });
+
+      // Signature & Stamp
+      if (yPos + 25 < 280) {
+        if (statementSignatureUrl) {
+          try {
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(148, 163, 184);
+            doc.text("AUTHORIZED SIGNATORY", 18, yPos + 6);
+            doc.addImage(statementSignatureUrl, "PNG", 18, yPos + 8, 30, 12);
+          } catch {}
+        }
+        if (statementStampUrl) {
+          try {
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(148, 163, 184);
+            doc.text("OFFICIAL STAMP", 150, yPos + 6);
+            doc.addImage(statementStampUrl, "PNG", 150, yPos + 8, 20, 20);
+          } catch {}
+        }
+      }
+
+      // Footer
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(148, 163, 184);
+      doc.text("Official E-Global Pay Automated Electronic Statement • Confidential & Private", 14, 288);
+
+      const pdfOutput = doc.output("arraybuffer");
+      pdfBase64 = Buffer.from(pdfOutput).toString("base64");
+    } catch (pdfErr: any) {
+      console.warn("[Statement Email Route] Server PDF generation warning:", pdfErr.message);
+    }
+
+    const attachments = pdfBase64
+      ? [
+          {
+            filename: `EGlobalPay_Statement_${fromDate}_to_${toDate}.pdf`,
+            content: pdfBase64,
+            contentType: "application/pdf",
+          },
+        ]
+      : undefined;
+
     const sent = await sendEmail({
       to: targetEmail,
       subject: `Statement of Account (${fromDate} to ${toDate}) - E-Global Pay`,
       html: emailHtml,
+      attachments,
     });
 
     if (sent) {

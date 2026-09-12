@@ -2551,7 +2551,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </div>
 
             {/* Scrollable Modal Body Container */}
-            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-28">
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-16">
 
             <AnimatePresence mode="wait">
               {/* STEP 1: Enter Amount */}
@@ -3178,7 +3178,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-28">
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-16">
             {!isTrfContentReady ? (
               <div className="flex-1 flex flex-col items-center justify-center my-auto py-12">
                 <div className="w-9 h-9 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin mb-3" />
@@ -4362,7 +4362,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           </div>
 
           {/* Body Content */}
-          <div className="flex-1 overflow-y-auto px-5 py-6 pb-28 max-w-md mx-auto w-full no-scrollbar space-y-5">
+          <div className="flex-1 overflow-y-auto px-5 py-6 pb-16 max-w-md mx-auto w-full no-scrollbar space-y-5">
             {swapStep === "form" ? (
               <form id="currency-swap-form" onSubmit={handleSwapFormContinue} className="space-y-5 text-left">
                 {/* Dynamic Swap Direction & Currency pill selector */}
