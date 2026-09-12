@@ -18,6 +18,7 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
   settings,
   wishlistCount,
   cartCount,
+  orderCount,
   onClearCache,
   onOpenWishlist,
   onOpenMyOrders,
