@@ -123,10 +123,16 @@ export default function StorePage() {
   useModalBackHandler(isAllRecentlyViewedOpen, () => setIsAllRecentlyViewedOpen(false), "store-recentlyviewed-modal");
   useModalBackHandler(Boolean(confirmedOrder), () => setConfirmedOrder(null), "store-confirmed-modal");
 
-  // Load Cart from localStorage on mount
+  // Load Cart from localStorage on mount and fetch user order count
   useEffect(() => {
     setCart(getSavedCart());
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchMyOrders();
+    }
+  }, [user]);
 
   // Sync Cart changes to localStorage
   const updateCart = (newCart: CartItem[]) => {
@@ -381,6 +387,7 @@ export default function StorePage() {
           settings={settings}
           wishlistCount={wishlist.length}
           cartCount={totalCartItems}
+          orderCount={myOrders.length}
           onClearCache={handleClearStoreCache}
           onOpenWishlist={() => {
             setWishlist(getSavedWishlist());

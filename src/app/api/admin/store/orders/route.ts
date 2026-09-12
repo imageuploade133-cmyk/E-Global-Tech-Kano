@@ -156,12 +156,12 @@ export async function POST(req: Request) {
 
     const orderData = orderSnap.data() || {};
     const oldStatus = orderData.status;
+    const userId = orderData.userId;
     const now = new Date().toISOString();
 
     const isRefundAction = (newStatus === "Refunded" || newStatus === "Canceled") && (oldStatus !== "Refunded" && oldStatus !== "Canceled");
 
     if (isRefundAction) {
-      const userId = orderData.userId;
       const refundAmount = Number(orderData.totalAmount) || 0;
 
       if (userId && refundAmount > 0) {
@@ -239,6 +239,35 @@ export async function POST(req: Request) {
     }
 
     await orderRef.update(updatePayload);
+
+    // Dispatch wallet push notification to customer for order status update
+    if (userId) {
+      try {
+        const { NotificationService } = await import("@/services/notification-service");
+        const statusTitle = isRefundAction
+          ? `Store Order Refunded: ${orderId}`
+          : `Store Order Status: ${newStatus}`;
+        const statusBody = isRefundAction
+          ? `Your store order ${orderId} was updated to "${newStatus}". ₦${Number(orderData.totalAmount || 0).toLocaleString()} NGN has been refunded to your wallet.`
+          : `Your store order ${orderId} status was updated to "${newStatus}".${adminNotes ? ` Note: ${adminNotes}` : ""}`;
+
+        await NotificationService.sendPushNotification(userId, {
+          userId,
+          title: statusTitle,
+          body: statusBody,
+          type: "transaction",
+          url: "/store",
+          amount: Number(orderData.totalAmount || 0),
+          currency: "NGN",
+          reference: `ORDER-${orderId}`,
+          recipientName: "E-Tech Store",
+          bankName: "Store Order",
+          channel: "STORE_ORDER",
+        } as any);
+      } catch (notifErr: any) {
+        console.warn("[Admin Store Orders] Push notification dispatch warning:", notifErr?.message);
+      }
+    }
 
     return NextResponse.json({
       success: true,
