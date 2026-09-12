@@ -277,6 +277,20 @@ export const ActivityLogContainer: React.FC = () => {
     return matchesCategory && matchesSearch && matchesCurrency;
   });
 
+  const handleBackNav = () => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasReturnToFunding = urlParams.get("returnToFunding") === "true";
+      const hasActiveSession = Boolean(sessionStorage.getItem("active_funding_session"));
+
+      if (hasReturnToFunding || hasActiveSession) {
+        window.location.href = "/?fromHistoryReturn=true";
+        return;
+      }
+    }
+    window.history.back();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -287,7 +301,7 @@ export const ActivityLogContainer: React.FC = () => {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => window.history.back()}
+            onClick={handleBackNav}
             className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
             title="Go Back"
           >

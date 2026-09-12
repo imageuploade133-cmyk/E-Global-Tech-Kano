@@ -1300,6 +1300,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setIsAddMoneyOpen(false);
     stopPolling();
     if (timerRef.current) clearInterval(timerRef.current);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("active_funding_session");
+    }
     fetchWalletBalances();
     // Reset steps
     setTimeout(() => {
@@ -1313,6 +1316,57 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setUssdErrorMessage("");
     }, 300);
   };
+
+  const handleIHavePaidClick = () => {
+    if (activeTxRef && typeof window !== "undefined") {
+      const sessionData = {
+        txRef: activeTxRef,
+        wizardStep,
+        addAmount,
+        selectedBank,
+        ussdCode,
+        transferDetails,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem("active_funding_session", JSON.stringify(sessionData));
+    }
+    setIsAddMoneyOpen(false);
+    toast.info("Navigating to Transaction History. Click Back on history to return to payment waiting status.");
+    router.push("/history?returnToFunding=true");
+  };
+
+  // Restore active funding session when returning from history or on page mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const restoreFundingSession = () => {
+      try {
+        const saved = sessionStorage.getItem("active_funding_session");
+        if (!saved) return;
+
+        const parsed = JSON.parse(saved);
+        // Only restore if within 15 minutes (900000 ms)
+        if (parsed && parsed.txRef && Date.now() - (parsed.timestamp || 0) < 900000) {
+          setActiveTxRef(parsed.txRef);
+          if (parsed.addAmount) setAddAmount(parsed.addAmount);
+          if (parsed.selectedBank) setSelectedBank(parsed.selectedBank);
+          if (parsed.ussdCode) setUssdCode(parsed.ussdCode);
+          if (parsed.transferDetails) setTransferDetails(parsed.transferDetails);
+          if (parsed.wizardStep) setWizardStep(parsed.wizardStep);
+
+          setIsAddMoneyOpen(true);
+          startPolling(parsed.txRef);
+        }
+      } catch (err) {
+        console.warn("[BalanceCard] Restore funding session exception:", err);
+      }
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("fromHistoryReturn") === "true" || urlParams.get("returnToFunding") === "true") {
+      restoreFundingSession();
+    }
+  }, []);
 
   // Close Outward Transfer Drawer
   const handleCloseTransferModal = () => {
@@ -2845,6 +2899,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </span>
                     </div>
                   </div>
+
+                  {/* "I Have Made Payment" Button */}
+                  <button
+                    type="button"
+                    onClick={handleIHavePaidClick}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl font-hanken text-xs font-black uppercase tracking-wider cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">history</span>
+                    <span>I Have Made Payment</span>
+                  </button>
                 </motion.div>
               )}
 
@@ -2927,6 +2991,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </span>
                     </div>
                   </div>
+
+                  {/* "I Have Made Payment" Button */}
+                  <button
+                    type="button"
+                    onClick={handleIHavePaidClick}
+                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl font-hanken text-xs font-black uppercase tracking-wider cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm border-0"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">history</span>
+                    <span>I Have Made Payment</span>
+                  </button>
                 </motion.div>
               )}
 
