@@ -21,6 +21,7 @@ export interface StoreOrder {
   customerEmail: string;
   customerPhone: string;
   deliveryAddress: string;
+  deliveryType?: string;
   items: Array<{
     id: string;
     title: string;
@@ -498,7 +499,20 @@ function CpanelStoreOrdersPageContent() {
                       </td>
 
                       <td className="p-4">
-                        <div className="font-extrabold text-black dark:text-white">{order.customerName}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-black dark:text-white">{order.customerName}</span>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[8.5px] font-black uppercase inline-flex items-center gap-0.5",
+                            (order.deliveryType === "PICKUP" || (order.deliveryAddress || "").toUpperCase().includes("PICKUP"))
+                              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                              : "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                          )}>
+                            <span className="material-symbols-outlined text-[11px]">
+                              {(order.deliveryType === "PICKUP" || (order.deliveryAddress || "").toUpperCase().includes("PICKUP")) ? "storefront" : "local_shipping"}
+                            </span>
+                            <span>{(order.deliveryType === "PICKUP" || (order.deliveryAddress || "").toUpperCase().includes("PICKUP")) ? "In-Store Pickup" : "Delivery"}</span>
+                          </span>
+                        </div>
                         <div className="text-[11px] text-gray-400 font-mono">{order.customerPhone}</div>
                         <div className="text-[10px] text-gray-500 truncate max-w-xs">{order.deliveryAddress}</div>
                       </td>

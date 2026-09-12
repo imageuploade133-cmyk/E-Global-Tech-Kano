@@ -187,6 +187,19 @@ export const StoreOrderHistoryModal: React.FC<StoreOrderHistoryModalProps> = ({
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-xs border-t border-gray-200/60 pt-2">
+                        <span className="text-gray-500 font-bold uppercase text-[10px]">Fulfillment Method</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase inline-flex items-center gap-1 ${
+                          (selectedOrder.deliveryType === "PICKUP" || (selectedOrder.deliveryAddress || "").toUpperCase().includes("PICKUP"))
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-blue-100 text-blue-800"
+                        }`}>
+                          <span className="material-symbols-outlined text-[13px]">
+                            {(selectedOrder.deliveryType === "PICKUP" || (selectedOrder.deliveryAddress || "").toUpperCase().includes("PICKUP")) ? "storefront" : "local_shipping"}
+                          </span>
+                          <span>{(selectedOrder.deliveryType === "PICKUP" || (selectedOrder.deliveryAddress || "").toUpperCase().includes("PICKUP")) ? "In-Store Pickup" : "Home Delivery"}</span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs border-t border-gray-200/60 pt-2">
                         <span className="text-gray-500 font-bold uppercase text-[10px]">Date Placed</span>
                         <span className="font-bold text-gray-800 text-[11px]">
                           {new Date(selectedOrder.createdAt).toLocaleString()}

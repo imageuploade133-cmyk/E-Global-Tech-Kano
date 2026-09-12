@@ -54,6 +54,8 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
   onSetCustomerDeliveryAddress,
   onConfirmCheckout,
 }) => {
+  const [deliveryType, setDeliveryType] = React.useState<"DELIVERY" | "PICKUP">("DELIVERY");
+
   if (!isOpen) return null;
 
   return (
@@ -287,7 +289,91 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
                     </span>
                   </div>
 
-                  <form id="checkout-form" onSubmit={onConfirmCheckout} className="space-y-3.5">
+                  <form
+                    id="checkout-form"
+                    onSubmit={(e) => {
+                      if (deliveryType === "PICKUP" && !customerDeliveryAddress.toUpperCase().includes("PICKUP")) {
+                        onSetCustomerDeliveryAddress(`[IN-STORE PICKUP] ${customerDeliveryAddress.trim()}`);
+                      }
+                      onConfirmCheckout(e);
+                    }}
+                    className="space-y-3.5"
+                  >
+                    {/* Fulfillment Method Selector (Shown when enablePickup is ON) */}
+                    {enablePickup && (
+                      <div className="space-y-1.5 bg-gray-50 p-3 rounded-2xl border border-gray-200">
+                        <label className="text-[10px] font-black uppercase text-gray-500 block">
+                          Fulfillment / Delivery Option *
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeliveryType("DELIVERY");
+                              if (customerDeliveryAddress.startsWith("[IN-STORE PICKUP] ")) {
+                                onSetCustomerDeliveryAddress(customerDeliveryAddress.replace("[IN-STORE PICKUP] ", ""));
+                              }
+                            }}
+                            className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                              deliveryType === "DELIVERY"
+                                ? "border-[#FC7A00] bg-orange-50/80 shadow-xs"
+                                : "border-gray-200 bg-white hover:bg-gray-100"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">
+                                local_shipping
+                              </span>
+                              {deliveryType === "DELIVERY" && (
+                                <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">
+                                  check_circle
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2">
+                              <span className="font-extrabold text-[11px] uppercase block text-black">
+                                Home Delivery
+                              </span>
+                              <span className="text-[9px] text-gray-400 font-semibold block">
+                                Deliver to address
+                              </span>
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeliveryType("PICKUP");
+                            }}
+                            className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                              deliveryType === "PICKUP"
+                                ? "border-emerald-500 bg-emerald-50/80 shadow-xs"
+                                : "border-gray-200 bg-white hover:bg-gray-100"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="material-symbols-outlined text-[20px] text-emerald-600">
+                                storefront
+                              </span>
+                              {deliveryType === "PICKUP" && (
+                                <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                                  check_circle
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2">
+                              <span className="font-extrabold text-[11px] uppercase block text-black">
+                                In-Store Pickup
+                              </span>
+                              <span className="text-[9px] text-gray-400 font-semibold block">
+                                Collect at physical store
+                              </span>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Prominent Payment Method Selector at Top of Checkout Form */}
                     <div className="space-y-1.5 bg-gray-50 p-3 rounded-2xl border border-gray-200">
                       <label className="text-[10px] font-black uppercase text-gray-500 block">
@@ -385,14 +471,20 @@ export const StoreCartModal: React.FC<StoreCartModalProps> = ({
 
                     <div>
                       <label className="text-[10px] font-black uppercase text-gray-400 block mb-1">
-                        {enablePickup ? "Delivery Address or In-Store Pickup Details *" : "Full Delivery Address *"}
+                        {deliveryType === "PICKUP"
+                          ? "In-Store Pickup Person & Notes *"
+                          : "Full Delivery Address *"}
                       </label>
                       <textarea
                         rows={3}
                         required
                         value={customerDeliveryAddress}
                         onChange={(e) => onSetCustomerDeliveryAddress(e.target.value)}
-                        placeholder={enablePickup ? "Enter delivery address OR write 'IN-STORE PICKUP'" : "e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"}
+                        placeholder={
+                          deliveryType === "PICKUP"
+                            ? "e.g. Person picking up: Abdulkadir Shaba (Phone: 08012345678)"
+                            : "e.g. Suite 4B, E-Tech Hub Plaza, Victoria Island, Lagos"
+                        }
                         className="w-full px-3.5 py-2.5 rounded-xl border-0 bg-gray-50 text-xs font-bold outline-none focus:ring-2 focus:ring-[#FC7A00] resize-none"
                       />
                     </div>

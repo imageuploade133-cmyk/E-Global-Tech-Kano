@@ -24,6 +24,7 @@ export interface OrderRecord {
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
+  deliveryType?: "DELIVERY" | "PICKUP";
   paymentMethod: "WALLET_NGN" | "CARD_CHECKOUT";
   status: string;
   createdAt: string;

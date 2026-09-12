@@ -156,6 +156,9 @@ export async function POST(req: Request) {
       ? `CARD-PAY-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
       : `WLT-PAY-${orderId}`;
 
+    const isPickup = String(deliveryAddress || "").toUpperCase().includes("PICKUP") || body.deliveryType === "PICKUP";
+    const resolvedDeliveryType = isPickup ? "PICKUP" : "DELIVERY";
+
     const newOrder = {
       id: orderId,
       userId: uid,
@@ -163,6 +166,7 @@ export async function POST(req: Request) {
       customerEmail: String(customerEmail || userEmail).trim(),
       customerPhone: String(customerPhone).trim(),
       deliveryAddress: String(deliveryAddress).trim(),
+      deliveryType: resolvedDeliveryType,
       items: orderItems,
       totalAmount,
       currency: "NGN",
