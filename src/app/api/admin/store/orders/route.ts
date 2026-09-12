@@ -169,7 +169,10 @@ export async function POST(req: Request) {
         const userRef = adminDb.collection("users").doc(userId);
 
         await adminDb.runTransaction(async (transaction) => {
+          // Perform ALL reads before executing any writes
           const wSnap = await transaction.get(walletRef);
+          const userSnap = await transaction.get(userRef);
+
           if (wSnap.exists) {
             const currentBal = Number(wSnap.data()?.balance) || 0;
             const newBal = currentBal + refundAmount;
@@ -181,7 +184,6 @@ export async function POST(req: Request) {
             });
 
             // 2. ALSO update user balance in users collection so app-wide available balance increases immediately
-            const userSnap = await transaction.get(userRef);
             if (userSnap.exists) {
               transaction.update(userRef, {
                 balance: newBal,
