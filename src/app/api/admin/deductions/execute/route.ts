@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { FieldValue } from "firebase-admin/firestore";
-import { toMinorUnits, toMajorUnits, calculateUserDeduction, isActiveUser } from "@/lib/monetary-util";
+import { toMinorUnits, toMajorUnits, calculateUserDeduction, isActiveUser, toMinorUnitsStrict } from "@/lib/monetary-util";
 
 export async function POST(req: Request) {
   try {
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { name, description, amount, deductionId: clientDeductionId } = body;
 
-    const parsedAmount = toMajorUnits(toMinorUnits(amount));
+    const parsedAmount = toMajorUnits(toMinorUnitsStrict(amount, "Deduction Amount"));
     if (parsedAmount <= 0) {
       return NextResponse.json({ error: "Deduction amount must be a positive number greater than 0." }, { status: 400 });
     }
@@ -92,17 +92,26 @@ export async function POST(req: Request) {
       }, { status: 409 });
     }
 
-    // Fetch all active users
-    const usersSnap = await adminDb.collection("users").get();
-    const activeUserDocs = usersSnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
-    const totalEligibleCount = activeUserDocs.length;
+    // Query active users using Firestore index where status == "active"
+    const activeQuerySnap = await adminDb.collection("users").where("status", "==", "active").get();
+    let activeUserDocs = activeQuerySnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
 
+    // Fallback: If no users have status == "active", load users safely
+    if (activeUserDocs.length === 0) {
+      const allUsersSnap = await adminDb.collection("users").get();
+      activeUserDocs = allUsersSnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
+    }
+
+    const totalEligibleCount = activeUserDocs.length;
     let failedUsersCount = 0;
     const nowIso = new Date().toISOString();
 
     // Process users in batch chunks of 25 users
     for (let i = 0; i < activeUserDocs.length; i += 25) {
       const chunk = activeUserDocs.slice(i, i + 25);
+
+      // Periodically renew worker lock lease during long operations
+      await deductionRef.set({ updatedAt: new Date().toISOString() }, { merge: true });
 
       await Promise.all(
         chunk.map(async (uDoc) => {
@@ -152,8 +161,8 @@ export async function POST(req: Request) {
               }
 
               let currentDebt = 0;
-              if (debtVal !== undefined && debtVal !== null) {
-                const parsedDebt = Number(debtVal);
+              if (debtVal !== undefined && debtVal !== null && debtVal !== "") {
+                const parsedDebt = typeof debtVal === "number" ? debtVal : Number(debtVal);
                 if (isNaN(parsedDebt) || !isFinite(parsedDebt) || parsedDebt < 0) {
                   throw new Error(`Invalid/corrupted outstanding debt (${debtVal}) detected for user ${userId}. Failing closed.`);
                 }
