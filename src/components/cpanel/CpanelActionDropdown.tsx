@@ -14,12 +14,14 @@ export interface CpanelActionItem {
 interface CpanelActionDropdownProps {
   actions: CpanelActionItem[];
   align?: "left" | "right";
+  direction?: "down" | "up";
   isDark?: boolean;
 }
 
 export const CpanelActionDropdown: React.FC<CpanelActionDropdownProps> = ({
   actions,
   align = "right",
+  direction = "down",
   isDark = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -74,7 +76,8 @@ export const CpanelActionDropdown: React.FC<CpanelActionDropdownProps> = ({
       {isOpen && (
         <div
           className={cn(
-            "absolute top-full mt-1.5 w-48 rounded-2xl border shadow-xl z-[1000] overflow-hidden py-1.5 animate-in fade-in zoom-in-95 duration-150",
+            "absolute w-48 rounded-2xl border shadow-xl z-[1000] overflow-hidden py-1.5 animate-in fade-in zoom-in-95 duration-150",
+            direction === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5",
             align === "right" ? "right-0" : "left-0",
             isDark
               ? "bg-[#111827] border-gray-800 text-white shadow-black/60"

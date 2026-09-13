@@ -487,7 +487,7 @@ function CpanelUsersPageContent() {
                         </div>
 
                         {!isEditing && (
-                          <div className="flex justify-between items-center flex-wrap gap-2 pt-1 border-t border-gray-200/30">
+                          <div className="flex justify-between items-center flex-wrap gap-2 pt-1 border-t border-gray-200/30 relative">
                             <div className="flex flex-wrap gap-1">
                               {u.permissions.length === 0 ? (
                                 <span className="text-[9px] text-gray-400 font-bold uppercase italic">Standard Permissions</span>
@@ -502,6 +502,7 @@ function CpanelUsersPageContent() {
 
                             <CpanelActionDropdown
                               isDark={isDark}
+                              direction="up"
                               actions={[
                                 {
                                   label: "Manage User",

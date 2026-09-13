@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -388,66 +389,54 @@ export default function CpanelEstatePropertiesPage() {
                           </td>
 
                           <td className="p-3.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedInspectProp(prop)}
-                                className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold text-[9.5px] uppercase rounded-lg cursor-pointer border-0"
-                              >
-                                Inspect
-                              </button>
-
-                              {isApproved ? (
-                                <button
-                                  type="button"
-                                  disabled={isExecuting}
-                                  onClick={() => handleAdminPropertyAction("unapprove", prop.id)}
-                                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
-                                >
-                                  {isExecuting ? "..." : "Unapprove"}
-                                </button>
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    disabled={isExecuting}
-                                    onClick={() => handleAdminPropertyAction("approve", prop.id)}
-                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
-                                  >
-                                    {isExecuting ? "..." : "Approve"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isExecuting}
-                                    onClick={() => setSelectedRejectProp(prop)}
-                                    className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-black text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
-                                  >
-                                    Reject
-                                  </button>
-                                </>
-                              )}
-
-                              <button
-                                type="button"
-                                disabled={isExecuting}
-                                onClick={() => handleAdminPropertyAction("toggle_featured", prop.id)}
-                                className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
-                              >
-                                {prop.featured ? "Unfeature" : "Feature"}
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={isExecuting}
-                                onClick={() => {
-                                  if (confirm("Delete this property listing permanently?")) {
-                                    handleAdminPropertyAction("delete", prop.id);
-                                  }
-                                }}
-                                className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-red-500/20 text-red-500 font-bold text-[9.5px] uppercase rounded-lg cursor-pointer border-0 disabled:opacity-50"
-                              >
-                                Delete
-                              </button>
+                            <div className="flex items-center justify-end">
+                              <CpanelActionDropdown
+                                isDark={isDark}
+                                actions={[
+                                  {
+                                    label: "Inspect Details",
+                                    icon: "visibility",
+                                    onClick: () => setSelectedInspectProp(prop),
+                                  },
+                                  {
+                                    label: "Approve Property",
+                                    icon: "verified",
+                                    variant: "emerald",
+                                    disabled: isApproved,
+                                    onClick: () => handleAdminPropertyAction("approve", prop.id),
+                                  },
+                                  {
+                                    label: "Unapprove Listing",
+                                    icon: "unpublished",
+                                    variant: "warning",
+                                    disabled: !isApproved,
+                                    onClick: () => handleAdminPropertyAction("unapprove", prop.id),
+                                  },
+                                  {
+                                    label: "Reject Listing",
+                                    icon: "cancel",
+                                    variant: "danger",
+                                    disabled: isApproved,
+                                    onClick: () => setSelectedRejectProp(prop),
+                                  },
+                                  {
+                                    label: prop.featured ? "Remove Featured" : "Feature Property",
+                                    icon: "star",
+                                    variant: "warning",
+                                    onClick: () => handleAdminPropertyAction("toggle_featured", prop.id),
+                                  },
+                                  {
+                                    label: "Delete Property",
+                                    icon: "delete",
+                                    variant: "danger",
+                                    onClick: () => {
+                                      if (confirm("Delete this property listing permanently?")) {
+                                        handleAdminPropertyAction("delete", prop.id);
+                                      }
+                                    },
+                                  },
+                                ]}
+                              />
                             </div>
                           </td>
                         </tr>
