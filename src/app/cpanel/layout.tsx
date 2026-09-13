@@ -405,6 +405,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     {
       title: "Branding & Customization",
       items: [
+        { id: "emergency", label: "Emergency Broadcast", icon: "campaign", href: "/cpanel/emergency", permission: "branding.manage" },
         { id: "settings", label: "Global Settings", icon: "settings_suggest", href: "/cpanel/settings", permission: "branding.manage" },
         { id: "communication", label: "Communication & Branding", icon: "mark_email_unread", href: "/cpanel/communication", permission: "communication.branding.manage" },
         { id: "banners", label: "Slide Banners", icon: "photo_library", href: "/cpanel/banners", permission: "banners.manage" },
