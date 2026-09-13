@@ -33,6 +33,7 @@ export const CPANEL_PERMISSIONS_CATALOG: PermissionDefinition[] = [
   { key: "exchange_rates.manage", label: "Exchange Rates & Swap Fees", category: "Finance", description: "Configure USD/NGN/XOF rates, live world dollar rate mode, and currency swap fees" },
   { key: "investments.manage", label: "Fixed Deposits & Yields", category: "Finance", description: "Manage investment interest rates and user portfolios" },
   { key: "deposit.manage", label: "Capital Deposit Tool", category: "Finance", description: "Atomically deposit capital into customer wallets" },
+  { key: "wallet.deductions.manage", label: "Global Wallet Deductions", category: "Finance", description: "Execute global wallet service/maintenance fee deductions and debt recovery" },
 
   // E-Commerce Store
   { key: "store.view", label: "View E-Store Directory", category: "Store", description: "Access store products, orders, categories, and stock" },
@@ -52,7 +53,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     "metrics.view", "admins.view", "users.view", "users.manage",
     "kyc.view", "kyc.manage", "freeze.manage", "limits.manage",
     "branding.manage", "communication.branding.manage", "banners.manage", "bank_logos.manage", "bill_logos.manage",
-    "whatsapp.manage", "email_connect.manage", "vtu.manage", "exchange_rates.manage", "investments.manage", "deposit.manage",
+    "whatsapp.manage", "email_connect.manage", "vtu.manage", "exchange_rates.manage", "investments.manage", "deposit.manage", "wallet.deductions.manage",
     "store.view", "store.manage", "estate.view", "estate.manage", "user_history.view"
   ],
   support: ["metrics.view", "users.view", "kyc.view", "store.view", "user_history.view"],

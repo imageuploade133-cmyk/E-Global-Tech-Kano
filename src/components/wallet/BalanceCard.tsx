@@ -2279,11 +2279,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       {balanceStr}
                     </h2>
                     {selectedCurrency === "NGN" && (
-                      <div className="flex items-center gap-1 mt-1 text-[#FFFFFF]/80 select-none animate-fade-in">
-                        <span className="material-symbols-outlined text-[10px] min-[360px]:text-[12px] text-emerald-400 font-bold animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>stars</span>
-                        <span className="font-hanken text-[8px] min-[360px]:text-[9.5px] font-bold tracking-wide uppercase">
-                          Reward Bonus: ₦{isVisible ? (userData?.bonusBalance !== undefined ? Number(userData.bonusBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "1,000.00") : "•••,•••"}
-                        </span>
+                      <div className="flex items-center gap-2 flex-wrap mt-1 select-none animate-fade-in">
+                        <div className="flex items-center gap-1 text-[#FFFFFF]/80">
+                          <span className="material-symbols-outlined text-[10px] min-[360px]:text-[12px] text-emerald-400 font-bold animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>stars</span>
+                          <span className="font-hanken text-[8px] min-[360px]:text-[9.5px] font-bold tracking-wide uppercase">
+                            Reward Bonus: ₦{isVisible ? (userData?.bonusBalance !== undefined ? Number(userData.bonusBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "1,000.00") : "•••,•••"}
+                          </span>
+                        </div>
+                        {Number(userData?.outstandingDebt) > 0 && (
+                          <div className="flex items-center gap-1 bg-rose-500/30 text-rose-200 px-2 py-0.5 rounded-md border border-rose-400/40 font-hanken text-[8px] min-[360px]:text-[9px] font-black uppercase tracking-wider backdrop-blur-xs">
+                            <span className="material-symbols-outlined text-[10px] text-rose-300 font-bold">pending_actions</span>
+                            <span>Debt: ₦{isVisible ? Number(userData?.outstandingDebt || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "•••,•••"}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3534,11 +3542,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                     ⚠️ Minimum required transfer limit is ₦{activeMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                   </p>
                                 )}
-                                {trfTotalDebit > balance && !isBelowMin && (
-                                  <p className="text-[9px] text-red-500 font-bold uppercase leading-none pt-1">
-                                    ⚠️ Total debit exceeds your wallet balance of ₦{balance.toLocaleString()}
-                                  </p>
-                                )}
+                                {(() => {
+                                  const debt = Number(userData?.outstandingDebt) || 0;
+                                  const spendable = Math.max(0, balance - debt);
+                                  if (trfTotalDebit > spendable && !isBelowMin) {
+                                    return (
+                                      <p className="text-[9px] text-red-500 font-bold uppercase leading-none pt-1">
+                                        ⚠️ Total debit exceeds spendable balance of ₦{spendable.toLocaleString()} (Outstanding Debt: ₦{debt.toLocaleString()})
+                                      </p>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             );
                           })()}
