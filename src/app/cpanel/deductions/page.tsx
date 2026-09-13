@@ -290,7 +290,7 @@ export default function GlobalDeductionsPage() {
           <div className="p-12 text-center text-gray-400 space-y-2">
             <span className="material-symbols-outlined text-4xl text-gray-300">payments</span>
             <p className="text-sm font-bold text-gray-600 dark:text-gray-400">No Global Deductions Executed Yet</p>
-            <p className="text-xs text-gray-400">Click "Assess Global Deduction" above to create and apply fee charges across users.</p>
+            <p className="text-xs text-gray-400">Click &quot;Assess Global Deduction&quot; above to create and apply fee charges across users.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

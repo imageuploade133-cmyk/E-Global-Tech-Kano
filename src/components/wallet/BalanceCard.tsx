@@ -2289,7 +2289,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         {Number(userData?.outstandingDebt) > 0 && (
                           <div className="flex items-center gap-1 bg-rose-500/30 text-rose-200 px-2 py-0.5 rounded-md border border-rose-400/40 font-hanken text-[8px] min-[360px]:text-[9px] font-black uppercase tracking-wider backdrop-blur-xs">
                             <span className="material-symbols-outlined text-[10px] text-rose-300 font-bold">pending_actions</span>
-                            <span>Debt: ₦{isVisible ? Number(userData.outstandingDebt).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "•••,•••"}</span>
+                            <span>Debt: ₦{isVisible ? Number(userData?.outstandingDebt || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "•••,•••"}</span>
                           </div>
                         )}
                       </div>
