@@ -5,20 +5,58 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
-interface EmergencyBroadcastData {
+export interface EmergencyBroadcastAttachment {
+  name: string;
+  url: string;
+  size?: string;
+  type?: string;
+}
+
+export interface EmergencyBroadcastData {
   active: boolean;
   title: string;
   message: string;
   urgency?: "info" | "warning" | "danger" | "emerald";
   badge?: string;
   icon?: string;
+  modalBgColor?: string;
+  modalTextColor?: string;
+  externalUrl?: string;
+  externalUrlLabel?: string;
+  videoUrl?: string;
+  attachments?: EmergencyBroadcastAttachment[];
+  images?: string[];
   updatedAt?: string;
   updatedBy?: string;
+}
+
+function getEmbedVideoUrl(url: string): { isDirectVideo: boolean; embedUrl: string } {
+  if (!url) return { isDirectVideo: false, embedUrl: "" };
+
+  const trimmed = url.trim();
+  if (trimmed.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) {
+    return { isDirectVideo: true, embedUrl: trimmed };
+  }
+
+  // Youtube shorts or watch link
+  const ytMatch = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([\w-]{11})/);
+  if (ytMatch && ytMatch[1]) {
+    return { isDirectVideo: false, embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}` };
+  }
+
+  // Vimeo
+  const vimeoMatch = trimmed.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/[^\/]*\/videos\/|album\/\d+\/video\/|video\/|)(\d+)/);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return { isDirectVideo: false, embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+  }
+
+  return { isDirectVideo: false, embedUrl: trimmed };
 }
 
 export const EmergencyBroadcastBanner: React.FC = () => {
   const [broadcast, setBroadcast] = useState<EmergencyBroadcastData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
 
   // Modal hardware/browser back button handling
   useModalBackHandler(isModalOpen, () => setIsModalOpen(false), "emergency-broadcast-modal");
@@ -49,6 +87,13 @@ export const EmergencyBroadcastBanner: React.FC = () => {
   const urgency = broadcast.urgency || "warning";
   const iconName = broadcast.icon || "campaign";
   const badgeLabel = broadcast.badge || "EMERGENCY BROADCAST";
+  const modalBg = broadcast.modalBgColor || "#FFFFFF";
+  const modalTextColor = broadcast.modalTextColor || "#111827";
+
+  const { isDirectVideo, embedUrl } = getEmbedVideoUrl(broadcast.videoUrl || "");
+
+  // Render message plain text vs HTML content safely
+  const isHtml = broadcast.message ? /<[a-z][\s\S]*>/i.test(broadcast.message) : false;
 
   return (
     <>
@@ -85,7 +130,7 @@ export const EmergencyBroadcastBanner: React.FC = () => {
               </h4>
             </div>
             <p className="text-[10.5px] font-medium text-gray-600 dark:text-gray-300 truncate mt-0.5">
-              {broadcast.message}
+              {broadcast.message ? broadcast.message.replace(/<[^>]*>?/gm, "") : ""}
             </p>
           </div>
         </div>
@@ -98,20 +143,31 @@ export const EmergencyBroadcastBanner: React.FC = () => {
       {/* Full-Screen Emergency Information Modal Overlay */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100000] bg-white dark:bg-gray-950 text-black dark:text-white flex flex-col justify-between overflow-hidden font-hanken select-none">
+          <div className="fixed inset-0 z-[100000] flex flex-col justify-between overflow-hidden font-hanken">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Main Full-Screen Modal Card */}
             <motion.div
               initial={{ opacity: 0, y: "100%" }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-              className="w-full h-full max-w-md mx-auto flex flex-col justify-between overflow-hidden p-5 sm:p-6"
+              style={{ backgroundColor: modalBg, color: modalTextColor }}
+              className="relative w-full h-full max-w-2xl mx-auto flex flex-col justify-between overflow-hidden p-5 sm:p-6 shadow-2xl z-10 sm:rounded-3xl sm:my-auto sm:h-[92vh]"
             >
               {/* Header Bar */}
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 flex-shrink-0">
+              <div className="flex items-center justify-between border-b border-gray-200/80 dark:border-gray-800 pb-4 flex-shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div
                     className={cn(
-                      "w-9 h-9 rounded-full flex items-center justify-center shrink-0",
+                      "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs",
                       urgency === "danger"
                         ? "bg-red-500/15 text-red-600"
                         : urgency === "warning"
@@ -121,7 +177,7 @@ export const EmergencyBroadcastBanner: React.FC = () => {
                         : "bg-blue-500/15 text-blue-600"
                     )}
                   >
-                    <span className="material-symbols-outlined text-[20px] font-bold animate-pulse">
+                    <span className="material-symbols-outlined text-[22px] font-bold animate-pulse">
                       {iconName}
                     </span>
                   </div>
@@ -129,8 +185,8 @@ export const EmergencyBroadcastBanner: React.FC = () => {
                     <span className="text-[9.5px] font-black uppercase tracking-widest text-gray-400 block">
                       {badgeLabel}
                     </span>
-                    <h3 className="font-extrabold text-sm uppercase text-black dark:text-white tracking-wide">
-                      Official Broadcast
+                    <h3 className="font-extrabold text-base uppercase tracking-tight">
+                      Official Emergency Broadcast
                     </h3>
                   </div>
                 </div>
@@ -138,72 +194,210 @@ export const EmergencyBroadcastBanner: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white cursor-pointer"
+                  className="w-9 h-9 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white transition-all cursor-pointer bg-black/5 dark:bg-white/10"
                 >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
 
               {/* Scrollable Broadcast Body Content */}
-              <div className="flex-1 overflow-y-auto py-6 space-y-5 custom-scrollbar text-left">
+              <div className="flex-1 overflow-y-auto py-6 space-y-6 custom-scrollbar text-left">
                 {/* Headline Hero Banner */}
                 <div
                   className={cn(
                     "p-5 rounded-3xl border space-y-2 text-left shadow-xs",
                     urgency === "danger"
-                      ? "bg-red-500/10 border-red-500/30 text-red-900 dark:text-red-200"
+                      ? "bg-red-500/10 border-red-500/30 text-red-950 dark:text-red-200"
                       : urgency === "warning"
-                      ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200"
                       : urgency === "emerald"
-                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
-                      : "bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-200"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200"
+                      : "bg-blue-500/10 border-blue-500/30 text-blue-950 dark:text-blue-200"
                   )}
                 >
                   <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-current/20 text-current inline-block">
                     {badgeLabel}
                   </span>
-                  <h2 className="font-extrabold text-lg text-black dark:text-white leading-tight">
+                  <h2 className="font-extrabold text-xl leading-tight">
                     {broadcast.title}
                   </h2>
                   {broadcast.updatedAt && (
-                    <p className="text-[10px] text-gray-400 font-mono font-medium">
+                    <p className="text-[10.5px] opacity-70 font-mono font-medium">
                       Published: {new Date(broadcast.updatedAt).toLocaleString()}
                     </p>
                   )}
                 </div>
 
                 {/* Main Body Message Paragraph */}
-                <div className="p-5 rounded-3xl bg-gray-50 dark:bg-gray-900 border border-gray-150 dark:border-gray-800 space-y-3">
-                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
-                    Broadcast Details & Information
+                <div className="p-5 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-3">
+                  <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
+                    Full Broadcast Information & Message
                   </span>
-                  <p className="font-medium text-xs text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">
-                    {broadcast.message}
-                  </p>
+                  {isHtml ? (
+                    <div
+                      className="prose prose-sm max-w-none text-xs font-medium leading-relaxed space-y-2"
+                      dangerouslySetInnerHTML={{ __html: broadcast.message }}
+                    />
+                  ) : (
+                    <p className="font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                      {broadcast.message}
+                    </p>
+                  )}
                 </div>
 
-                {/* Security Verification Footer Card */}
-                <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/20 text-center space-y-1">
+                {/* Attached Images Gallery */}
+                {Array.isArray(broadcast.images) && broadcast.images.length > 0 && (
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
+                      Attached Images & Photos ({broadcast.images.length})
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {broadcast.images.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setSelectedPreviewImage(imgUrl)}
+                          className="group relative aspect-video rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/10 cursor-pointer shadow-xs"
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`Broadcast photo ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="material-symbols-outlined text-white text-[24px]">visibility</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Embedded Video Player */}
+                {embedUrl && (
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
+                      Embedded Broadcast Video
+                    </span>
+                    <div className="aspect-video w-full rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-black shadow-md">
+                      {isDirectVideo ? (
+                        <video controls className="w-full h-full object-contain" src={embedUrl} />
+                      ) : (
+                        <iframe
+                          src={embedUrl}
+                          title="Broadcast Video"
+                          className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Attached Downloadable Documents */}
+                {Array.isArray(broadcast.attachments) && broadcast.attachments.length > 0 && (
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
+                      Attached Documents & Downloads ({broadcast.attachments.length})
+                    </span>
+                    <div className="space-y-2">
+                      {broadcast.attachments.map((doc, idx) => (
+                        <a
+                          key={idx}
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={doc.name || "document"}
+                          className="p-3.5 rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 flex items-center justify-between gap-3 hover:bg-black/10 dark:hover:bg-white/10 transition-all text-left group text-inherit no-underline"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="w-9 h-9 rounded-xl bg-[#FC7A00]/15 text-[#FC7A00] flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-[20px]">
+                                {doc.type === "pdf" ? "picture_as_pdf" : "description"}
+                              </span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h5 className="font-extrabold text-xs truncate group-hover:text-[#FC7A00] transition-colors">
+                                {doc.name || `Attachment ${idx + 1}`}
+                              </h5>
+                              {doc.size && (
+                                <p className="text-[10px] opacity-60 font-mono mt-0.5">
+                                  {doc.size}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="material-symbols-outlined text-[20px] opacity-60 group-hover:opacity-100 group-hover:text-[#FC7A00] transition-all shrink-0">
+                            download
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* External Link Button */}
+                {broadcast.externalUrl && (
+                  <div className="pt-2">
+                    <a
+                      href={broadcast.externalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3.5 px-4 rounded-2xl bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all text-center no-underline"
+                    >
+                      <span>{broadcast.externalUrlLabel || "Learn More / Open Link"}</span>
+                      <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                    </a>
+                  </div>
+                )}
+
+                {/* Official Verification Notice */}
+                <div className="p-4 rounded-2xl bg-[#FC7A00]/10 border border-[#FC7A00]/20 text-center space-y-1">
                   <p className="font-black text-xs text-[#FC7A00] uppercase">
                     E-Global Pay Verified Official Announcement
                   </p>
-                  <p className="text-[10px] text-gray-400 font-medium">
+                  <p className="text-[10px] opacity-60 font-medium">
                     Broadcast issued by Platform Administration • Real-time Notice
                   </p>
                 </div>
               </div>
 
               {/* Static Bottom Action Bar */}
-              <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+              <div className="pt-4 border-t border-gray-200/80 dark:border-gray-800 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-sm active:scale-98 border-0"
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-md active:scale-98 border-0"
                 >
                   I Understand & Acknowledge
                 </button>
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Image Preview Modal Overlay */}
+      <AnimatePresence>
+        {selectedPreviewImage && (
+          <div
+            onClick={() => setSelectedPreviewImage(null)}
+            className="fixed inset-0 z-[100010] bg-black/90 flex items-center justify-center p-4 cursor-pointer"
+          >
+            <div className="relative max-w-4xl max-h-[90vh] w-full flex items-center justify-center">
+              <img
+                src={selectedPreviewImage}
+                alt="Enlarged preview"
+                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+              />
+              <button
+                type="button"
+                onClick={() => setSelectedPreviewImage(null)}
+                className="absolute top-2 right-2 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+              >
+                <span className="material-symbols-outlined text-[24px]">close</span>
+              </button>
+            </div>
           </div>
         )}
       </AnimatePresence>

@@ -21,6 +21,13 @@ export async function GET(req: Request) {
         urgency: data.urgency || "warning",
         badge: data.badge || "EMERGENCY BROADCAST",
         icon: data.icon || "campaign",
+        modalBgColor: data.modalBgColor || "#FFFFFF",
+        modalTextColor: data.modalTextColor || "#111827",
+        externalUrl: data.externalUrl || "",
+        externalUrlLabel: data.externalUrlLabel || "Learn More / Open Link",
+        videoUrl: data.videoUrl || "",
+        attachments: Array.isArray(data.attachments) ? data.attachments : [],
+        images: Array.isArray(data.images) ? data.images : [],
         updatedAt: data.updatedAt || new Date().toISOString(),
         updatedBy: data.updatedBy || "System Admin",
       },
@@ -39,7 +46,21 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { active, title, message, urgency, badge, icon } = body;
+    const {
+      active,
+      title,
+      message,
+      urgency,
+      badge,
+      icon,
+      modalBgColor,
+      modalTextColor,
+      externalUrl,
+      externalUrlLabel,
+      videoUrl,
+      attachments,
+      images,
+    } = body;
 
     const updatedAt = new Date().toISOString();
     const updatedBy = perm.auth?.email || "System Admin";
@@ -51,6 +72,13 @@ export async function POST(req: Request) {
       urgency: urgency || "warning",
       badge: (badge || "EMERGENCY BROADCAST").trim().toUpperCase(),
       icon: icon || "campaign",
+      modalBgColor: modalBgColor || "#FFFFFF",
+      modalTextColor: modalTextColor || "#111827",
+      externalUrl: (externalUrl || "").trim(),
+      externalUrlLabel: (externalUrlLabel || "Learn More / Open Link").trim(),
+      videoUrl: (videoUrl || "").trim(),
+      attachments: Array.isArray(attachments) ? attachments : [],
+      images: Array.isArray(images) ? images : [],
       updatedAt,
       updatedBy,
     };
