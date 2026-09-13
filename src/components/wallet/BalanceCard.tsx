@@ -1426,9 +1426,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const currentSelectedBalance = selectedCurrency === "NGN"
+  const outstandingDebt = selectedCurrency === "NGN" ? (Number(userData?.outstandingDebt) || 0) : 0;
+  const rawBalance = selectedCurrency === "NGN"
     ? walletBalances.NGN
     : (selectedCurrency === "USD" ? walletBalances.USD : walletBalances.XOF);
+
+  const netBalance = rawBalance - outstandingDebt;
 
   const formattedBalance = new Intl.NumberFormat(
     selectedCurrency === "NGN" ? "en-NG" : (selectedCurrency === "USD" ? "en-US" : "fr-FR"),
@@ -1437,7 +1440,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       currency: selectedCurrency,
       minimumFractionDigits: 2,
     }
-  ).format(currentSelectedBalance);
+  ).format(netBalance);
 
   const balanceStr = isVisible
     ? formattedBalance

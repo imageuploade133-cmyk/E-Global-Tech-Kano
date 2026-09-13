@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { FieldValue } from "firebase-admin/firestore";
+import { toMinorUnits, toMajorUnits, calculateUserDeduction } from "@/lib/monetary-util";
+import { isActiveUser } from "@/lib/monetary-util";
 
 export async function POST(req: Request) {
   try {
@@ -16,58 +18,89 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { name, description, amount, deductionId: clientDeductionId } = body;
 
-    const parsedAmount = Math.round((Number(amount) || 0) * 100) / 100;
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    const parsedAmount = toMajorUnits(toMinorUnits(amount));
+    if (parsedAmount <= 0) {
       return NextResponse.json({ error: "Deduction amount must be a positive number greater than 0." }, { status: 400 });
     }
 
-    // Deterministic immutable deduction ID for idempotency (e.g. DED-20260913-0001 or client provided)
+    if (parsedAmount > 100000) {
+      return NextResponse.json({ error: "Maximum single global deduction amount cannot exceed ₦100,000." }, { status: 400 });
+    }
+
+    // Deterministic immutable deduction ID for idempotency
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const deductionId = clientDeductionId || `DED-${todayStr}-${Date.now().toString().slice(-4)}`;
 
     const deductionRef = adminDb.collection("global_deductions").doc(deductionId);
 
-    // Check if this deduction master record already exists (idempotency check)
-    const existingDoc = await deductionRef.get();
-    if (existingDoc.exists && existingDoc.data()?.status === "COMPLETED") {
+    // Atomic State Transition & Concurrency Lock Check inside transaction
+    const lockResult = await adminDb.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(deductionRef);
+      if (docSnap.exists) {
+        const d = docSnap.data() || {};
+        if (d.status === "COMPLETED") {
+          return { status: "ALREADY_COMPLETED", data: d };
+        }
+        if (d.status === "PROCESSING") {
+          return { status: "ALREADY_PROCESSING", data: d };
+        }
+        // Immutable parameters check
+        if (d.amount !== undefined && toMinorUnits(d.amount) !== toMinorUnits(parsedAmount)) {
+          throw new Error("Cannot alter original immutable deduction amount once created.");
+        }
+      }
+
+      const nowIso = new Date().toISOString();
+      const initialData = {
+        deductionId,
+        name: (name || "Maintenance Fee").trim(),
+        description: (description || "").trim(),
+        amount: parsedAmount,
+        currency: "NGN",
+        target: "All Active Users",
+        status: "PROCESSING",
+        createdBy: adminEmail,
+        createdByUid: adminUid,
+        createdAt: docSnap.exists ? docSnap.data()?.createdAt : nowIso,
+        updatedAt: nowIso,
+      };
+
+      transaction.set(deductionRef, initialData, { merge: true });
+      return { status: "PROCEED", data: initialData };
+    });
+
+    if (lockResult.status === "ALREADY_COMPLETED") {
       return NextResponse.json({
         success: true,
         message: "This global deduction has already been executed to completion.",
-        deduction: { id: deductionRef.id, ...existingDoc.data() },
+        deduction: { id: deductionRef.id, ...lockResult.data },
       });
     }
 
-    const nowIso = new Date().toISOString();
+    if (lockResult.status === "ALREADY_PROCESSING") {
+      return NextResponse.json({
+        error: "This global deduction is currently being processed by another administrator request.",
+      }, { status: 409 });
+    }
 
-    // Create or update master deduction record in PROCESSING state
-    await deductionRef.set({
-      deductionId,
-      name: (name || "Maintenance Fee").trim(),
-      description: (description || "").trim(),
-      amount: parsedAmount,
-      currency: "NGN",
-      target: "All Active Users",
-      status: "PROCESSING",
-      createdBy: adminEmail,
-      createdByUid: adminUid,
-      createdAt: existingDoc.exists ? existingDoc.data()?.createdAt : nowIso,
-      updatedAt: nowIso,
-    }, { merge: true });
-
-    // Fetch all users to process in retry-safe batch chunks
+    // Fetch all active users
     const usersSnap = await adminDb.collection("users").get();
+    const activeUserDocs = usersSnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
+    const totalEligibleCount = activeUserDocs.length;
 
     let processedUsersCount = 0;
-    let totalAssessedAmount = 0;
-    let totalRecoveredAmount = 0;
-    let totalOutstandingAmount = 0;
+    let failedUsersCount = 0;
+
+    let totalAssessedMinor = 0;
+    let totalRecoveredMinor = 0;
+    let totalOutstandingMinor = 0;
     let indebtedUsersCount = 0;
 
-    // Process users in batch chunks of 50 users at a time using Firestore transactions
-    const userDocs = usersSnap.docs;
+    const nowIso = new Date().toISOString();
 
-    for (let i = 0; i < userDocs.length; i += 25) {
-      const chunk = userDocs.slice(i, i + 25);
+    // Process users in batch chunks of 25 users
+    for (let i = 0; i < activeUserDocs.length; i += 25) {
+      const chunk = activeUserDocs.slice(i, i + 25);
 
       await Promise.all(
         chunk.map(async (uDoc) => {
@@ -80,13 +113,12 @@ export async function POST(req: Request) {
               // 1. Idempotency Check: Read user_deductions record first inside transaction
               const userDedSnap = await transaction.get(userDeductionRef);
               if (userDedSnap.exists && userDedSnap.data()?.status === "APPLIED") {
-                // Already processed for this user
                 const dData = userDedSnap.data() || {};
                 processedUsersCount++;
-                totalAssessedAmount += Number(dData.amountAssessed) || 0;
-                totalRecoveredAmount += Number(dData.amountRecovered) || 0;
-                totalOutstandingAmount += Number(dData.amountOutstanding) || 0;
-                if ((Number(dData.amountOutstanding) || 0) > 0) indebtedUsersCount++;
+                totalAssessedMinor += toMinorUnits(dData.amountAssessed);
+                totalRecoveredMinor += toMinorUnits(dData.amountRecovered);
+                totalOutstandingMinor += toMinorUnits(dData.amountOutstanding);
+                if (toMinorUnits(dData.amountOutstanding) > 0) indebtedUsersCount++;
                 return;
               }
 
@@ -102,45 +134,28 @@ export async function POST(req: Request) {
               if (!userSnap.exists) return;
               const uData = userSnap.data() || {};
 
-              // Skip frozen/suspended users
-              if (uData.isFrozen || uData.status === "FROZEN" || uData.status === "SUSPENDED") {
-                return;
-              }
+              if (!isActiveUser(uData)) return;
 
               const currentWalletBalance = walletSnap.exists ? (Number(walletSnap.data()?.balance) || 0) : 0;
               const currentDebt = Math.max(0, Number(uData.outstandingDebt) || 0);
 
-              // Calculate deduction accounting
-              let recoveredImmediately = 0;
-              let addedDebt = 0;
-              let newBalance = currentWalletBalance;
-
-              if (currentWalletBalance >= parsedAmount) {
-                recoveredImmediately = parsedAmount;
-                newBalance = currentWalletBalance - parsedAmount;
-                addedDebt = 0;
-              } else {
-                recoveredImmediately = currentWalletBalance;
-                newBalance = 0;
-                addedDebt = parsedAmount - currentWalletBalance;
-              }
-
-              const newDebt = currentDebt + addedDebt;
+              // Integer minor units calculation
+              const calc = calculateUserDeduction(currentWalletBalance, currentDebt, parsedAmount);
 
               // Write updates to wallet
               transaction.set(walletRef, {
                 userId,
                 currency: "NGN",
-                balance: newBalance,
+                balance: calc.newBalance,
                 updatedAt: nowIso,
               }, { merge: true });
 
               // Write updates to user document
               const userUpdates: Record<string, any> = {
-                balance: newBalance,
+                balance: calc.newBalance,
               };
-              if (addedDebt > 0) {
-                userUpdates.outstandingDebt = FieldValue.increment(addedDebt);
+              if (calc.amountOutstanding > 0) {
+                userUpdates.outstandingDebt = FieldValue.increment(calc.amountOutstanding);
               }
               transaction.update(userRef, userUpdates);
 
@@ -152,13 +167,13 @@ export async function POST(req: Request) {
                 userName: uData.name || uData.displayName || "Customer",
                 userEmail: uData.email || "",
                 userPhone: uData.phoneNumber || "",
-                amountAssessed: parsedAmount,
-                amountRecovered: recoveredImmediately,
-                amountOutstanding: addedDebt,
+                amountAssessed: calc.amountAssessed,
+                amountRecovered: calc.amountRecovered,
+                amountOutstanding: calc.amountOutstanding,
                 walletBalanceBefore: currentWalletBalance,
-                walletBalanceAfter: newBalance,
+                walletBalanceAfter: calc.newBalance,
                 outstandingDebtBefore: currentDebt,
-                outstandingDebtAfter: newDebt,
+                outstandingDebtAfter: calc.newDebt,
                 status: "APPLIED",
                 createdAt: nowIso,
                 updatedAt: nowIso,
@@ -169,48 +184,59 @@ export async function POST(req: Request) {
               const txDocRef = adminDb.collection("transactions").doc(`tx-${txRef}`);
               transaction.set(txDocRef, {
                 userId,
-                amount: parsedAmount,
+                amount: calc.amountAssessed,
                 currency: "NGN",
                 reference: txRef,
                 type: "GLOBAL_DEDUCTION",
                 category: "DEDUCTION",
                 direction: "DEBIT",
-                description: `${name} (${description || "Wallet Fee"})`,
+                description: `${name} (Amount Assessed: ₦${calc.amountAssessed.toLocaleString()}, Recovered: ₦${calc.amountRecovered.toLocaleString()}, Debt: ₦${calc.amountOutstanding.toLocaleString()})`,
                 recipientName: "Service Charge",
                 status: "SUCCESS",
                 date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
                 time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
                 fee: 0,
-                totalDebited: parsedAmount,
+                totalDebited: calc.amountRecovered,
                 totalCredited: 0,
                 createdAt: nowIso,
                 completedAt: nowIso,
                 metadata: {
                   deductionId,
-                  amountAssessed: parsedAmount,
-                  recoveredImmediately,
-                  addedDebt,
-                  newDebtPosition: newDebt,
+                  amountAssessed: calc.amountAssessed,
+                  amountRecovered: calc.amountRecovered,
+                  amountOutstanding: calc.amountOutstanding,
+                  newDebtPosition: calc.newDebt,
+                  netPositionAfter: calc.netBalanceAfter,
                 },
               });
 
               processedUsersCount++;
-              totalAssessedAmount += parsedAmount;
-              totalRecoveredAmount += recoveredImmediately;
-              totalOutstandingAmount += addedDebt;
-              if (addedDebt > 0) indebtedUsersCount++;
+              totalAssessedMinor += toMinorUnits(calc.amountAssessed);
+              totalRecoveredMinor += toMinorUnits(calc.amountRecovered);
+              totalOutstandingMinor += toMinorUnits(calc.amountOutstanding);
+              if (calc.amountOutstanding > 0) indebtedUsersCount++;
             });
           } catch (txErr: any) {
             console.error(`[Global Deduction Transaction Error for User ${userId}]:`, txErr.message);
+            failedUsersCount++;
           }
         })
       );
     }
 
-    // Finalize master global_deduction record
+    const finalStatus = (failedUsersCount === 0 && processedUsersCount >= totalEligibleCount)
+      ? "COMPLETED"
+      : "PARTIAL";
+
+    const totalAssessedAmount = toMajorUnits(totalAssessedMinor);
+    const totalRecoveredAmount = toMajorUnits(totalRecoveredMinor);
+    const totalOutstandingAmount = toMajorUnits(totalOutstandingMinor);
+
     const summaryData = {
-      status: "COMPLETED",
-      eligibleUsersCount: processedUsersCount,
+      status: finalStatus,
+      eligibleUsersCount: totalEligibleCount,
+      processedUsersCount,
+      failedUsersCount,
       indebtedUsersCount,
       totalAssessedAmount,
       totalRecoveredAmount,
@@ -221,7 +247,7 @@ export async function POST(req: Request) {
 
     await deductionRef.set(summaryData, { merge: true });
 
-    // Write audit log
+    // Non-silent Audit Log
     try {
       await adminDb.collection("admin_audit_logs").add({
         action: "global_wallet_deduction_executed",
@@ -231,18 +257,23 @@ export async function POST(req: Request) {
         details: {
           name,
           amount: parsedAmount,
+          status: finalStatus,
+          eligibleUsersCount: totalEligibleCount,
           processedUsersCount,
+          failedUsersCount,
           totalAssessedAmount,
           totalRecoveredAmount,
           totalOutstandingAmount,
         },
         timestamp: new Date().toISOString(),
       });
-    } catch {}
+    } catch (auditErr: any) {
+      console.error("[Audit Logging Error]: Failed to record admin audit log:", auditErr.message);
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Global deduction "${name}" executed successfully across ${processedUsersCount} users!`,
+      message: `Global deduction "${name}" processed! Status: ${finalStatus}. Processed: ${processedUsersCount}, Failed: ${failedUsersCount}`,
       deduction: {
         id: deductionId,
         deductionId,

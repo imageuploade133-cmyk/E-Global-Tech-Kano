@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
+import { toMinorUnits, toMajorUnits, calculateNetBalance, isActiveUser } from "@/lib/monetary-util";
 
 export async function POST(req: Request) {
   try {
@@ -12,8 +13,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { name, description, amount } = body;
 
-    const parsedAmount = Math.round((Number(amount) || 0) * 100) / 100;
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    const parsedAmount = toMajorUnits(toMinorUnits(amount));
+    if (parsedAmount <= 0) {
       return NextResponse.json({ error: "Deduction amount must be a positive number greater than 0." }, { status: 400 });
     }
 
@@ -21,32 +22,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Maximum single global deduction amount cannot exceed ₦100,000." }, { status: 400 });
     }
 
-    // 1. Fetch user counts and inspect balances
+    // Fetch user counts and inspect balances using the exact same active user filter and minor units math
     const usersSnap = await adminDb.collection("users").get();
     const totalUsers = usersSnap.size;
 
     let eligibleUsersCount = 0;
     let sufficientFundsCount = 0;
     let expectedIndebtedCount = 0;
+    let totalImmediateRecoveryMinor = 0;
+    let totalNewOutstandingDebtMinor = 0;
+
+    const dedMinor = toMinorUnits(parsedAmount);
 
     usersSnap.forEach((doc) => {
       const uData = doc.data() || {};
-      // Filter out frozen/suspended or inactive users if needed, count all active users
-      if (uData.isFrozen || uData.status === "FROZEN" || uData.status === "SUSPENDED") {
-        return;
-      }
+      if (!isActiveUser(uData)) return;
 
       eligibleUsersCount++;
-      const currentNetBalance = (Number(uData.balance) || 0) - (Number(uData.outstandingDebt) || 0);
 
-      if (currentNetBalance >= parsedAmount) {
+      const walletBal = Number(uData.balance) || 0;
+      const debt = Math.max(0, Number(uData.outstandingDebt) || 0);
+
+      const balMinor = toMinorUnits(walletBal);
+      const debtMinor = toMinorUnits(debt);
+
+      const recoverMinor = Math.min(balMinor, dedMinor);
+      const newDebtCreatedMinor = dedMinor - recoverMinor;
+
+      totalImmediateRecoveryMinor += recoverMinor;
+      totalNewOutstandingDebtMinor += newDebtCreatedMinor;
+
+      const netBal = calculateNetBalance(walletBal, debt);
+      if (netBal >= parsedAmount) {
         sufficientFundsCount++;
       } else {
         expectedIndebtedCount++;
       }
     });
 
-    const maxTotalCharge = Math.round(eligibleUsersCount * parsedAmount * 100) / 100;
+    const totalAssessedAmount = toMajorUnits(eligibleUsersCount * dedMinor);
+    const totalImmediateRecovery = toMajorUnits(totalImmediateRecoveryMinor);
+    const totalNewOutstandingDebt = toMajorUnits(totalNewOutstandingDebtMinor);
 
     return NextResponse.json({
       success: true,
@@ -59,8 +75,10 @@ export async function POST(req: Request) {
         totalUsers,
         eligibleUsersCount,
         sufficientFundsCount,
-        expectedIndebtedCount,
-        maxTotalCharge,
+        indebtedCount: expectedIndebtedCount,
+        totalAssessedAmount,
+        totalImmediateRecovery,
+        totalNewOutstandingDebt,
       },
     });
   } catch (err: any) {

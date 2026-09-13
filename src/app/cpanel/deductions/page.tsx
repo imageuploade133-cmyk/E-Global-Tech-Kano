@@ -14,8 +14,10 @@ interface GlobalDeduction {
   amount: number;
   currency: string;
   target: string;
-  status: "PROCESSING" | "COMPLETED" | "FAILED";
+  status: "DRAFT" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED" | string;
   eligibleUsersCount?: number;
+  processedUsersCount?: number;
+  failedUsersCount?: number;
   indebtedUsersCount?: number;
   totalAssessedAmount?: number;
   totalRecoveredAmount?: number;
@@ -86,7 +88,12 @@ export default function GlobalDeductionsPage() {
       if (res.ok && data.success) {
         setDeductions(data.deductions || []);
         if (data.summary) {
-          setSummary(data.summary);
+          setSummary({
+            totalDeductionsExecuted: Number(data.summary.totalDeductionsExecuted) || 0,
+            totalAssessedAmount: Number(data.summary.totalAssessedAmount) || 0,
+            totalRecoveredAmount: Number(data.summary.totalRecoveredAmount) || 0,
+            totalOutstandingAmount: Number(data.summary.totalOutstandingAmount) || 0,
+          });
         }
       } else {
         toast.error(data.error || "Failed to load global deductions");
@@ -119,7 +126,14 @@ export default function GlobalDeductionsPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setPreviewData(data.preview);
+        setPreviewData({
+          eligibleUsersCount: Number(data.preview?.eligibleUsersCount) || 0,
+          sufficientFundsCount: Number(data.preview?.sufficientFundsCount) || 0,
+          indebtedCount: Number(data.preview?.indebtedCount) || 0,
+          totalAssessedAmount: Number(data.preview?.totalAssessedAmount) || 0,
+          totalImmediateRecovery: Number(data.preview?.totalImmediateRecovery) || 0,
+          totalNewOutstandingDebt: Number(data.preview?.totalNewOutstandingDebt) || 0,
+        });
         setModalStep("preview");
       } else {
         toast.error(data.error || "Failed to generate preview");
@@ -185,7 +199,7 @@ export default function GlobalDeductionsPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto font-hanken">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -194,7 +208,7 @@ export default function GlobalDeductionsPage() {
               <span className="material-symbols-outlined text-[24px]">payments</span>
             </div>
             <div>
-              <h1 className={cn("text-xl sm:text-2xl font-black font-hanken tracking-tight", isDark ? "text-white" : "text-gray-900")}>
+              <h1 className={cn("text-xl sm:text-2xl font-black tracking-tight", isDark ? "text-white" : "text-gray-900")}>
                 Global Wallet Deductions
               </h1>
               <p className={cn("text-xs font-semibold mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
@@ -210,7 +224,7 @@ export default function GlobalDeductionsPage() {
             setPreviewData(null);
             setShowModal(true);
           }}
-          className="px-5 py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
+          className="px-5 py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto border-0"
         >
           <span className="material-symbols-outlined text-[18px]">add_circle</span>
           Assess Global Deduction
@@ -221,13 +235,13 @@ export default function GlobalDeductionsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className={cn("p-4 rounded-3xl border transition-all", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200 shadow-xs")}>
           <div className="flex items-center justify-between text-gray-400 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider">Executed Deductions</span>
+            <span className="text-[10px] font-black uppercase tracking-wider">Executed Batches</span>
             <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">verified</span>
           </div>
-          <p className={cn("text-xl sm:text-2xl font-black font-hanken tracking-tight", isDark ? "text-white" : "text-gray-900")}>
-            {summary.totalDeductionsExecuted}
+          <p className={cn("text-xl sm:text-2xl font-black tracking-tight", isDark ? "text-white" : "text-gray-900")}>
+            {(summary?.totalDeductionsExecuted ?? 0).toLocaleString()}
           </p>
-          <span className="text-[10px] text-gray-400 font-semibold mt-1 block">Master Batches Completed</span>
+          <span className="text-[10px] text-gray-400 font-semibold mt-1 block">Master Batches Processed</span>
         </div>
 
         <div className={cn("p-4 rounded-3xl border transition-all", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200 shadow-xs")}>
@@ -235,8 +249,8 @@ export default function GlobalDeductionsPage() {
             <span className="text-[10px] font-black uppercase tracking-wider">Total Assessed</span>
             <span className="material-symbols-outlined text-[20px] text-blue-500">account_balance_wallet</span>
           </div>
-          <p className={cn("text-xl sm:text-2xl font-black font-hanken tracking-tight", isDark ? "text-white" : "text-gray-900")}>
-            ₦{summary.totalAssessedAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          <p className={cn("text-xl sm:text-2xl font-black tracking-tight", isDark ? "text-white" : "text-gray-900")}>
+            ₦{(summary?.totalAssessedAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-gray-400 font-semibold mt-1 block">Total Fee Value Assessed</span>
         </div>
@@ -246,8 +260,8 @@ export default function GlobalDeductionsPage() {
             <span className="text-[10px] font-black uppercase tracking-wider">Recovered Immediately</span>
             <span className="material-symbols-outlined text-[20px] text-emerald-500">price_check</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black font-hanken tracking-tight text-emerald-500">
-            ₦{summary.totalRecoveredAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          <p className="text-xl sm:text-2xl font-black tracking-tight text-emerald-500">
+            ₦{(summary?.totalRecoveredAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-emerald-600/70 font-semibold mt-1 block">Debited directly from balances</span>
         </div>
@@ -257,8 +271,8 @@ export default function GlobalDeductionsPage() {
             <span className="text-[10px] font-black uppercase tracking-wider">Outstanding Debt</span>
             <span className="material-symbols-outlined text-[20px] text-amber-500">pending_actions</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black font-hanken tracking-tight text-amber-500">
-            ₦{summary.totalOutstandingAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          <p className="text-xl sm:text-2xl font-black tracking-tight text-amber-500">
+            ₦{(summary?.totalOutstandingAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-amber-600/70 font-semibold mt-1 block">Pending automatic recovery</span>
         </div>
@@ -275,7 +289,7 @@ export default function GlobalDeductionsPage() {
           </div>
           <button
             onClick={fetchDeductions}
-            className="text-xs font-bold text-[#FC7A00] hover:underline flex items-center gap-1"
+            className="text-xs font-bold text-[#FC7A00] hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0"
           >
             <span className="material-symbols-outlined text-[16px]">refresh</span> Refresh
           </button>
@@ -299,7 +313,7 @@ export default function GlobalDeductionsPage() {
                 <tr className={cn("border-b text-[10px] font-black uppercase tracking-wider text-gray-400", isDark ? "border-gray-800 bg-gray-950/50" : "border-gray-100 bg-gray-50")}>
                   <th className="py-3.5 px-4">Deduction Info</th>
                   <th className="py-3.5 px-4">Rate / User</th>
-                  <th className="py-3.5 px-4">Processed Users</th>
+                  <th className="py-3.5 px-4">Users Breakdown</th>
                   <th className="py-3.5 px-4">Immediate Recovery</th>
                   <th className="py-3.5 px-4">Debt Created</th>
                   <th className="py-3.5 px-4">Status</th>
@@ -307,43 +321,65 @@ export default function GlobalDeductionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-medium">
-                {deductions.map((ded) => (
-                  <tr key={ded.id} className={cn("hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors", isDark ? "text-gray-200" : "text-gray-700")}>
-                    <td className="py-3.5 px-4">
-                      <div className="font-bold text-gray-900 dark:text-white">{ded.name}</div>
-                      <div className="text-[11px] text-gray-400 truncate max-w-xs">{ded.description || ded.deductionId}</div>
-                      <div className="text-[9px] text-gray-400 font-mono mt-0.5">{new Date(ded.createdAt).toLocaleString()}</div>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-gray-900 dark:text-white">
-                      ₦{(ded.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold">
-                      {ded.eligibleUsersCount || 0} users
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-emerald-600">
-                      ₦{(ded.totalRecoveredAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-amber-500">
-                      ₦{(ded.totalOutstandingAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                        ded.status === "COMPLETED" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-                      )}>
-                        {ded.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => handleViewUserRecords(ded)}
-                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
-                      >
-                        User Audit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {deductions.map((ded) => {
+                  const eligible = ded.eligibleUsersCount ?? 0;
+                  const processed = ded.processedUsersCount ?? eligible;
+                  const failed = ded.failedUsersCount ?? 0;
+                  const rate = ded.amount ?? 0;
+                  const recovered = ded.totalRecoveredAmount ?? 0;
+                  const outstanding = ded.totalOutstandingAmount ?? 0;
+
+                  return (
+                    <tr key={ded.id} className={cn("hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors", isDark ? "text-gray-200" : "text-gray-700")}>
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-gray-900 dark:text-white">{ded.name}</div>
+                        <div className="text-[11px] text-gray-400 truncate max-w-xs">{ded.description || "All Active Users"}</div>
+                        <div className="text-[9.5px] text-gray-400 font-mono mt-0.5">
+                          By {ded.createdBy || "Admin"} • {ded.createdAt ? new Date(ded.createdAt).toLocaleString() : "Recently"}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-gray-900 dark:text-white">
+                        ₦{rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-gray-800 dark:text-gray-200">{processed} / {eligible} Processed</div>
+                        {failed > 0 ? (
+                          <span className="text-[10px] font-black text-rose-500">{failed} Failed</span>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-emerald-600">0 Failed</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-emerald-600">
+                        ₦{recovered.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-amber-500">
+                        ₦{outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block",
+                          ded.status === "COMPLETED"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            : ded.status === "PARTIAL"
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
+                            : ded.status === "PROCESSING"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 animate-pulse"
+                            : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
+                        )}>
+                          {ded.status || "COMPLETED"}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => handleViewUserRecords(ded)}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl text-[11px] font-bold transition-all cursor-pointer border-0"
+                        >
+                          User Audit
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -385,7 +421,7 @@ export default function GlobalDeductionsPage() {
 
                 <button
                   onClick={() => setShowModal(false)}
-                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer border-0"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
@@ -443,7 +479,7 @@ export default function GlobalDeductionsPage() {
                     <button
                       type="submit"
                       disabled={isPreviewing}
-                      className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-2 border-0"
                     >
                       {isPreviewing ? (
                         <>
@@ -463,23 +499,23 @@ export default function GlobalDeductionsPage() {
                   {previewData && (
                     <div className="grid grid-cols-2 gap-3 text-center">
                       <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Eligible Users</span>
-                        <span className="text-lg font-black text-gray-900 dark:text-white">{previewData.eligibleUsersCount}</span>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Eligible Active Users</span>
+                        <span className="text-lg font-black text-gray-900 dark:text-white">{(previewData.eligibleUsersCount ?? 0).toLocaleString()}</span>
                       </div>
 
                       <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
                         <span className="text-[10px] text-gray-400 font-bold uppercase block">Max Assessment</span>
-                        <span className="text-lg font-black text-blue-500">₦{previewData.totalAssessedAmount.toLocaleString()}</span>
+                        <span className="text-lg font-black text-blue-500">₦{(previewData.totalAssessedAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
 
                       <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-                        <span className="text-[10px] text-emerald-600 font-bold uppercase block">Sufficient Funds</span>
-                        <span className="text-lg font-black text-emerald-600">{previewData.sufficientFundsCount} users</span>
+                        <span className="text-[10px] text-emerald-600 font-bold uppercase block">Immediate Recovery</span>
+                        <span className="text-lg font-black text-emerald-600">₦{(previewData.totalImmediateRecovery ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
 
                       <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-2xl border border-amber-100 dark:border-amber-900/30">
-                        <span className="text-[10px] text-amber-600 font-bold uppercase block">New Indebted Users</span>
-                        <span className="text-lg font-black text-amber-600">{previewData.indebtedCount} users</span>
+                        <span className="text-[10px] text-amber-600 font-bold uppercase block">New Debt Created</span>
+                        <span className="text-lg font-black text-amber-600">₦{(previewData.totalNewOutstandingDebt ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   )}
@@ -487,10 +523,10 @@ export default function GlobalDeductionsPage() {
                   <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-2xl text-left space-y-1">
                     <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-black text-xs uppercase">
                       <span className="material-symbols-outlined text-[16px]">warning</span>
-                      Atomic Debit & Recovery Warning
+                      Atomic Debit & Debt Recovery Warning
                     </div>
                     <p className="text-[11px] text-amber-800 dark:text-amber-300 font-semibold leading-relaxed">
-                      Executing this deduction will debit <strong>₦{Number(amount).toLocaleString()}</strong> from all active users. Users with insufficient balance will enter an <strong>Outstanding Debt</strong> state and will be automatically debited upon their next wallet deposit.
+                      Executing this deduction will debit <strong>₦{(Number(amount) || 0).toLocaleString()}</strong> from all active users. Users with insufficient balance will enter an <strong>Outstanding Debt</strong> state and will be automatically debited upon their next wallet deposit.
                     </p>
                   </div>
 
@@ -498,7 +534,7 @@ export default function GlobalDeductionsPage() {
                     <button
                       type="button"
                       onClick={() => setModalStep("form")}
-                      className="py-3.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
+                      className="py-3.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0"
                     >
                       ← Back to Form
                     </button>
@@ -507,7 +543,7 @@ export default function GlobalDeductionsPage() {
                       type="button"
                       disabled={isExecuting}
                       onClick={handleExecute}
-                      className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 border-0"
                     >
                       {isExecuting ? (
                         <>
@@ -553,13 +589,13 @@ export default function GlobalDeductionsPage() {
                     User Audit Log: {selectedDeduction.name}
                   </h3>
                   <p className="text-[11px] text-gray-400 font-semibold">
-                    ID: {selectedDeduction.deductionId} | Rate: ₦{selectedDeduction.amount.toLocaleString()}
+                    ID: {selectedDeduction.deductionId} | Rate: ₦{(selectedDeduction.amount ?? 0).toLocaleString()}
                   </p>
                 </div>
 
                 <button
                   onClick={() => setSelectedDeduction(null)}
-                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer border-0"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
@@ -582,30 +618,40 @@ export default function GlobalDeductionsPage() {
                           <th className="py-2.5 px-3">Assessed</th>
                           <th className="py-2.5 px-3">Recovered</th>
                           <th className="py-2.5 px-3">Outstanding Debt</th>
-                          <th className="py-2.5 px-3">Balance After</th>
+                          <th className="py-2.5 px-3">Net Position After</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-medium">
-                        {userRecords.map((ur) => (
-                          <tr key={ur.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                            <td className="py-2.5 px-3">
-                              <div className="font-bold text-gray-900 dark:text-white">{ur.userName}</div>
-                              <div className="text-[10px] text-gray-400">{ur.userEmail || ur.userPhone}</div>
-                            </td>
-                            <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
-                              ₦{(ur.amountAssessed || 0).toLocaleString()}
-                            </td>
-                            <td className="py-2.5 px-3 font-bold text-emerald-600">
-                              ₦{(ur.amountRecovered || 0).toLocaleString()}
-                            </td>
-                            <td className="py-2.5 px-3 font-bold text-amber-500">
-                              ₦{(ur.amountOutstanding || 0).toLocaleString()}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono font-bold text-gray-700 dark:text-gray-300">
-                              ₦{(ur.walletBalanceAfter || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
+                        {userRecords.map((ur) => {
+                          const assessed = ur.amountAssessed ?? 0;
+                          const recovered = ur.amountRecovered ?? 0;
+                          const outstanding = ur.amountOutstanding ?? 0;
+                          const balAfter = ur.walletBalanceAfter ?? 0;
+                          const netAfter = balAfter - outstanding;
+
+                          return (
+                            <tr key={ur.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                              <td className="py-2.5 px-3">
+                                <div className="font-bold text-gray-900 dark:text-white">{ur.userName || "User"}</div>
+                                <div className="text-[10px] text-gray-400">{ur.userEmail || ur.userPhone || ur.userId}</div>
+                              </td>
+                              <td className="py-2.5 px-3 font-semibold text-gray-800 dark:text-gray-200">
+                                ₦{assessed.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-emerald-600">
+                                ₦{recovered.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-amber-500">
+                                ₦{outstanding.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono font-bold">
+                                <span className={netAfter < 0 ? "text-rose-500" : "text-emerald-600"}>
+                                  ₦{netAfter.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
