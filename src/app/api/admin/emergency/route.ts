@@ -1,0 +1,81 @@
+import { NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
+import { verifyAdminAuth } from "@/lib/auth-util";
+
+export async function GET(req: Request) {
+  try {
+    const authResult = await verifyAdminAuth(req);
+    if (!authResult.authorized) {
+      return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: 401 });
+    }
+
+    const docSnap = await adminDb.collection("config").doc("emergency_broadcast").get();
+    const data = docSnap.exists ? docSnap.data() || {} : {};
+
+    return NextResponse.json({
+      success: true,
+      broadcast: {
+        active: Boolean(data.active),
+        title: data.title || "",
+        message: data.message || "",
+        urgency: data.urgency || "warning",
+        badge: data.badge || "EMERGENCY BROADCAST",
+        icon: data.icon || "campaign",
+        updatedAt: data.updatedAt || new Date().toISOString(),
+        updatedBy: data.updatedBy || "System Admin",
+      },
+    });
+  } catch (err: any) {
+    console.error("[Admin Emergency GET Error]:", err.message);
+    return NextResponse.json({ error: err.message || "Failed to fetch broadcast settings" }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const authResult = await verifyAdminAuth(req);
+    if (!authResult.authorized) {
+      return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { active, title, message, urgency, badge, icon } = body;
+
+    const updatedAt = new Date().toISOString();
+    const updatedBy = authResult.email || "System Admin";
+
+    const broadcastData = {
+      active: Boolean(active),
+      title: (title || "").trim(),
+      message: (message || "").trim(),
+      urgency: urgency || "warning",
+      badge: (badge || "EMERGENCY BROADCAST").trim().toUpperCase(),
+      icon: icon || "campaign",
+      updatedAt,
+      updatedBy,
+    };
+
+    await adminDb.collection("config").doc("emergency_broadcast").set(broadcastData, { merge: true });
+
+    // Also write audit log
+    try {
+      await adminDb.collection("admin_audit_logs").add({
+        action: "emergency_broadcast_update",
+        adminEmail: updatedBy,
+        details: broadcastData,
+        timestamp: updatedAt,
+      });
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      message: active
+        ? "Emergency broadcast published live across user wallet dashboards!"
+        : "Emergency broadcast disabled.",
+      broadcast: broadcastData,
+    });
+  } catch (err: any) {
+    console.error("[Admin Emergency POST Error]:", err.message);
+    return NextResponse.json({ error: err.message || "Failed to save emergency broadcast" }, { status: 500 });
+  }
+}
