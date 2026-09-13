@@ -22,9 +22,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Maximum single global deduction amount cannot exceed ₦100,000." }, { status: 400 });
     }
 
-    // Fetch user counts and inspect balances using the exact same active user filter and minor units math
-    const usersSnap = await adminDb.collection("users").get();
-    const totalUsers = usersSnap.size;
+    // Fetch user counts using indexed status == "active" query for high read efficiency
+    const activeQuerySnap = await adminDb.collection("users").where("status", "==", "active").get();
+    const totalUsers = activeQuerySnap.size;
 
     let eligibleUsersCount = 0;
     let sufficientFundsCount = 0;
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
     const dedMinor = toMinorUnits(parsedAmount);
 
-    usersSnap.forEach((doc) => {
+    activeQuerySnap.forEach((doc) => {
       const uData = doc.data() || {};
       if (!isActiveUser(uData)) return;
 

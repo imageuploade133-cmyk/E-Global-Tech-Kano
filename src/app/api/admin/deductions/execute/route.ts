@@ -94,13 +94,7 @@ export async function POST(req: Request) {
 
     // Query active users using Firestore index where status == "active"
     const activeQuerySnap = await adminDb.collection("users").where("status", "==", "active").get();
-    let activeUserDocs = activeQuerySnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
-
-    // Fallback: If no users have status == "active", load users safely
-    if (activeUserDocs.length === 0) {
-      const allUsersSnap = await adminDb.collection("users").get();
-      activeUserDocs = allUsersSnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
-    }
+    const activeUserDocs = activeQuerySnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
 
     const totalEligibleCount = activeUserDocs.length;
     let failedUsersCount = 0;
@@ -110,8 +104,23 @@ export async function POST(req: Request) {
     for (let i = 0; i < activeUserDocs.length; i += 25) {
       const chunk = activeUserDocs.slice(i, i + 25);
 
-      // Periodically renew worker lock lease during long operations
-      await deductionRef.set({ updatedAt: new Date().toISOString() }, { merge: true });
+      // Periodically renew worker lock lease during long operations atomically inside a transaction
+      const renewResult = await adminDb.runTransaction(async (transaction) => {
+        const masterSnap = await transaction.get(deductionRef);
+        if (masterSnap.exists) {
+          const masterData = masterSnap.data() || {};
+          if (masterData.status === "PROCESSING" && masterData.processingToken === workerToken) {
+            transaction.set(deductionRef, { updatedAt: new Date().toISOString() }, { merge: true });
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (!renewResult) {
+        console.warn(`[Global Deduction Worker Lease Lost]: Worker ${workerToken} lost lease ownership during chunk iteration.`);
+        break;
+      }
 
       await Promise.all(
         chunk.map(async (uDoc) => {
