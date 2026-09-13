@@ -112,6 +112,15 @@ export async function POST(req: Request) {
 
           try {
             await adminDb.runTransaction(async (transaction) => {
+              // WORKER LEASE ENFORCEMENT: Verify this worker still owns master lock
+              const masterSnap = await transaction.get(deductionRef);
+              if (masterSnap.exists) {
+                const masterData = masterSnap.data() || {};
+                if (masterData.processingToken && masterData.processingToken !== workerToken) {
+                  throw new Error(`Worker lost lock lease for deduction ${deductionId}. Active worker token: ${masterData.processingToken}`);
+                }
+              }
+
               // 1. Idempotency Check: Read user_deductions record first inside transaction
               const userDedSnap = await transaction.get(userDeductionRef);
               if (userDedSnap.exists && userDedSnap.data()?.status === "APPLIED") {
@@ -135,18 +144,23 @@ export async function POST(req: Request) {
               if (!isActiveUser(uData)) return;
 
               const rawBal = walletSnap.exists ? Number(walletSnap.data()?.balance) : 0;
-              const rawDebt = Number(uData.outstandingDebt);
+              const debtVal = uData.outstandingDebt;
 
               // DATA INTEGRITY FAIL-CLOSED: Reject invalid, NaN, or infinite balances
               if (isNaN(rawBal) || !isFinite(rawBal) || rawBal < 0) {
                 throw new Error(`Invalid wallet balance (${rawBal}) detected for user ${userId}. Failing closed.`);
               }
-              if (!isNaN(rawDebt) && (!isFinite(rawDebt) || rawDebt < 0)) {
-                throw new Error(`Invalid outstanding debt (${rawDebt}) detected for user ${userId}. Failing closed.`);
+
+              let currentDebt = 0;
+              if (debtVal !== undefined && debtVal !== null) {
+                const parsedDebt = Number(debtVal);
+                if (isNaN(parsedDebt) || !isFinite(parsedDebt) || parsedDebt < 0) {
+                  throw new Error(`Invalid/corrupted outstanding debt (${debtVal}) detected for user ${userId}. Failing closed.`);
+                }
+                currentDebt = parsedDebt;
               }
 
               const currentWalletBalance = rawBal;
-              const currentDebt = isNaN(rawDebt) ? 0 : rawDebt;
 
               // Integer minor units calculation
               const calc = calculateUserDeduction(currentWalletBalance, currentDebt, parsedAmount);
@@ -278,18 +292,32 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // Atomic Finalization: Ensure stale worker cannot overwrite a COMPLETED status set by a newer worker
-    await adminDb.runTransaction(async (transaction) => {
+    // WORKER FINALIZATION: Only current owner worker Token can finalize master record
+    const finalizationResult = await adminDb.runTransaction(async (transaction) => {
       const docSnap = await transaction.get(deductionRef);
       if (docSnap.exists) {
         const d = docSnap.data() || {};
-        if (d.status === "COMPLETED" && finalStatus === "PARTIAL") {
-          // Keep completed state
-          return;
+
+        // If master is already COMPLETED, keep completed state
+        if (d.status === "COMPLETED") {
+          return { finalized: true, status: "COMPLETED" };
+        }
+
+        // Verify token ownership
+        if (d.processingToken && d.processingToken !== workerToken) {
+          return { finalized: false, reason: "LOST_OWNERSHIP", activeToken: d.processingToken };
         }
       }
+
       transaction.set(deductionRef, summaryData, { merge: true });
+      return { finalized: true, status: finalStatus };
     });
+
+    if (!finalizationResult.finalized) {
+      return NextResponse.json({
+        error: "Worker lost lock lease ownership before finalization.",
+      }, { status: 409 });
+    }
 
     // Reliable Non-silent Audit Log
     try {

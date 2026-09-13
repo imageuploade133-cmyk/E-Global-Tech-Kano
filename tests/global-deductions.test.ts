@@ -118,4 +118,77 @@ describe("Production-Ready Global Wallet Deductions & Debt Recovery Architecture
     expect(isActiveUser({ status: "DELETED" })).toBe(false);
     expect(isActiveUser({ status: "CLOSED" })).toBe(false);
   });
+
+  // Test 9: Data Integrity Fail-Closed Validation
+  test("Test 9: Fail-closed debt validation rejects malformed non-numeric or negative debt values", () => {
+    const validateDebt = (debtVal: any) => {
+      let currentDebt = 0;
+      if (debtVal !== undefined && debtVal !== null) {
+        const parsedDebt = Number(debtVal);
+        if (isNaN(parsedDebt) || !isFinite(parsedDebt) || parsedDebt < 0) {
+          throw new Error(`Invalid/corrupted outstanding debt (${debtVal}) detected. Failing closed.`);
+        }
+        currentDebt = parsedDebt;
+      }
+      return currentDebt;
+    };
+
+    expect(validateDebt(undefined)).toBe(0);
+    expect(validateDebt(null)).toBe(0);
+    expect(validateDebt(50)).toBe(50);
+    expect(validateDebt("100")).toBe(100);
+
+    expect(() => validateDebt("invalid_string")).toThrow("Failing closed");
+    expect(() => validateDebt(NaN)).toThrow("Failing closed");
+    expect(() => validateDebt(-50)).toThrow("Failing closed");
+    expect(() => validateDebt(Infinity)).toThrow("Failing closed");
+  });
+
+  // Test 10: Worker Token Lease & Master Finalization Ownership Simulation
+  test("Test 10: Worker A loses lease when Worker B reclaims token B, blocking Worker A finalization", () => {
+    let masterRecord = {
+      deductionId: "DED-001",
+      status: "PROCESSING",
+      processingToken: "wrk_token_A",
+    };
+
+    const attemptPerUserProcessing = (workerToken: string) => {
+      if (masterRecord.processingToken !== workerToken) {
+        throw new Error(`Worker ${workerToken} lost lock lease. Active token: ${masterRecord.processingToken}`);
+      }
+      return "USER_PROCESSED";
+    };
+
+    const attemptFinalization = (workerToken: string, targetStatus: string) => {
+      if (masterRecord.status === "COMPLETED") {
+        return { finalized: true, status: "COMPLETED" };
+      }
+      if (masterRecord.processingToken !== workerToken) {
+        return { finalized: false, reason: "LOST_OWNERSHIP" };
+      }
+      masterRecord.status = targetStatus;
+      return { finalized: true, status: targetStatus };
+    };
+
+    // Worker A processes user 1
+    expect(attemptPerUserProcessing("wrk_token_A")).toBe("USER_PROCESSED");
+
+    // Worker B reclaims lease after lease expiry
+    masterRecord.processingToken = "wrk_token_B";
+
+    // Worker A attempts to process user 2 -> FAILS
+    expect(() => attemptPerUserProcessing("wrk_token_A")).toThrow("lost lock lease");
+
+    // Worker A attempts to finalize -> FAILS
+    const resA = attemptFinalization("wrk_token_A", "PARTIAL");
+    expect(resA.finalized).toBe(false);
+    expect(resA.reason).toBe("LOST_OWNERSHIP");
+
+    // Worker B processes user 2 and finalizes -> SUCCEEDS
+    expect(attemptPerUserProcessing("wrk_token_B")).toBe("USER_PROCESSED");
+    const resB = attemptFinalization("wrk_token_B", "COMPLETED");
+    expect(resB.finalized).toBe(true);
+    expect(resB.status).toBe("COMPLETED");
+    expect(masterRecord.status).toBe("COMPLETED");
+  });
 });
