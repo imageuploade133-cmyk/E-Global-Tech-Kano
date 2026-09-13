@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { FieldValue } from "firebase-admin/firestore";
-import { toMinorUnits, toMajorUnits, calculateUserDeduction } from "@/lib/monetary-util";
-import { isActiveUser } from "@/lib/monetary-util";
+import { toMinorUnits, toMajorUnits, calculateUserDeduction, isActiveUser } from "@/lib/monetary-util";
 
 export async function POST(req: Request) {
   try {
@@ -33,24 +32,32 @@ export async function POST(req: Request) {
 
     const deductionRef = adminDb.collection("global_deductions").doc(deductionId);
 
-    // Atomic State Transition & Concurrency Lock Check inside transaction
+    // Atomic Lock & Immutability Check inside transaction
     const lockResult = await adminDb.runTransaction(async (transaction) => {
       const docSnap = await transaction.get(deductionRef);
+      const nowIso = new Date().toISOString();
+
       if (docSnap.exists) {
         const d = docSnap.data() || {};
+
+        // 1. Immutability Check: Once created, amount, currency, target CANNOT be modified
+        if (d.amount !== undefined && toMinorUnits(d.amount) !== toMinorUnits(parsedAmount)) {
+          throw new Error(`Cannot modify amount of existing deduction ${deductionId}. Original amount: ₦${d.amount}`);
+        }
+
         if (d.status === "COMPLETED") {
           return { status: "ALREADY_COMPLETED", data: d };
         }
-        if (d.status === "PROCESSING") {
-          return { status: "ALREADY_PROCESSING", data: d };
-        }
-        // Immutable parameters check
-        if (d.amount !== undefined && toMinorUnits(d.amount) !== toMinorUnits(parsedAmount)) {
-          throw new Error("Cannot alter original immutable deduction amount once created.");
+
+        // 2. Concurrency Lock: If PROCESSING and updatedAt is < 2 minutes old, block concurrent executions
+        if (d.status === "PROCESSING" && d.updatedAt) {
+          const ageMs = Date.now() - new Date(d.updatedAt).getTime();
+          if (ageMs < 2 * 60 * 1000) {
+            return { status: "ALREADY_PROCESSING", data: d };
+          }
         }
       }
 
-      const nowIso = new Date().toISOString();
       const initialData = {
         deductionId,
         name: (name || "Maintenance Fee").trim(),
@@ -79,7 +86,7 @@ export async function POST(req: Request) {
 
     if (lockResult.status === "ALREADY_PROCESSING") {
       return NextResponse.json({
-        error: "This global deduction is currently being processed by another administrator request.",
+        error: "This global deduction is currently being processed by another active request.",
       }, { status: 409 });
     }
 
@@ -88,14 +95,7 @@ export async function POST(req: Request) {
     const activeUserDocs = usersSnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
     const totalEligibleCount = activeUserDocs.length;
 
-    let processedUsersCount = 0;
     let failedUsersCount = 0;
-
-    let totalAssessedMinor = 0;
-    let totalRecoveredMinor = 0;
-    let totalOutstandingMinor = 0;
-    let indebtedUsersCount = 0;
-
     const nowIso = new Date().toISOString();
 
     // Process users in batch chunks of 25 users
@@ -113,12 +113,7 @@ export async function POST(req: Request) {
               // 1. Idempotency Check: Read user_deductions record first inside transaction
               const userDedSnap = await transaction.get(userDeductionRef);
               if (userDedSnap.exists && userDedSnap.data()?.status === "APPLIED") {
-                const dData = userDedSnap.data() || {};
-                processedUsersCount++;
-                totalAssessedMinor += toMinorUnits(dData.amountAssessed);
-                totalRecoveredMinor += toMinorUnits(dData.amountRecovered);
-                totalOutstandingMinor += toMinorUnits(dData.amountOutstanding);
-                if (toMinorUnits(dData.amountOutstanding) > 0) indebtedUsersCount++;
+                // Already processed for this user - do nothing inside transaction
                 return;
               }
 
@@ -134,6 +129,7 @@ export async function POST(req: Request) {
               if (!userSnap.exists) return;
               const uData = userSnap.data() || {};
 
+              // Re-check active user status inside per-user transaction
               if (!isActiveUser(uData)) return;
 
               const currentWalletBalance = walletSnap.exists ? (Number(walletSnap.data()?.balance) || 0) : 0;
@@ -209,12 +205,6 @@ export async function POST(req: Request) {
                   netPositionAfter: calc.netBalanceAfter,
                 },
               });
-
-              processedUsersCount++;
-              totalAssessedMinor += toMinorUnits(calc.amountAssessed);
-              totalRecoveredMinor += toMinorUnits(calc.amountRecovered);
-              totalOutstandingMinor += toMinorUnits(calc.amountOutstanding);
-              if (calc.amountOutstanding > 0) indebtedUsersCount++;
             });
           } catch (txErr: any) {
             console.error(`[Global Deduction Transaction Error for User ${userId}]:`, txErr.message);
@@ -223,6 +213,36 @@ export async function POST(req: Request) {
         })
       );
     }
+
+    // Compute master totals by querying committed user_deductions documents to ensure transaction retries never inflate metrics
+    const userDeductionsSnap = await adminDb
+      .collection("user_deductions")
+      .where("deductionId", "==", deductionId)
+      .get();
+
+    let processedUsersCount = 0;
+    let indebtedUsersCount = 0;
+    let totalAssessedMinor = 0;
+    let totalRecoveredMinor = 0;
+    let totalOutstandingMinor = 0;
+
+    userDeductionsSnap.forEach((doc) => {
+      const dData = doc.data() || {};
+      if (dData.status === "APPLIED") {
+        processedUsersCount++;
+        const assessed = toMinorUnits(dData.amountAssessed);
+        const recovered = toMinorUnits(dData.amountRecovered);
+        const outstanding = toMinorUnits(dData.amountOutstanding);
+
+        totalAssessedMinor += assessed;
+        totalRecoveredMinor += recovered;
+        totalOutstandingMinor += outstanding;
+
+        if (outstanding > 0) {
+          indebtedUsersCount++;
+        }
+      }
+    });
 
     const finalStatus = (failedUsersCount === 0 && processedUsersCount >= totalEligibleCount)
       ? "COMPLETED"
@@ -247,7 +267,7 @@ export async function POST(req: Request) {
 
     await deductionRef.set(summaryData, { merge: true });
 
-    // Non-silent Audit Log
+    // Reliable Non-silent Audit Log
     try {
       await adminDb.collection("admin_audit_logs").add({
         action: "global_wallet_deduction_executed",
