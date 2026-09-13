@@ -319,21 +319,28 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // WORKER FINALIZATION: Only current owner worker Token can finalize master record
+    // STRICT WORKER FINALIZATION: Atomically requires BOTH d.status === "PROCESSING" AND d.processingToken === workerToken
     const finalizationResult = await adminDb.runTransaction(async (transaction) => {
       const docSnap = await transaction.get(deductionRef);
-      if (docSnap.exists) {
-        const d = docSnap.data() || {};
+      if (!docSnap.exists) {
+        return { finalized: false, reason: "MASTER_DOC_MISSING" };
+      }
 
-        // If master is already COMPLETED, keep completed state
-        if (d.status === "COMPLETED") {
-          return { finalized: true, status: "COMPLETED" };
-        }
+      const d = docSnap.data() || {};
 
-        // Verify token ownership
-        if (d.processingToken && d.processingToken !== workerToken) {
-          return { finalized: false, reason: "LOST_OWNERSHIP", activeToken: d.processingToken };
-        }
+      // If already COMPLETED by this exact worker, allow idempotent completion return
+      if (d.status === "COMPLETED" && d.processingToken === workerToken) {
+        return { finalized: true, status: "COMPLETED" };
+      }
+
+      // Mandatory check: Must be in "PROCESSING" state AND processingToken must match current workerToken exactly
+      if (d.status !== "PROCESSING" || !d.processingToken || d.processingToken !== workerToken) {
+        return {
+          finalized: false,
+          reason: "LOST_OWNERSHIP",
+          currentStatus: d.status,
+          activeToken: d.processingToken,
+        };
       }
 
       transaction.set(deductionRef, summaryData, { merge: true });

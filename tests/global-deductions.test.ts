@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   toMinorUnits,
+  toMinorUnitsStrict,
   toMajorUnits,
   calculateNetBalance,
   calculateSpendableBalance,
@@ -144,7 +145,7 @@ describe("Production-Ready Global Wallet Deductions & Debt Recovery Architecture
     expect(() => validateDebt(Infinity)).toThrow("Failing closed");
   });
 
-  // Test 10: Worker Token Lease & Master Finalization Ownership Simulation
+  // Test 10: Worker Token Lease & Strict Finalization Simulation
   test("Test 10: Worker A loses lease when Worker B reclaims token B, blocking Worker A finalization", () => {
     let masterRecord = {
       deductionId: "DED-001",
@@ -159,11 +160,11 @@ describe("Production-Ready Global Wallet Deductions & Debt Recovery Architecture
       return "USER_PROCESSED";
     };
 
-    const attemptFinalization = (workerToken: string, targetStatus: string) => {
-      if (masterRecord.status === "COMPLETED") {
+    const attemptStrictFinalization = (workerToken: string, targetStatus: string) => {
+      if (masterRecord.status === "COMPLETED" && masterRecord.processingToken === workerToken) {
         return { finalized: true, status: "COMPLETED" };
       }
-      if (masterRecord.processingToken !== workerToken) {
+      if (masterRecord.status !== "PROCESSING" || !masterRecord.processingToken || masterRecord.processingToken !== workerToken) {
         return { finalized: false, reason: "LOST_OWNERSHIP" };
       }
       masterRecord.status = targetStatus;
@@ -179,16 +180,44 @@ describe("Production-Ready Global Wallet Deductions & Debt Recovery Architecture
     // Worker A attempts to process user 2 -> FAILS
     expect(() => attemptPerUserProcessing("wrk_token_A")).toThrow("lost lock lease");
 
-    // Worker A attempts to finalize -> FAILS
-    const resA = attemptFinalization("wrk_token_A", "PARTIAL");
+    // Worker A attempts to finalize -> FAILS strictly
+    const resA = attemptStrictFinalization("wrk_token_A", "PARTIAL");
     expect(resA.finalized).toBe(false);
     expect(resA.reason).toBe("LOST_OWNERSHIP");
 
     // Worker B processes user 2 and finalizes -> SUCCEEDS
     expect(attemptPerUserProcessing("wrk_token_B")).toBe("USER_PROCESSED");
-    const resB = attemptFinalization("wrk_token_B", "COMPLETED");
+    const resB = attemptStrictFinalization("wrk_token_B", "COMPLETED");
     expect(resB.finalized).toBe(true);
     expect(resB.status).toBe("COMPLETED");
     expect(masterRecord.status).toBe("COMPLETED");
+  });
+
+  // Test 11: Missing Wallet Document Fails Closed
+  test("Test 11: Missing wallet document throws data integrity error and fails closed", () => {
+    const processUser = (hasWalletDoc: boolean, walletBal?: number) => {
+      if (!hasWalletDoc || walletBal === undefined) {
+        throw new Error("[Data Integrity Error] Missing authoritative wallet document (wallets/user123_NGN). Failing closed.");
+      }
+      return toMinorUnitsStrict(walletBal, "Wallet Balance");
+    };
+
+    expect(() => processUser(false)).toThrow("Failing closed");
+    expect(processUser(true, 100)).toBe(10000);
+  });
+
+  // Test 12: Strict Worker Finalization fails on missing token or non-PROCESSING status
+  test("Test 12: Strict Worker Finalization rejects missing token or non-PROCESSING status", () => {
+    const checkFinalization = (status: string, token: string | null, workerToken: string) => {
+      if (status !== "PROCESSING" || !token || token !== workerToken) {
+        return { finalized: false, reason: "LOST_OWNERSHIP" };
+      }
+      return { finalized: true };
+    };
+
+    expect(checkFinalization("COMPLETED", "wrk_123", "wrk_123").finalized).toBe(false);
+    expect(checkFinalization("PROCESSING", null, "wrk_123").finalized).toBe(false);
+    expect(checkFinalization("PROCESSING", "wrk_other", "wrk_123").finalized).toBe(false);
+    expect(checkFinalization("PROCESSING", "wrk_123", "wrk_123").finalized).toBe(true);
   });
 });
