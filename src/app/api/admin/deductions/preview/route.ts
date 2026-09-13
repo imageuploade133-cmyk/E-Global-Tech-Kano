@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-import { toMinorUnits, toMajorUnits, calculateNetBalance, isActiveUser } from "@/lib/monetary-util";
+import { toMinorUnitsStrict, toMajorUnits, calculateNetBalance, isActiveUser } from "@/lib/monetary-util";
 
 export async function POST(req: Request) {
   try {
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { name, description, amount } = body;
 
-    const parsedAmount = toMajorUnits(toMinorUnits(amount));
+    const parsedAmount = toMajorUnits(toMinorUnitsStrict(amount, "Deduction Amount"));
     if (parsedAmount <= 0) {
       return NextResponse.json({ error: "Deduction amount must be a positive number greater than 0." }, { status: 400 });
     }
@@ -22,9 +22,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Maximum single global deduction amount cannot exceed ₦100,000." }, { status: 400 });
     }
 
-    // Fetch user counts using indexed status == "active" query for high read efficiency
-    const activeQuerySnap = await adminDb.collection("users").where("status", "==", "active").get();
-    const totalUsers = activeQuerySnap.size;
+    // Legacy migration compatibility query: Query active users safely using status == "active"
+    // Also include legacy users where status is undefined or missing without loading full users collection
+    const [activeQuerySnap, noStatusQuerySnap] = await Promise.all([
+      adminDb.collection("users").where("status", "==", "active").get(),
+      adminDb.collection("users").where("status", "==", null).get(),
+    ]);
+
+    // Merge doc arrays maintaining map uniqueness
+    const userMap = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    activeQuerySnap.docs.forEach((d) => userMap.set(d.id, d));
+    noStatusQuerySnap.docs.forEach((d) => userMap.set(d.id, d));
+
+    const candidateDocs = Array.from(userMap.values());
+    const totalUsers = candidateDocs.length;
+
+    // Batch query authoritative wallet documents (wallets/{userId}_NGN) in chunks of 100 to align balance source with execute
+    const walletDocRefs = candidateDocs.map((doc) => adminDb.collection("wallets").doc(`${doc.id}_NGN`));
+    const walletSnapsMap = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+
+    for (let i = 0; i < walletDocRefs.length; i += 100) {
+      const chunkRefs = walletDocRefs.slice(i, i + 100);
+      if (chunkRefs.length > 0) {
+        const snaps = await adminDb.getAll(...chunkRefs);
+        snaps.forEach((s) => walletSnapsMap.set(s.id, s));
+      }
+    }
 
     let eligibleUsersCount = 0;
     let sufficientFundsCount = 0;
@@ -32,19 +55,28 @@ export async function POST(req: Request) {
     let totalImmediateRecoveryMinor = 0;
     let totalNewOutstandingDebtMinor = 0;
 
-    const dedMinor = toMinorUnits(parsedAmount);
+    const dedMinor = toMinorUnitsStrict(parsedAmount, "Deduction Amount");
 
-    activeQuerySnap.forEach((doc) => {
+    candidateDocs.forEach((doc) => {
       const uData = doc.data() || {};
       if (!isActiveUser(uData)) return;
 
       eligibleUsersCount++;
 
-      const walletBal = Number(uData.balance) || 0;
-      const debt = Math.max(0, Number(uData.outstandingDebt) || 0);
+      const walletSnap = walletSnapsMap.get(`${doc.id}_NGN`);
+      const rawBal = walletSnap && walletSnap.exists ? walletSnap.data()?.balance : uData.balance;
+      const debtVal = uData.outstandingDebt;
 
-      const balMinor = toMinorUnits(walletBal);
-      const debtMinor = toMinorUnits(debt);
+      // FAIL-CLOSED DATA INTEGRITY VALIDATION: Reject malformed, negative, NaN, or non-numeric balances or debt
+      const balMinor = toMinorUnitsStrict(rawBal, `Wallet Balance for user ${doc.id}`);
+
+      let debtMinor = 0;
+      if (debtVal !== undefined && debtVal !== null && debtVal !== "") {
+        debtMinor = toMinorUnitsStrict(debtVal, `Outstanding Debt for user ${doc.id}`);
+      }
+
+      const walletBal = toMajorUnits(balMinor);
+      const debt = toMajorUnits(debtMinor);
 
       const recoverMinor = Math.min(balMinor, dedMinor);
       const newDebtCreatedMinor = dedMinor - recoverMinor;
