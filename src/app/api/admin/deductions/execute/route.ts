@@ -26,13 +26,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Maximum single global deduction amount cannot exceed ₦100,000." }, { status: 400 });
     }
 
-    // Deterministic immutable deduction ID for idempotency
+    // Deterministic immutable deduction ID & unique worker token for safe lock recovery
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const deductionId = clientDeductionId || `DED-${todayStr}-${Date.now().toString().slice(-4)}`;
+    const workerToken = `wrk_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
     const deductionRef = adminDb.collection("global_deductions").doc(deductionId);
 
-    // Atomic Lock & Immutability Check inside transaction
+    // Atomic Lock, Immutability & Processing Token Lease
     const lockResult = await adminDb.runTransaction(async (transaction) => {
       const docSnap = await transaction.get(deductionRef);
       const nowIso = new Date().toISOString();
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
       if (docSnap.exists) {
         const d = docSnap.data() || {};
 
-        // 1. Immutability Check: Once created, amount, currency, target CANNOT be modified
+        // 1. Immutability Check: Amount, currency, and target cannot be altered once created
         if (d.amount !== undefined && toMinorUnits(d.amount) !== toMinorUnits(parsedAmount)) {
           throw new Error(`Cannot modify amount of existing deduction ${deductionId}. Original amount: ₦${d.amount}`);
         }
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
           return { status: "ALREADY_COMPLETED", data: d };
         }
 
-        // 2. Concurrency Lock: If PROCESSING and updatedAt is < 2 minutes old, block concurrent executions
+        // 2. Concurrency Lock: If PROCESSING and lease is active (< 2 minutes), reject parallel execution
         if (d.status === "PROCESSING" && d.updatedAt) {
           const ageMs = Date.now() - new Date(d.updatedAt).getTime();
           if (ageMs < 2 * 60 * 1000) {
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
         currency: "NGN",
         target: "All Active Users",
         status: "PROCESSING",
+        processingToken: workerToken,
         createdBy: adminEmail,
         createdByUid: adminUid,
         createdAt: docSnap.exists ? docSnap.data()?.createdAt : nowIso,
@@ -132,8 +134,19 @@ export async function POST(req: Request) {
               // Re-check active user status inside per-user transaction
               if (!isActiveUser(uData)) return;
 
-              const currentWalletBalance = walletSnap.exists ? (Number(walletSnap.data()?.balance) || 0) : 0;
-              const currentDebt = Math.max(0, Number(uData.outstandingDebt) || 0);
+              const rawBal = walletSnap.exists ? Number(walletSnap.data()?.balance) : 0;
+              const rawDebt = Number(uData.outstandingDebt);
+
+              // DATA INTEGRITY FAIL-CLOSED: Reject invalid, NaN, or infinite balances
+              if (isNaN(rawBal) || !isFinite(rawBal) || rawBal < 0) {
+                throw new Error(`Invalid wallet balance (${rawBal}) detected for user ${userId}. Failing closed.`);
+              }
+              if (!isNaN(rawDebt) && (!isFinite(rawDebt) || rawDebt < 0)) {
+                throw new Error(`Invalid outstanding debt (${rawDebt}) detected for user ${userId}. Failing closed.`);
+              }
+
+              const currentWalletBalance = rawBal;
+              const currentDebt = isNaN(rawDebt) ? 0 : rawDebt;
 
               // Integer minor units calculation
               const calc = calculateUserDeduction(currentWalletBalance, currentDebt, parsedAmount);
@@ -265,7 +278,18 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    await deductionRef.set(summaryData, { merge: true });
+    // Atomic Finalization: Ensure stale worker cannot overwrite a COMPLETED status set by a newer worker
+    await adminDb.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(deductionRef);
+      if (docSnap.exists) {
+        const d = docSnap.data() || {};
+        if (d.status === "COMPLETED" && finalStatus === "PARTIAL") {
+          // Keep completed state
+          return;
+        }
+      }
+      transaction.set(deductionRef, summaryData, { merge: true });
+    });
 
     // Reliable Non-silent Audit Log
     try {
