@@ -4,6 +4,7 @@ import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
 
 import React, { useState, useEffect } from "react";
+import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
@@ -395,50 +396,45 @@ function CpanelKycPageContent() {
 
                     {/* Actions */}
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200/30">
-                      {u.kycStatus === "UNVERIFIED" && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUnverifiedUser(u.uid, u.name)}
-                          className="px-3 py-1.5 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 rounded-xl text-[10px] font-black uppercase transition-all cursor-pointer flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">delete_forever</span>
-                          <span>Delete User</span>
-                        </button>
-                      )}
-
-                      {(u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW" || u.kycStatus === "VERIFICATION_FAILED") && (
-                        <button
-                          type="button"
-                          disabled={!!isProcessingKyc}
-                          onClick={() => handleProcessKyc(u.uid, "verify")}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center"
-                        >
-                          {processing ? <ButtonSpinner /> : "Check Identity"}
-                        </button>
-                      )}
-
-                      {u.kycStatus === "IDENTITY_VERIFIED" && (
-                        <button
-                          type="button"
-                          disabled={!!isProcessingKyc}
-                          onClick={() => handleProcessKyc(u.uid, "approve")}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center"
-                        >
-                          {processing ? <ButtonSpinner /> : "Approve & Provision"}
-                        </button>
-                      )}
-
-                      {u.kycStatus === "PROVISIONING_FAILED" && (
-                        <button
-                          type="button"
-                          disabled={!!isProcessingKyc}
-                          onClick={() => handleProcessKyc(u.uid, "retry")}
-                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase rounded-xl transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-                        >
-                          {processing ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">refresh</span>}
-                          <span>Retry Provisioning</span>
-                        </button>
-                      )}
+                      <CpanelActionDropdown
+                        isDark={isDark}
+                        actions={[
+                          {
+                            label: "Check Identity",
+                            icon: "badge",
+                            disabled: !(u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW" || u.kycStatus === "VERIFICATION_FAILED"),
+                            onClick: () => handleProcessKyc(u.uid, "verify"),
+                          },
+                          {
+                            label: "Approve & Provision",
+                            icon: "verified",
+                            variant: "emerald",
+                            disabled: u.kycStatus !== "IDENTITY_VERIFIED",
+                            onClick: () => handleProcessKyc(u.uid, "approve"),
+                          },
+                          {
+                            label: "Retry Provisioning",
+                            icon: "refresh",
+                            variant: "warning",
+                            disabled: u.kycStatus !== "PROVISIONING_FAILED",
+                            onClick: () => handleProcessKyc(u.uid, "retry"),
+                          },
+                          {
+                            label: "Reject KYC",
+                            icon: "cancel",
+                            variant: "danger",
+                            disabled: u.kycStatus === "REJECTED" || u.kycStatus === "VERIFIED" || u.kycStatus === "UNVERIFIED",
+                            onClick: () => handleProcessKyc(u.uid, "reject"),
+                          },
+                          {
+                            label: "Delete User",
+                            icon: "delete_forever",
+                            variant: "danger",
+                            disabled: u.kycStatus !== "UNVERIFIED",
+                            onClick: () => handleDeleteUnverifiedUser(u.uid, u.name),
+                          },
+                        ]}
+                      />
                     </div>
 
                     {u.kycStatus !== "REJECTED" && u.kycStatus !== "VERIFIED" && u.kycStatus !== "UNVERIFIED" && (

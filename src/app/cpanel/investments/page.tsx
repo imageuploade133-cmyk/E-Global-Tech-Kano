@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { useAppConfig } from "@/lib/ConfigContext";
@@ -1423,46 +1424,37 @@ function AdminFixedDepositsPageContent() {
                               </p>
                             </td>
                             <td className="py-3.5 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedInvestmentModal(inv)}
-                                  className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-all cursor-pointer"
-                                  title="View Investment Details"
-                                >
-                                  <span className="material-symbols-outlined text-[16px]">visibility</span>
-                                </button>
-
-                                {isClaimRequested && (
-                                  <button
-                                    type="button"
-                                    disabled={approvingId === inv.id}
-                                    onClick={() => handleApproveClaim(inv.id, publicRef)}
-                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
-                                    title="Approve Matured Payout"
-                                  >
-                                    {approvingId === inv.id ? (
-                                      <ButtonSpinner />
-                                    ) : (
-                                      <>
-                                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                                        <span>Approve</span>
-                                      </>
-                                    )}
-                                  </button>
-                                )}
-
-                                {(isActive || isClaimRequested) && (
-                                  <button
-                                    type="button"
-                                    disabled={cancellingId === inv.id}
-                                    onClick={() => handleAdminCancelInvestment(inv.id, publicRef)}
-                                    className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all cursor-pointer"
-                                    title="Admin Cancel Investment"
-                                  >
-                                    {cancellingId === inv.id ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">cancel</span>}
-                                  </button>
-                                )}
+                              <div className="flex items-center justify-center">
+                                <CpanelActionDropdown
+                                  isDark={isDark}
+                                  actions={[
+                                    {
+                                      label: "Audit Details",
+                                      icon: "visibility",
+                                      onClick: () => setSelectedInvestmentModal(inv),
+                                    },
+                                    {
+                                      label: "Approve Payout",
+                                      icon: "check_circle",
+                                      variant: "emerald",
+                                      disabled: !isClaimRequested,
+                                      onClick: () => handleApproveClaim(inv.id, publicRef),
+                                    },
+                                    {
+                                      label: inv.isUserInvestmentBlocked ? "Unblock User Access" : "Block User Access",
+                                      icon: inv.isUserInvestmentBlocked ? "verified_user" : "block",
+                                      variant: inv.isUserInvestmentBlocked ? "emerald" : "warning",
+                                      onClick: () => handleToggleBlockUser(inv.userId, inv.userName, Boolean(inv.isUserInvestmentBlocked)),
+                                    },
+                                    {
+                                      label: "Cancel Investment",
+                                      icon: "cancel",
+                                      variant: "danger",
+                                      disabled: !(isActive || isClaimRequested),
+                                      onClick: () => handleAdminCancelInvestment(inv.id, publicRef),
+                                    },
+                                  ]}
+                                />
                               </div>
                             </td>
                           </tr>
