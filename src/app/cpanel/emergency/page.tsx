@@ -754,7 +754,7 @@ function CpanelEmergencyPageContent() {
                     />
                   </div>
 
-                  {isUploadingImage && <UploadProgressBar progress={uploadProgress} label="Uploading Image..." />}
+                  <UploadProgressBar progress={uploadProgress} label="Uploading Image..." isUploading={isUploadingImage} />
 
                   {images.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
@@ -806,7 +806,7 @@ function CpanelEmergencyPageContent() {
                     />
                   </div>
 
-                  {isUploadingDoc && <UploadProgressBar progress={uploadProgress} label="Uploading Document..." />}
+                  <UploadProgressBar progress={uploadProgress} label="Uploading Document..." isUploading={isUploadingDoc} />
 
                   {/* Manual File URL input */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
