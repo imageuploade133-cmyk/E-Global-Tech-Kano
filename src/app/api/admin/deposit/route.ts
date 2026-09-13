@@ -57,7 +57,24 @@ export async function POST(req: Request) {
         currentWalletBalance = Number(walletSnap.data()?.balance) || 0;
       }
 
-      const newWalletBalance = currentWalletBalance + parsedAmount;
+      // Atomic debt recovery calculation if currency is NGN
+      let debtRecovered = 0;
+      let netCreditToBalance = parsedAmount;
+
+      if (currency === "NGN") {
+        const currentDebt = Math.max(0, Number(userData.outstandingDebt) || 0);
+        if (currentDebt > 0) {
+          const amtMinor = Math.round(parsedAmount * 100);
+          const debtMinor = Math.round(currentDebt * 100);
+          const recoveredMinor = Math.min(amtMinor, debtMinor);
+          const netCreditMinor = amtMinor - recoveredMinor;
+
+          debtRecovered = recoveredMinor / 100;
+          netCreditToBalance = netCreditMinor / 100;
+        }
+      }
+
+      const newWalletBalance = currentWalletBalance + netCreditToBalance;
 
       // Update wallet balance
       transaction.set(walletRef, {
@@ -67,11 +84,45 @@ export async function POST(req: Request) {
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
-      // If currency is NGN, update the legacy balance on user profile
+      // If currency is NGN, update the legacy balance on user profile & outstanding debt
       if (currency === "NGN") {
-        const newLegacyBalance = currentLegacyBalance + parsedAmount;
-        transaction.update(userRef, {
+        const newLegacyBalance = currentLegacyBalance + netCreditToBalance;
+        const userUpdates: Record<string, any> = {
           balance: newLegacyBalance
+        };
+        if (debtRecovered > 0) {
+          userUpdates.outstandingDebt = FieldValue.increment(-debtRecovered);
+        }
+        transaction.update(userRef, userUpdates);
+      }
+
+      if (debtRecovered > 0) {
+        const secureRef = `ADMIN-CR-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+        const debtTxRef = `recovery-${secureRef}`;
+        const debtTxDocRef = adminDb.collection("transactions").doc(`tx-${debtTxRef}`);
+        transaction.set(debtTxDocRef, {
+          userId: targetUid,
+          amount: debtRecovered,
+          currency: currency,
+          reference: debtTxRef,
+          type: "DEBT_RECOVERY",
+          category: "DEDUCTION",
+          direction: "DEBIT",
+          description: `Automatic Recovery for Outstanding Debt (₦${debtRecovered.toLocaleString()})`,
+          recipientName: "System Recovery",
+          status: "SUCCESS",
+          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          fee: 0,
+          totalDebited: debtRecovered,
+          totalCredited: 0,
+          createdAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          metadata: {
+            depositReference: secureRef,
+            recoveredAmount: debtRecovered,
+            originalAmount: parsedAmount,
+          },
         });
       }
 
