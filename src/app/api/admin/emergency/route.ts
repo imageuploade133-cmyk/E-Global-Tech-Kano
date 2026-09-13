@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { verifyAdminAuth } from "@/lib/auth-util";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export async function GET(req: Request) {
   try {
-    const authResult = await verifyAdminAuth(req);
-    if (!authResult.authorized) {
-      return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: 401 });
+    const perm = await requireAdminPermission(req, "branding.manage");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     const docSnap = await adminDb.collection("config").doc("emergency_broadcast").get();
@@ -33,16 +33,16 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const authResult = await verifyAdminAuth(req);
-    if (!authResult.authorized) {
-      return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: 401 });
+    const perm = await requireAdminPermission(req, "branding.manage");
+    if (!perm.authorized) {
+      return perm.response!;
     }
 
     const body = await req.json();
     const { active, title, message, urgency, badge, icon } = body;
 
     const updatedAt = new Date().toISOString();
-    const updatedBy = authResult.email || "System Admin";
+    const updatedBy = perm.auth?.email || "System Admin";
 
     const broadcastData = {
       active: Boolean(active),
