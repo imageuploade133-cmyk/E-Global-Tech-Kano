@@ -59,6 +59,7 @@ export async function POST(req: Request) {
       createdAt: userSnap.exists && userSnap.data()?.createdAt ? userSnap.data()?.createdAt : new Date().toISOString(),
       balance: userSnap.exists && typeof userSnap.data()?.balance === "number" ? userSnap.data()?.balance : 0.00,
       bonusBalance: userSnap.exists && typeof userSnap.data()?.bonusBalance === "number" ? userSnap.data()?.bonusBalance : 0.00,
+      status: userSnap.exists && userSnap.data()?.status ? userSnap.data()?.status : "active",
       kycStatus: userSnap.exists && userSnap.data()?.kycStatus ? userSnap.data()?.kycStatus : "UNVERIFIED",
       role: userSnap.exists && userSnap.data()?.role ? userSnap.data()?.role : "USER",
       dailyLimit: userSnap.exists && typeof userSnap.data()?.dailyLimit === "number" ? userSnap.data()?.dailyLimit : 500000,

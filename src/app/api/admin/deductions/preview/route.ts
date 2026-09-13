@@ -64,7 +64,11 @@ export async function POST(req: Request) {
       eligibleUsersCount++;
 
       const walletSnap = walletSnapsMap.get(`${doc.id}_NGN`);
-      const rawBal = walletSnap && walletSnap.exists ? walletSnap.data()?.balance : uData.balance;
+      if (!walletSnap || !walletSnap.exists) {
+        throw new Error(`[Data Integrity Error] Missing authoritative wallet document (wallets/${doc.id}_NGN) for active user ${doc.id}. Failing closed.`);
+      }
+
+      const rawBal = walletSnap.data()?.balance;
       const debtVal = uData.outstandingDebt;
 
       // FAIL-CLOSED DATA INTEGRITY VALIDATION: Reject malformed, negative, NaN, or non-numeric balances or debt
@@ -76,7 +80,6 @@ export async function POST(req: Request) {
       }
 
       const walletBal = toMajorUnits(balMinor);
-      const debt = toMajorUnits(debtMinor);
 
       const recoverMinor = Math.min(balMinor, dedMinor);
       const newDebtCreatedMinor = dedMinor - recoverMinor;
@@ -84,8 +87,9 @@ export async function POST(req: Request) {
       totalImmediateRecoveryMinor += recoverMinor;
       totalNewOutstandingDebtMinor += newDebtCreatedMinor;
 
-      const netBal = calculateNetBalance(walletBal, debt);
-      if (netBal >= parsedAmount) {
+      // SUFFICIENT FUNDS CALCULATION: Matches execute algorithm exactly.
+      // Wallet balance >= deduction amount means full recovery without creating new debt for this charge.
+      if (walletBal >= parsedAmount) {
         sufficientFundsCount++;
       } else {
         expectedIndebtedCount++;
