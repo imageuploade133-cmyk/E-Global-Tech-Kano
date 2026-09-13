@@ -209,7 +209,8 @@ function CpanelEmergencyPageContent() {
         setUploadProgress(percent);
       });
       if (result.success && result.url) {
-        setImages((prev) => [...prev, result.url]);
+        const imageUrl: string = result.url;
+        setImages((prev) => [...prev, imageUrl]);
         toast.success("Broadcast image uploaded successfully!");
       } else {
         toast.error(result.error || "Failed to upload image.");
