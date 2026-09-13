@@ -8,7 +8,7 @@ export interface TransactionRecord {
   currency: string;
   reference: string;
   flwId?: string | null;
-  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS" | "SWAP_DEBIT" | "SWAP_CREDIT" | "CASHOUT" | "CARD_FUND" | "STORE_PURCHASE" | "REFUND" | "VIRTUAL_ACCOUNT_DEPOSIT" | string;
+  type: "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "INVESTMENT" | "AIRTIME" | "DATA" | "BILLS" | "SWAP_DEBIT" | "SWAP_CREDIT" | "CASHOUT" | "CARD_FUND" | "STORE_PURCHASE" | "REFUND" | "VIRTUAL_ACCOUNT_DEPOSIT" | "GLOBAL_DEDUCTION" | "DEBT_RECOVERY" | string;
   category?: string;
   direction?: "CREDIT" | "DEBIT";
   description: string;
@@ -235,18 +235,31 @@ export class WalletService {
       user = preLoadedUser || (await this.getUserProfile(transaction, userId));
     }
 
-    // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
-    // Calculate total refund / credit amount authoritatively:
-    // If totalCredited is provided (e.g. refund total including transfer fee + commission), credit that full amount.
-    // Otherwise fallback to amount + fee + vat.
+    // AUTOMATIC DEBT RECOVERY LOGIC (FOR NGN MAIN WALLET DEPOSITS/CREDITS)
+    let debtRecovered = 0;
+    let netBalanceIncrement = 0;
+
     const feeNum = Number(fee) || 0;
     const vatNum = Number(params.vat) || 0;
     const creditAmount = params.totalCredited !== undefined && params.totalCredited !== null && Number(params.totalCredited) > 0
       ? Number(params.totalCredited)
       : (amount + feeNum + vatNum);
 
-    const newBalance = currentBalance + creditAmount;
+    if (ucCurrency === "NGN" && !isBonus && user) {
+      const currentDebt = Math.max(0, Number(user.data.outstandingDebt) || 0);
+      if (currentDebt > 0 && creditAmount > 0) {
+        debtRecovered = Math.min(creditAmount, currentDebt);
+        netBalanceIncrement = creditAmount - debtRecovered;
+      } else {
+        netBalanceIncrement = creditAmount;
+      }
+    } else {
+      netBalanceIncrement = creditAmount;
+    }
 
+    const newBalance = currentBalance + netBalanceIncrement;
+
+    // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
     // Update specific wallet balance atomically
     if (isBonus) {
       transaction.set(walletRef, {
@@ -265,15 +278,49 @@ export class WalletService {
       transaction.set(walletRef, {
         userId,
         currency: ucCurrency,
-        balance: FieldValue.increment(creditAmount),
+        balance: FieldValue.increment(netBalanceIncrement),
         updatedAt: new Date().toISOString(),
       }, { merge: true });
 
       if (ucCurrency === "NGN" && user) {
-        transaction.update(user.ref, {
-          balance: FieldValue.increment(creditAmount),
-        });
+        const userUpdates: Record<string, any> = {
+          balance: FieldValue.increment(netBalanceIncrement),
+        };
+        if (debtRecovered > 0) {
+          userUpdates.outstandingDebt = FieldValue.increment(-debtRecovered);
+        }
+        transaction.update(user.ref, userUpdates);
       }
+    }
+
+    // Record debt recovery ledger transaction if debt was recovered
+    if (debtRecovered > 0) {
+      const debtTxRef = `recovery-${reference}`;
+      const debtTxDocRef = adminDb.collection("transactions").doc(`tx-${debtTxRef}`);
+      transaction.set(debtTxDocRef, {
+        userId,
+        amount: debtRecovered,
+        currency: ucCurrency,
+        reference: debtTxRef,
+        type: "DEBT_RECOVERY",
+        category: "DEDUCTION",
+        direction: "DEBIT",
+        description: `Automatic Recovery for Outstanding Debt (₦${debtRecovered.toLocaleString()})`,
+        recipientName: "System Recovery",
+        status: "SUCCESS",
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+        time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        fee: 0,
+        totalDebited: debtRecovered,
+        totalCredited: 0,
+        createdAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        metadata: {
+          fundingReference: reference,
+          recoveredAmount: debtRecovered,
+          originalAmount: creditAmount,
+        },
+      });
     }
 
     // Record transaction in general ledger
@@ -468,8 +515,19 @@ export class WalletService {
     const vatNum = Number(params.vat) || 0;
     const totalDeduction = amount + feeNum + vatNum;
 
-    if (currentBalance < totalDeduction) {
-      throw new Error(`Insufficient ${isBonus ? "bonus reward" : "wallet"} funds to complete this ${type.toLowerCase()}. Required: ${ucCurrency === "NGN" ? "₦" : "$"}${totalDeduction}, Available: ${ucCurrency === "NGN" ? "₦" : "$"}${currentBalance}`);
+    // Enforce outstanding debt check for NGN main wallet debits so indebted users cannot spend or transfer funds
+    const outstandingDebt = (ucCurrency === "NGN" && !isBonus && user)
+      ? Math.max(0, Number(user.data.outstandingDebt) || 0)
+      : 0;
+
+    const spendableBalance = Math.max(0, currentBalance - outstandingDebt);
+
+    if (spendableBalance < totalDeduction) {
+      throw new Error(
+        outstandingDebt > 0
+          ? `Insufficient spendable balance due to an outstanding debt obligation of ₦${outstandingDebt.toLocaleString()}. Spendable Balance: ₦${spendableBalance.toLocaleString()}, Required: ₦${totalDeduction.toLocaleString()}`
+          : `Insufficient ${isBonus ? "bonus reward" : "wallet"} funds to complete this ${type.toLowerCase()}. Required: ${ucCurrency === "NGN" ? "₦" : "$"}${totalDeduction}, Available: ${ucCurrency === "NGN" ? "₦" : "$"}${currentBalance}`
+      );
     }
 
     const newBalance = currentBalance - totalDeduction;
