@@ -3,7 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { FieldValue } from "firebase-admin/firestore";
 import { toMinorUnits, toMajorUnits, calculateUserDeduction } from "@/lib/monetary-util";
-import { isActiveUser } from "@/app/api/admin/deductions/preview/route";
+import { isActiveUser } from "@/lib/monetary-util";
 
 export async function POST(req: Request) {
   try {

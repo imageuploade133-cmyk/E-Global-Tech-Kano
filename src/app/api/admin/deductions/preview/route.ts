@@ -3,8 +3,6 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { toMinorUnits, toMajorUnits, calculateNetBalance, isActiveUser } from "@/lib/monetary-util";
 
-export { isActiveUser };
-
 export async function POST(req: Request) {
   try {
     const perm = await requireAdminPermission(req, "wallet.deductions.manage");
