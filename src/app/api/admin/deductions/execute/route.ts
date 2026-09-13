@@ -92,9 +92,18 @@ export async function POST(req: Request) {
       }, { status: 409 });
     }
 
-    // Query active users using Firestore index where status == "active"
-    const activeQuerySnap = await adminDb.collection("users").where("status", "==", "active").get();
-    const activeUserDocs = activeQuerySnap.docs.filter((doc) => isActiveUser(doc.data() || {}));
+    // Legacy migration compatibility query: Query active users safely using status == "active"
+    // Also include legacy users where status is undefined or missing without loading full users collection
+    const [activeQuerySnap, noStatusQuerySnap] = await Promise.all([
+      adminDb.collection("users").where("status", "==", "active").get(),
+      adminDb.collection("users").where("status", "==", null).get(),
+    ]);
+
+    const userMap = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    activeQuerySnap.docs.forEach((d) => userMap.set(d.id, d));
+    noStatusQuerySnap.docs.forEach((d) => userMap.set(d.id, d));
+
+    const activeUserDocs = Array.from(userMap.values()).filter((doc) => isActiveUser(doc.data() || {}));
 
     const totalEligibleCount = activeUserDocs.length;
     let failedUsersCount = 0;
