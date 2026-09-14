@@ -19,6 +19,9 @@ import {
   toggleWishlist,
 } from "@/lib/store-cache";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { useAppConfig } from "@/lib/ConfigContext";
+import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
+import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 import {
   StoreItem,
   StoreSlide,
@@ -43,6 +46,8 @@ import {
 export default function StorePage() {
   const router = useRouter();
   const { userData, user } = useAuth();
+  const { config } = useAppConfig();
+  const isStoreEnabled = isFeatureEnabled(config?.featureToggles, "store");
   const userName = (userData?.name || user?.displayName || "Captain") as string;
 
   const [items, setItems] = useState<StoreItem[]>([]);
@@ -299,6 +304,11 @@ export default function StorePage() {
       return;
     }
 
+    if (!isStoreEnabled) {
+      toast.error(getFeatureDisabledMessage(config?.featureToggles, "store"));
+      return;
+    }
+
     if (cart.length === 0) {
       toast.error("Your shopping cart is empty.");
       return;
@@ -420,6 +430,14 @@ export default function StorePage() {
               isHidden: s.isHidden,
             }))}
           />
+
+          {/* Feature Disabled Banner */}
+          {!isStoreEnabled && (
+            <FeatureDisabledBanner
+              title="E-Tech Store Unavailable"
+              message={getFeatureDisabledMessage(config?.featureToggles, "store")}
+            />
+          )}
 
           {/* Search Input Bar with Gradient Border */}
           <StoreSearchBar

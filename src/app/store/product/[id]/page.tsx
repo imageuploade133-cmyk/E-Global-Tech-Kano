@@ -20,6 +20,9 @@ import {
   toggleWishlist,
 } from "@/lib/store-cache";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { useAppConfig } from "@/lib/ConfigContext";
+import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
+import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 
 interface ProductReview {
   id: string;
@@ -39,6 +42,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const router = useRouter();
   const { userData, user } = useAuth();
+  const { config } = useAppConfig();
+  const isStoreEnabled = isFeatureEnabled(config?.featureToggles, "store");
   const userName = (userData?.name || user?.displayName || "Verified Customer") as string;
 
   const [product, setProduct] = useState<StoreItem | null>(() => getCachedProductDetail(productId));
@@ -350,6 +355,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const handleConfirmCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isStoreEnabled) {
+      toast.error(getFeatureDisabledMessage(config?.featureToggles, "store"));
+      return;
+    }
+
     if (!customerDeliveryName.trim() || !customerDeliveryPhone.trim() || !customerDeliveryAddress.trim()) {
       toast.error("Please fill in all delivery information fields.");
       return;
@@ -511,6 +521,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   return (
     <RouteGuard>
       <div id="store-page-root" className="min-h-dvh bg-[#F4F5F7] text-black pb-28">
+        {!isStoreEnabled && (
+          <div className="pt-2 px-3.5">
+            <FeatureDisabledBanner
+              title="E-Tech Store Unavailable"
+              message={getFeatureDisabledMessage(config?.featureToggles, "store")}
+            />
+          </div>
+        )}
         {/* Sticky Top Header Bar - Minimal Space */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md px-3.5 pt-3.5 pb-2.5 border-0 shadow-none">
           <div className="max-w-md mx-auto flex items-center justify-between gap-2">

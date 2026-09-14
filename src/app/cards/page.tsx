@@ -12,9 +12,14 @@ import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { cn } from "@/lib/utils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { RequestCardModal } from "@/components/cards/RequestCardModal";
+import { useAppConfig } from "@/lib/ConfigContext";
+import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
+import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 
 export default function CardsPage() {
   const { userData, user } = useAuth();
+  const { config } = useAppConfig();
+  const isVirtualCardsEnabled = isFeatureEnabled(config?.featureToggles, "virtual_cards");
   const {
     cards,
     loading,
@@ -194,6 +199,10 @@ export default function CardsPage() {
   };
 
   const handleOpenRequest = () => {
+    if (!isVirtualCardsEnabled) {
+      toast.error(getFeatureDisabledMessage(config?.featureToggles, "virtual_cards"));
+      return;
+    }
     setFormCurrency("USD");
     setInitialAmount("5.00");
     setBillingCountry("US");
@@ -398,6 +407,14 @@ export default function CardsPage() {
               Create Card
             </button>
           </div>
+
+          {/* Feature Disabled Banner */}
+          {!isVirtualCardsEnabled && (
+            <FeatureDisabledBanner
+              title="Virtual Cards Unavailable"
+              message={getFeatureDisabledMessage(config?.featureToggles, "virtual_cards")}
+            />
+          )}
 
           {/* Error State */}
           {error && (
