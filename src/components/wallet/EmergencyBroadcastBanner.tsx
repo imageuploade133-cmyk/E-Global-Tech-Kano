@@ -143,7 +143,7 @@ export const EmergencyBroadcastBanner: React.FC = () => {
       {/* Full-Screen Emergency Information Modal Overlay */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100000] flex flex-col justify-between overflow-hidden font-hanken">
+          <div className="fixed inset-0 z-[100000] flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 overflow-hidden font-hanken">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -153,224 +153,244 @@ export const EmergencyBroadcastBanner: React.FC = () => {
               className="absolute inset-0 bg-black/60 backdrop-blur-xs"
             />
 
-            {/* Main Full-Screen Modal Card */}
+            {/* Main Gradient Border Card Wrapper */}
             <motion.div
               initial={{ opacity: 0, y: "100%" }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
-              style={{ backgroundColor: modalBg, color: modalTextColor }}
-              className="relative w-full h-full max-w-2xl mx-auto flex flex-col justify-between overflow-hidden p-5 sm:p-6 shadow-2xl z-10 sm:rounded-3xl sm:my-auto sm:h-[92vh]"
+              className={cn(
+                "relative w-full h-full sm:h-auto sm:max-h-[90vh] max-w-xl mx-auto p-[1.5px] rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 flex flex-col overflow-hidden",
+                urgency === "danger"
+                  ? "bg-gradient-to-r from-red-500 via-rose-400 to-orange-500"
+                  : urgency === "emerald"
+                  ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-green-500"
+                  : urgency === "info"
+                  ? "bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500"
+                  : "bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600]"
+              )}
             >
-              {/* Header Bar */}
-              <div className="flex items-center justify-between border-b border-gray-200/80 dark:border-gray-800 pb-4 flex-shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={cn(
-                      "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs",
-                      urgency === "danger"
-                        ? "bg-red-500/15 text-red-600"
-                        : urgency === "warning"
-                        ? "bg-amber-500/15 text-amber-600"
-                        : urgency === "emerald"
-                        ? "bg-emerald-500/15 text-emerald-600"
-                        : "bg-blue-500/15 text-blue-600"
-                    )}
-                  >
-                    <span className="material-symbols-outlined text-[22px] font-bold animate-pulse">
-                      {iconName}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[9.5px] font-black uppercase tracking-widest text-gray-400 block">
-                      {badgeLabel}
-                    </span>
-                    <h3 className="font-extrabold text-base uppercase tracking-tight">
-                      Official Emergency Broadcast
-                    </h3>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="w-9 h-9 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white transition-all cursor-pointer bg-black/5 dark:bg-white/10"
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-
-              {/* Scrollable Broadcast Body Content */}
-              <div className="flex-1 overflow-y-auto py-6 space-y-6 custom-scrollbar text-left">
-                {/* Headline Hero Banner */}
-                <div
-                  className={cn(
-                    "p-5 rounded-3xl border space-y-2 text-left shadow-xs",
-                    urgency === "danger"
-                      ? "bg-red-500/10 border-red-500/30 text-red-950 dark:text-red-200"
-                      : urgency === "warning"
-                      ? "bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200"
-                      : urgency === "emerald"
-                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200"
-                      : "bg-blue-500/10 border-blue-500/30 text-blue-950 dark:text-blue-200"
-                  )}
-                >
-                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-current/20 text-current inline-block">
-                    {badgeLabel}
-                  </span>
-                  <h2 className="font-extrabold text-xl leading-tight">
-                    {broadcast.title}
-                  </h2>
-                  {broadcast.updatedAt && (
-                    <p className="text-[10.5px] opacity-70 font-mono font-medium">
-                      Published: {new Date(broadcast.updatedAt).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-
-                {/* Main Body Message Paragraph */}
-                <div className="p-5 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-3">
-                  <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
-                    Full Broadcast Information & Message
-                  </span>
-                  {isHtml ? (
+              <div
+                style={{ backgroundColor: modalBg, color: modalTextColor }}
+                className="w-full h-full flex flex-col justify-between overflow-hidden p-4 sm:p-6 rounded-t-[22.5px] sm:rounded-[22.5px] flex-1"
+              >
+                {/* Header Bar */}
+                <div className="flex items-center justify-between border-b border-gray-200/80 dark:border-gray-800/80 pb-3.5 flex-shrink-0 gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div
-                      className="prose dark:prose-invert max-w-none text-xs sm:text-sm font-medium leading-relaxed space-y-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-[#FC7A00] [&_a]:underline [&_h3]:text-base [&_h3]:font-black [&_h3]:my-2 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_img]:shadow-md"
-                      dangerouslySetInnerHTML={{ __html: broadcast.message }}
-                    />
-                  ) : (
-                    <p className="font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                      {broadcast.message}
-                    </p>
-                  )}
-                </div>
-
-                {/* Attached Images Gallery */}
-                {Array.isArray(broadcast.images) && broadcast.images.length > 0 && (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
-                      Attached Images & Photos ({broadcast.images.length})
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {broadcast.images.map((imgUrl, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => setSelectedPreviewImage(imgUrl)}
-                          className="group relative aspect-video rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/10 cursor-pointer shadow-xs"
-                        >
-                          <img
-                            src={imgUrl}
-                            alt={`Broadcast photo ${idx + 1}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="material-symbols-outlined text-white text-[24px]">visibility</span>
-                          </div>
-                        </div>
-                      ))}
+                      className={cn(
+                        "w-9 h-9 min-[360px]:w-10 min-[360px]:h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs",
+                        urgency === "danger"
+                          ? "bg-red-500/15 text-red-600"
+                          : urgency === "warning"
+                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          : urgency === "emerald"
+                          ? "bg-emerald-500/15 text-emerald-600"
+                          : "bg-blue-500/15 text-blue-600"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[20px] min-[360px]:text-[22px] font-bold animate-pulse">
+                        {iconName}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[8.5px] min-[360px]:text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-400 block truncate">
+                        {badgeLabel}
+                      </span>
+                      <h3 className="font-extrabold text-xs min-[360px]:text-sm sm:text-base uppercase tracking-tight truncate">
+                        Emergency Broadcast
+                      </h3>
                     </div>
                   </div>
-                )}
 
-                {/* Embedded Video Player */}
-                {embedUrl && (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
-                      Embedded Broadcast Video
-                    </span>
-                    <div className="aspect-video w-full rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-black shadow-md">
-                      {isDirectVideo ? (
-                        <video controls className="w-full h-full object-contain" src={embedUrl} />
-                      ) : (
-                        <iframe
-                          src={embedUrl}
-                          title="Broadcast Video"
-                          className="w-full h-full border-0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="w-8 h-8 min-[360px]:w-9 min-[360px]:h-9 rounded-full border border-gray-300/80 dark:border-gray-700/80 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white transition-all cursor-pointer bg-black/5 dark:bg-white/10 shrink-0"
+                    aria-label="Close broadcast modal"
+                  >
+                    <span className="material-symbols-outlined text-[18px] min-[360px]:text-[20px]">close</span>
+                  </button>
+                </div>
+
+                {/* Scrollable Broadcast Body Content */}
+                <div className="flex-1 overflow-y-auto py-5 space-y-5 custom-scrollbar text-left">
+                  {/* Headline Hero Banner */}
+                  <div
+                    className={cn(
+                      "p-4 sm:p-5 rounded-2xl sm:rounded-3xl border space-y-2 text-left shadow-xs transition-all",
+                      urgency === "danger"
+                        ? "bg-red-500/10 border-red-500/30 text-red-950 dark:text-red-200"
+                        : urgency === "warning"
+                        ? "bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200"
+                        : urgency === "emerald"
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-200"
+                        : "bg-blue-500/10 border-blue-500/30 text-blue-950 dark:text-blue-200"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-full text-[8.5px] min-[360px]:text-[9px] font-black uppercase tracking-wider bg-current/20 text-current inline-block">
+                        {badgeLabel}
+                      </span>
+                      {broadcast.updatedAt && (
+                        <span className="text-[10px] opacity-75 font-mono font-medium">
+                          {new Date(broadcast.updatedAt).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="font-extrabold text-base min-[360px]:text-lg sm:text-xl leading-tight">
+                      {broadcast.title}
+                    </h2>
+                  </div>
+
+                  {/* Main Body Message Paragraph */}
+                  <div className="p-[1.5px] rounded-2xl sm:rounded-3xl bg-gradient-to-r from-black/10 via-black/5 to-black/10 dark:from-white/10 dark:via-white/5 dark:to-white/10 shadow-xs">
+                    <div className="p-4 sm:p-5 rounded-[14.5px] sm:rounded-[22.5px] bg-black/[0.03] dark:bg-white/[0.03] space-y-2.5">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider opacity-60 block">
+                        Full Broadcast Information & Message
+                      </span>
+                      {isHtml ? (
+                        <div
+                          className="prose dark:prose-invert max-w-none text-xs sm:text-sm font-medium leading-relaxed space-y-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-[#FC7A00] [&_a]:underline [&_h3]:text-base [&_h3]:font-black [&_h3]:my-2 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_img]:shadow-md"
+                          dangerouslySetInnerHTML={{ __html: broadcast.message }}
                         />
+                      ) : (
+                        <p className="font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                          {broadcast.message}
+                        </p>
                       )}
                     </div>
                   </div>
-                )}
 
-                {/* Attached Downloadable Documents */}
-                {Array.isArray(broadcast.attachments) && broadcast.attachments.length > 0 && (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-black uppercase tracking-wider opacity-60 block">
-                      Attached Documents & Downloads ({broadcast.attachments.length})
-                    </span>
-                    <div className="space-y-2">
-                      {broadcast.attachments.map((doc, idx) => (
-                        <a
-                          key={idx}
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download={doc.name || "document"}
-                          className="p-3.5 rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 flex items-center justify-between gap-3 hover:bg-black/10 dark:hover:bg-white/10 transition-all text-left group text-inherit no-underline"
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="w-9 h-9 rounded-xl bg-[#FC7A00]/15 text-[#FC7A00] flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-[20px]">
-                                {doc.type === "pdf" ? "picture_as_pdf" : "description"}
-                              </span>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h5 className="font-extrabold text-xs truncate group-hover:text-[#FC7A00] transition-colors">
-                                {doc.name || `Attachment ${idx + 1}`}
-                              </h5>
-                              {doc.size && (
-                                <p className="text-[10px] opacity-60 font-mono mt-0.5">
-                                  {doc.size}
-                                </p>
-                              )}
+                  {/* Attached Images Gallery */}
+                  {Array.isArray(broadcast.images) && broadcast.images.length > 0 && (
+                    <div className="space-y-2.5">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider opacity-60 block">
+                        Attached Images & Photos ({broadcast.images.length})
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {broadcast.images.map((imgUrl, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => setSelectedPreviewImage(imgUrl)}
+                            className="group relative aspect-video rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/10 cursor-pointer shadow-xs"
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={`Broadcast photo ${idx + 1}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white text-xs font-bold">
+                              <span className="material-symbols-outlined text-[20px]">visibility</span>
+                              <span>View</span>
                             </div>
                           </div>
-                          <span className="material-symbols-outlined text-[20px] opacity-60 group-hover:opacity-100 group-hover:text-[#FC7A00] transition-all shrink-0">
-                            download
-                          </span>
-                        </a>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* External Link Button */}
-                {broadcast.externalUrl && (
-                  <div className="pt-2">
-                    <a
-                      href={broadcast.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-3.5 px-4 rounded-2xl bg-[#FC7A00] hover:bg-[#e06600] text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all text-center no-underline"
-                    >
-                      <span>{broadcast.externalUrlLabel || "Learn More / Open Link"}</span>
-                      <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                    </a>
-                  </div>
-                )}
+                  {/* Embedded Video Player */}
+                  {embedUrl && (
+                    <div className="space-y-2.5">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider opacity-60 block">
+                        Embedded Broadcast Video
+                      </span>
+                      <div className="aspect-video w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-black/10 dark:border-white/10 bg-black shadow-md">
+                        {isDirectVideo ? (
+                          <video controls className="w-full h-full object-contain" src={embedUrl} />
+                        ) : (
+                          <iframe
+                            src={embedUrl}
+                            title="Broadcast Video"
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                {/* Official Verification Notice */}
-                <div className="p-4 rounded-2xl bg-[#FC7A00]/10 border border-[#FC7A00]/20 text-center space-y-1">
-                  <p className="font-black text-xs text-[#FC7A00] uppercase">
-                    E-Global Pay Verified Official Announcement
-                  </p>
-                  <p className="text-[10px] opacity-60 font-medium">
-                    Broadcast issued by Platform Administration • Real-time Notice
-                  </p>
+                  {/* Attached Downloadable Documents */}
+                  {Array.isArray(broadcast.attachments) && broadcast.attachments.length > 0 && (
+                    <div className="space-y-2.5">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider opacity-60 block">
+                        Attached Documents & Downloads ({broadcast.attachments.length})
+                      </span>
+                      <div className="space-y-2">
+                        {broadcast.attachments.map((doc, idx) => (
+                          <a
+                            key={idx}
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={doc.name || "document"}
+                            className="p-3.5 rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 flex items-center justify-between gap-3 hover:bg-black/10 dark:hover:bg-white/10 transition-all text-left group text-inherit no-underline"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-9 h-9 rounded-xl bg-[#FC7A00]/15 text-[#FC7A00] flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[20px]">
+                                  {doc.type === "pdf" ? "picture_as_pdf" : "description"}
+                                </span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h5 className="font-extrabold text-xs truncate group-hover:text-[#FC7A00] transition-colors">
+                                  {doc.name || `Attachment ${idx + 1}`}
+                                </h5>
+                                {doc.size && (
+                                  <p className="text-[10px] opacity-60 font-mono mt-0.5">
+                                    {doc.size}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <span className="material-symbols-outlined text-[20px] opacity-60 group-hover:opacity-100 group-hover:text-[#FC7A00] transition-all shrink-0">
+                              download
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* External Link Button */}
+                  {broadcast.externalUrl && (
+                    <div className="pt-1">
+                      <a
+                        href={broadcast.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#E06600] hover:brightness-105 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md active:scale-98 transition-all text-center no-underline border-0 cursor-pointer"
+                      >
+                        <span>{broadcast.externalUrlLabel || "Learn More / Open Link"}</span>
+                        <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Official Verification Notice */}
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-[#FC7A00]/10 border border-[#FC7A00]/25 text-center space-y-0.5">
+                    <p className="font-black text-xs text-[#FC7A00] uppercase tracking-wide">
+                      E-Global Pay Verified Official Announcement
+                    </p>
+                    <p className="text-[10px] opacity-65 font-medium">
+                      Broadcast issued by Platform Administration • Real-time Notice
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Static Bottom Action Bar */}
-              <div className="pt-4 border-t border-gray-200/80 dark:border-gray-800 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-md active:scale-98 border-0"
-                >
-                  I Understand & Acknowledge
-                </button>
+                {/* Static Bottom Action Bar */}
+                <div className="pt-3.5 border-t border-gray-200/80 dark:border-gray-800/80 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="w-full py-3.5 sm:py-4 bg-gradient-to-r from-[#FC7A00] via-amber-500 to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-md hover:brightness-105 active:scale-98 border-0 flex items-center justify-center gap-2"
+                  >
+                    <span>I Understand & Acknowledge</span>
+                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
