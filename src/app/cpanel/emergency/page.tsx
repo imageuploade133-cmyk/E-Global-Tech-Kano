@@ -175,6 +175,8 @@ function CpanelEmergencyPageContent() {
     }
   }, [message]);
 
+  const inlineEditorImageInputRef = useRef<HTMLInputElement | null>(null);
+
   // Rich text formatting helpers using native document commands (WYSIWYG Word-style)
   const applyRichFormat = (command: string, value: string | undefined = undefined) => {
     if (!richEditorRef.current) return;
@@ -184,6 +186,18 @@ function CpanelEmergencyPageContent() {
       const url = prompt("Enter website or link URL:", "https://");
       if (!url) return;
       document.execCommand("createLink", false, url);
+    } else if (command === "insertImage") {
+      const choice = prompt("Type '1' to upload image file from computer/phone, or paste image URL directly:", "1");
+      if (!choice) return;
+      if (choice.trim() === "1") {
+        inlineEditorImageInputRef.current?.click();
+        return;
+      } else if (choice.startsWith("http://") || choice.startsWith("https://")) {
+        document.execCommand("insertImage", false, choice.trim());
+      } else {
+        toast.error("Invalid image URL provided.");
+        return;
+      }
     } else if (command === "clear") {
       richEditorRef.current.innerHTML = "";
       setMessage("");
@@ -194,6 +208,36 @@ function CpanelEmergencyPageContent() {
 
     if (richEditorRef.current) {
       setMessage(richEditorRef.current.innerHTML);
+    }
+  };
+
+  // Upload inline image directly into rich editor content
+  const handleInlineEditorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    setUploadProgress(0);
+    try {
+      const result = await uploadImageSecurely(file, "editor_inline_image", (percent) => {
+        setUploadProgress(percent);
+      });
+      if (result.success && result.url) {
+        if (richEditorRef.current) {
+          richEditorRef.current.focus();
+          document.execCommand("insertImage", false, result.url);
+          setMessage(richEditorRef.current.innerHTML);
+        }
+        toast.success("Inline image inserted into editor!");
+      } else {
+        toast.error(result.error || "Failed to upload image.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error uploading image.");
+    } finally {
+      setIsUploadingImage(false);
+      setUploadProgress(0);
+      if (inlineEditorImageInputRef.current) inlineEditorImageInputRef.current.value = "";
     }
   };
 
@@ -568,12 +612,21 @@ function CpanelEmergencyPageContent() {
                     <span className="text-[10px] text-gray-400 font-bold uppercase">Visual Rich Text Editor</span>
                   </div>
 
+                  {/* Hidden Input for Inline Rich Editor Image Upload */}
+                  <input
+                    ref={inlineEditorImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleInlineEditorImageUpload}
+                    className="hidden"
+                  />
+
                   {/* WYSIWYG Formatting Toolbar */}
                   <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
                     <button
                       type="button"
                       onClick={() => applyRichFormat("bold")}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer shadow-3xs"
                       title="Bold text"
                     >
                       Bold
@@ -581,7 +634,7 @@ function CpanelEmergencyPageContent() {
                     <button
                       type="button"
                       onClick={() => applyRichFormat("italic")}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 italic font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 italic font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer shadow-3xs"
                       title="Italic text"
                     >
                       Italic
@@ -589,7 +642,7 @@ function CpanelEmergencyPageContent() {
                     <button
                       type="button"
                       onClick={() => applyRichFormat("underline")}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 underline font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 underline font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer shadow-3xs"
                       title="Underline text"
                     >
                       Underline
@@ -597,7 +650,7 @@ function CpanelEmergencyPageContent() {
                     <button
                       type="button"
                       onClick={() => applyRichFormat("formatBlock", "<h3>")}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-extrabold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-extrabold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer shadow-3xs"
                       title="Heading"
                     >
                       Heading
@@ -605,16 +658,25 @@ function CpanelEmergencyPageContent() {
                     <button
                       type="button"
                       onClick={() => applyRichFormat("insertUnorderedList")}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
                       title="Bullet List"
                     >
                       <span className="material-symbols-outlined text-[14px]">format_list_bulleted</span>
-                      <span>List</span>
+                      <span>Bullets</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyRichFormat("insertOrderedList")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
+                      title="Numbered List"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">format_list_numbered</span>
+                      <span>Numbered</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => applyRichFormat("createLink")}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
                       title="Insert Link"
                     >
                       <span className="material-symbols-outlined text-[14px]">link</span>
@@ -622,8 +684,17 @@ function CpanelEmergencyPageContent() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => applyRichFormat("insertImage")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1 shadow-3xs"
+                      title="Import Image inside text"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">image</span>
+                      <span>Image</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => applyRichFormat("clear")}
-                      className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 font-bold text-xs hover:bg-red-500 hover:text-white transition-all cursor-pointer ml-auto"
+                      className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 font-bold text-xs hover:bg-red-500 hover:text-white transition-all cursor-pointer ml-auto shadow-3xs"
                       title="Clear content"
                     >
                       Clear
@@ -1062,7 +1133,10 @@ function CpanelEmergencyPageContent() {
                 <div className="p-3.5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-2 text-xs font-medium leading-relaxed">
                   <span className="text-[9px] font-black uppercase opacity-60 block">Message Body</span>
                   {message ? (
-                    <div dangerouslySetInnerHTML={{ __html: message }} />
+                    <div
+                      className="prose dark:prose-invert max-w-none text-xs font-medium leading-relaxed space-y-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-[#FC7A00] [&_a]:underline [&_h3]:text-sm [&_h3]:font-extrabold [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2"
+                      dangerouslySetInnerHTML={{ __html: message }}
+                    />
                   ) : (
                     <p className="italic opacity-60">Write broadcast text message above...</p>
                   )}
