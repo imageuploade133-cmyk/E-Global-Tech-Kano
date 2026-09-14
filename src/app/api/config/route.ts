@@ -5,10 +5,16 @@ import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
 export async function GET() {
   try {
     const globalMinTransfer = await getGlobalMinTransferAmount();
-    const docSnap = await adminDb.collection("config").doc("app").get();
-    if (docSnap.exists) {
-      const data = docSnap.data();
-      // Only expose non-privileged visual branding information to public route
+    const [docSnap, togglesSnap] = await Promise.all([
+      adminDb.collection("config").doc("app").get(),
+      adminDb.collection("config").doc("feature_toggles").get(),
+    ]);
+
+    if (docSnap.exists || togglesSnap.exists) {
+      const data = docSnap.exists ? docSnap.data() : {};
+      const togglesData = togglesSnap.exists ? togglesSnap.data() : {};
+
+      // Only expose non-privileged visual branding & feature toggle information to public route
       const publicConfig = {
         logoUrl: data?.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png",
         supportPhone1: data?.supportPhone1 || "+234 800 345 6225",
@@ -30,7 +36,8 @@ export async function GET() {
         bannerHeightDesktop: data?.bannerHeightDesktop || 220,
         statementWatermarkUrl: data?.statementWatermarkUrl || "",
         statementWatermarkSize: data?.statementWatermarkSize || 100,
-        statementWatermarkOpacity: data?.statementWatermarkOpacity ?? 0.15
+        statementWatermarkOpacity: data?.statementWatermarkOpacity ?? 0.15,
+        featureToggles: togglesData?.toggles || data?.featureToggles || undefined,
       };
       return NextResponse.json({ success: true, config: publicConfig });
     }
