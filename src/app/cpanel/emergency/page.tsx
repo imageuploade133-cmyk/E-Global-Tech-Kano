@@ -90,7 +90,7 @@ function CpanelEmergencyPageContent() {
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docFileInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const richEditorRef = useRef<HTMLDivElement | null>(null);
 
   // Check Admin Unlock Session
   useEffect(() => {
@@ -168,33 +168,33 @@ function CpanelEmergencyPageContent() {
     }
   }, [isLoadingSession]);
 
-  // Rich text formatting helpers
-  const applyTextFormat = (tag: string) => {
-    if (!textareaRef.current) return;
-    const el = textareaRef.current;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = message.substring(start, end);
+  // Keep rich editor innerHTML in sync with message state when loaded or updated
+  useEffect(() => {
+    if (richEditorRef.current && richEditorRef.current.innerHTML !== message) {
+      richEditorRef.current.innerHTML = message;
+    }
+  }, [message]);
 
-    let formatted = "";
-    if (tag === "b") {
-      formatted = `<b>${selected || "bold text"}</b>`;
-    } else if (tag === "i") {
-      formatted = `<i>${selected || "italic text"}</i>`;
-    } else if (tag === "u") {
-      formatted = `<u>${selected || "underlined text"}</u>`;
-    } else if (tag === "h3") {
-      formatted = `\n<h3>${selected || "Heading Title"}</h3>\n`;
-    } else if (tag === "ul") {
-      formatted = `\n<ul>\n  <li>${selected || "List Item 1"}</li>\n  <li>List Item 2</li>\n</ul>\n`;
-    } else if (tag === "a") {
-      const url = prompt("Enter link URL:", "https://");
+  // Rich text formatting helpers using native document commands (WYSIWYG Word-style)
+  const applyRichFormat = (command: string, value: string | undefined = undefined) => {
+    if (!richEditorRef.current) return;
+    richEditorRef.current.focus();
+
+    if (command === "createLink") {
+      const url = prompt("Enter website or link URL:", "https://");
       if (!url) return;
-      formatted = `<a href="${url}" target="_blank" rel="noopener noreferrer">${selected || "Click Here"}</a>`;
+      document.execCommand("createLink", false, url);
+    } else if (command === "clear") {
+      richEditorRef.current.innerHTML = "";
+      setMessage("");
+      return;
+    } else {
+      document.execCommand(command, false, value);
     }
 
-    const newMessage = message.substring(0, start) + formatted + message.substring(end);
-    setMessage(newMessage);
+    if (richEditorRef.current) {
+      setMessage(richEditorRef.current.innerHTML);
+    }
   };
 
   // Image Upload Handler
@@ -559,53 +559,53 @@ function CpanelEmergencyPageContent() {
                   </div>
                 </div>
 
-                {/* 4. Full Broadcast Message with Rich Text Formatting Toolbar */}
+                {/* 4. Full Broadcast Message with Visual WYSIWYG Editor */}
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="text-[11px] font-black uppercase text-gray-600 dark:text-gray-300 block">
                       Full Broadcast Information / Message *
                     </label>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">Supports HTML & Formatting</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase">Visual Rich Text Editor</span>
                   </div>
 
-                  {/* Formatting Toolbar */}
+                  {/* WYSIWYG Formatting Toolbar */}
                   <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
                     <button
                       type="button"
-                      onClick={() => applyTextFormat("b")}
-                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      onClick={() => applyRichFormat("bold")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-black text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
                       title="Bold text"
                     >
                       Bold
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyTextFormat("i")}
-                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 italic font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      onClick={() => applyRichFormat("italic")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 italic font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
                       title="Italic text"
                     >
                       Italic
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyTextFormat("u")}
-                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 underline font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      onClick={() => applyRichFormat("underline")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 underline font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
                       title="Underline text"
                     >
                       Underline
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyTextFormat("h3")}
-                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-extrabold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
+                      onClick={() => applyRichFormat("formatBlock", "<h3>")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-extrabold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer"
                       title="Heading"
                     >
                       Heading
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyTextFormat("ul")}
-                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                      onClick={() => applyRichFormat("insertUnorderedList")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1"
                       title="Bullet List"
                     >
                       <span className="material-symbols-outlined text-[14px]">format_list_bulleted</span>
@@ -613,8 +613,8 @@ function CpanelEmergencyPageContent() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyTextFormat("a")}
-                      className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1"
+                      onClick={() => applyRichFormat("createLink")}
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-bold text-xs text-gray-800 dark:text-gray-200 hover:bg-[#FC7A00] hover:text-white transition-all cursor-pointer flex items-center gap-1"
                       title="Insert Link"
                     >
                       <span className="material-symbols-outlined text-[14px]">link</span>
@@ -622,22 +622,25 @@ function CpanelEmergencyPageContent() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMessage("")}
-                      className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 font-bold text-xs hover:bg-red-500 hover:text-white transition-all cursor-pointer ml-auto"
+                      onClick={() => applyRichFormat("clear")}
+                      className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 font-bold text-xs hover:bg-red-500 hover:text-white transition-all cursor-pointer ml-auto"
                       title="Clear content"
                     >
                       Clear
                     </button>
                   </div>
 
-                  <textarea
-                    ref={textareaRef}
-                    rows={6}
-                    required={isActive}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Write complete detailed broadcast information shown when users tap the banner..."
-                    className={cn("w-full p-3.5 rounded-2xl text-xs font-semibold outline-none resize-y min-h-[140px]", inputClass)}
+                  {/* Visual ContentEditable Word-style Rich Editor */}
+                  <div
+                    ref={richEditorRef}
+                    contentEditable={true}
+                    suppressContentEditableWarning={true}
+                    onInput={(e) => setMessage((e.target as HTMLDivElement).innerHTML)}
+                    onBlur={(e) => setMessage((e.target as HTMLDivElement).innerHTML)}
+                    className={cn(
+                      "w-full p-4 rounded-2xl text-xs font-medium outline-none min-h-[160px] overflow-y-auto prose dark:prose-invert max-w-none transition-all",
+                      inputClass
+                    )}
                   />
                 </div>
 
