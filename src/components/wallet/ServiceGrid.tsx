@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
+import { useAppConfig } from "@/lib/ConfigContext";
+import { isFeatureEnabled, getFeatureDisabledMessage, FeatureToggleKey } from "@/lib/feature-toggle";
 import { useRouter } from "next/navigation";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
 import { toast } from "sonner";
@@ -40,6 +42,7 @@ const item = {
 
 export const ServiceGrid: React.FC = () => {
   const { userData } = useAuth();
+  const { config } = useAppConfig();
   const router = useRouter();
 
   // Loading state for clicked service icon
@@ -84,6 +87,19 @@ export const ServiceGrid: React.FC = () => {
 
   const handleLinkClick = (e: React.MouseEvent, service: typeof services[0]) => {
     e.preventDefault();
+
+    // Map service route to feature toggle key
+    let featureKey: FeatureToggleKey | null = null;
+    if (service.href.startsWith("/bills")) featureKey = "bills";
+    else if (service.href === "/estate") featureKey = "estate";
+    else if (service.href === "/cards") featureKey = "virtual_cards";
+    else if (service.href === "/referrals") featureKey = "referral";
+
+    if (featureKey && !isFeatureEnabled(config?.featureToggles, featureKey)) {
+      toast.error(getFeatureDisabledMessage(config?.featureToggles, featureKey));
+      return;
+    }
+
     setLoadingLabel(service.label);
 
     const isMockMode = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
