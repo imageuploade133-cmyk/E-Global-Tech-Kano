@@ -3,7 +3,10 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAppConfig } from "@/lib/ConfigContext";
+import { isFeatureEnabled, getFeatureDisabledMessage, FeatureToggleKey } from "@/lib/feature-toggle";
+import { toast } from "sonner";
 
 interface NavItem {
   label: string;
@@ -70,6 +73,21 @@ const navItems: NavItem[] = [
 
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
+  const router = useRouter();
+  const { config } = useAppConfig();
+
+  const handleNavClick = (e: React.MouseEvent, item: NavItem) => {
+    let featureKey: FeatureToggleKey | null = null;
+    if (item.href === "/cards") featureKey = "virtual_cards";
+    else if (item.href === "/store") featureKey = "store";
+    else if (item.href === "/investment") featureKey = "investment";
+
+    if (featureKey && !isFeatureEnabled(config?.featureToggles, featureKey)) {
+      e.preventDefault();
+      toast.error(getFeatureDisabledMessage(config?.featureToggles, featureKey));
+      return;
+    }
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-0.5 pb-3.5 min-[360px]:pb-5.5 pt-2 bg-white/95 backdrop-blur-2xl border-none shadow-[0_-4px_20px_rgba(252,122,0,0.05)] rounded-t-[20px] min-[360px]:rounded-t-[28px]">
@@ -79,6 +97,7 @@ export const BottomNav: React.FC = () => {
           <Link
             key={item.label}
             href={item.href}
+            onClick={(e) => handleNavClick(e, item)}
             className={cn(
               "flex flex-col items-center justify-center transition-all duration-300 active:scale-95 cursor-pointer flex-1 min-w-0 px-0.5 py-1",
               isActive

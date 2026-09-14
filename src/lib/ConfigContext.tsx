@@ -126,6 +126,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
 
+    let unsubscribeToggles: (() => void) | null = null;
+
     const setupListener = () => {
       try {
         unsubscribe = onSnapshot(doc(db, "config", "app"), (docSnap) => {
@@ -134,14 +136,35 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setConfig((prev) => ({
               ...prev,
               ...remoteData,
+              // Preserve existing featureToggles if remoteData does not contain featureToggles
+              featureToggles: remoteData.featureToggles || prev.featureToggles || DEFAULT_FEATURE_TOGGLES,
             }));
           }
         }, (error) => {
-          // Quietly handle permission failures for guest or unauthenticated users and fetch via serverless API
           if (error.code === "permission-denied") {
             fetchPublicConfigFallback();
           } else {
             console.warn("Config listener error:", error);
+          }
+        });
+
+        // Real-time listener specifically for config/feature_toggles document
+        unsubscribeToggles = onSnapshot(doc(db, "config", "feature_toggles"), (docSnap) => {
+          if (docSnap.exists()) {
+            const togglesData = docSnap.data()?.toggles;
+            if (togglesData) {
+              setConfig((prev) => ({
+                ...prev,
+                featureToggles: {
+                  ...DEFAULT_FEATURE_TOGGLES,
+                  ...togglesData,
+                },
+              }));
+            }
+          }
+        }, (error) => {
+          if (error.code === "permission-denied") {
+            fetchPublicConfigFallback();
           }
         });
       } catch (e) {
@@ -167,6 +190,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       unsubscribeAuth();
       if (unsubscribe) unsubscribe();
+      if (unsubscribeToggles) unsubscribeToggles();
     };
   }, []);
 

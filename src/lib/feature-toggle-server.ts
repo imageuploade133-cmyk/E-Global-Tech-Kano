@@ -5,14 +5,20 @@ export async function checkServerFeatureStatus(
   key: FeatureToggleKey
 ): Promise<{ enabled: boolean; message: string }> {
   try {
-    const docSnap = await adminDb.collection("config").doc("feature_toggles").get();
-    if (!docSnap.exists) {
-      return { enabled: true, message: DEFAULT_DISABLED_NOTICE };
+    const [togglesSnap, appSnap] = await Promise.all([
+      adminDb.collection("config").doc("feature_toggles").get(),
+      adminDb.collection("config").doc("app").get(),
+    ]);
+
+    let toggles: Record<string, any> = {};
+
+    if (togglesSnap.exists && togglesSnap.data()?.toggles) {
+      toggles = togglesSnap.data()?.toggles || {};
+    } else if (appSnap.exists && appSnap.data()?.featureToggles) {
+      toggles = appSnap.data()?.featureToggles || {};
     }
 
-    const toggles = docSnap.data()?.toggles || {};
     const item = toggles[key];
-
     if (!item) {
       return { enabled: true, message: DEFAULT_DISABLED_NOTICE };
     }
