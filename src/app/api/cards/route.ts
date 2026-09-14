@@ -3,6 +3,7 @@ import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util"
 import { adminDb } from "@/lib/firebase-admin";
 import { CardService } from "@/services/card-service";
 import { hasAdminCredentials } from "@/lib/firebase-admin";
+import { checkServerFeatureStatus } from "@/lib/feature-toggle-server";
 
 export async function GET(req: Request) {
   let uid = "";
@@ -93,6 +94,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const featureStatus = await checkServerFeatureStatus("virtual_cards");
+  if (!featureStatus.enabled) {
+    return NextResponse.json({ error: featureStatus.message }, { status: 403 });
+  }
+
   let uid = "";
   let idToken = "";
   try {

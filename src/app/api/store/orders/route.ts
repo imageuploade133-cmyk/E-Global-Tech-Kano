@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
+import { checkServerFeatureStatus } from "@/lib/feature-toggle-server";
 
 // Helper function to auto-clean stale unpaid/abandoned orders older than 24 hours (100% server-side)
 async function autoCleanStaleAbandonedOrders() {
@@ -46,6 +47,11 @@ async function autoCleanStaleAbandonedOrders() {
 
 export async function POST(req: Request) {
   try {
+    const featureStatus = await checkServerFeatureStatus("store");
+    if (!featureStatus.enabled) {
+      return NextResponse.json({ error: featureStatus.message }, { status: 403 });
+    }
+
     let uid = "";
     let userEmail = "";
     try {

@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { CardService } from "@/services/card-service";
+import { checkServerFeatureStatus } from "@/lib/feature-toggle-server";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const featureStatus = await checkServerFeatureStatus("virtual_cards");
+  if (!featureStatus.enabled) {
+    return NextResponse.json({ error: featureStatus.message }, { status: 403 });
+  }
   let uid = "";
   let idToken = "";
   try {
