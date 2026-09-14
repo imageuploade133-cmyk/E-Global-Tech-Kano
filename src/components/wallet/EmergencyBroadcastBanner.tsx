@@ -177,14 +177,11 @@ export const EmergencyBroadcastBanner: React.FC = () => {
                       {iconName}
                     </span>
                   </div>
-                  <div className="min-w-0 flex-1 flex items-center gap-1.5">
-                    <span className="text-[8.5px] min-[360px]:text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-400 shrink-0">
-                      {badgeLabel}
-                    </span>
-                    <h3 className="font-extrabold text-xs min-[360px]:text-sm uppercase tracking-tight truncate flex items-center gap-1">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-extrabold text-xs min-[360px]:text-sm sm:text-base uppercase tracking-tight truncate flex items-center gap-1.5">
                       <span>Emergency Broadcast</span>
                       {/* Blue Verification Badge Icon */}
-                      <span className="material-symbols-outlined text-[17px] text-blue-500 fill-blue-500 shrink-0 select-none">
+                      <span className="material-symbols-outlined text-[18px] text-blue-500 fill-blue-500 shrink-0 select-none">
                         verified
                       </span>
                     </h3>
