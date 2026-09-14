@@ -13,6 +13,8 @@ import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawe
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
+import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
+import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
 
 interface BalanceCardProps {
   balance: number;
@@ -293,6 +295,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   const handleSwapExecute = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!isFeatureEnabled(config?.featureToggles, "currency_swap")) {
+      toast.error(getFeatureDisabledMessage(config?.featureToggles, "currency_swap"));
+      return;
+    }
     const amt = parseFloat(swapAmount);
     const fromCurrency = swapFromCurrency;
     const toCurrency = swapToCurrency;
@@ -1681,6 +1687,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   // Execute Direct Outward Transfer (Single or Bulk)
   const executeOutwardTransfer = async (completedPin: string) => {
+    if (!isFeatureEnabled(config?.featureToggles, "transfer")) {
+      toast.error(getFeatureDisabledMessage(config?.featureToggles, "transfer"));
+      return;
+    }
     setIsTransferring(true);
 
     if (isBulkMode) {
@@ -2564,6 +2574,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             {/* Scrollable Modal Body Container */}
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar pb-16">
 
+            {!isFeatureEnabled(config?.featureToggles, "fund_wallet") ? (
+              <div className="py-8">
+                <FeatureDisabledBanner
+                  title="Fund Wallet Unavailable"
+                  message={getFeatureDisabledMessage(config?.featureToggles, "fund_wallet")}
+                />
+              </div>
+            ) : (
             <AnimatePresence mode="wait">
               {/* STEP 1: Enter Amount */}
               {wizardStep === "amount" && (
@@ -3105,10 +3123,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                 </motion.div>
               )}
             </AnimatePresence>
+            )}
             </div>
 
             {/* Static Bottom Action Bar for Fund Wallet */}
-            {wizardStep === "amount" && (
+            {isFeatureEnabled(config?.featureToggles, "fund_wallet") && wizardStep === "amount" && (
               <div className="p-5 bg-white border-t border-gray-100 flex-shrink-0 shadow-lg z-20">
                 <button
                   type="submit"
@@ -3190,7 +3209,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             </div>
 
             <div className="flex-1 overflow-y-auto no-scrollbar pb-16">
-            {!isTrfContentReady ? (
+            {!isFeatureEnabled(config?.featureToggles, "transfer") ? (
+              <div className="py-8">
+                <FeatureDisabledBanner
+                  title="Bank Transfer Unavailable"
+                  message={getFeatureDisabledMessage(config?.featureToggles, "transfer")}
+                />
+              </div>
+            ) : !isTrfContentReady ? (
               <div className="flex-1 flex flex-col items-center justify-center my-auto py-12">
                 <div className="w-9 h-9 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin mb-3" />
                 <span className="font-hanken text-xs font-bold text-gray-400 uppercase tracking-wider">Loading Transfer Portal...</span>
@@ -4381,7 +4407,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
           {/* Body Content */}
           <div className="flex-1 overflow-y-auto px-5 py-6 pb-16 max-w-md mx-auto w-full no-scrollbar space-y-5">
-            {swapStep === "form" ? (
+            {!isFeatureEnabled(config?.featureToggles, "currency_swap") ? (
+              <div className="py-8">
+                <FeatureDisabledBanner
+                  title="Currency Swap Unavailable"
+                  message={getFeatureDisabledMessage(config?.featureToggles, "currency_swap")}
+                />
+              </div>
+            ) : swapStep === "form" ? (
               <form id="currency-swap-form" onSubmit={handleSwapFormContinue} className="space-y-5 text-left">
                 {/* Dynamic Swap Direction & Currency pill selector */}
                 <div className="space-y-2">
