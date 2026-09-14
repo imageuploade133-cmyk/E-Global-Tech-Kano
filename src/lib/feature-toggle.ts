@@ -44,14 +44,16 @@ export const FEATURE_METADATA: Record<FeatureToggleKey, { name: string; icon: st
 };
 
 export function isFeatureEnabled(toggles?: FeatureToggles | null, key?: FeatureToggleKey): boolean {
-  if (!toggles || !key) return true;
-  const item = toggles[key];
+  if (!key) return true;
+  const activeToggles = toggles || DEFAULT_FEATURE_TOGGLES;
+  const item = activeToggles[key];
   if (!item) return true;
   return item.enabled !== false;
 }
 
 export function getFeatureDisabledMessage(toggles?: FeatureToggles | null, key?: FeatureToggleKey): string {
-  if (!toggles || !key) return DEFAULT_DISABLED_NOTICE;
-  const item = toggles[key];
+  if (!key) return DEFAULT_DISABLED_NOTICE;
+  const activeToggles = toggles || DEFAULT_FEATURE_TOGGLES;
+  const item = activeToggles[key];
   return (item?.disabledNotice || "").trim() || DEFAULT_DISABLED_NOTICE;
 }
