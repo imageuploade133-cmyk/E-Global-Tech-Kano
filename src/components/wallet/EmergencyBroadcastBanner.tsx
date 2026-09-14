@@ -235,7 +235,7 @@ export const EmergencyBroadcastBanner: React.FC = () => {
                   </span>
                   {isHtml ? (
                     <div
-                      className="prose prose-sm max-w-none text-xs font-medium leading-relaxed space-y-2"
+                      className="prose dark:prose-invert max-w-none text-xs sm:text-sm font-medium leading-relaxed space-y-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_a]:text-[#FC7A00] [&_a]:underline [&_h3]:text-base [&_h3]:font-black [&_h3]:my-2 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:my-2 [&_img]:shadow-md"
                       dangerouslySetInnerHTML={{ __html: broadcast.message }}
                     />
                   ) : (
