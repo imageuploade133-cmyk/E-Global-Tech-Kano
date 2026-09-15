@@ -212,9 +212,25 @@ html.material-symbols-loaded .material-symbols-outlined {
   box-shadow: 0 4px 15px rgba(11, 81, 61, 0.1);
 }
 
-@utility custom-scrollbar {
+@utility no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
   &::-webkit-scrollbar {
-    display: none;
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+  }
+}
+
+@utility custom-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  &::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
   }
 }
 

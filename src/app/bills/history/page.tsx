@@ -258,48 +258,56 @@ export default function BillsHistoryPage() {
         >
           {/* Header Bar */}
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={() => window.history.back()}
-                className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
+                className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none flex-shrink-0"
                 title="Go Back"
               >
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
-              <div>
-                <h2 className="font-bodoni font-extrabold text-lg text-black leading-tight">Bills History</h2>
-                <p className="font-hanken text-[10.5px] text-gray-400 font-bold uppercase tracking-wider">Airtime, Data & Utility Logs</p>
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center flex-shrink-0 shadow-none">
+                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">manage_search</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bodoni font-extrabold text-lg text-black leading-tight truncate">Bills History</h2>
+                <p className="font-hanken text-[10.5px] text-gray-400 font-bold uppercase tracking-wider truncate">Airtime, Data & Utility Logs</p>
               </div>
             </div>
 
             <Link
               href="/bills"
-              className="px-3 py-1.5 rounded-xl border border-[#FC7A00]/30 bg-[#FC7A00]/10 text-[#FC7A00] font-black text-xs uppercase tracking-wider hover:bg-[#FC7A00] hover:text-white transition-all"
+              className="px-3.5 py-2 rounded-xl border border-[#FC7A00]/30 bg-[#FC7A00]/10 text-[#FC7A00] font-black text-xs uppercase tracking-wider hover:bg-[#FC7A00] hover:text-white transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 shadow-3xs"
             >
-              Pay Bills
+              <span className="material-symbols-outlined text-[16px]">payments</span>
+              <span>Pay Bills</span>
             </Link>
           </div>
 
-          {/* Search Input */}
+          {/* User-Friendly & Robust Balanced Search Bar */}
           <div className="relative w-full">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
-              search
-            </span>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search phone number, provider or ref..."
-              className="w-full bg-white border border-black rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
+            <div className="relative flex items-center">
+              <span className="material-symbols-outlined absolute left-3.5 text-gray-400 text-[20px] pointer-events-none">
+                search
+              </span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search phone number, provider, or transaction ref..."
+                className="w-full bg-white border border-gray-200 focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 rounded-2xl pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none shadow-3xs transition-all duration-200"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3.5 text-gray-400 hover:text-black transition-colors p-1 flex items-center justify-center rounded-full hover:bg-gray-100"
+                  title="Clear search"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Filter Pill Tabs */}
