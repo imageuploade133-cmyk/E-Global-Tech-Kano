@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 
+function sanitizeBillErrorMessage(rawMessage: string, defaultType: string = "WAEC PIN"): string {
+  const msg = String(rawMessage || "").toLowerCase();
+
+  if (
+    msg.includes("insufficient_balance") ||
+    msg.includes("insufficient balance") ||
+    msg.includes("clubkonnect") ||
+    msg.includes("flutterwave") ||
+    msg.includes("rejected request") ||
+    msg.includes("provider") ||
+    msg.includes("gateway")
+  ) {
+    return `${defaultType} purchase network issue. Please try again later.`;
+  }
+
+  return rawMessage || `${defaultType} purchase network issue. Please try again later.`;
+}
+
 export async function POST(req: Request) {
   try {
     const authResult = await authenticateUserRequest(req);
@@ -44,17 +62,23 @@ export async function POST(req: Request) {
       const errText = await gatewayRes.text();
       try {
         const errJson = JSON.parse(errText);
-        return NextResponse.json(errJson, { status: gatewayRes.status });
+        const rawErr = errJson.message || errJson.error || errJson.details || "WAEC PIN purchase failed";
+        return NextResponse.json({ ...errJson, message: sanitizeBillErrorMessage(rawErr, "WAEC PIN"), error: sanitizeBillErrorMessage(rawErr, "WAEC PIN") }, { status: gatewayRes.status });
       } catch {
-        return NextResponse.json({ error: "Failed to process WAEC pin purchase", details: errText }, { status: gatewayRes.status });
+        return NextResponse.json({ error: sanitizeBillErrorMessage(errText, "WAEC PIN") }, { status: gatewayRes.status });
       }
     }
 
     const data = await gatewayRes.json();
+    if (data && data.success === false) {
+      const rawMsg = data.message || data.error || "WAEC PIN purchase failed";
+      data.message = sanitizeBillErrorMessage(rawMsg, "WAEC PIN");
+      data.error = sanitizeBillErrorMessage(rawMsg, "WAEC PIN");
+    }
     return NextResponse.json(data);
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[WAEC Purchase Route Error]:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: sanitizeBillErrorMessage(error.message, "WAEC PIN") }, { status: 500 });
   }
 }

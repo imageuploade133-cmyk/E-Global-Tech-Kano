@@ -2,6 +2,24 @@ import { NextResponse } from "next/server";
 import { authenticateUserRequest, verifyUserKycApproved } from "@/lib/auth-util";
 import { safeParseJson } from "@/lib/utils";
 
+function sanitizeBillErrorMessage(rawMessage: string, defaultType: string = "electricity"): string {
+  const msg = String(rawMessage || "").toLowerCase();
+
+  if (
+    msg.includes("insufficient_balance") ||
+    msg.includes("insufficient balance") ||
+    msg.includes("clubkonnect") ||
+    msg.includes("flutterwave") ||
+    msg.includes("rejected request") ||
+    msg.includes("provider") ||
+    msg.includes("gateway")
+  ) {
+    return `${defaultType.charAt(0).toUpperCase() + defaultType.slice(1)} payment network issue. Please try again later.`;
+  }
+
+  return rawMessage || `${defaultType.charAt(0).toUpperCase() + defaultType.slice(1)} payment network issue. Please try again later.`;
+}
+
 export async function POST(req: Request) {
   try {
     const authResult = await authenticateUserRequest(req);
@@ -33,17 +51,23 @@ export async function POST(req: Request) {
       const errText = await gatewayRes.text();
       try {
         const errJson = JSON.parse(errText);
-        return NextResponse.json(errJson, { status: gatewayRes.status });
+        const rawErr = errJson.message || errJson.error || errJson.details || "Electricity payment failed";
+        return NextResponse.json({ ...errJson, message: sanitizeBillErrorMessage(rawErr, "electricity"), error: sanitizeBillErrorMessage(rawErr, "electricity") }, { status: gatewayRes.status });
       } catch {
-        return NextResponse.json({ error: "Failed to process electricity payment", details: errText }, { status: gatewayRes.status });
+        return NextResponse.json({ error: sanitizeBillErrorMessage(errText, "electricity") }, { status: gatewayRes.status });
       }
     }
 
     const data = await safeParseJson(gatewayRes);
+    if (data && data.success === false) {
+      const rawMsg = data.message || data.error || "Electricity payment failed";
+      data.message = sanitizeBillErrorMessage(rawMsg, "electricity");
+      data.error = sanitizeBillErrorMessage(rawMsg, "electricity");
+    }
     return NextResponse.json(data);
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Electricity Route Error]:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: sanitizeBillErrorMessage(error.message, "electricity") }, { status: 500 });
   }
 }

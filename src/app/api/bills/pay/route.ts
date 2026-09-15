@@ -8,6 +8,40 @@ import { NotificationService } from "@/services/notification-service";
 import bcrypt from "bcryptjs";
 import { MOCK_ITEMS } from "../items/config";
 
+function sanitizeBillErrorMessage(rawMessage: string, billType: string = "bill"): string {
+  const msg = String(rawMessage || "").toLowerCase();
+  const typeLower = (billType || "bill").toLowerCase();
+
+  if (
+    msg.includes("insufficient_balance") ||
+    msg.includes("insufficient balance") ||
+    msg.includes("clubkonnect") ||
+    msg.includes("flutterwave") ||
+    msg.includes("rejected request") ||
+    msg.includes("provider") ||
+    msg.includes("gateway")
+  ) {
+    if (typeLower.includes("airtime")) {
+      return "Airtime purchase network issue. Please try again later.";
+    }
+    if (typeLower.includes("data")) {
+      return "Data purchase network issue. Please try again later.";
+    }
+    if (typeLower.includes("cable")) {
+      return "Cable TV subscription network issue. Please try again later.";
+    }
+    if (typeLower.includes("electricity") || typeLower.includes("utility")) {
+      return "Electricity payment network issue. Please try again later.";
+    }
+    if (typeLower.includes("waec")) {
+      return "WAEC PIN purchase network issue. Please try again later.";
+    }
+    return "Bill payment network issue. Please try again later.";
+  }
+
+  return rawMessage || "Bill payment network issue. Please try again later.";
+}
+
 export async function POST(req: Request) {
   const startTime = Date.now();
   let uid = "";
@@ -502,14 +536,15 @@ export async function POST(req: Request) {
         }
       });
 
+      const sanitizedError = sanitizeBillErrorMessage(err.message, biller_type || "bill");
       return NextResponse.json({
-        error: `Failed to complete payment with billing provider: ${err.message}. Wallet funds have been successfully refunded.`
+        error: `${sanitizedError} Wallet funds have been successfully refunded.`
       }, { status: 400 });
     }
 
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Bills Pay Main Exception]:", error.message, error.stack);
-    return NextResponse.json({ error: "Internal processing error occurred while executing payment." }, { status: 500 });
+    return NextResponse.json({ error: sanitizeBillErrorMessage(error.message, "bill") }, { status: 500 });
   }
 }
