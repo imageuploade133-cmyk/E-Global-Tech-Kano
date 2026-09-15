@@ -369,58 +369,74 @@ export async function POST(req: Request) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         try {
-          const finalTxSnap = await adminDb.collection("transactions").doc(`tx-${trfReference}`).get();
-          const finalTxStatus = finalTxSnap.exists ? String(finalTxSnap.data()?.status || "").toUpperCase() : "SUCCESS";
+          const txRefDoc = adminDb.collection("transactions").doc(`tx-${trfReference}`);
 
-          if (finalTxStatus === "SUCCESS") {
-            // 1. Sender Notification
+          let shouldNotifySender = false;
+
+          await adminDb.runTransaction(async (claimTx) => {
+            const snap = await claimTx.get(txRefDoc);
+            if (!snap.exists) return;
+            const data = snap.data() || {};
+            const statusUpper = String(data.status || "").toUpperCase();
+
+            if (statusUpper === "SUCCESS") {
+              if (!data.senderNotified) {
+                shouldNotifySender = true;
+                claimTx.update(txRefDoc, {
+                  senderNotified: true,
+                  notifiedAt: new Date().toISOString(),
+                });
+              }
+            }
+          });
+
+          // 1. Sender Notification (Dispatched only if atomically claimed)
+          if (shouldNotifySender) {
             NotificationService.sendPushNotification(uid, {
               title: "💸 Bulk Transfer Queued",
               body: `Your bulk transfer of ₦${totalAmt.toLocaleString()} for ${trfRecipients.length} recipients has been successfully queued.`,
               type: "transaction",
               url: "/history",
             }).catch(() => {});
+          }
 
-            // 2. Recipient Notifications for any internal recipients
-            try {
-              const senderSnap = await adminDb.collection("users").doc(uid).get();
-              const senderUserData = senderSnap.exists ? senderSnap.data() || {} : {};
-              const senderName = senderUserData.name || senderUserData.displayName || senderUserData.fullName || "E-Global Pay User";
+          // 2. Recipient Notifications for any internal recipients
+          try {
+            const senderSnap = await adminDb.collection("users").doc(uid).get();
+            const senderUserData = senderSnap.exists ? senderSnap.data() || {} : {};
+            const senderName = senderUserData.name || senderUserData.displayName || senderUserData.fullName || "E-Global Pay User";
 
-              for (const rec of trfRecipients) {
-                const accountNumberRaw = rec.accountNumber || rec.account_number || rec.recipientAccount;
-                const accountNumber = (accountNumberRaw !== undefined && accountNumberRaw !== null) ? String(accountNumberRaw).trim() : "";
-                const recAmt = Number(rec.amount) || 0;
+            for (const rec of trfRecipients) {
+              const accountNumberRaw = rec.accountNumber || rec.account_number || rec.recipientAccount;
+              const accountNumber = (accountNumberRaw !== undefined && accountNumberRaw !== null) ? String(accountNumberRaw).trim() : "";
+              const recAmt = Number(rec.amount) || 0;
 
-                if (accountNumber && recAmt > 0) {
-                  const recipientUser = await resolveInternalUserByAccount(accountNumber);
-                  if (recipientUser && recipientUser.uid !== uid) {
-                    NotificationService.sendPushNotification(recipientUser.uid, {
-                      title: "Money Received 💰",
-                      body: `You received ₦${recAmt.toLocaleString()} from ${senderName}`,
-                      type: "transaction",
-                      url: "/history",
-                      amount: recAmt,
-                      currency: "NGN",
-                      reference: trfReference,
-                      recipientName: "Main Wallet",
-                      bankName: "E-Global Pay",
-                      channel: "Inward Transfer",
-                    }).catch(() => {});
-                    console.log(`[Bulk Transfer API] Dispatched recipient notification to userId=${recipientUser.uid} for recAmt=₦${recAmt}`);
-                  }
+              if (accountNumber && recAmt > 0) {
+                const recipientUser = await resolveInternalUserByAccount(accountNumber);
+                if (recipientUser && recipientUser.uid !== uid) {
+                  NotificationService.sendPushNotification(recipientUser.uid, {
+                    title: "Money Received 💰",
+                    body: `You received ₦${recAmt.toLocaleString()} from ${senderName}`,
+                    type: "transaction",
+                    url: "/history",
+                    amount: recAmt,
+                    currency: "NGN",
+                    reference: trfReference,
+                    recipientName: "Main Wallet",
+                    bankName: "E-Global Pay",
+                    channel: "Inward Transfer",
+                  }).catch(() => {});
+                  console.log(`[Bulk Transfer API] Dispatched recipient notification to userId=${recipientUser.uid} for recAmt=₦${recAmt}`);
                 }
               }
-            } catch (bulkRecErr: any) {
-              console.error("[Bulk Transfer API Recipient Notif Error]:", bulkRecErr.message);
             }
-
-            console.log(`[Bulk Transfer API] Added notifications for 100% successful bulk transfer ref=${trfReference}`);
-          } else {
-            console.warn(`[Bulk Transfer API] Skipping notification dispatch: bulk transfer ref=${trfReference} status is '${finalTxStatus}' (not 100% SUCCESS)`);
+          } catch (bulkRecErr: any) {
+            console.error("[Bulk Transfer API Recipient Notif Error]:", bulkRecErr.message);
           }
+
+          console.log(`[Bulk Transfer API] Processed notifications (claimed sender=${shouldNotifySender}) for ref=${trfReference}`);
         } catch (notifErr: any) {
-          console.error("[Notification Warning] Failed to dispatch real bulk transfer notification:", notifErr.message);
+          console.error("[Notification Warning] Failed to process real bulk transfer notification:", notifErr.message);
         }
 
         return NextResponse.json({
