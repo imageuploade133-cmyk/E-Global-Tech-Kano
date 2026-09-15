@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       .limit(100)
       .get();
 
-    let logs: any[] = [];
+    const logs: any[] = [];
     auditLogsSnap.forEach((doc) => {
       const data = doc.data() || {};
       const action = data.action || "";
