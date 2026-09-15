@@ -6,6 +6,7 @@ import { logPaymentEvent } from "@/lib/payment-logger";
 import { NotificationService } from "@/services/notification-service";
 import { calculateTransferMarkupFee, TransferTieredMarkup } from "@/lib/transfer-markup-util";
 import { getGlobalMinTransferAmount } from "@/lib/global-limits-util";
+import { resolveInternalUserByAccount } from "@/lib/user-resolver";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
@@ -301,7 +302,7 @@ export async function POST(req: Request) {
         processingTimeMs: Date.now() - startTime,
       });
 
-      // Send Notification
+      // Send Sender Notification
       try {
         NotificationService.sendPushNotification(uid, {
           title: "💸 Bank Transfer Sent",
@@ -317,6 +318,32 @@ export async function POST(req: Request) {
         });
       } catch (notifErr: any) {
         console.error("[Notification Warning] Failed to dispatch mock transfer notification:", notifErr.message);
+      }
+
+      // Send Recipient Notification if internal
+      try {
+        const recipientUser = await resolveInternalUserByAccount(trfAccount);
+        if (recipientUser && recipientUser.uid !== uid) {
+          const userSnap = await adminDb.collection("users").doc(uid).get();
+          const senderUserData = userSnap.exists ? userSnap.data() || {} : {};
+          const senderName = senderUserData.name || senderUserData.displayName || senderUserData.fullName || "E-Global Pay User";
+
+          NotificationService.sendPushNotification(recipientUser.uid, {
+            title: "Money Received 💰",
+            body: `You received ₦${trfAmount.toLocaleString()} from ${senderName}`,
+            type: "transaction",
+            url: "/history",
+            amount: trfAmount,
+            currency: trfCurrency || "NGN",
+            reference: trfReference,
+            recipientName: "Main Wallet",
+            bankName: trfBankName || "E-Global Pay",
+            channel: "Inward Transfer",
+          });
+          console.log(`[Transfer API] Dispatched mock recipient notification to userId=${recipientUser.uid}`);
+        }
+      } catch (recNotifErr: any) {
+        console.error("[Notification Warning] Failed to dispatch mock recipient notification:", recNotifErr.message);
       }
 
       return NextResponse.json({
@@ -399,22 +426,62 @@ export async function POST(req: Request) {
 
         try {
           const finalTxSnap = await adminDb.collection("transactions").doc(`tx-${trfReference}`).get();
-          const finalTxStatus = finalTxSnap.exists ? String(finalTxSnap.data()?.status || "").toUpperCase() : "SUCCESS";
+          const finalTxData = finalTxSnap.exists ? finalTxSnap.data() || {} : {};
+          const finalTxStatus = String(finalTxData.status || "").toUpperCase();
 
           if (finalTxStatus === "SUCCESS") {
-            NotificationService.sendPushNotification(uid, {
-              title: "💸 Bank Transfer Sent",
-              body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
-              type: "transaction",
-              url: "/history",
-              amount: trfAmount,
-              currency: trfCurrency || "NGN",
-              reference: trfReference,
-              recipientName: trfName,
-              bankName: trfBankName || "Bank Transfer",
-              channel: "Outward Transfer",
-            });
-            console.log(`[Transfer API] Added notification for 100% successful transfer ref=${trfReference}`);
+            // 1. Sender Notification (Idempotent: check senderNotified flag)
+            if (!finalTxData.senderNotified) {
+              NotificationService.sendPushNotification(uid, {
+                title: "💸 Bank Transfer Sent",
+                body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
+                type: "transaction",
+                url: "/history",
+                amount: trfAmount,
+                currency: trfCurrency || "NGN",
+                reference: trfReference,
+                recipientName: trfName,
+                bankName: trfBankName || "Bank Transfer",
+                channel: "Outward Transfer",
+              }).catch(() => {});
+            }
+
+            // 2. Recipient Notification (Idempotent: check recipientNotified flag)
+            if (!finalTxData.recipientNotified) {
+              try {
+                const recipientUser = await resolveInternalUserByAccount(trfAccount);
+                if (recipientUser && recipientUser.uid !== uid) {
+                  const senderSnap = await adminDb.collection("users").doc(uid).get();
+                  const senderUserData = senderSnap.exists ? senderSnap.data() || {} : {};
+                  const senderName = senderUserData.name || senderUserData.displayName || senderUserData.fullName || "E-Global Pay User";
+
+                  NotificationService.sendPushNotification(recipientUser.uid, {
+                    title: "Money Received 💰",
+                    body: `You received ₦${trfAmount.toLocaleString()} from ${senderName}`,
+                    type: "transaction",
+                    url: "/history",
+                    amount: trfAmount,
+                    currency: trfCurrency || "NGN",
+                    reference: trfReference,
+                    recipientName: "Main Wallet",
+                    bankName: trfBankName || "E-Global Pay",
+                    channel: "Inward Transfer",
+                  }).catch(() => {});
+                  console.log(`[Transfer API] Dispatched recipient notification to userId=${recipientUser.uid} for ref=${trfReference}`);
+                }
+              } catch (recErr: any) {
+                console.error("[Transfer API Recipient Notif Error]:", recErr.message);
+              }
+            }
+
+            // Update transaction flags to prevent duplicate notifications on retry
+            await adminDb.collection("transactions").doc(`tx-${trfReference}`).update({
+              senderNotified: true,
+              recipientNotified: true,
+              notifiedAt: new Date().toISOString(),
+            }).catch(() => {});
+
+            console.log(`[Transfer API] Processed notifications for 100% successful transfer ref=${trfReference}`);
           } else {
             console.warn(`[Transfer API] Skipping notification dispatch: transfer ref=${trfReference} status is '${finalTxStatus}' (not 100% SUCCESS)`);
           }
