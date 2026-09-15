@@ -3,7 +3,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { checkServerFeatureStatus } from "@/lib/feature-toggle-server";
 
-// Helper function to auto-clean stale unpaid/abandoned orders older than 24 hours (100% server-side)
+// Helper function to auto-clean stale unpaid/abandoned orders older than 24 hours & restore stock if needed
 async function autoCleanStaleAbandonedOrders() {
   try {
     const twentyFourHoursAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -13,15 +13,12 @@ async function autoCleanStaleAbandonedOrders() {
       .get();
 
     if (!staleOrdersSnap.empty) {
-      const batch = adminDb.batch();
-      let deleteCount = 0;
-
+      const ordersToPurge: any[] = [];
       staleOrdersSnap.forEach((doc) => {
         const data = doc.data();
         const st = String(data.status || "").toLowerCase();
         const paySt = String(data.paymentStatus || "").toLowerCase();
 
-        // Delete if unpaid, abandoned, or failed after 24 hours
         if (
           st === "pending payment" ||
           st === "payment failed" ||
@@ -30,14 +27,49 @@ async function autoCleanStaleAbandonedOrders() {
           paySt === "pending_payment" ||
           paySt === "failed"
         ) {
-          batch.delete(doc.ref);
-          deleteCount++;
+          ordersToPurge.push({ id: doc.id, ref: doc.ref, data });
         }
       });
 
-      if (deleteCount > 0) {
-        await batch.commit();
-        console.log(`[Store Orders Auto-Clean] Auto-deleted ${deleteCount} stale abandoned store orders (>24h old).`);
+      if (ordersToPurge.length > 0) {
+        const storeDataRef = adminDb.collection("config").doc("store_data");
+
+        await adminDb.runTransaction(async (transaction) => {
+          const storeSnap = await transaction.get(storeDataRef);
+          let currentItems: any[] = Array.isArray(storeSnap.data()?.items)
+            ? [...(storeSnap.data()?.items)]
+            : [];
+          let stockModified = false;
+
+          for (const orderObj of ordersToPurge) {
+            const data = orderObj.data;
+            // If stock was deducted and not yet restored, restore item stock
+            if (data.stockDeducted === true && data.stockRestored !== true && Array.isArray(data.items)) {
+              for (const oItem of data.items) {
+                const idx = currentItems.findIndex((i: any) => i.id === oItem.id);
+                if (idx > -1) {
+                  const targetItem = currentItems[idx];
+                  if (!targetItem.unlimitedStock && typeof targetItem.stockQuantity === "number") {
+                    const restoredQty = targetItem.stockQuantity + (Number(oItem.quantity) || 1);
+                    currentItems[idx] = {
+                      ...targetItem,
+                      stockQuantity: restoredQty,
+                      inStock: restoredQty > 0,
+                    };
+                    stockModified = true;
+                  }
+                }
+              }
+            }
+            transaction.delete(orderObj.ref);
+          }
+
+          if (stockModified) {
+            transaction.update(storeDataRef, { items: currentItems, updatedAt: new Date().toISOString() });
+          }
+        });
+
+        console.log(`[Store Orders Auto-Clean] Auto-cleaned ${ordersToPurge.length} stale abandoned store orders & restored inventory stock.`);
       }
     }
   } catch (err: any) {
@@ -76,81 +108,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required customer delivery information (name, phone, address)." }, { status: 400 });
     }
 
-    // Fetch database single source of truth from config/store_data for 100% server-side price & stock verification
-    const storeDataRef = adminDb.collection("config").doc("store_data");
-    const storeDataSnap = await storeDataRef.get();
-
-    if (!storeDataSnap.exists) {
-      return NextResponse.json({ error: "Store catalog database is unavailable." }, { status: 500 });
-    }
-
-    const currentStoreItems: any[] = Array.isArray(storeDataSnap.data()?.items)
-      ? [...(storeDataSnap.data()?.items)]
-      : [];
-
-    let totalAmount = 0;
-    const orderItems: any[] = [];
-
-    // Process each ordered item and enforce server-authoritative promotional prices & stock limits
-    for (const reqItem of items) {
-      const targetStoreItem = currentStoreItems.find((i: any) => i.id === reqItem.id);
-      if (!targetStoreItem) {
-        return NextResponse.json({ error: `Invalid item "${reqItem.title || reqItem.id}": Item does not exist in store catalog.` }, { status: 400 });
-      }
-
-      if (targetStoreItem.isHidden === true) {
-        return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is no longer available.` }, { status: 400 });
-      }
-
-      if (targetStoreItem.inStock === false) {
-        return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
-      }
-
-      const quantity = Math.max(1, Number(reqItem.quantity) || 1);
-
-      if (!targetStoreItem.unlimitedStock && typeof targetStoreItem.stockQuantity === "number") {
-        if (targetStoreItem.stockQuantity <= 0) {
-          return NextResponse.json({ error: `Sorry, "${targetStoreItem.title}" is currently out of stock.` }, { status: 400 });
-        }
-        if (quantity > targetStoreItem.stockQuantity) {
-          return NextResponse.json({
-            error: `Insufficient stock for "${targetStoreItem.title}". Only ${targetStoreItem.stockQuantity} unit(s) available.`,
-          }, { status: 400 });
-        }
-      }
-
-      // Calculate server-authoritative effective selling price (honoring discounts/promos)
-      const basePrice = Number(targetStoreItem.price) || 0;
-      const promoPrice = typeof targetStoreItem.discountPrice === "number" && targetStoreItem.discountPrice > 0
-        ? targetStoreItem.discountPrice
-        : typeof targetStoreItem.promoPrice === "number" && targetStoreItem.promoPrice > 0
-        ? targetStoreItem.promoPrice
-        : null;
-
-      const serverEffectivePrice = promoPrice !== null && promoPrice < basePrice ? promoPrice : basePrice;
-
-      if (serverEffectivePrice <= 0) {
-        return NextResponse.json({ error: `Invalid server price for "${targetStoreItem.title}".` }, { status: 400 });
-      }
-
-      const itemTotal = serverEffectivePrice * quantity;
-      totalAmount += itemTotal;
-
-      orderItems.push({
-        id: targetStoreItem.id,
-        title: String(targetStoreItem.title).trim(),
-        price: serverEffectivePrice,
-        originalListPrice: basePrice,
-        quantity,
-        imageUrl: String(targetStoreItem.coverImageUrl || targetStoreItem.imageUrl || "").trim(),
-        category: String(targetStoreItem.category || "General").trim(),
-      });
-    }
-
-    if (totalAmount <= 0) {
-      return NextResponse.json({ error: "Invalid total order amount." }, { status: 400 });
-    }
-
     const orderId = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
     const now = new Date().toISOString();
     const isCardCheckout = paymentMethod === "CARD_CHECKOUT";
@@ -165,28 +122,106 @@ export async function POST(req: Request) {
     const isPickup = String(deliveryAddress || "").toUpperCase().includes("PICKUP") || body.deliveryType === "PICKUP";
     const resolvedDeliveryType = isPickup ? "PICKUP" : "DELIVERY";
 
-    const newOrder = {
-      id: orderId,
-      userId: uid,
-      customerName: String(customerName).trim(),
-      customerEmail: String(customerEmail || userEmail).trim(),
-      customerPhone: String(customerPhone).trim(),
-      deliveryAddress: String(deliveryAddress).trim(),
-      deliveryType: resolvedDeliveryType,
-      items: orderItems,
-      totalAmount,
-      currency: "NGN",
-      status: initialOrderStatus,
-      adminNotes: "",
-      paymentMethod: isCardCheckout ? "CARD_CHECKOUT" : "WALLET_NGN",
-      paymentChannel,
-      paymentStatus: initialPaymentStatus,
-      paymentVerificationRef,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const storeDataRef = adminDb.collection("config").doc("store_data");
+    const walletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
+    const userRef = adminDb.collection("users").doc(uid);
+    const orderRef = adminDb.collection("store_orders").doc(orderId);
+
+    // Prepare variables for order construction
+    let finalOrderItems: any[] = [];
+    let calculatedTotalAmount = 0;
 
     if (isCardCheckout) {
+      // 100% ATOMIC TRANSACTION FOR CARD CHECKOUT: Validate prices & reserve stock atomically
+      await adminDb.runTransaction(async (transaction) => {
+        const storeSnap = await transaction.get(storeDataRef);
+        if (!storeSnap.exists) {
+          throw new Error("Store catalog database is unavailable.");
+        }
+
+        const freshStoreItems: any[] = Array.isArray(storeSnap.data()?.items)
+          ? [...(storeSnap.data()?.items)]
+          : [];
+
+        calculatedTotalAmount = 0;
+        finalOrderItems = [];
+        let stockModified = false;
+
+        for (const reqItem of items) {
+          const idx = freshStoreItems.findIndex((i: any) => i.id === reqItem.id);
+          if (idx === -1) {
+            throw new Error(`Invalid item "${reqItem.title || reqItem.id}": Item does not exist in store catalog.`);
+          }
+
+          const targetStoreItem = freshStoreItems[idx];
+
+          if (targetStoreItem.isHidden === true) {
+            throw new Error(`Sorry, "${targetStoreItem.title}" is no longer available.`);
+          }
+
+          if (targetStoreItem.inStock === false) {
+            throw new Error(`Sorry, "${targetStoreItem.title}" is currently out of stock.`);
+          }
+
+          const quantity = Math.max(1, Number(reqItem.quantity) || 1);
+
+          if (!targetStoreItem.unlimitedStock && typeof targetStoreItem.stockQuantity === "number") {
+            if (targetStoreItem.stockQuantity <= 0) {
+              throw new Error(`Sorry, "${targetStoreItem.title}" is currently out of stock.`);
+            }
+            if (quantity > targetStoreItem.stockQuantity) {
+              throw new Error(`Insufficient stock for "${targetStoreItem.title}". Only ${targetStoreItem.stockQuantity} unit(s) available.`);
+            }
+
+            // Deduct stock quantity atomically inside transaction
+            const newQty = targetStoreItem.stockQuantity - quantity;
+            freshStoreItems[idx] = {
+              ...targetStoreItem,
+              stockQuantity: newQty,
+              inStock: newQty > 0,
+            };
+            stockModified = true;
+          }
+
+          // Calculate server-authoritative effective price
+          const basePrice = Number(targetStoreItem.price) || 0;
+          const promoPrice = typeof targetStoreItem.discountPrice === "number" && targetStoreItem.discountPrice > 0
+            ? targetStoreItem.discountPrice
+            : typeof targetStoreItem.promoPrice === "number" && targetStoreItem.promoPrice > 0
+            ? targetStoreItem.promoPrice
+            : null;
+
+          const serverEffectivePrice = promoPrice !== null && promoPrice < basePrice ? promoPrice : basePrice;
+
+          if (serverEffectivePrice <= 0) {
+            throw new Error(`Invalid server price for "${targetStoreItem.title}".`);
+          }
+
+          calculatedTotalAmount += serverEffectivePrice * quantity;
+
+          finalOrderItems.push({
+            id: targetStoreItem.id,
+            title: String(targetStoreItem.title).trim(),
+            price: serverEffectivePrice,
+            costPrice: typeof targetStoreItem.costPrice === "number" ? targetStoreItem.costPrice : null,
+            originalListPrice: basePrice,
+            quantity,
+            imageUrl: String(targetStoreItem.coverImageUrl || targetStoreItem.imageUrl || "").trim(),
+            category: String(targetStoreItem.category || "General").trim(),
+          });
+        }
+
+        if (calculatedTotalAmount <= 0) {
+          throw new Error("Invalid total order amount.");
+        }
+
+        // Write updated inventory stock back to store_data inside transaction
+        if (stockModified) {
+          transaction.update(storeDataRef, { items: freshStoreItems, updatedAt: now });
+        }
+      });
+
+      // Generate card payment checkout link
       const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
       const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
 
@@ -200,7 +235,7 @@ export async function POST(req: Request) {
       let paymentUrl = "";
       let flwErrorMessage = "";
 
-      // 1. Primary: Request backend VM proxy S2S payment initialization via secure VM .env configuration
+      // Request VM proxy S2S payment initialization
       try {
         const vmProxyRes = await fetch(`${gatewayUrl}/api/flutterwave/proxy`, {
           method: "POST",
@@ -214,14 +249,10 @@ export async function POST(req: Request) {
             endpoint: "/payments",
             body: {
               tx_ref: txRef,
-              amount: totalAmount,
+              amount: calculatedTotalAmount,
               currency: "NGN",
               redirect_url: redirectUrl,
-              meta: {
-                orderId,
-                userId: uid,
-                customerPhone,
-              },
+              meta: { orderId, userId: uid, customerPhone },
               customer: {
                 email: customerEmail || userEmail || "customer@e-tech-store.com",
                 phonenumber: customerPhone,
@@ -248,7 +279,7 @@ export async function POST(req: Request) {
         console.warn("[Store Order POST] VM proxy call exception:", err.message);
       }
 
-      // 2. Secondary: Fallback to backend VM /api/flutterwave/initialize endpoint
+      // Secondary: VM initialize fallback
       if (!paymentUrl) {
         try {
           const vmInitRes = await fetch(`${gatewayUrl}/api/flutterwave/initialize`, {
@@ -259,7 +290,7 @@ export async function POST(req: Request) {
               "Authorization": `Bearer ${gatewayApiKey}`,
             },
             body: JSON.stringify({
-              amount: totalAmount,
+              amount: calculatedTotalAmount,
               currency: "NGN",
               email: customerEmail || userEmail || "customer@e-tech-store.com",
               name: customerName,
@@ -282,107 +313,38 @@ export async function POST(req: Request) {
         }
       }
 
-      // 3. Fallback: Check local env / Firestore config if direct key exists locally
-      if (!paymentUrl) {
-        let flutterwaveSecretKey = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || "";
-        if (!flutterwaveSecretKey) {
-          try {
-            const configDoc = await adminDb.collection("config").doc("app_config").get();
-            if (configDoc.exists) {
-              const cfg = configDoc.data() || {};
-              flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
-            }
-            if (!flutterwaveSecretKey) {
-              const appDoc = await adminDb.collection("config").doc("app").get();
-              if (appDoc.exists) {
-                const cfg = appDoc.data() || {};
-                flutterwaveSecretKey = cfg.flutterwaveSecretKey || cfg.flwSecretKey || cfg.flw_secret_key || cfg.flutterwave_secret_key || "";
-              }
-            }
-          } catch (err: any) {
-            console.warn("[Store Order POST] Local config lookup warning:", err.message);
-          }
-        }
-
-        if (flutterwaveSecretKey) {
-          try {
-            const flwRes = await fetch("https://api.flutterwave.com/v3/payments", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${flutterwaveSecretKey}`,
-              },
-              body: JSON.stringify({
-                tx_ref: txRef,
-                amount: totalAmount,
-                currency: "NGN",
-                redirect_url: redirectUrl,
-                meta: {
-                  orderId,
-                  userId: uid,
-                  customerPhone,
-                },
-                customer: {
-                  email: customerEmail || userEmail || "customer@e-tech-store.com",
-                  phonenumber: customerPhone,
-                  name: customerName,
-                },
-                customizations: {
-                  title: "E-Tech Store Order Payment",
-                  description: `Payment for Order ${orderId}`,
-                  logo: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
-                },
-              }),
-            });
-
-            const flwData = await flwRes.json();
-            if (flwRes.ok && flwData.status === "success" && flwData.data?.link) {
-              paymentUrl = flwData.data.link;
-            } else if (!flwErrorMessage) {
-              flwErrorMessage = flwData.message || flwData.error;
-            }
-          } catch (flwErr: any) {
-            if (!flwErrorMessage) flwErrorMessage = flwErr.message;
-          }
-        }
-      }
-
       if (!paymentUrl) {
         return NextResponse.json({
           error: flwErrorMessage || "Unable to generate card payment checkout link. Please try again or pay with Main Wallet.",
         }, { status: 502 });
       }
 
-      // Save order record as Pending Payment and decrement stock
-      const orderRef = adminDb.collection("store_orders").doc(orderId);
-      await orderRef.set({
-        ...newOrder,
+      const newOrder = {
+        id: orderId,
+        userId: uid,
+        customerName: String(customerName).trim(),
+        customerEmail: String(customerEmail || userEmail).trim(),
+        customerPhone: String(customerPhone).trim(),
+        deliveryAddress: String(deliveryAddress).trim(),
+        deliveryType: resolvedDeliveryType,
+        items: finalOrderItems,
+        totalAmount: calculatedTotalAmount,
+        currency: "NGN",
+        status: initialOrderStatus,
+        adminNotes: "",
+        paymentMethod: "CARD_CHECKOUT",
+        paymentChannel,
+        paymentStatus: initialPaymentStatus,
+        paymentVerificationRef,
+        stockDeducted: true,
+        stockRestored: false,
         txRef,
         paymentUrl,
-      });
+        createdAt: now,
+        updatedAt: now,
+      };
 
-      // Deduct stock for items with limited stock quantity
-      if (currentStoreItems.length > 0) {
-        let stockUpdated = false;
-        for (const oItem of orderItems) {
-          const idx = currentStoreItems.findIndex((i: any) => i.id === oItem.id);
-          if (idx > -1) {
-            const itemObj = currentStoreItems[idx];
-            if (!itemObj.unlimitedStock && typeof itemObj.stockQuantity === "number") {
-              const newQty = Math.max(0, itemObj.stockQuantity - oItem.quantity);
-              currentStoreItems[idx] = {
-                ...itemObj,
-                stockQuantity: newQty,
-                inStock: newQty > 0,
-              };
-              stockUpdated = true;
-            }
-          }
-        }
-        if (stockUpdated) {
-          await storeDataRef.update({ items: currentStoreItems, updatedAt: now });
-        }
-      }
+      await orderRef.set(newOrder);
 
       return NextResponse.json({
         success: true,
@@ -394,49 +356,121 @@ export async function POST(req: Request) {
       });
 
     } else {
-      // Wallet NGN Payment: Validate wallet & deduct balance atomically
-      const walletRef = adminDb.collection("wallets").doc(`${uid}_NGN`);
-      const walletSnap = await walletRef.get();
-
-      if (!walletSnap.exists) {
-        return NextResponse.json({ error: "NGN wallet not found." }, { status: 404 });
-      }
-
-      const walletData = walletSnap.data() || {};
-      const currentBalance = Number(walletData.balance) || 0;
-
-      if (currentBalance < totalAmount) {
-        return NextResponse.json({
-          error: `Insufficient wallet balance. Total is ₦${totalAmount.toLocaleString()}, but balance is ₦${currentBalance.toLocaleString()}. You can switch to 'Checkout with Card Payment' to complete your order.`,
-        }, { status: 400 });
-      }
+      // 100% ATOMIC TRANSACTION FOR MAIN NGN WALLET PAYMENT:
+      // Verify stock, verify wallet balance, deduct stock & debit wallet in a single atomic transaction
+      let newBalance = 0;
 
       await adminDb.runTransaction(async (transaction) => {
+        // 1. Read Store Catalog & Items
+        const storeSnap = await transaction.get(storeDataRef);
+        if (!storeSnap.exists) {
+          throw new Error("Store catalog database is unavailable.");
+        }
+
+        const freshStoreItems: any[] = Array.isArray(storeSnap.data()?.items)
+          ? [...(storeSnap.data()?.items)]
+          : [];
+
+        calculatedTotalAmount = 0;
+        finalOrderItems = [];
+        let stockModified = false;
+
+        for (const reqItem of items) {
+          const idx = freshStoreItems.findIndex((i: any) => i.id === reqItem.id);
+          if (idx === -1) {
+            throw new Error(`Invalid item "${reqItem.title || reqItem.id}": Item does not exist in store catalog.`);
+          }
+
+          const targetStoreItem = freshStoreItems[idx];
+
+          if (targetStoreItem.isHidden === true) {
+            throw new Error(`Sorry, "${targetStoreItem.title}" is no longer available.`);
+          }
+
+          if (targetStoreItem.inStock === false) {
+            throw new Error(`Sorry, "${targetStoreItem.title}" is currently out of stock.`);
+          }
+
+          const quantity = Math.max(1, Number(reqItem.quantity) || 1);
+
+          if (!targetStoreItem.unlimitedStock && typeof targetStoreItem.stockQuantity === "number") {
+            if (targetStoreItem.stockQuantity <= 0) {
+              throw new Error(`Sorry, "${targetStoreItem.title}" is currently out of stock.`);
+            }
+            if (quantity > targetStoreItem.stockQuantity) {
+              throw new Error(`Insufficient stock for "${targetStoreItem.title}". Only ${targetStoreItem.stockQuantity} unit(s) available.`);
+            }
+
+            // Deduct stock quantity atomically
+            const newQty = targetStoreItem.stockQuantity - quantity;
+            freshStoreItems[idx] = {
+              ...targetStoreItem,
+              stockQuantity: newQty,
+              inStock: newQty > 0,
+            };
+            stockModified = true;
+          }
+
+          // Calculate server-authoritative effective price
+          const basePrice = Number(targetStoreItem.price) || 0;
+          const promoPrice = typeof targetStoreItem.discountPrice === "number" && targetStoreItem.discountPrice > 0
+            ? targetStoreItem.discountPrice
+            : typeof targetStoreItem.promoPrice === "number" && targetStoreItem.promoPrice > 0
+            ? targetStoreItem.promoPrice
+            : null;
+
+          const serverEffectivePrice = promoPrice !== null && promoPrice < basePrice ? promoPrice : basePrice;
+
+          if (serverEffectivePrice <= 0) {
+            throw new Error(`Invalid server price for "${targetStoreItem.title}".`);
+          }
+
+          calculatedTotalAmount += serverEffectivePrice * quantity;
+
+          finalOrderItems.push({
+            id: targetStoreItem.id,
+            title: String(targetStoreItem.title).trim(),
+            price: serverEffectivePrice,
+            costPrice: typeof targetStoreItem.costPrice === "number" ? targetStoreItem.costPrice : null,
+            originalListPrice: basePrice,
+            quantity,
+            imageUrl: String(targetStoreItem.coverImageUrl || targetStoreItem.imageUrl || "").trim(),
+            category: String(targetStoreItem.category || "General").trim(),
+          });
+        }
+
+        if (calculatedTotalAmount <= 0) {
+          throw new Error("Invalid total order amount.");
+        }
+
+        // 2. Read Wallet and User records inside transaction
         const freshWalletSnap = await transaction.get(walletRef);
         if (!freshWalletSnap.exists) {
-          throw new Error("Wallet record not found.");
+          throw new Error("NGN wallet not found.");
         }
+
         const freshBal = Number(freshWalletSnap.data()?.balance) || 0;
-        if (freshBal < totalAmount) {
-          throw new Error("Insufficient wallet balance for store order.");
+        if (freshBal < calculatedTotalAmount) {
+          throw new Error(`Insufficient wallet balance. Order total is ₦${calculatedTotalAmount.toLocaleString()}, but your balance is ₦${freshBal.toLocaleString()}. Please switch to 'Checkout with Card Payment'.`);
         }
 
-        const newBalance = freshBal - totalAmount;
+        newBalance = freshBal - calculatedTotalAmount;
 
-        // Update wallet balance in wallets collection
+        // 3. Update Wallet & User Balances
         transaction.update(walletRef, {
           balance: newBalance,
           updatedAt: now,
         });
 
-        // Also update user balance in users collection for 100% app-wide balance synchronization
-        const userRef = adminDb.collection("users").doc(uid);
-        transaction.update(userRef, {
-          balance: newBalance,
-          updatedAt: now,
-        });
+        const userSnap = await transaction.get(userRef);
+        if (userSnap.exists) {
+          transaction.update(userRef, {
+            balance: newBalance,
+            updatedAt: now,
+          });
+        }
 
-        // Write wallet ledger transaction with complete order and item metadata
+        // 4. Write Wallet Ledger Transaction
         const txRef = adminDb.collection("transactions").doc();
         const txId = txRef.id;
         transaction.set(txRef, {
@@ -446,9 +480,9 @@ export async function POST(req: Request) {
           category: "DEBIT",
           direction: "DEBIT",
           title: "Store Order",
-          description: `Store Order ${orderId} (${orderItems.length} items)`,
-          amount: totalAmount,
-          totalDebited: totalAmount,
+          description: `Store Order ${orderId} (${finalOrderItems.length} items)`,
+          amount: calculatedTotalAmount,
+          totalDebited: calculatedTotalAmount,
           fee: 0,
           vat: 0,
           currency: "NGN",
@@ -460,48 +494,67 @@ export async function POST(req: Request) {
           transactionId: txId,
           paymentStatus: "PAID",
           orderStatus: "Pending",
-          items: orderItems,
+          items: finalOrderItems,
           recipientName: "E-Tech Store",
-          narration: `Store Order ${orderId} (${orderItems.length} items)`,
+          narration: `Store Order ${orderId} (${finalOrderItems.length} items)`,
           createdAt: now,
           updatedAt: now,
         });
 
-        // Write store order with associated transactionId
-        const orderRef = adminDb.collection("store_orders").doc(orderId);
-        transaction.set(orderRef, {
-          ...newOrder,
+        // 5. Write Store Order
+        const newOrder = {
+          id: orderId,
+          userId: uid,
+          customerName: String(customerName).trim(),
+          customerEmail: String(customerEmail || userEmail).trim(),
+          customerPhone: String(customerPhone).trim(),
+          deliveryAddress: String(deliveryAddress).trim(),
+          deliveryType: resolvedDeliveryType,
+          items: finalOrderItems,
+          totalAmount: calculatedTotalAmount,
+          currency: "NGN",
+          status: initialOrderStatus,
+          adminNotes: "",
+          paymentMethod: "WALLET_NGN",
+          paymentChannel,
+          paymentStatus: initialPaymentStatus,
+          paymentVerificationRef,
+          stockDeducted: true,
+          stockRestored: false,
           transactionId: txId,
-        });
+          createdAt: now,
+          updatedAt: now,
+        };
 
-        // Deduct stock inside transaction
-        if (currentStoreItems.length > 0) {
-          let stockUpdated = false;
-          for (const oItem of orderItems) {
-            const idx = currentStoreItems.findIndex((i: any) => i.id === oItem.id);
-            if (idx > -1) {
-              const itemObj = currentStoreItems[idx];
-              if (!itemObj.unlimitedStock && typeof itemObj.stockQuantity === "number") {
-                const newQty = Math.max(0, itemObj.stockQuantity - oItem.quantity);
-                currentStoreItems[idx] = {
-                  ...itemObj,
-                  stockQuantity: newQty,
-                  inStock: newQty > 0,
-                };
-                stockUpdated = true;
-              }
-            }
-          }
-          if (stockUpdated) {
-            transaction.update(storeDataRef, { items: currentStoreItems, updatedAt: now });
-          }
+        transaction.set(orderRef, newOrder);
+
+        // 6. Update Store Catalog Inventory Stock
+        if (stockModified) {
+          transaction.update(storeDataRef, { items: freshStoreItems, updatedAt: now });
         }
       });
 
       return NextResponse.json({
         success: true,
         message: "Store order placed successfully!",
-        order: newOrder,
+        order: {
+          id: orderId,
+          userId: uid,
+          customerName: String(customerName).trim(),
+          customerEmail: String(customerEmail || userEmail).trim(),
+          customerPhone: String(customerPhone).trim(),
+          deliveryAddress: String(deliveryAddress).trim(),
+          deliveryType: resolvedDeliveryType,
+          items: finalOrderItems,
+          totalAmount: calculatedTotalAmount,
+          currency: "NGN",
+          status: initialOrderStatus,
+          paymentMethod: "WALLET_NGN",
+          paymentChannel,
+          paymentStatus: initialPaymentStatus,
+          createdAt: now,
+          updatedAt: now,
+        },
       });
     }
   } catch (err: any) {

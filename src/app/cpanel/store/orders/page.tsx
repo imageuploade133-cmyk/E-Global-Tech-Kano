@@ -27,6 +27,7 @@ export interface StoreOrder {
     id: string;
     title: string;
     price: number;
+    costPrice?: number | null;
     quantity: number;
     imageUrl?: string;
     category?: string;
@@ -39,6 +40,8 @@ export interface StoreOrder {
   paymentChannel?: string;
   paymentStatus?: string;
   paymentVerificationRef?: string;
+  stockDeducted?: boolean;
+  stockRestored?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,7 +65,10 @@ function CpanelStoreOrdersPageContent() {
   ]);
   const [metrics, setMetrics] = useState({
     totalOrders: 0,
+    grossRevenue: 0,
+    netRevenue: 0,
     totalRevenue: 0,
+    totalRealizedProfit: 0,
     pendingCount: 0,
     deliveredCount: 0,
     refundedCount: 0,
@@ -176,7 +182,18 @@ function CpanelStoreOrdersPageContent() {
 
       if (data.success && Array.isArray(data.orders)) {
         setOrders(data.orders);
-        if (data.metrics) setMetrics(data.metrics);
+        if (data.metrics) {
+          setMetrics({
+            totalOrders: data.metrics.totalOrders || 0,
+            grossRevenue: data.metrics.grossRevenue || 0,
+            netRevenue: data.metrics.netRevenue || data.metrics.totalRevenue || 0,
+            totalRevenue: data.metrics.netRevenue || data.metrics.totalRevenue || 0,
+            totalRealizedProfit: data.metrics.totalRealizedProfit || 0,
+            pendingCount: data.metrics.pendingCount || 0,
+            deliveredCount: data.metrics.deliveredCount || 0,
+            refundedCount: data.metrics.refundedCount || 0,
+          });
+        }
       } else {
         toast.error(data.error || "Failed to load store orders.");
       }
@@ -319,8 +336,8 @@ function CpanelStoreOrdersPageContent() {
     if ((targetStatus === "Refunded" || targetStatus === "Canceled") && (oldStatus !== "Refunded" && oldStatus !== "Canceled")) {
       promptAdminConfirmation({
         title: `Confirm ${targetStatus} & Refund Order`,
-        description: `Updating status to "${targetStatus}" will automatically credit ₦${activeOrder.totalAmount.toLocaleString()} NGN back to customer's wallet (${activeOrder.customerName}). Are you sure you want to proceed?`,
-        confirmText: `Refund ₦${activeOrder.totalAmount.toLocaleString()} & ${targetStatus}`,
+        description: `Updating status to "${targetStatus}" will automatically credit ₦${activeOrder.totalAmount.toLocaleString()} NGN back to customer's wallet (${activeOrder.customerName}) and restore item quantities back to store inventory. Are you sure you want to proceed?`,
+        confirmText: `Refund ₦${activeOrder.totalAmount.toLocaleString()} & Restore Stock`,
         isDanger: true,
         onConfirm: () => executeUpdateOrderStatus(targetStatus),
       });
@@ -414,7 +431,7 @@ function CpanelStoreOrdersPageContent() {
                 </h1>
               </div>
               <p className="text-xs font-medium text-gray-400 mt-0.5">
-                Inspect customer orders, track fulfillment status, write admin dispatch notes & issue instant wallet refunds
+                Inspect customer orders, track fulfillment status, write admin dispatch notes & issue instant wallet refunds with global stock restoration
               </p>
             </div>
           </div>
@@ -454,22 +471,28 @@ function CpanelStoreOrdersPageContent() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className={cn("p-4 rounded-2xl border flex flex-col justify-between", panelClass)}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Store Revenue</span>
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Net Store Income</span>
               <span className="material-symbols-outlined text-emerald-500 text-[20px]">payments</span>
             </div>
-            <p className="text-xl font-black tracking-tight text-emerald-600 mt-2">
-              ₦{metrics.totalRevenue.toLocaleString()}
-            </p>
+            <div>
+              <p className="text-xl font-black tracking-tight text-emerald-600 mt-2">
+                ₦{metrics.netRevenue.toLocaleString()}
+              </p>
+              <span className="text-[9px] text-gray-400 font-semibold block mt-0.5">Excludes refunded/canceled orders</span>
+            </div>
           </div>
 
           <div className={cn("p-4 rounded-2xl border flex flex-col justify-between", panelClass)}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Total Orders</span>
-              <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">receipt_long</span>
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Realized Net Profit</span>
+              <span className="material-symbols-outlined text-teal-500 text-[20px]">trending_up</span>
             </div>
-            <p className="text-xl font-black tracking-tight text-black dark:text-white mt-2">
-              {metrics.totalOrders}
-            </p>
+            <div>
+              <p className="text-xl font-black tracking-tight text-teal-600 mt-2">
+                ₦{metrics.totalRealizedProfit.toLocaleString()}
+              </p>
+              <span className="text-[9px] text-gray-400 font-semibold block mt-0.5">(Selling Price - Cost Price)</span>
+            </div>
           </div>
 
           <div className={cn("p-4 rounded-2xl border flex flex-col justify-between", panelClass)}>
@@ -641,10 +664,15 @@ function CpanelStoreOrdersPageContent() {
                             <span>{order.paymentStatus || "PAID"}</span>
                           </span>
                         </div>
-                        <div>
+                        <div className="flex items-center gap-1">
                           <span className={cn("px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border", getStatusBadge(order.status))}>
                             {order.status}
                           </span>
+                          {order.stockRestored && (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" title="Inventory stock restored to store catalog">
+                              Stock Restored
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -801,7 +829,7 @@ function CpanelStoreOrdersPageContent() {
                       <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-2 text-amber-700 dark:text-amber-300 text-xs">
                         <span className="material-symbols-outlined text-[20px] text-amber-500 shrink-0">lock</span>
                         <p className="font-semibold leading-relaxed text-[11px]">
-                          This order has already been <strong className="uppercase">{activeOrder.status}</strong>. All status modifications are locked to prevent duplicate refunds. Only record deletion is permitted.
+                          This order has already been <strong className="uppercase">{activeOrder.status}</strong>. All status modifications are locked to prevent duplicate refunds. Stock was restored back to catalog. Only record deletion is permitted.
                         </p>
                       </div>
                     )}
@@ -881,7 +909,7 @@ function CpanelStoreOrdersPageContent() {
                       className="py-2.5 px-3 rounded-xl bg-rose-600 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider hover:opacity-90 transition-all flex items-center justify-center gap-1 cursor-pointer border-0 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-[15px]">undo</span>
-                      Refund & Cancel
+                      Refund & Restore Stock
                     </button>
 
                     <button
