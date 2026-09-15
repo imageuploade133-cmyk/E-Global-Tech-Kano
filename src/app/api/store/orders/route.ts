@@ -36,7 +36,7 @@ async function autoCleanStaleAbandonedOrders() {
 
         await adminDb.runTransaction(async (transaction) => {
           const storeSnap = await transaction.get(storeDataRef);
-          let currentItems: any[] = Array.isArray(storeSnap.data()?.items)
+          const currentItems: any[] = Array.isArray(storeSnap.data()?.items)
             ? [...(storeSnap.data()?.items)]
             : [];
           let stockModified = false;
