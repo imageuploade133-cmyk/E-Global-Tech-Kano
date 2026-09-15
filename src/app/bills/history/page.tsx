@@ -300,15 +300,15 @@ export default function BillsHistoryPage() {
     <>
       <Header userName={userName.split(" ")[0].toUpperCase()} profileImage={currentPhoto} />
 
-      <main className="mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black max-w-md mx-auto">
+      <main className="w-full max-w-md mx-auto mt-20 min-[375px]:mt-24 px-margin-mobile flex-grow pb-28 min-[375px]:pb-32 text-black overflow-x-hidden">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-5"
         >
           {/* Header Bar */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2.5 w-full">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <button
                 onClick={() => window.history.back()}
                 className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none flex-shrink-0"
@@ -317,33 +317,33 @@ export default function BillsHistoryPage() {
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
               <div className="min-w-0 flex-1">
-                <h2 className="font-hanken font-extrabold text-lg text-black leading-tight truncate">Bills History</h2>
-                <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider truncate">Airtime, Data & Utility Logs</p>
+                <h2 className="font-hanken font-extrabold text-base min-[360px]:text-lg text-black leading-tight truncate">Bills History</h2>
+                <p className="font-hanken text-[10px] min-[360px]:text-[11px] text-gray-400 font-bold uppercase tracking-wider truncate">Airtime, Data & Utility Logs</p>
               </div>
             </div>
 
             <Link
               href="/bills"
-              className="px-3.5 py-2 rounded-xl border border-[#FC7A00]/30 bg-[#FC7A00]/10 text-[#FC7A00] font-black text-xs uppercase tracking-wider hover:bg-[#FC7A00] hover:text-white transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 shadow-3xs"
+              className="px-3 py-2 rounded-xl border border-[#FC7A00]/30 bg-[#FC7A00]/10 text-[#FC7A00] font-black text-xs uppercase tracking-wider hover:bg-[#FC7A00] hover:text-white transition-all flex items-center gap-1 cursor-pointer flex-shrink-0 shadow-3xs active:scale-95"
             >
               <span className="material-symbols-outlined text-[16px]">payments</span>
-              <span>Pay Bills</span>
+              <span className="hidden min-[340px]:inline">Pay Bills</span>
             </Link>
           </div>
 
           {/* Summary Card: Total Bill Spent This Month */}
-          <div className="w-full p-4 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shadow-md relative overflow-hidden flex items-center justify-between">
-            <div className="relative z-10">
-              <p className="font-hanken text-[10px] font-extrabold text-orange-100 uppercase tracking-widest flex items-center gap-1">
+          <div className="w-full p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shadow-md relative overflow-hidden flex items-center justify-between gap-3">
+            <div className="relative z-10 min-w-0 flex-1">
+              <p className="font-hanken text-[10px] font-extrabold text-orange-100 uppercase tracking-widest flex items-center gap-1 truncate">
                 <span className="material-symbols-outlined text-[14px]">receipt_long</span>
-                <span>Total Bill Spent This Month</span>
+                <span className="truncate">Total Bill Spent This Month</span>
               </p>
-              <p className="font-mono text-xl sm:text-2xl font-black mt-1">
+              <p className="font-mono text-lg sm:text-2xl font-black mt-1 truncate">
                 ₦{monthlyBillSpentTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-orange-100 shrink-0 border border-white/20">
-              <span className="material-symbols-outlined text-[28px]">payments</span>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-orange-100 shrink-0 border border-white/20">
+              <span className="material-symbols-outlined text-[24px] sm:text-[28px]">payments</span>
             </div>
           </div>
 
@@ -435,7 +435,7 @@ export default function BillsHistoryPage() {
                       key={tx.id}
                       onClick={() => setSelectedTx(tx)}
                       className={cn(
-                        "w-full text-left relative overflow-hidden bg-white border rounded-2xl p-4 pl-5 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-3xs",
+                        "w-full text-left relative overflow-hidden bg-white border rounded-2xl p-3.5 sm:p-4 pl-4 sm:pl-5 flex items-center justify-between gap-2.5 sm:gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-3xs",
                         isCredit
                           ? "bg-gradient-to-r from-emerald-500/[0.03] via-emerald-500/[0.005] to-white border-emerald-500/15 hover:border-emerald-500/35"
                           : "bg-gradient-to-r from-[#FC7A00]/[0.03] via-[#FC7A00]/[0.005] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35"
@@ -451,29 +451,29 @@ export default function BillsHistoryPage() {
                         )}
                       />
 
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                         <TransactionIcon
                           type={tx.type}
                           description={tx.description}
                           recipientName={tx.recipientName}
                           bankName={tx.bankName}
-                          className="w-10 h-10"
+                          className="w-9 h-9 sm:w-10 sm:h-10 shrink-0"
                         />
 
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="font-hanken font-extrabold text-xs text-black leading-tight truncate">
                             {tx.description}
                           </p>
-                          <p className="font-hanken text-[9px] text-gray-400 mt-1 font-semibold uppercase tracking-wider">
+                          <p className="font-hanken text-[9px] text-gray-400 mt-1 font-semibold uppercase tracking-wider truncate">
                             {formatTransactionDateTime(tx.createdAt, tx.date, tx.time).dateTime}
                           </p>
                         </div>
                       </div>
 
-                      <div className="text-right flex-shrink-0">
+                      <div className="text-right shrink-0">
                         <p
                           className={cn(
-                            "font-mono text-xs min-[360px]:text-sm font-bold",
+                            "font-mono text-xs sm:text-sm font-bold",
                             isCredit ? "text-emerald-600" : "text-black"
                           )}
                         >
