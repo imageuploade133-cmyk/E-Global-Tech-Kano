@@ -13,6 +13,8 @@ import { Transaction } from "@/components/wallet/TransactionReceipt";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { StatementCalendarModal } from "./StatementCalendarModal";
+import { StatementPinModal } from "./StatementPinModal";
 
 interface StatementModalProps {
   isOpen: boolean;
@@ -35,7 +37,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
   const { user, userData } = useAuth();
   const { config } = useAppConfig();
 
-  // Intercept hardware and browser back button presses to close full-screen modal cleanly
+  // Intercept hardware and browser back button presses
   useModalBackHandler(isOpen, onClose, "statement-modal-drawer");
 
   // Default dates: From 1 month ago to today
@@ -48,6 +50,13 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
   const [toDate, setToDate] = useState<string>(todayStr);
   const [deliveryMethod, setDeliveryMethod] = useState<"download" | "email">("download");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  // Interactive Calendar Drawer state
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState<"fromDate" | "toDate">("fromDate");
+
+  // Security PIN Verification Modal state
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -75,16 +84,45 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
     return { valid: true, startIso: start.toISOString(), endIso: end.toISOString() };
   };
 
-  const handleGenerate = async () => {
+  const handleOpenPin = () => {
+    const { valid } = validateDates();
+    if (!valid || !user) return;
+    setIsPinModalOpen(true);
+  };
+
+  const executeStatementProcess = async (pin: string) => {
     const { valid, startIso, endIso } = validateDates();
     if (!valid || !user) return;
 
     setIsGenerating(true);
-    toast.loading(deliveryMethod === "download" ? "Generating PDF Bank Statement..." : "Sending Statement to Email...", { id: "statement-gen" });
+    toast.loading(
+      deliveryMethod === "download" ? "Verifying PIN & Generating PDF Statement..." : "Verifying PIN & Sending Statement to Email...",
+      { id: "statement-gen" }
+    );
 
     try {
+      let idToken = "";
+      if (user && typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+
       if (deliveryMethod === "download") {
-        // Fetch client-side Firestore transactions
+        // First verify PIN securely server-side
+        const pinVerifyRes = await fetch("/api/auth/pin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ action: "verify", pin }),
+        });
+
+        const pinData = await pinVerifyRes.json();
+        if (!pinVerifyRes.ok || !pinData.success) {
+          throw new Error(pinData.message || "Incorrect transaction PIN. Please try again.");
+        }
+
+        // Fetch client-side Firestore transactions for PDF download
         const q = query(
           collection(db, "transactions"),
           where("userId", "==", user.uid),
@@ -103,6 +141,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
           toast.dismiss("statement-gen");
           toast.info("No transactions found for the selected date range.");
           setIsGenerating(false);
+          setIsPinModalOpen(false);
           return;
         }
 
@@ -320,21 +359,17 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         doc.save(`EGlobalPay_Statement_${fromDate}_to_${toDate}.pdf`);
         toast.dismiss("statement-gen");
         toast.success("Bank Statement PDF generated and downloaded successfully!");
+        setIsPinModalOpen(false);
         onClose();
       } else {
-        // Call S2S API route to dispatch statement to user email
-        let idToken = "";
-        if (user && typeof user.getIdToken === "function") {
-          idToken = await user.getIdToken();
-        }
-
+        // Call S2S API route passing pin to verify and dispatch statement email with PDF attachment
         const res = await fetch("/api/history/statement/email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
           },
-          body: JSON.stringify({ fromDate, toDate }),
+          body: JSON.stringify({ fromDate, toDate, pin }),
         });
 
         const data = await res.json();
@@ -342,6 +377,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
 
         if (res.ok && data.success) {
           toast.success(data.message || "Statement of Account sent to your email!");
+          setIsPinModalOpen(false);
           onClose();
         } else {
           toast.error(data.error || "Failed to dispatch email statement.");
@@ -350,175 +386,218 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
     } catch (err: any) {
       console.error("[Generate Statement Error]:", err);
       toast.dismiss("statement-gen");
-      toast.error("Failed to generate statement: " + (err.message || "Unknown error"));
+      toast.error(err.message || "Failed to generate statement.");
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100000] bg-white flex flex-col justify-between overflow-hidden">
-          <motion.div
-            initial={{ opacity: 0, y: "100%" }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: "100%" }}
-            transition={{ type: "spring", damping: 32, stiffness: 350 }}
-            className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
-          >
-            {/* Drawer Top Header Bar */}
-            <div className="px-5 py-4 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] flex-shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">description</span>
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-[100000] bg-white flex flex-col justify-between overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "spring", damping: 32, stiffness: 350 }}
+              className="w-full h-full flex flex-col text-black max-w-md mx-auto overflow-hidden will-change-transform"
+            >
+              {/* Drawer Top Header Bar */}
+              <div className="px-5 py-4 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] flex-shrink-0">
+                    <span className="material-symbols-outlined text-[20px]">description</span>
+                  </div>
+                  <div>
+                    <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
+                      Statement of Account
+                    </h2>
+                    <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
+                      Generate Financial Records
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
-                    Statement of Account
-                  </h2>
-                  <p className="font-hanken text-[9.5px] text-gray-400 font-bold uppercase tracking-widest">
-                    Generate Financial Records
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0 flex-shrink-0"
+                  title="Close"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Main Full-Screen Form Container */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
+                {/* Brand Banner Card */}
+                <div className="p-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] rounded-2xl text-white shadow-sm flex items-center justify-between">
+                  <div>
+                    <h3 className="font-black text-sm uppercase tracking-wider">E-Global Pay</h3>
+                    <p className="text-[10.5px] opacity-90 font-medium">Official Electronic Bank Statements</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white text-[24px]">description</span>
+                  </div>
+                </div>
+
+                {/* 6-Month Constraint Guidance Note */}
+                <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-start gap-3">
+                  <span className="material-symbols-outlined text-amber-600 text-[20px] shrink-0 mt-0.5">info</span>
+                  <p className="font-hanken text-xs text-amber-900 leading-snug">
+                    Statements can be generated for up to <strong>6 months</strong> of transaction history per request.
                   </p>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0 flex-shrink-0"
-                title="Close"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
 
-            {/* Main Full-Screen Form Container */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
-              {/* Brand Banner Card */}
-              <div className="p-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] rounded-2xl text-white shadow-sm flex items-center justify-between">
-                <div>
-                  <h3 className="font-black text-sm uppercase tracking-wider">E-Global Pay</h3>
-                  <p className="text-[10.5px] opacity-90 font-medium">Official Electronic Bank Statements</p>
+                {/* Interactive Date Selection Grid */}
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block mb-1">
+                      From Date *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarTarget("fromDate");
+                        setIsCalendarOpen(true);
+                      }}
+                      className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold text-black flex items-center justify-between transition-all cursor-pointer shadow-3xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">calendar_today</span>
+                        <span>{fromDate || "Select Start Date"}</span>
+                      </div>
+                      <span className="material-symbols-outlined text-[18px] text-gray-400">edit_calendar</span>
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block mb-1">
+                      To Date *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarTarget("toDate");
+                        setIsCalendarOpen(true);
+                      }}
+                      className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-4 py-3.5 text-xs font-bold text-black flex items-center justify-between transition-all cursor-pointer shadow-3xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-[#FC7A00]">event</span>
+                        <span>{toDate || "Select End Date"}</span>
+                      </div>
+                      <span className="material-symbols-outlined text-[18px] text-gray-400">edit_calendar</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white text-[24px]">description</span>
-                </div>
-              </div>
 
-              {/* 6-Month Constraint Guidance Note */}
-              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-start gap-3">
-                <span className="material-symbols-outlined text-amber-600 text-[20px] shrink-0 mt-0.5">info</span>
-                <p className="font-hanken text-xs text-amber-900 leading-snug">
-                  Statements can be generated for up to <strong>6 months</strong> of transaction history per request.
-                </p>
-              </div>
-
-              {/* Date Selection Grid */}
-              <div className="space-y-3.5">
-                <div>
-                  <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block mb-1">
-                    From Date *
+                {/* Delivery Option Selector */}
+                <div className="space-y-2">
+                  <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block">
+                    Delivery Format / Action
                   </label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    max={todayStr}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold text-black outline-none focus:border-[#FC7A00]"
-                  />
-                </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod("download")}
+                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                        deliveryMethod === "download"
+                          ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
+                          : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">picture_as_pdf</span>
+                        {deliveryMethod === "download" && (
+                          <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check_circle</span>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-xs uppercase font-extrabold block">PDF Download</span>
+                        <span className="text-[9.5px] text-gray-400 font-semibold block">Save file to device</span>
+                      </div>
+                    </button>
 
-                <div>
-                  <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block mb-1">
-                    To Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    max={todayStr}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold text-black outline-none focus:border-[#FC7A00]"
-                  />
-                </div>
-              </div>
-
-              {/* Delivery Option Selector */}
-              <div className="space-y-2">
-                <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block">
-                  Delivery Format / Action
-                </label>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryMethod("download")}
-                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                      deliveryMethod === "download"
-                        ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
-                        : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">picture_as_pdf</span>
-                      {deliveryMethod === "download" && (
-                        <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check_circle</span>
-                      )}
-                    </div>
-                    <div className="mt-2">
-                      <span className="text-xs uppercase font-extrabold block">PDF Download</span>
-                      <span className="text-[9.5px] text-gray-400 font-semibold block">Save file to device</span>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryMethod("email")}
-                    className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                      deliveryMethod === "email"
-                        ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
-                        : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">mail</span>
-                      {deliveryMethod === "email" && (
-                        <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check_circle</span>
-                      )}
-                    </div>
-                    <div className="mt-2">
-                      <span className="text-xs uppercase font-extrabold block">Send to Email</span>
-                      <span className="text-[9.5px] text-gray-400 font-semibold block">Deliver to registered inbox</span>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod("email")}
+                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                        deliveryMethod === "email"
+                          ? "border-[#FC7A00] bg-orange-50/90 text-black font-extrabold shadow-3xs"
+                          : "border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="material-symbols-outlined text-[20px] text-[#FC7A00]">mail</span>
+                        {deliveryMethod === "email" && (
+                          <span className="material-symbols-outlined text-[16px] text-[#FC7A00]">check_circle</span>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-xs uppercase font-extrabold block">Send to Email</span>
+                        <span className="text-[9.5px] text-gray-400 font-semibold block">Deliver to registered inbox</span>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Bottom Action Footer */}
-            <div className="p-5 border-t border-gray-100 bg-white shadow-lg flex-shrink-0">
-              <button
-                type="button"
-                disabled={isGenerating}
-                onClick={handleGenerate}
-                className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 border-0"
-              >
-                {isGenerating ? (
-                  <>
-                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Processing Statement...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[18px]">
-                      {deliveryMethod === "download" ? "download" : "send"}
-                    </span>
-                    <span>{deliveryMethod === "download" ? "Download PDF Statement" : "Send Statement to Email"}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+              {/* Bottom Action Footer */}
+              <div className="p-5 border-t border-gray-100 bg-white shadow-lg flex-shrink-0">
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={handleOpenPin}
+                  className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 border-0"
+                >
+                  {isGenerating ? (
+                    <>
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Processing Statement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">
+                        {deliveryMethod === "download" ? "download" : "send"}
+                      </span>
+                      <span>{deliveryMethod === "download" ? "Download PDF Statement" : "Send Statement to Email"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Interactive Date Picker Calendar Modal */}
+      <StatementCalendarModal
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        targetField={calendarTarget}
+        fromDate={fromDate}
+        toDate={toDate}
+        onSelectDate={(field, dateStr) => {
+          if (field === "fromDate") setFromDate(dateStr);
+          else setToDate(dateStr);
+        }}
+        onApplyPresetRange={(fromStr, toStr) => {
+          setFromDate(fromStr);
+          setToDate(toStr);
+        }}
+      />
+
+      {/* 4-Digit Security PIN Pad Modal */}
+      <StatementPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        fromDate={fromDate}
+        toDate={toDate}
+        deliveryMethod={deliveryMethod}
+        onExecute={executeStatementProcess}
+      />
+    </>
   );
 };

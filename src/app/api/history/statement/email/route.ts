@@ -6,6 +6,7 @@ import { formatTransactionDateTime } from "@/lib/date-utils";
 import { isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import bcrypt from "bcryptjs";
 
 async function fetchImageAsDataUri(url: string): Promise<string | null> {
   if (!url || !url.startsWith("http")) return null;
@@ -38,10 +39,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { fromDate, toDate } = body;
+    const { fromDate, toDate, pin } = body;
 
     if (!fromDate || !toDate) {
       return NextResponse.json({ error: "Please select both From Date and To Date." }, { status: 400 });
+    }
+
+    if (!pin || typeof pin !== "string" || pin.length !== 4) {
+      return NextResponse.json({ error: "Please enter a valid 4-digit transaction PIN." }, { status: 400 });
     }
 
     const start = new Date(fromDate + "T00:00:00.000Z");
@@ -79,9 +84,21 @@ export async function POST(req: Request) {
       console.warn("[Statement Email Route] Config lookup warning:", cfgErr.message);
     }
 
-    // Fetch user profile
+    // Fetch user profile & verify transaction PIN
     const userDocSnap = await adminDb.collection("users").doc(uid).get();
     const userData = userDocSnap.exists ? userDocSnap.data() || {} : {};
+
+    if (userData.pinHash) {
+      const isMatch = bcrypt.compareSync(pin, userData.pinHash);
+      if (!isMatch) {
+        return NextResponse.json({ error: "Incorrect transaction PIN. Please try again." }, { status: 400 });
+      }
+    } else if (userData.pin) {
+      if (pin !== userData.pin) {
+        return NextResponse.json({ error: "Incorrect transaction PIN. Please try again." }, { status: 400 });
+      }
+    }
+
     const userName = userData.name || userData.displayName || "E-Global Pay Valued Customer";
     const targetEmail = userData.email || userEmail;
     const userPhone = userData.phoneNumber || userData.phone || "N/A";
