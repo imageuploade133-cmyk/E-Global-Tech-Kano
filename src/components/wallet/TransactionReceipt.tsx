@@ -12,6 +12,7 @@ import { formatTransactionDateTime } from "@/lib/date-utils";
 import { resolveBankName } from "@/lib/bank-resolver";
 import { getTransactionLedgerStatus } from "@/lib/transaction-status-normalizer";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { parseDataPlan } from "@/components/bills/types";
 
 export interface Transaction {
   id: string;
@@ -167,8 +168,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     (transaction.recipientName && transaction.recipientName.toLowerCase().includes("virtual card"))
   );
   const isStore = !isRefund && (txType.includes("STORE") || cat.includes("STORE") || desc.includes("store"));
-  const isAirtime = !isSwap && !isRefund && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime"));
-  const isData = !isSwap && !isRefund && (txType === "DATA" || cat === "DATA" || desc.includes("data"));
+  const isAirtime = !isSwap && !isRefund && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime") || desc.includes("recharge"));
+  const isData = !isSwap && !isRefund && (txType === "DATA" || cat === "DATA" || desc.includes("data") || desc.includes("gig") || desc.includes("sme"));
   const isCable = !isSwap && !isRefund && (txType === "CABLE" || cat === "CABLE" || desc.includes("cable") || desc.includes("dstv") || desc.includes("gotv") || desc.includes("startimes"));
   const isElectricity = !isSwap && !isRefund && (txType === "ELECTRICITY" || cat === "ELECTRICITY" || desc.includes("electricity") || desc.includes("meter"));
   const isWaec = !isSwap && !isRefund && (txType === "WAEC" || cat === "WAEC" || desc.includes("waec") || desc.includes("exam"));
@@ -188,11 +189,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const vat = Number(transaction.vat) || 0;
   const markup = Number(transaction.markup) || 0;
 
-  // Calculate combined transfer fee authoritatively for both legacy and new transactions:
-  // 1. If storedTotalDebited > transaction.amount + rawFee, use (storedTotalDebited - transaction.amount - vat).
-  // 2. If markup > 0, combine rawFee + markup.
-  // 3. Otherwise, if storedTotalDebited > transaction.amount, use storedTotalDebited - transaction.amount - vat.
-  // 4. Fall back to rawFee.
   const storedTotalDebited = Number(transaction.totalDebited) || 0;
   let combinedTransferFee = rawFee;
   if (markup > 0) {
@@ -208,11 +204,17 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
   const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");
   const resolvedTransferFromBank = resolveBankName(transaction, banks, "TRANSFER_FROM");
-  const resolvedBankName = isDeposit ? resolvedTransferFromBank : resolvedTransferToBank;
 
   // Logo Resolution
   const receiptHeaderName = config.receiptName || "E-TECH GLOBAL HUB";
   const receiptHeaderLogo = config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
+
+  const detectedNetworkName = transaction.network || transaction.billerName || transaction.billerCode || (
+    desc.includes("mtn") ? "MTN" :
+    desc.includes("glo") ? "GLO" :
+    desc.includes("airtel") ? "Airtel" :
+    desc.includes("9mobile") ? "9mobile" : ""
+  );
 
   const matchedLogo = isStore
     ? (getBillerLogo("store") || getStoreLogo())
@@ -223,10 +225,16 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     : isDeposit
     ? (getBillerLogo("deposit") || getBillerLogo("Cash Deposit") || getBankLogo(resolvedTransferFromBank))
     : isBill
-    ? (getBillerLogo(transaction.network || transaction.billerName || transaction.billerCode || "") || getBillerLogo(desc))
+    ? (getBillerLogo(detectedNetworkName) || getBillerLogo(transaction.billerName || "") || getBillerLogo(desc))
     : (getBankLogo(resolvedTransferToBank) || getBankLogo(desc));
 
   const logoUrl = matchedLogo || receiptHeaderLogo;
+
+  // Data Plan details parsing
+  const fullPlanString = transaction.planName || transaction.itemName || transaction.description || "";
+  const parsedPlanData = parseDataPlan(fullPlanString);
+  const dataPlanSize = parsedPlanData.size && parsedPlanData.size !== "Data Plan" ? parsedPlanData.size : (transaction.planName || "Data Package");
+  const dataPlanValidity = (transaction.metadata as any)?.validity || (transaction.metadata as any)?.duration || parsedPlanData.duration || "30 Days";
 
   // PDF Export (HD Quality)
   const handleDownloadPDF = async () => {
@@ -251,7 +259,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
       const imgData = canvas.toDataURL("image/png", 1.0);
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
 
       const imgWidth = 180;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -272,7 +279,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     }
   };
 
-  // Reusable helper to wait for images inside receipt before canvas capture
   const waitForReceiptImages = async (element: HTMLElement, timeoutMs = 5000): Promise<void> => {
     const images = Array.from(element.querySelectorAll("img"));
     if (images.length === 0) return;
@@ -311,7 +317,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     await Promise.race([Promise.all(imagePromises), timeoutPromise]);
   };
 
-  // Image Export
   const handleDownloadImage = async () => {
     if (!receiptRef.current) return;
     try {
@@ -361,7 +366,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     }
   };
 
-  // Share Receipt (HD Quality)
   const handleShareReceipt = async () => {
     if (!receiptRef.current) return;
     try {
@@ -619,7 +623,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </>
                 )}
 
-                {/* 0. STORE ORDER CANCELLATION REFUND */}
+                {/* 2. STORE ORDER CANCELLATION REFUND */}
                 {(txType === "STORE_ORDER_REFUND" || (isRefund && (isStore || desc.includes("store order") || desc.includes("order cancel")))) && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -675,7 +679,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </>
                 )}
 
-                {/* 7. STORE ORDER PURCHASE */}
+                {/* 3. STORE ORDER PURCHASE */}
                 {isStore && !isRefund && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -735,7 +739,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </>
                 )}
 
-                {/* 2. SINGLE BANK TRANSFER */}
+                {/* 4. SINGLE BANK TRANSFER */}
                 {isTransfer && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -798,12 +802,19 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </>
                 )}
 
-                {/* 2. AIRTIME & DATA */}
+                {/* 5. AIRTIME & DATA BILL DETAILS WITH NETWORK LOGO */}
                 {(isAirtime || isData) && (
                   <>
-                    <div className="flex justify-between items-start text-gray-500 font-semibold">
+                    <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Network Provider</span>
-                      <span className="text-black font-bold uppercase">{transaction.network || transaction.billerName || "Not available"}</span>
+                      <div className="flex items-center gap-1.5">
+                        {logoUrl && (
+                          <div className="relative w-5 h-5 rounded-full overflow-hidden border border-gray-100 bg-white shrink-0">
+                            <Image src={logoUrl} alt="Network Logo" fill className="object-contain p-0.5" />
+                          </div>
+                        )}
+                        <span className="text-black font-extrabold uppercase">{detectedNetworkName || "Network"}</span>
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -825,27 +836,46 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     </div>
 
                     {isData && (
-                      <div className="flex justify-between items-start text-gray-500 font-semibold">
-                        <span>Data Plan</span>
-                        <span className="text-black font-bold text-right max-w-[180px] truncate">
-                          {transaction.planName || transaction.itemName || "Data Package"}
-                        </span>
-                      </div>
+                      <>
+                        <div className="flex justify-between items-start text-gray-500 font-semibold">
+                          <span>Data Plan</span>
+                          <span className="text-black font-bold text-right max-w-[180px] truncate">
+                            {dataPlanSize}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Plan Duration / Validity</span>
+                          <span className="text-black font-bold uppercase">{dataPlanValidity}</span>
+                        </div>
+                      </>
                     )}
 
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
                       <span>Amount</span>
                       <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
+
+                    <div className="flex justify-between items-center border-t border-gray-100 pt-2 text-gray-500 font-semibold">
+                      <span>Total Debited</span>
+                      <span className="text-black font-bold text-sm">{currencySymbol}{totalDebited.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
                   </>
                 )}
 
-                {/* 3. ELECTRICITY */}
+                {/* 6. ELECTRICITY */}
                 {isElectricity && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>DISCO Operator</span>
-                      <span className="text-black font-bold uppercase">{transaction.billerName || "Electricity Provider"}</span>
+                      <div className="flex items-center gap-1.5">
+                        {logoUrl && (
+                          <div className="relative w-5 h-5 rounded-full overflow-hidden border border-gray-100 bg-white shrink-0">
+                            <Image src={logoUrl} alt="DISCO Logo" fill className="object-contain p-0.5" />
+                          </div>
+                        )}
+                        <span className="text-black font-extrabold uppercase">{transaction.billerName || "Electricity Provider"}</span>
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -893,15 +923,27 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       <span>Amount Paid</span>
                       <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
+
+                    <div className="flex justify-between items-center border-t border-gray-100 pt-2 text-gray-500 font-semibold">
+                      <span>Total Debited</span>
+                      <span className="text-black font-bold text-sm">{currencySymbol}{totalDebited.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
                   </>
                 )}
 
-                {/* 4. CABLE TV */}
+                {/* 7. CABLE TV */}
                 {isCable && (
                   <>
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
                       <span>Cable Operator</span>
-                      <span className="text-black font-bold uppercase">{transaction.billerName || "Cable Provider"}</span>
+                      <div className="flex items-center gap-1.5">
+                        {logoUrl && (
+                          <div className="relative w-5 h-5 rounded-full overflow-hidden border border-gray-100 bg-white shrink-0">
+                            <Image src={logoUrl} alt="Cable Logo" fill className="object-contain p-0.5" />
+                          </div>
+                        )}
+                        <span className="text-black font-extrabold uppercase">{transaction.billerName || "Cable Provider"}</span>
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-start text-gray-500 font-semibold">
@@ -933,10 +975,15 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       <span>Subscription Fee</span>
                       <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
+
+                    <div className="flex justify-between items-center border-t border-gray-100 pt-2 text-gray-500 font-semibold">
+                      <span>Total Debited</span>
+                      <span className="text-black font-bold text-sm">{currencySymbol}{totalDebited.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
                   </>
                 )}
 
-                {/* 5. CURRENCY SWAP */}
+                {/* 8. CURRENCY SWAP */}
                 {isSwap && (
                   <>
                     <div className="flex justify-between items-center text-gray-500 font-semibold">
@@ -963,14 +1010,12 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   </>
                 )}
 
-                {/* 0. REVERSAL / REFUND */}
+                {/* 9. REVERSAL / REFUND */}
                 {isRefund && (() => {
                   const totalRefundedAmount = Number(transaction.totalCredited) || Number(transaction.totalDebited) || (transaction.amount + fee + vat);
                   let refundFee = fee;
                   let refundPrincipal = transaction.amount;
 
-                  // If transaction.amount was saved as the total refund amount (e.g. 5010), but fee > 0 exists,
-                  // derive the principal as totalRefundedAmount - fee so Fee + Principal always equals total credited refund.
                   if (fee > 0 && transaction.amount >= totalRefundedAmount && totalRefundedAmount > fee) {
                     refundPrincipal = totalRefundedAmount - fee - vat;
                   } else if (fee === 0 && totalRefundedAmount > transaction.amount) {
@@ -1042,7 +1087,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   );
                 })()}
 
-                {/* 6. WALLET FUNDING (CARD / USSD / BANK TRANSFER) */}
+                {/* 10. WALLET FUNDING (CARD / USSD / BANK TRANSFER) */}
                 {isDeposit && (() => {
                   const rawFm = (transaction.fundingMethod || "").toUpperCase();
                   const isCardMethod = rawFm === "CARD" || desc.includes("card payment");
@@ -1050,7 +1095,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                   const feeAmt = Number(transaction.fee) || 0;
 
-                  // Masking utilities
                   const maskAcc = (acc?: string) => {
                     if (!acc) return null;
                     const clean = acc.replace(/\D/g, "");
