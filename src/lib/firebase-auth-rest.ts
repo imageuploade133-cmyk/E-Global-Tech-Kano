@@ -274,6 +274,34 @@ export async function getFirebaseAuthUserByUid(uid: string): Promise<{ uid: stri
 }
 
 /**
+ * Verifies a user's password in Firebase Authentication using Google's Identity Toolkit signInWithPassword REST API.
+ */
+export async function verifyUserPasswordWithREST(email: string, password: string): Promise<boolean> {
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing FIREBASE_API_KEY environment variable.");
+  }
+
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      returnSecureToken: true,
+    }),
+  });
+
+  const data = await res.json();
+  if (res.ok && data.idToken) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Deletes a user account in Firebase Authentication using Google's Identity Toolkit v1 REST API.
  */
 export async function deleteFirebaseAuthUser(uid: string): Promise<void> {
