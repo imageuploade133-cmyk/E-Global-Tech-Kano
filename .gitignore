@@ -42,7 +42,7 @@ next-env.d.ts
 
 # local logs
 *.log
-logs/
+/logs/
 
 # local verification artifacts
 verification/videos/
