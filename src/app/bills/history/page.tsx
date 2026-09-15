@@ -28,6 +28,9 @@ export default function BillsHistoryPage() {
   const [activeCategory, setActiveCategory] = useState<"all" | "airtime" | "data" | "cable" | "electricity" | "waec">("all");
   const hasPushedState = React.useRef(false);
 
+  // Total Bill Spent This Month state
+  const [monthlyBillSpentTotal, setMonthlyBillSpentTotal] = useState<number>(0);
+
   // Pagination states
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +38,7 @@ export default function BillsHistoryPage() {
   const [lastVisibleDoc, setLastVisibleDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  // Sync state with browser back history
+  // Sync state with browser back history for receipt drawer
   React.useEffect(() => {
     if (selectedTx) {
       window.history.pushState({ receiptOpen: true }, "");
@@ -58,6 +61,55 @@ export default function BillsHistoryPage() {
     }
   }, [selectedTx]);
 
+  // Fetch Monthly Bill Spent Total
+  useEffect(() => {
+    if (!user) return;
+    const fetchMonthlyBillSpent = async () => {
+      try {
+        const now = new Date();
+        const startOfMonthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+        const qMonth = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          where("createdAt", ">=", startOfMonthIso)
+        );
+
+        const monthSnap = await getDocs(qMonth);
+        let total = 0;
+        monthSnap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const typeUpper = (data.type || "").toUpperCase();
+          const descLower = (data.description || "").toLowerCase();
+          const statusUpper = (data.status || "").toUpperCase();
+          const isSuccess = statusUpper === "SUCCESS" || statusUpper === "COMPLETED";
+
+          const isBill =
+            BILL_TYPES.includes(typeUpper) ||
+            descLower.includes("airtime") ||
+            descLower.includes("data") ||
+            descLower.includes("recharge") ||
+            descLower.includes("cable") ||
+            descLower.includes("electricity") ||
+            descLower.includes("waec") ||
+            descLower.includes("meter") ||
+            descLower.includes("betting") ||
+            descLower.includes("vtu");
+
+          if (isSuccess && isBill && !isCreditTransaction({ ...data } as Transaction)) {
+            total += getTransactionDisplayAmount({ ...data } as Transaction);
+          }
+        });
+
+        setMonthlyBillSpentTotal(total);
+      } catch (err) {
+        console.warn("[Monthly Bill Spent Fetch Warning]:", err);
+      }
+    };
+
+    fetchMonthlyBillSpent();
+  }, [user]);
+
   // Initial secure paginated loading of bill transactions
   useEffect(() => {
     const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
@@ -71,7 +123,6 @@ export default function BillsHistoryPage() {
     const fetchInitialBillsHistory = async () => {
       try {
         setLoading(true);
-        // Fetch recent user transactions ordered by createdAt to avoid Firestore composite index missing errors
         const q = query(
           collection(db, "transactions"),
           where("userId", "==", user.uid),
@@ -124,7 +175,7 @@ export default function BillsHistoryPage() {
 
         setTransactions(list);
         if (list.length === 0) {
-          toast.info("No history");
+          toast.info("No bill history");
         }
 
         if (snap.docs.length < 50) {
@@ -137,7 +188,7 @@ export default function BillsHistoryPage() {
         console.error("[BillsHistoryPage Initial Load Exception]:", err);
         setTransactions([]);
         setHasMore(false);
-        toast.info("No history");
+        toast.info("No bill history");
       } finally {
         setLoading(false);
       }
@@ -202,7 +253,7 @@ export default function BillsHistoryPage() {
       });
 
       if (list.length === 0) {
-        toast.info("No history");
+        toast.info("No more bill history");
       }
 
       setTransactions((prev) => [...prev, ...list]);
@@ -216,7 +267,6 @@ export default function BillsHistoryPage() {
     } catch (err) {
       console.error("[BillsHistoryPage Load More Exception]:", err);
       setHasMore(false);
-      toast.info("No history");
     } finally {
       setLoadingMore(false);
     }
@@ -267,8 +317,8 @@ export default function BillsHistoryPage() {
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
               <div className="min-w-0 flex-1">
-                <h2 className="font-bodoni font-extrabold text-lg text-black leading-tight truncate">Bills History</h2>
-                <p className="font-hanken text-[10.5px] text-gray-400 font-bold uppercase tracking-wider truncate">Airtime, Data & Utility Logs</p>
+                <h2 className="font-hanken font-extrabold text-lg text-black leading-tight truncate">Bills History</h2>
+                <p className="font-hanken text-[11px] text-gray-400 font-bold uppercase tracking-wider truncate">Airtime, Data & Utility Logs</p>
               </div>
             </div>
 
@@ -281,33 +331,46 @@ export default function BillsHistoryPage() {
             </Link>
           </div>
 
-          {/* User-Friendly & Robust Balanced Search Bar */}
-          <div className="relative w-full">
-            <div className="relative flex items-center">
-              <span className="material-symbols-outlined absolute left-3.5 text-gray-400 text-[20px] pointer-events-none">
-                search
-              </span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search phone number, provider, or transaction ref..."
-                className="w-full bg-white border border-gray-200 focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 rounded-2xl pl-11 pr-10 py-3 text-xs font-semibold text-black placeholder-gray-400 outline-none shadow-3xs transition-all duration-200"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-3.5 text-gray-400 hover:text-black transition-colors p-1 flex items-center justify-center rounded-full hover:bg-gray-100"
-                  title="Clear search"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              )}
+          {/* Summary Card: Total Bill Spent This Month */}
+          <div className="w-full p-4 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shadow-md relative overflow-hidden flex items-center justify-between">
+            <div className="relative z-10">
+              <p className="font-hanken text-[10px] font-extrabold text-orange-100 uppercase tracking-widest flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                <span>Total Bill Spent This Month</span>
+              </p>
+              <p className="font-mono text-xl sm:text-2xl font-black mt-1">
+                ₦{monthlyBillSpentTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-orange-100 shrink-0 border border-white/20">
+              <span className="material-symbols-outlined text-[28px]">payments</span>
             </div>
           </div>
 
-          {/* Filter Pill Tabs */}
+          {/* Search Bar Input */}
+          <div className="relative w-full">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
+              search
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search phone number, provider, or transaction ref..."
+              className="w-full bg-white border border-black rounded-2xl pl-11 pr-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Filter Pill Tabs Horizontal Drawer */}
           <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 -mx-margin-mobile px-margin-mobile select-none">
             {[
               { id: "all" as const, label: "All Bills" },
@@ -372,12 +435,13 @@ export default function BillsHistoryPage() {
                       key={tx.id}
                       onClick={() => setSelectedTx(tx)}
                       className={cn(
-                        "w-full text-left relative overflow-hidden rounded-2xl p-4 pl-5 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-3xs border",
+                        "w-full text-left relative overflow-hidden bg-white border rounded-2xl p-4 pl-5 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer shadow-3xs",
                         isCredit
                           ? "bg-gradient-to-r from-emerald-500/[0.03] via-emerald-500/[0.005] to-white border-emerald-500/15 hover:border-emerald-500/35"
                           : "bg-gradient-to-r from-[#FC7A00]/[0.03] via-[#FC7A00]/[0.005] to-white border-[#FC7A00]/15 hover:border-[#FC7A00]/35"
                       )}
                     >
+                      {/* Side Accent Strip */}
                       <div
                         className={cn(
                           "absolute left-0 top-0 bottom-0 w-[4px]",
@@ -416,27 +480,26 @@ export default function BillsHistoryPage() {
                           {isCredit ? "+" : "-"}₦{displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
 
-                      {(() => {
-                        const ledgerStatus = getTransactionLedgerStatus(tx);
-                        return (
-                          <span
-                            className={cn(
-                              "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase border",
-                              ledgerStatus.badgeBg,
-                              ledgerStatus.badgeText,
-                              ledgerStatus.badgeBorder
-                            )}
-                          >
-                            {ledgerStatus.label}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                  </button>
-                );
-              })}
+                        {(() => {
+                          const ledgerStatus = getTransactionLedgerStatus(tx);
+                          return (
+                            <span
+                              className={cn(
+                                "inline-block px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest mt-1 uppercase border",
+                                ledgerStatus.badgeBg,
+                                ledgerStatus.badgeText,
+                                ledgerStatus.badgeBorder
+                              )}
+                            >
+                              {ledgerStatus.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </button>
+                  );
+                })}
 
-                {/* Skeleton placeholders when loading more bill items so user continues seamlessly */}
                 {loadingMore && (
                   <div className="space-y-2.5 pt-1">
                     {[1, 2, 3].map((i) => (
