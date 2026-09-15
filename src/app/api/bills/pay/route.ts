@@ -532,6 +532,17 @@ export async function POST(req: Request) {
             description: `Refund for failed bill payment: ${description}`,
             recipientName: customer_id,
             walletType: walletType || "MAIN",
+            type: "REFUND",
+            category: (biller_type || "BILLS").toUpperCase(),
+            metadata: {
+              billerCode: item_code || biller_code || "",
+              billerName: biller_name || biller_code || "",
+              billerType: biller_type || "",
+              customerId: customer_id || "",
+              phoneNumber: customer_id || "",
+              network: biller_name || biller_code || "",
+              originalReference: reference,
+            },
           });
         }
       });
