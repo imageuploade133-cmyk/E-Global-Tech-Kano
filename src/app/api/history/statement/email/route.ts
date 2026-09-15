@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/email-service";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 async function fetchImageAsDataUri(url: string): Promise<string | null> {
   if (!url || !url.startsWith("http")) return null;
@@ -78,11 +79,12 @@ export async function POST(req: Request) {
       console.warn("[Statement Email Route] Config lookup warning:", cfgErr.message);
     }
 
-    // Fetch user profile name
+    // Fetch user profile
     const userDocSnap = await adminDb.collection("users").doc(uid).get();
     const userData = userDocSnap.exists ? userDocSnap.data() || {} : {};
     const userName = userData.name || userData.displayName || "E-Global Pay Valued Customer";
     const targetEmail = userData.email || userEmail;
+    const userPhone = userData.phoneNumber || userData.phone || "N/A";
 
     if (!targetEmail) {
       return NextResponse.json({ error: "No registered email address found for your account." }, { status: 400 });
@@ -104,11 +106,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No transactions found for the selected date range." }, { status: 404 });
     }
 
-    const tableRows = txList
+    // Calculate Inflow vs Outflow Financial Summaries
+    let totalInflow = 0;
+    let totalOutflow = 0;
+
+    const tableRowsHtml = txList
       .map((tx) => {
         const { dateTime } = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
         const isCredit = isCreditTransaction(tx);
         const displayAmt = getTransactionDisplayAmount(tx);
+
+        if (isCredit) {
+          totalInflow += displayAmt;
+        } else {
+          totalOutflow += displayAmt;
+        }
 
         return `
           <tr>
@@ -116,7 +128,7 @@ export async function POST(req: Request) {
             <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; font-weight: 700; color: #0f172a;">${(tx.description || tx.title || "Transaction").toString().slice(0, 45)}</td>
             <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #64748b;">${(tx.type || "PAYMENT").toString()}</td>
             <td style="padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; font-weight: 800; text-align: right; color: ${isCredit ? "#10b981" : "#0f172a"};">
-              ${isCredit ? "+" : "-"}₦${displayAmt.toLocaleString()}
+              ${isCredit ? "+" : "-"}₦${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </td>
           </tr>
         `;
@@ -162,7 +174,7 @@ export async function POST(req: Request) {
         </div>
 
         <p style="font-size: 14px; color: #1e293b; margin-top: 0;">Hello <strong>${userName}</strong>,</p>
-        <p style="font-size: 13px; color: #475569; line-height: 1.5;">Please find below your requested electronic <strong>Statement of Account</strong> for the period <strong>${fromDate}</strong> to <strong>${toDate}</strong>.</p>
+        <p style="font-size: 13px; color: #475569; line-height: 1.5;">Please find below your requested electronic <strong>Statement of Account</strong> for the period <strong>${fromDate}</strong> to <strong>${toDate}</strong>. The complete official PDF bank statement is attached to this email.</p>
 
         <!-- Summary Specs -->
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin: 20px 0; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
@@ -173,6 +185,14 @@ export async function POST(req: Request) {
           <div>
             <span style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; display: block;">Date Period</span>
             <strong style="font-size: 12px; color: #0f172a;">${fromDate} ~ ${toDate}</strong>
+          </div>
+          <div>
+            <span style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; display: block;">Total Money In</span>
+            <strong style="font-size: 12px; color: #10b981;">+₦${totalInflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+          </div>
+          <div>
+            <span style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; display: block;">Total Money Out</span>
+            <strong style="font-size: 12px; color: #0f172a;">-₦${totalOutflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
           <div>
             <span style="font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: 800; display: block;">Total Transactions</span>
@@ -191,7 +211,7 @@ export async function POST(req: Request) {
             </tr>
           </thead>
           <tbody>
-            ${tableRows}
+            ${tableRowsHtml}
           </tbody>
         </table>
 
@@ -205,7 +225,7 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    // Generate server-side PDF attachment using jsPDF
+    // Generate high-fidelity server-side PDF attachment using jsPDF + autoTable
     let pdfBase64 = "";
     try {
       const doc = new jsPDF({
@@ -214,154 +234,183 @@ export async function POST(req: Request) {
         format: "a4",
       });
 
-      // Pre-fetch Data URIs for remote images so jsPDF doc.addImage never fails on raw HTTP URLs
-      const watermarkDataUri = statementWatermarkUrl ? await fetchImageAsDataUri(statementWatermarkUrl) : null;
-      const signatureDataUri = statementSignatureUrl ? await fetchImageAsDataUri(statementSignatureUrl) : null;
-      const stampDataUri = statementStampUrl ? await fetchImageAsDataUri(statementStampUrl) : null;
+      // Pre-fetch Data URIs for remote image assets so jsPDF never fails
+      const [logoDataUri, watermarkDataUri, signatureDataUri, stampDataUri] = await Promise.all([
+        fetchImageAsDataUri(statementLogoUrl),
+        statementWatermarkUrl ? fetchImageAsDataUri(statementWatermarkUrl) : Promise.resolve(null),
+        statementSignatureUrl ? fetchImageAsDataUri(statementSignatureUrl) : Promise.resolve(null),
+        statementStampUrl ? fetchImageAsDataUri(statementStampUrl) : Promise.resolve(null),
+      ]);
 
-      // Background watermark opacity
-      if (watermarkDataUri) {
+      // Brand Header Banner
+      doc.setFillColor(252, 122, 0); // #FC7A00
+      doc.rect(14, 12, 182, 24, "F");
+
+      if (logoDataUri) {
         try {
-          doc.saveGraphicsState();
-          (doc as any).setGState(new (doc as any).GState({ opacity: statementWatermarkOpacity }));
-          const wmWidth = statementWatermarkSize;
-          const wmHeight = statementWatermarkSize;
-          const wmX = (210 - wmWidth) / 2;
-          const wmY = (297 - wmHeight) / 2;
-          doc.addImage(watermarkDataUri, "PNG", wmX, wmY, wmWidth, wmHeight);
-          doc.restoreGraphicsState();
+          doc.addImage(logoDataUri, "PNG", 18, 14, 20, 20);
         } catch {}
       }
-
-      // Brand Header
-      doc.setFillColor(252, 122, 0); // #FC7A00
-      doc.rect(14, 12, 182, 22, "F");
 
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(255, 255, 255);
-      doc.text("E-GLOBAL PAY", 22, 23);
+      doc.text("E-GLOBAL PAY", logoDataUri ? 42 : 20, 23);
 
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
-      doc.text("OFFICIAL FINANCIAL STATEMENT OF ACCOUNT", 22, 28);
+      doc.text("OFFICIAL ELECTRONIC BANK STATEMENT OF ACCOUNT", logoDataUri ? 42 : 20, 29);
 
-      // Account Overview Box
+      // Overview Summary Box
       doc.setFillColor(248, 250, 252);
-      doc.roundedRect(14, 38, 182, 20, 3, 3, "F");
+      doc.roundedRect(14, 40, 182, 28, 3, 3, "F");
 
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(100, 116, 139);
-      doc.text("ACCOUNT HOLDER", 20, 45);
-      doc.text("STATEMENT PERIOD", 85, 45);
-      doc.text("TOTAL TRANSACTIONS", 145, 45);
+      doc.text("ACCOUNT HOLDER", 20, 47);
+      doc.text("EMAIL & PHONE", 85, 47);
+      doc.text("STATEMENT PERIOD", 145, 47);
 
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setTextColor(15, 23, 42);
-      doc.text(String(userName).slice(0, 30), 20, 52);
-      doc.text(`${fromDate} to ${toDate}`, 85, 52);
-      doc.text(`${txList.length} Record(s)`, 145, 52);
+      doc.text(String(userName).slice(0, 32), 20, 53);
+      doc.text(String(targetEmail).slice(0, 28), 85, 53);
+      doc.text(`${fromDate} to ${toDate}`, 145, 53);
 
-      // Table Header
-      let yPos = 66;
-      doc.setFillColor(241, 245, 249);
-      doc.rect(14, yPos, 182, 7, "F");
-
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(71, 85, 105);
-      doc.text("DATE & TIME", 18, yPos + 5);
-      doc.text("DESCRIPTION", 60, yPos + 5);
-      doc.text("TYPE", 130, yPos + 5);
-      doc.text("AMOUNT (NGN)", 188, yPos + 5, { align: "right" });
+      doc.setTextColor(100, 116, 139);
+      doc.text("TOTAL TRANSACTIONS", 20, 60);
+      doc.text("TOTAL MONEY IN", 85, 60);
+      doc.text("TOTAL MONEY OUT", 145, 60);
 
-      yPos += 11;
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(252, 122, 0);
+      doc.text(`${txList.length} Record(s)`, 20, 65);
 
-      // Table Rows
-      txList.forEach((tx) => {
-        if (yPos > 270) {
-          doc.addPage();
-          yPos = 20;
+      doc.setTextColor(16, 185, 129);
+      doc.text(`+N${totalInflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 85, 65);
 
-          // Header on new page
-          doc.setFillColor(241, 245, 249);
-          doc.rect(14, yPos, 182, 7, "F");
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(71, 85, 105);
-          doc.text("DATE & TIME", 18, yPos + 5);
-          doc.text("DESCRIPTION", 60, yPos + 5);
-          doc.text("TYPE", 130, yPos + 5);
-          doc.text("AMOUNT (NGN)", 188, yPos + 5, { align: "right" });
-          yPos += 11;
-        }
+      doc.setTextColor(15, 23, 42);
+      doc.text(`-N${totalOutflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 145, 65);
 
+      // Table Data
+      const tableBody = txList.map((tx) => {
         const { dateTime } = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
         const isCredit = isCreditTransaction(tx);
         const displayAmt = getTransactionDisplayAmount(tx);
+        const sign = isCredit ? "+" : "-";
 
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(51, 65, 85);
-        doc.text(dateTime, 18, yPos);
-
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
-        doc.text(String(tx.description || tx.title || "Transaction").slice(0, 38), 60, yPos);
-
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        doc.text(String(tx.type || "PAYMENT").toUpperCase(), 130, yPos);
-
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        if (isCredit) {
-          doc.setTextColor(16, 185, 129); // green
-          doc.text(`+N${displayAmt.toLocaleString()}`, 188, yPos, { align: "right" });
-        } else {
-          doc.setTextColor(15, 23, 42); // dark
-          doc.text(`-N${displayAmt.toLocaleString()}`, 188, yPos, { align: "right" });
-        }
-
-        doc.setDrawColor(241, 245, 249);
-        doc.line(14, yPos + 2, 196, yPos + 2);
-
-        yPos += 7.5;
+        return [
+          dateTime,
+          String(tx.reference || tx.id || "").slice(0, 20),
+          String(tx.description || tx.title || "Transaction"),
+          String(tx.type || "PAYMENT").toUpperCase(),
+          `${sign}N${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        ];
       });
 
-      // Signature & Stamp
-      if (yPos + 25 < 280) {
+      autoTable(doc, {
+        startY: 74,
+        margin: { left: 14, right: 14, top: 20, bottom: 25 },
+        head: [["DATE & TIME", "REFERENCE", "DESCRIPTION", "TYPE", "AMOUNT (NGN)"]],
+        body: tableBody,
+        headStyles: {
+          fillColor: [252, 122, 0], // #FC7A00
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 8,
+          halign: "left",
+        },
+        bodyStyles: {
+          fontSize: 7.5,
+          textColor: [15, 23, 42],
+          cellPadding: 3,
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 32 },
+          1: { cellWidth: 32, fontStyle: "bold" },
+          2: { cellWidth: 62 },
+          3: { cellWidth: 22, fontStyle: "bold" },
+          4: { cellWidth: 34, halign: "right", fontStyle: "bold" },
+        },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 4) {
+            const rawVal = String(data.cell.raw || "");
+            const isCredit = rawVal.startsWith("+");
+            data.cell.styles.textColor = isCredit ? [16, 185, 129] : [15, 23, 42];
+          }
+        },
+        didDrawPage: () => {
+          if (watermarkDataUri) {
+            try {
+              doc.saveGraphicsState();
+              (doc as any).setGState(new (doc as any).GState({ opacity: statementWatermarkOpacity }));
+              const wmWidth = statementWatermarkSize;
+              const wmHeight = statementWatermarkSize;
+              const wmX = (210 - wmWidth) / 2;
+              const wmY = (297 - wmHeight) / 2;
+              doc.addImage(watermarkDataUri, "PNG", wmX, wmY, wmWidth, wmHeight);
+              doc.restoreGraphicsState();
+            } catch {}
+          }
+        },
+      });
+
+      let finalY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : 200;
+
+      if (finalY > 250) {
+        doc.addPage();
+        finalY = 30;
+      }
+
+      // Add Signature & Official Stamp
+      if (signatureDataUri || stampDataUri) {
+        doc.setDrawColor(226, 232, 240);
+        doc.line(14, finalY, 196, finalY);
+        finalY += 6;
+
         if (signatureDataUri) {
           try {
-            doc.setFontSize(7);
+            doc.setFontSize(7.5);
             doc.setFont("helvetica", "bold");
-            doc.setTextColor(148, 163, 184);
-            doc.text("AUTHORIZED SIGNATORY", 18, yPos + 6);
-            doc.addImage(signatureDataUri, "PNG", 18, yPos + 8, 30, 12);
+            doc.setTextColor(100, 116, 139);
+            doc.text("AUTHORIZED SIGNATORY", 16, finalY);
+            doc.addImage(signatureDataUri, "PNG", 16, finalY + 2, 35, 16);
           } catch {}
         }
+
         if (stampDataUri) {
           try {
-            doc.setFontSize(7);
+            doc.setFontSize(7.5);
             doc.setFont("helvetica", "bold");
-            doc.setTextColor(148, 163, 184);
-            doc.text("OFFICIAL STAMP", 150, yPos + 6);
-            doc.addImage(stampDataUri, "PNG", 150, yPos + 8, 20, 20);
+            doc.setTextColor(100, 116, 139);
+            doc.text("OFFICIAL STAMP", 148, finalY);
+            doc.addImage(stampDataUri, "PNG", 148, finalY + 2, 24, 24);
           } catch {}
         }
       }
 
-      // Footer
-      doc.setFontSize(7);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(148, 163, 184);
-      doc.text("Official E-Global Pay Automated Electronic Statement • Confidential & Private", 14, 288);
+      // Add Page Numbers to all pages
+      const totalPages = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(148, 163, 184);
+        doc.text("Official E-Global Pay Automated Electronic Bank Statement • Confidential", 14, 288);
+        doc.text(`Page ${i} of ${totalPages}`, 196, 288, { align: "right" });
+      }
 
       const pdfOutput = doc.output("arraybuffer");
       pdfBase64 = Buffer.from(pdfOutput).toString("base64");
     } catch (pdfErr: any) {
-      console.warn("[Statement Email Route] Server PDF generation warning:", pdfErr.message);
+      console.error("[Statement Email Route] Server PDF generation exception:", pdfErr);
     }
 
     const attachments = pdfBase64
