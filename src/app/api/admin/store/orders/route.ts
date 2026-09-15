@@ -24,7 +24,9 @@ export async function GET(req: Request) {
     const snapshot = await query.get();
 
     const orders: any[] = [];
-    let totalRevenue = 0;
+    let grossRevenue = 0;
+    let netRevenue = 0;
+    let totalRealizedProfit = 0;
     let pendingCount = 0;
     let deliveredCount = 0;
     let refundedCount = 0;
@@ -32,12 +34,30 @@ export async function GET(req: Request) {
     snapshot.forEach((doc) => {
       const data = doc.data();
       const amt = Number(data.totalAmount) || 0;
-      totalRevenue += amt;
+      grossRevenue += amt;
 
       const st = String(data.status || "Pending").toLowerCase();
+      const paySt = String(data.paymentStatus || "").toLowerCase();
+      const isSettledOrPaid = paySt === "paid" && st !== "refunded" && st !== "canceled" && st !== "cancelled" && st !== "payment failed";
+
       if (st === "pending") pendingCount++;
       else if (st === "delivered") deliveredCount++;
       else if (st === "refunded" || st === "canceled" || st === "cancelled") refundedCount++;
+
+      // Calculate Net Revenue & Realized Profit for non-refunded, paid/active orders
+      if (isSettledOrPaid) {
+        netRevenue += amt;
+
+        if (Array.isArray(data.items)) {
+          for (const item of data.items) {
+            const sellingPrice = Number(item.price) || 0;
+            const costPrice = typeof item.costPrice === "number" ? item.costPrice : 0;
+            const qty = Number(item.quantity) || 1;
+            const profitPerUnit = Math.max(0, sellingPrice - costPrice);
+            totalRealizedProfit += profitPerUnit * qty;
+          }
+        }
+      }
 
       // Apply search query filter across customer fields
       if (searchQuery) {
@@ -66,7 +86,10 @@ export async function GET(req: Request) {
       orders: paginatedOrders,
       metrics: {
         totalOrders: snapshot.size,
-        totalRevenue,
+        grossRevenue,
+        netRevenue,
+        totalRevenue: netRevenue, // Canonical Net Income
+        totalRealizedProfit,
         pendingCount,
         deliveredCount,
         refundedCount,
@@ -172,74 +195,102 @@ export async function POST(req: Request) {
 
     if (isRefundAction) {
       const refundAmount = Number(orderData.totalAmount) || 0;
+      const storeDataRef = adminDb.collection("config").doc("store_data");
 
-      if (userId && refundAmount > 0) {
-        const walletRef = adminDb.collection("wallets").doc(`${userId}_NGN`);
-        const userRef = adminDb.collection("users").doc(userId);
+      await adminDb.runTransaction(async (transaction) => {
+        const walletRef = userId ? adminDb.collection("wallets").doc(`${userId}_NGN`) : null;
+        const userRef = userId ? adminDb.collection("users").doc(userId) : null;
 
-        await adminDb.runTransaction(async (transaction) => {
-          // Perform ALL reads before executing any writes
-          const wSnap = await transaction.get(walletRef);
-          const userSnap = await transaction.get(userRef);
+        // Perform ALL reads first
+        const storeSnap = await transaction.get(storeDataRef);
+        const wSnap = walletRef ? await transaction.get(walletRef) : null;
+        const userSnap = userRef ? await transaction.get(userRef) : null;
 
-          if (wSnap.exists) {
-            const currentBal = Number(wSnap.data()?.balance) || 0;
-            const newBal = currentBal + refundAmount;
+        // 1. Refund Wallet Balance
+        if (wSnap && wSnap.exists && refundAmount > 0 && userId) {
+          const currentBal = Number(wSnap.data()?.balance) || 0;
+          const newBal = currentBal + refundAmount;
 
-            // 1. Update wallet balance in wallets collection
-            transaction.update(walletRef, {
+          transaction.update(walletRef!, {
+            balance: newBal,
+            updatedAt: now,
+          });
+
+          if (userSnap && userSnap.exists) {
+            transaction.update(userRef!, {
               balance: newBal,
               updatedAt: now,
             });
-
-            // 2. ALSO update user balance in users collection so app-wide available balance increases immediately
-            if (userSnap.exists) {
-              transaction.update(userRef, {
-                balance: newBal,
-                updatedAt: now,
-              });
-            }
-
-            // 3. Write structured refund ledger entry for normalization & receipts
-            const txRef = adminDb.collection("transactions").doc();
-            transaction.set(txRef, {
-              id: txRef.id,
-              userId,
-              type: "STORE_ORDER_REFUND",
-              category: "REFUND",
-              direction: "CREDIT",
-              title: "Order Cancel & Refund",
-              description: `Order Cancel & Refund - Order ID: ${orderId}`,
-              amount: refundAmount,
-              totalCredited: refundAmount,
-              totalDebited: refundAmount,
-              totalDeducted: refundAmount,
-              totalRefunded: refundAmount,
-              fee: 0,
-              vat: 0,
-              markup: 0,
-              currency: "NGN",
-              balanceBefore: currentBal,
-              balanceAfter: newBal,
-              status: "SUCCESS",
-              reference: `REFUND-${orderId}`,
-              orderId: orderId,
-              canceledOrderId: orderId,
-              recipientName: "E-Tech Store",
-              beneficiaryName: "E-Tech Store",
-              items: Array.isArray(orderData.items) ? orderData.items : [],
-              narration: `Order Cancel & Refund for Store Order ${orderId}`,
-              createdAt: now,
-              updatedAt: now,
-            });
           }
-        });
-      }
+
+          // Write structured refund ledger entry
+          const txRef = adminDb.collection("transactions").doc();
+          transaction.set(txRef, {
+            id: txRef.id,
+            userId,
+            type: "STORE_ORDER_REFUND",
+            category: "REFUND",
+            direction: "CREDIT",
+            title: "Order Cancel & Refund",
+            description: `Order Cancel & Refund - Order ID: ${orderId}`,
+            amount: refundAmount,
+            totalCredited: refundAmount,
+            totalDebited: refundAmount,
+            totalDeducted: refundAmount,
+            totalRefunded: refundAmount,
+            fee: 0,
+            vat: 0,
+            markup: 0,
+            currency: "NGN",
+            balanceBefore: currentBal,
+            balanceAfter: newBal,
+            status: "SUCCESS",
+            reference: `REFUND-${orderId}`,
+            orderId: orderId,
+            canceledOrderId: orderId,
+            recipientName: "E-Tech Store",
+            beneficiaryName: "E-Tech Store",
+            items: Array.isArray(orderData.items) ? orderData.items : [],
+            narration: `Order Cancel & Refund for Store Order ${orderId}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+
+        // 2. Restore Inventory Stock globally to config/store_data
+        if (storeSnap.exists && Array.isArray(orderData.items) && orderData.stockRestored !== true) {
+          const currentItems: any[] = Array.isArray(storeSnap.data()?.items)
+            ? [...(storeSnap.data()?.items)]
+            : [];
+          let stockModified = false;
+
+          for (const oItem of orderData.items) {
+            const idx = currentItems.findIndex((i: any) => i.id === oItem.id);
+            if (idx > -1) {
+              const targetItem = currentItems[idx];
+              if (!targetItem.unlimitedStock && typeof targetItem.stockQuantity === "number") {
+                const restoredQty = targetItem.stockQuantity + (Number(oItem.quantity) || 1);
+                currentItems[idx] = {
+                  ...targetItem,
+                  stockQuantity: restoredQty,
+                  inStock: restoredQty > 0,
+                };
+                stockModified = true;
+              }
+            }
+          }
+
+          if (stockModified) {
+            transaction.update(storeDataRef, { items: currentItems, updatedAt: now });
+          }
+        }
+      });
     }
 
     // Update order status
     const updatePayload: Record<string, any> = {
       status: newStatus,
+      stockRestored: isRefundAction ? true : Boolean(orderData.stockRestored),
       updatedAt: now,
     };
 
@@ -257,7 +308,7 @@ export async function POST(req: Request) {
           ? `Store Order Refunded: ${orderId}`
           : `Store Order Status: ${newStatus}`;
         const statusBody = isRefundAction
-          ? `Your store order ${orderId} was updated to "${newStatus}". ₦${Number(orderData.totalAmount || 0).toLocaleString()} NGN has been refunded to your wallet.`
+          ? `Your store order ${orderId} was updated to "${newStatus}". ₦${Number(orderData.totalAmount || 0).toLocaleString()} NGN has been refunded to your wallet and items returned to store inventory.`
           : `Your store order ${orderId} status was updated to "${newStatus}".${adminNotes ? ` Note: ${adminNotes}` : ""}`;
 
         await NotificationService.sendPushNotification(userId, {
@@ -281,7 +332,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: isRefundAction
-        ? `Order status updated to "${newStatus}" and ₦${Number(orderData.totalAmount || 0).toLocaleString()} was refunded to customer wallet!`
+        ? `Order status updated to "${newStatus}", inventory stock restored to catalog, and ₦${Number(orderData.totalAmount || 0).toLocaleString()} refunded to customer wallet!`
         : `Order status updated to "${newStatus}"!`,
       orderId,
       status: newStatus,

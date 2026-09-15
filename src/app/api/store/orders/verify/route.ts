@@ -190,10 +190,48 @@ export async function GET(req: Request) {
 
       return NextResponse.redirect(new URL(`/store?orderSuccess=${orderId}`, req.url));
     } else {
-      // Payment Failed or Cancelled: Keep as Payment Failed and do NOT complete order
+      // Payment Failed or Cancelled: If stock was previously reserved, restore stock atomically
+      if (orderData?.stockDeducted === true && orderData?.stockRestored !== true && Array.isArray(orderData?.items)) {
+        try {
+          const storeDataRef = adminDb.collection("config").doc("store_data");
+          await adminDb.runTransaction(async (transaction) => {
+            const storeSnap = await transaction.get(storeDataRef);
+            if (storeSnap.exists) {
+              const currentItems: any[] = Array.isArray(storeSnap.data()?.items)
+                ? [...(storeSnap.data()?.items)]
+                : [];
+              let stockModified = false;
+
+              for (const oItem of orderData.items) {
+                const idx = currentItems.findIndex((i: any) => i.id === oItem.id);
+                if (idx > -1) {
+                  const targetItem = currentItems[idx];
+                  if (!targetItem.unlimitedStock && typeof targetItem.stockQuantity === "number") {
+                    const restoredQty = targetItem.stockQuantity + (Number(oItem.quantity) || 1);
+                    currentItems[idx] = {
+                      ...targetItem,
+                      stockQuantity: restoredQty,
+                      inStock: restoredQty > 0,
+                    };
+                    stockModified = true;
+                  }
+                }
+              }
+
+              if (stockModified) {
+                transaction.update(storeDataRef, { items: currentItems, updatedAt: now });
+              }
+            }
+          });
+        } catch (restErr: any) {
+          console.warn("[Store Order Verify] Stock restoration on failed payment warning:", restErr.message);
+        }
+      }
+
       await orderRef.update({
         status: "Payment Failed",
         paymentStatus: "FAILED",
+        stockRestored: true,
         updatedAt: now,
       });
 
