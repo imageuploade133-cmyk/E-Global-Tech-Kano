@@ -113,7 +113,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { action, orderId, newStatus, adminNotes } = body;
 
-    // Single order deletion
+    // Single order deletion with automatic wallet refund & stock restoration
     if (action === "delete_order") {
       if (!orderId) {
         return NextResponse.json({ error: "Missing orderId parameter." }, { status: 400 });
@@ -124,10 +124,133 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Order not found." }, { status: 404 });
       }
 
+      const orderData = orderSnap.data() || {};
+      const st = String(orderData.status || "").toLowerCase();
+      const paySt = String(orderData.paymentStatus || "").toLowerCase();
+      const isPaid = paySt === "paid" || paySt === "success";
+      const isNotAlreadyRefunded = st !== "refunded" && st !== "canceled" && st !== "cancelled";
+
+      const userId = orderData.userId;
+      const refundAmount = Number(orderData.totalAmount) || 0;
+      const now = new Date().toISOString();
+      const storeDataRef = adminDb.collection("config").doc("store_data");
+
+      // Execute atomic wallet refund & stock restoration if paid and not previously settled
+      if (isPaid && isNotAlreadyRefunded) {
+        await adminDb.runTransaction(async (transaction) => {
+          const walletRef = userId ? adminDb.collection("wallets").doc(`${userId}_NGN`) : null;
+          const userRef = userId ? adminDb.collection("users").doc(userId) : null;
+
+          const storeSnap = await transaction.get(storeDataRef);
+          const wSnap = walletRef ? await transaction.get(walletRef) : null;
+          const userSnap = userRef ? await transaction.get(userRef) : null;
+
+          // 1. Credit wallet balance
+          if (wSnap && wSnap.exists && refundAmount > 0 && userId) {
+            const currentBal = Number(wSnap.data()?.balance) || 0;
+            const newBal = currentBal + refundAmount;
+
+            transaction.update(walletRef!, {
+              balance: newBal,
+              updatedAt: now,
+            });
+
+            if (userSnap && userSnap.exists) {
+              transaction.update(userRef!, {
+                balance: newBal,
+                updatedAt: now,
+              });
+            }
+
+            // Write structured refund ledger entry
+            const txRef = adminDb.collection("transactions").doc();
+            transaction.set(txRef, {
+              id: txRef.id,
+              userId,
+              type: "STORE_ORDER_REFUND",
+              category: "REFUND",
+              direction: "CREDIT",
+              title: "Order Delete & Refund",
+              description: `Order Delete & Refund - Order ID: ${orderId}`,
+              amount: refundAmount,
+              totalCredited: refundAmount,
+              totalDebited: refundAmount,
+              fee: 0,
+              vat: 0,
+              markup: 0,
+              currency: "NGN",
+              balanceBefore: currentBal,
+              balanceAfter: newBal,
+              status: "SUCCESS",
+              reference: `REFUND-${orderId}`,
+              orderId,
+              canceledOrderId: orderId,
+              recipientName: "E-Tech Store",
+              items: Array.isArray(orderData.items) ? orderData.items : [],
+              narration: `Order Deletion Refund for Store Order ${orderId}`,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+
+          // 2. Restore Inventory Stock globally
+          if (storeSnap.exists && Array.isArray(orderData.items) && orderData.stockRestored !== true) {
+            const currentItems: any[] = Array.isArray(storeSnap.data()?.items)
+              ? [...(storeSnap.data()?.items)]
+              : [];
+            let stockModified = false;
+
+            for (const oItem of orderData.items) {
+              const idx = currentItems.findIndex((i: any) => i.id === oItem.id);
+              if (idx > -1) {
+                const targetItem = currentItems[idx];
+                if (!targetItem.unlimitedStock && typeof targetItem.stockQuantity === "number") {
+                  const restoredQty = targetItem.stockQuantity + (Number(oItem.quantity) || 1);
+                  currentItems[idx] = {
+                    ...targetItem,
+                    stockQuantity: restoredQty,
+                    inStock: restoredQty > 0,
+                  };
+                  stockModified = true;
+                }
+              }
+            }
+
+            if (stockModified) {
+              transaction.update(storeDataRef, { items: currentItems, updatedAt: now });
+            }
+          }
+        });
+
+        // Dispatch wallet push notification to customer for order deletion & refund
+        if (userId) {
+          try {
+            const { NotificationService } = await import("@/services/notification-service");
+            await NotificationService.sendPushNotification(userId, {
+              userId,
+              title: `Store Order Refunded & Removed: ${orderId}`,
+              body: `Your store order ${orderId} was removed by admin. ₦${refundAmount.toLocaleString()} NGN has been refunded to your wallet and items returned to store inventory.`,
+              type: "transaction",
+              url: "/store",
+              amount: refundAmount,
+              currency: "NGN",
+              reference: `ORDER-${orderId}`,
+              recipientName: "E-Tech Store",
+              bankName: "Store Order",
+              channel: "STORE_ORDER",
+            } as any);
+          } catch (notifErr: any) {
+            console.warn("[Admin Store Orders Delete] Push notification warning:", notifErr?.message);
+          }
+        }
+      }
+
       await orderRef.delete();
       return NextResponse.json({
         success: true,
-        message: `Order ${orderId} has been deleted successfully!`,
+        message: isPaid && isNotAlreadyRefunded
+          ? `Order ${orderId} deleted successfully! ₦${refundAmount.toLocaleString()} NGN was refunded to customer wallet and stock returned to inventory.`
+          : `Order ${orderId} deleted successfully!`,
       });
     }
 

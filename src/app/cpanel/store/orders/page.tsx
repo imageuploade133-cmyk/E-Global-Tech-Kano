@@ -223,9 +223,9 @@ function CpanelStoreOrdersPageContent() {
 
   const handleDeleteOrder = (orderId: string) => {
     promptAdminConfirmation({
-      title: "Delete Order Record",
-      description: `Are you sure you want to permanently delete order record ${orderId}? This document will be purged from Firestore storage.`,
-      confirmText: "Delete Order",
+      title: "Delete Order & Refund Customer",
+      description: `Are you sure you want to delete order ${orderId}? The customer's wallet will be refunded automatically (if paid), item stock returned to store inventory, and the order removed from system records.`,
+      confirmText: "Delete & Refund Order",
       isDanger: true,
       onConfirm: async () => {
         try {
@@ -240,11 +240,11 @@ function CpanelStoreOrdersPageContent() {
 
           const data = await res.json();
           if (res.ok && data.success) {
-            toast.success(data.message || "Order record deleted!");
+            toast.success(data.message || "Order deleted and refunded!");
             if (activeOrder?.id === orderId) setActiveProductOrder(null);
             fetchOrders();
           } else {
-            toast.error(data.error || "Failed to delete order record.");
+            toast.error(data.error || "Failed to delete order.");
           }
         } catch (err: any) {
           toast.error(err.message || "Network error deleting order.");
