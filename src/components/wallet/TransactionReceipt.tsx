@@ -350,11 +350,29 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const receiptHeaderName = config.receiptName || "E-TECH GLOBAL HUB";
   const receiptHeaderLogo = config.receiptLogoUrl || config.logoUrl || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
 
-  const detectedNetworkName = transaction.network || transaction.billerName || transaction.billerCode || (
+  const detectedNetworkName = transaction.network || transaction.billerName || (
+    transaction.billerCode && !transaction.billerCode.toLowerCase().includes("vtu") && !transaction.billerCode.toLowerCase().includes("bill")
+      ? transaction.billerCode
+      : ""
+  ) || (
     desc.includes("mtn") ? "MTN" :
     desc.includes("glo") ? "GLO" :
     desc.includes("airtel") ? "Airtel" :
-    desc.includes("9mobile") ? "9mobile" : ""
+    desc.includes("9mobile") ? "9mobile" :
+    desc.includes("kedco") || desc.includes("kano") ? "KEDCO" :
+    desc.includes("ikedc") || desc.includes("ikeja") ? "IKEDC" :
+    desc.includes("ekedc") || desc.includes("eko") ? "EKEDC" :
+    desc.includes("aedc") || desc.includes("abuja") ? "AEDC" :
+    desc.includes("ibedc") || desc.includes("ibadan") ? "IBEDC" :
+    desc.includes("phhedc") || desc.includes("port harcourt") ? "PHED" :
+    desc.includes("eedc") || desc.includes("enugu") ? "EEDC" :
+    desc.includes("jedc") || desc.includes("jos") ? "JED" :
+    desc.includes("kaedco") || desc.includes("kaduna") ? "KAEDCO" :
+    desc.includes("betting") || desc.includes("sporty") || desc.includes("1xbet") || desc.includes("bet9ja") || desc.includes("nairabet") || desc.includes("msport") ? "Betting" :
+    desc.includes("dstv") ? "DSTV" :
+    desc.includes("gotv") ? "GOtv" :
+    desc.includes("startimes") ? "Startimes" :
+    desc.includes("waec") ? "WAEC" : ""
   );
 
   const matchedLogo = isStore
@@ -1192,9 +1210,16 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         <div className="flex justify-between items-start text-gray-500 font-semibold">
                           <span>{isCardRef ? "Reversal Target" : isBillRefund ? (isAirtimeRefund || isDataRefund ? "Network Operator" : "Biller Provider") : "Reversal Target"}</span>
                           <div className="flex flex-col items-end text-right max-w-[220px]">
-                            <span className="text-black font-bold uppercase">
-                              {targetName}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {isBillRefund && logoUrl && (
+                                <div className="relative w-5 h-5 rounded-full overflow-hidden border border-gray-100 bg-white shrink-0">
+                                  <Image src={logoUrl} alt="Operator Logo" fill className="object-contain p-0.5" />
+                                </div>
+                              )}
+                              <span className="text-black font-extrabold uppercase">
+                                {targetName}
+                              </span>
+                            </div>
                             {isBankTransferRefund && (
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <BankLogoResolver
