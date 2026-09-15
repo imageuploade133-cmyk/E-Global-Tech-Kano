@@ -285,17 +285,25 @@ export function NotificationDetailModal({
 
           <div className="mt-8 flex flex-col gap-3">
             {notification.type === "transaction" ? (
-              <Link
-                href="/history"
+              <button
+                type="button"
                 onClick={() => {
                   onClose();
                   onCloseParentTray();
+                  const txRef = notification.reference;
+                  if (txRef && typeof window !== "undefined") {
+                    if ((window as any).__openNotificationTransaction) {
+                      (window as any).__openNotificationTransaction(txRef);
+                    } else {
+                      window.location.href = `/?txRef=${encodeURIComponent(txRef)}`;
+                    }
+                  }
                 }}
                 className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-none text-center cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                <span>View Full History Ledger</span>
-              </Link>
+                <span>{notification.reference ? "View Exact Transaction Receipt" : "View Transaction Details"}</span>
+              </button>
             ) : notification.type === "order" ? (
               <Link
                 href="/store"

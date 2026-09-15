@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { BalanceCard } from "@/components/wallet/BalanceCard";
@@ -10,16 +10,112 @@ import { ServiceGrid } from "@/components/wallet/ServiceGrid";
 import { Promotions } from "@/components/wallet/Promotions";
 import { PullToRefreshOverlay } from "@/components/wallet/PullToRefreshOverlay";
 import { PaymentVerificationOverlay } from "@/components/wallet/PaymentVerificationOverlay";
+import { TransactionReceipt, Transaction } from "@/components/wallet/TransactionReceipt";
 import { useAuth } from "@/lib/AuthContext";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useFcm } from "@/hooks/useFcm";
+import { AnimatePresence } from "framer-motion";
 
 export default function Home() {
-  const { userData, user, loading, updateUserData } = useAuth();
+  const { userData, user, loading, updateUserData, setPinVerified } = useAuth();
   useFcm(); // Initialize FCM Web Push notifications and foreground listener
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Notification Receipt State Machine
+  const [notificationTx, setNotificationTx] = useState<Transaction | null>(null);
+  const [isNotificationReceiptFlow, setIsNotificationReceiptFlow] = useState(false);
+  const isFetchingNotificationRef = useRef<string | null>(null);
+
+  const fetchAndOpenNotificationTransaction = async (txRefToFetch: string) => {
+    if (!txRefToFetch || isFetchingNotificationRef.current === txRefToFetch) return;
+    isFetchingNotificationRef.current = txRefToFetch;
+
+    // Clean query parameters from URL immediately
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
+    try {
+      let idToken = "mock-token";
+      const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
+      if (!isMock && user) {
+        try {
+          idToken = await user.getIdToken();
+        } catch (tokenErr) {
+          console.error("Failed to retrieve ID token for notification receipt:", tokenErr);
+        }
+      }
+
+      toast.loading("Fetching transaction details...");
+      const res = await fetch(`/api/transactions/${encodeURIComponent(txRefToFetch)}`, {
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+        },
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (res.ok && data.success && data.transaction) {
+        setNotificationTx(data.transaction);
+        setIsNotificationReceiptFlow(true);
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("notification_receipt_active", "true");
+        }
+      } else if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("pending_notification_tx_ref", txRefToFetch);
+        }
+        toast.info("Please log in to view transaction details.");
+      } else {
+        toast.error(data.error || "You are not authorized to view this transaction.");
+      }
+    } catch (err) {
+      console.error("[Notification Receipt Fetch Exception]:", err);
+      toast.dismiss();
+      toast.error("Failed to load transaction details.");
+    } finally {
+      isFetchingNotificationRef.current = null;
+    }
+  };
+
+  const handleCloseNotificationReceipt = () => {
+    setNotificationTx(null);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("notification_receipt_active");
+      sessionStorage.removeItem("pending_notification_tx_ref");
+    }
+
+    if (isNotificationReceiptFlow) {
+      setIsNotificationReceiptFlow(false);
+      // Section 10, 11, 13, 14: Require Access PIN after leaving notification-opened receipt
+      setPinVerified(false);
+      router.push("/auth/pin?mode=notification_unlock");
+    }
+  };
+
+  // Expose global callback and listen for deep-link or search parameter txRef
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).__openNotificationTransaction = (ref: string) => {
+        fetchAndOpenNotificationTransaction(ref);
+      };
+    }
+
+    const txRefParam = searchParams.get("txRef") || searchParams.get("transactionReference") || searchParams.get("reference");
+    const pendingRef = typeof window !== "undefined" ? sessionStorage.getItem("pending_notification_tx_ref") : null;
+
+    const refToProcess = txRefParam || pendingRef;
+
+    if (refToProcess && user && !loading) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("pending_notification_tx_ref");
+      }
+      fetchAndOpenNotificationTransaction(refToProcess);
+    }
+  }, [searchParams, user, loading]);
 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "success" | "error">("idle");
@@ -289,6 +385,15 @@ export default function Home() {
         <ServiceGrid />
         <Promotions />
       </main>
+
+      <AnimatePresence>
+        {notificationTx && (
+          <TransactionReceipt
+            transaction={notificationTx}
+            onClose={handleCloseNotificationReceipt}
+          />
+        )}
+      </AnimatePresence>
 
       <BottomNav />
     </div>
