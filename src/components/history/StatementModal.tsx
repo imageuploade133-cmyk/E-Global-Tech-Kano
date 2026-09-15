@@ -13,6 +13,8 @@ import { Transaction } from "@/components/wallet/TransactionReceipt";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { InvestmentPinModal } from "@/components/investment/InvestmentPinModal";
+import { InvestmentCalendarModal } from "@/components/investment/InvestmentCalendarModal";
 
 interface StatementModalProps {
   isOpen: boolean;
@@ -49,7 +51,73 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
   const [deliveryMethod, setDeliveryMethod] = useState<"download" | "email">("download");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
+  // Quick Preset State
+  const [selectedPreset, setSelectedPreset] = useState<string>("30DAYS");
+
+  // Custom Calendar Picker State
+  const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
+  const [calendarTarget, setCalendarTarget] = useState<"FROM" | "TO">("FROM");
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+
+  // PIN modal state
+  const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+  const [isVerifyingPin, setIsVerifyingPin] = useState<boolean>(false);
+
   if (!isOpen) return null;
+
+  // Preset Date Selection Handlers
+  const handleSetPreset = (preset: string) => {
+    setSelectedPreset(preset);
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    setToDate(today);
+
+    if (preset === "30DAYS") {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      setFromDate(d.toISOString().split("T")[0]);
+    } else if (preset === "60DAYS") {
+      const d = new Date();
+      d.setDate(d.getDate() - 60);
+      setFromDate(d.toISOString().split("T")[0]);
+    } else if (preset === "90DAYS") {
+      const d = new Date();
+      d.setDate(d.getDate() - 90);
+      setFromDate(d.toISOString().split("T")[0]);
+    } else if (preset === "THIS_MONTH") {
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      setFromDate(d.toISOString().split("T")[0]);
+    } else if (preset === "LAST_MONTH") {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      setFromDate(start.toISOString().split("T")[0]);
+      setToDate(end.toISOString().split("T")[0]);
+    } else if (preset === "6MONTHS") {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 6);
+      setFromDate(d.toISOString().split("T")[0]);
+    }
+  };
+
+  const openCalendarFor = (target: "FROM" | "TO") => {
+    setCalendarTarget(target);
+    const targetDateStr = target === "FROM" ? fromDate : toDate;
+    if (targetDateStr) {
+      setCalendarMonth(new Date(targetDateStr));
+    } else {
+      setCalendarMonth(new Date());
+    }
+    setIsCalendarOpen(true);
+  };
+
+  const handleSelectCalendarDate = (dateStr: string) => {
+    if (calendarTarget === "FROM") {
+      setFromDate(dateStr);
+    } else {
+      setToDate(dateStr);
+    }
+    setSelectedPreset("CUSTOM");
+  };
 
   const validateDates = (): { valid: boolean; startIso: string; endIso: string } => {
     if (!fromDate || !toDate) {
@@ -75,14 +143,52 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
     return { valid: true, startIso: start.toISOString(), endIso: end.toISOString() };
   };
 
-  const handleGenerate = async () => {
-    const { valid, startIso, endIso } = validateDates();
+  const handleInitiateGenerate = () => {
+    const { valid } = validateDates();
     if (!valid || !user) return;
+    setIsPinModalOpen(true);
+  };
 
+  const handlePinSubmit = async (pin: string) => {
+    const { valid, startIso, endIso } = validateDates();
+    if (!valid || !user) {
+      setIsPinModalOpen(false);
+      return;
+    }
+
+    setIsVerifyingPin(true);
     setIsGenerating(true);
     toast.loading(deliveryMethod === "download" ? "Generating PDF Bank Statement..." : "Sending Statement to Email...", { id: "statement-gen" });
 
     try {
+      let idToken = "";
+      if (user && typeof user.getIdToken === "function") {
+        idToken = await user.getIdToken();
+      }
+
+      // Step 1: Verify PIN via API
+      const pinRes = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ action: "verify", pin }),
+      });
+
+      const pinData = await pinRes.json();
+      if (!pinRes.ok || !pinData.success) {
+        toast.dismiss("statement-gen");
+        toast.error(pinData.message || pinData.error || "Incorrect transaction PIN.");
+        setIsGenerating(false);
+        setIsVerifyingPin(false);
+        return;
+      }
+
+      // PIN is valid! Close PIN modal
+      setIsPinModalOpen(false);
+      setIsVerifyingPin(false);
+
       if (deliveryMethod === "download") {
         // Fetch client-side Firestore transactions
         const q = query(
@@ -322,19 +428,14 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
         toast.success("Bank Statement PDF generated and downloaded successfully!");
         onClose();
       } else {
-        // Call S2S API route to dispatch statement to user email
-        let idToken = "";
-        if (user && typeof user.getIdToken === "function") {
-          idToken = await user.getIdToken();
-        }
-
+        // Call S2S API route to dispatch statement to user email passing verified PIN
         const res = await fetch("/api/history/statement/email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
           },
-          body: JSON.stringify({ fromDate, toDate }),
+          body: JSON.stringify({ fromDate, toDate, pin }),
         });
 
         const data = await res.json();
@@ -353,6 +454,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
       toast.error("Failed to generate statement: " + (err.message || "Unknown error"));
     } finally {
       setIsGenerating(false);
+      setIsVerifyingPin(false);
     }
   };
 
@@ -413,32 +515,123 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
                 </p>
               </div>
 
-              {/* Date Selection Grid */}
-              <div className="space-y-3.5">
-                <div>
-                  <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block mb-1">
-                    From Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    max={todayStr}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold text-black outline-none focus:border-[#FC7A00]"
-                  />
-                </div>
+              {/* Quick Date Range Selection Pills */}
+              <div className="space-y-2">
+                <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block">
+                  Quick Date Range
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-50 rounded-2xl border border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => handleSetPreset("30DAYS")}
+                    className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
+                      selectedPreset === "30DAYS"
+                        ? "bg-[#FC7A00] text-white shadow-2xs"
+                        : "text-gray-600 hover:text-black"
+                    }`}
+                  >
+                    Last 30 Days
+                  </button>
 
-                <div>
-                  <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block mb-1">
-                    To Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    max={todayStr}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs font-bold text-black outline-none focus:border-[#FC7A00]"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSetPreset("THIS_MONTH")}
+                    className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
+                      selectedPreset === "THIS_MONTH"
+                        ? "bg-[#FC7A00] text-white shadow-2xs"
+                        : "text-gray-600 hover:text-black"
+                    }`}
+                  >
+                    This Month
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetPreset("60DAYS")}
+                    className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
+                      selectedPreset === "60DAYS"
+                        ? "bg-[#FC7A00] text-white shadow-2xs"
+                        : "text-gray-600 hover:text-black"
+                    }`}
+                  >
+                    Last 60 Days
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetPreset("LAST_MONTH")}
+                    className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
+                      selectedPreset === "LAST_MONTH"
+                        ? "bg-[#FC7A00] text-white shadow-2xs"
+                        : "text-gray-600 hover:text-black"
+                    }`}
+                  >
+                    Last Month
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetPreset("90DAYS")}
+                    className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
+                      selectedPreset === "90DAYS"
+                        ? "bg-[#FC7A00] text-white shadow-2xs"
+                        : "text-gray-600 hover:text-black"
+                    }`}
+                  >
+                    Last 90 Days
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSetPreset("6MONTHS")}
+                    className={`py-2 text-[10px] font-extrabold uppercase rounded-xl transition-all cursor-pointer ${
+                      selectedPreset === "6MONTHS"
+                        ? "bg-[#FC7A00] text-white shadow-2xs"
+                        : "text-gray-600 hover:text-black"
+                    }`}
+                  >
+                    6 Months
+                  </button>
+                </div>
+              </div>
+
+              {/* Date Selection Interactive Buttons */}
+              <div className="space-y-3">
+                <label className="text-[10.5px] font-black uppercase tracking-wider text-gray-500 block">
+                  Select Specific Dates
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">From Date</span>
+                    <button
+                      type="button"
+                      onClick={() => openCalendarFor("FROM")}
+                      className="w-full text-left px-3.5 py-3 bg-white border border-gray-200 hover:border-[#FC7A00] rounded-xl flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-3xs"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="material-symbols-outlined text-[18px] text-[#FC7A00] shrink-0">calendar_month</span>
+                        <span className="font-hanken text-xs font-extrabold text-black truncate">
+                          {fromDate ? new Date(fromDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Select"}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">To Date</span>
+                    <button
+                      type="button"
+                      onClick={() => openCalendarFor("TO")}
+                      className="w-full text-left px-3.5 py-3 bg-white border border-gray-200 hover:border-[#FC7A00] rounded-xl flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-3xs"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="material-symbols-outlined text-[18px] text-[#FC7A00] shrink-0">event</span>
+                        <span className="font-hanken text-xs font-extrabold text-black truncate">
+                          {toDate ? new Date(toDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Select"}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -498,7 +691,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
               <button
                 type="button"
                 disabled={isGenerating}
-                onClick={handleGenerate}
+                onClick={handleInitiateGenerate}
                 className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 border-0"
               >
                 {isGenerating ? (
@@ -517,6 +710,27 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
               </button>
             </div>
           </motion.div>
+
+          {/* Calendar Picker Modal */}
+          <InvestmentCalendarModal
+            isOpen={isCalendarOpen}
+            onClose={() => setIsCalendarOpen(false)}
+            calendarMonth={calendarMonth}
+            setCalendarMonth={setCalendarMonth}
+            selectedPlan={{ minCustomDays: -36500 } as any}
+            customMaturityDate={calendarTarget === "FROM" ? fromDate : toDate}
+            onSelectDate={handleSelectCalendarDate}
+          />
+
+          {/* Authorization PIN Modal */}
+          <InvestmentPinModal
+            isOpen={isPinModalOpen}
+            onClose={() => setIsPinModalOpen(false)}
+            title="Authorize Statement Request"
+            description="Enter your 4-digit transaction PIN to generate statement."
+            isSubmitting={isVerifyingPin}
+            onPinSubmit={handlePinSubmit}
+          />
         </div>
       )}
     </AnimatePresence>
