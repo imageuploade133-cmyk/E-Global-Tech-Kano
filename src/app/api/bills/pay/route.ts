@@ -536,11 +536,11 @@ export async function POST(req: Request) {
             category: (biller_type || "BILLS").toUpperCase(),
             metadata: {
               billerCode: item_code || biller_code || "",
-              billerName: biller_name || network || "",
+              billerName: biller_name || biller_code || "",
               billerType: biller_type || "",
               customerId: customer_id || "",
               phoneNumber: customer_id || "",
-              network: network || biller_name || "",
+              network: biller_name || biller_code || "",
               originalReference: reference,
             },
           });
