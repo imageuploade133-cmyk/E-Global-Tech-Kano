@@ -52,9 +52,25 @@ interface DeductionPreview {
   totalNewOutstandingDebt: number;
 }
 
+interface AuditLogRecord {
+  id: string;
+  action: string;
+  adminEmail: string;
+  adminUid: string;
+  adminName: string;
+  adminRole: string;
+  deductionId: string;
+  details: Record<string, any>;
+  timestamp: string;
+}
+
 export default function GlobalDeductionsPage() {
   const { isDark } = useCpanelTheme();
 
+  // Active Tab: "history" (Master Batches) vs "logs" (Dedicated Admin Audit Logs)
+  const [activeTab, setActiveTab] = useState<"history" | "logs">("history");
+
+  // Deductions State & Pagination
   const [deductions, setDeductions] = useState<GlobalDeduction[]>([]);
   const [summary, setSummary] = useState({
     totalDeductionsExecuted: 0,
@@ -63,6 +79,18 @@ export default function GlobalDeductionsPage() {
     totalOutstandingAmount: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+
+  // Dedicated Admin Audit Logs State
+  const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
+  const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(false);
+  const [logSearch, setLogSearch] = useState("");
+  const [logPage, setLogPage] = useState(1);
+  const [logTotalPages, setLogTotalPages] = useState(1);
+  const [logTotalRecords, setLogTotalRecords] = useState(0);
 
   // New Deduction Modal State
   const [showModal, setShowModal] = useState(false);
@@ -80,13 +108,28 @@ export default function GlobalDeductionsPage() {
   const [userRecords, setUserRecords] = useState<UserDeductionRecord[]>([]);
   const [isLoadingUserRecords, setIsLoadingUserRecords] = useState(false);
 
+  // Delete Authorization Modal State
+  const [deleteDeduction, setDeleteDeduction] = useState<GlobalDeduction | null>(null);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const fetchDeductions = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/admin/deductions");
+      const queryParams = new URLSearchParams({
+        page: String(page),
+        limit: "10",
+        search: search.trim(),
+      });
+      const res = await fetch(`/api/admin/deductions?${queryParams.toString()}`);
       const data = await res.json();
       if (res.ok && data.success) {
         setDeductions(data.deductions || []);
+        if (data.pagination) {
+          setPage(data.pagination.page);
+          setTotalPages(data.pagination.totalPages);
+          setTotalRecords(data.pagination.totalRecords);
+        }
         if (data.summary) {
           setSummary({
             totalDeductionsExecuted: Number(data.summary.totalDeductionsExecuted) || 0,
@@ -105,9 +148,42 @@ export default function GlobalDeductionsPage() {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    setIsLoadingAuditLogs(true);
+    try {
+      const queryParams = new URLSearchParams({
+        page: String(logPage),
+        limit: "15",
+        search: logSearch.trim(),
+      });
+      const res = await fetch(`/api/admin/deductions/logs?${queryParams.toString()}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAuditLogs(data.logs || []);
+        if (data.pagination) {
+          setLogPage(data.pagination.page);
+          setLogTotalPages(data.pagination.totalPages);
+          setLogTotalRecords(data.pagination.totalRecords);
+        }
+      } else {
+        toast.error(data.error || "Failed to load deduction audit logs");
+      }
+    } catch {
+      toast.error("Network error fetching deduction audit logs");
+    } finally {
+      setIsLoadingAuditLogs(false);
+    }
+  };
+
   useEffect(() => {
     fetchDeductions();
-  }, []);
+  }, [page, search]);
+
+  useEffect(() => {
+    if (activeTab === "logs") {
+      fetchAuditLogs();
+    }
+  }, [activeTab, logPage, logSearch]);
 
   const handlePreview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,6 +246,7 @@ export default function GlobalDeductionsPage() {
         setModalStep("form");
         setPreviewData(null);
         fetchDeductions();
+        if (activeTab === "logs") fetchAuditLogs();
       } else {
         toast.error(data.error || "Failed to execute global deduction");
       }
@@ -177,6 +254,43 @@ export default function GlobalDeductionsPage() {
       toast.error("Network error executing global deduction");
     } finally {
       setIsExecuting(false);
+    }
+  };
+
+  const handleDeleteMasterDeduction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteDeduction) return;
+
+    if (!adminPassword || adminPassword.trim() === "") {
+      toast.error("Please enter your administrator password to confirm deletion.");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/admin/deductions", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deductionId: deleteDeduction.deductionId,
+          adminPassword: adminPassword.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Global deduction master record deleted successfully!");
+        setDeleteDeduction(null);
+        setAdminPassword("");
+        fetchDeductions();
+        if (activeTab === "logs") fetchAuditLogs();
+      } else {
+        toast.error(data.error || "Deletion authorization failed.");
+      }
+    } catch {
+      toast.error("Network error deleting deduction history.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -278,113 +392,354 @@ export default function GlobalDeductionsPage() {
         </div>
       </div>
 
-      {/* History Audit Table */}
-      <div className={cn("rounded-3xl border overflow-hidden", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200 shadow-sm")}>
-        <div className={cn("p-4 sm:p-5 border-b flex items-center justify-between", isDark ? "border-gray-800" : "border-gray-100")}>
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#FC7A00]">history</span>
-            <h2 className={cn("font-black text-sm uppercase tracking-wider", isDark ? "text-white" : "text-gray-900")}>
-              Global Deduction Master History
-            </h2>
-          </div>
-          <button
-            onClick={fetchDeductions}
-            className="text-xs font-bold text-[#FC7A00] hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0"
-          >
-            <span className="material-symbols-outlined text-[16px]">refresh</span> Refresh
-          </button>
-        </div>
+      {/* Main Console Tab Navigation Bar */}
+      <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+        <button
+          onClick={() => setActiveTab("history")}
+          className={cn(
+            "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer border-0",
+            activeTab === "history"
+              ? "bg-[#FC7A00] text-white shadow-sm"
+              : isDark ? "text-gray-400 hover:text-white bg-gray-900" : "text-gray-600 hover:text-black bg-gray-100"
+          )}
+        >
+          <span className="material-symbols-outlined text-[18px]">history</span>
+          Master History ({totalRecords})
+        </button>
 
-        {isLoading ? (
-          <div className="p-12 text-center text-gray-400 animate-pulse">
-            <span className="material-symbols-outlined text-4xl animate-spin mb-2">progress_activity</span>
-            <p className="text-xs font-bold uppercase tracking-wider">Loading Deduction Audit History...</p>
-          </div>
-        ) : deductions.length === 0 ? (
-          <div className="p-12 text-center text-gray-400 space-y-2">
-            <span className="material-symbols-outlined text-4xl text-gray-300">payments</span>
-            <p className="text-sm font-bold text-gray-600 dark:text-gray-400">No Global Deductions Executed Yet</p>
-            <p className="text-xs text-gray-400">Click &quot;Assess Global Deduction&quot; above to create and apply fee charges across users.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className={cn("border-b text-[10px] font-black uppercase tracking-wider text-gray-400", isDark ? "border-gray-800 bg-gray-950/50" : "border-gray-100 bg-gray-50")}>
-                  <th className="py-3.5 px-4">Deduction Info</th>
-                  <th className="py-3.5 px-4">Rate / User</th>
-                  <th className="py-3.5 px-4">Users Breakdown</th>
-                  <th className="py-3.5 px-4">Immediate Recovery</th>
-                  <th className="py-3.5 px-4">Debt Created</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-medium">
-                {deductions.map((ded) => {
-                  const eligible = ded.eligibleUsersCount ?? 0;
-                  const processed = ded.processedUsersCount ?? eligible;
-                  const failed = ded.failedUsersCount ?? 0;
-                  const rate = ded.amount ?? 0;
-                  const recovered = ded.totalRecoveredAmount ?? 0;
-                  const outstanding = ded.totalOutstandingAmount ?? 0;
-
-                  return (
-                    <tr key={ded.id} className={cn("hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors", isDark ? "text-gray-200" : "text-gray-700")}>
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-gray-900 dark:text-white">{ded.name}</div>
-                        <div className="text-[11px] text-gray-400 truncate max-w-xs">{ded.description || "All Active Users"}</div>
-                        <div className="text-[9.5px] text-gray-400 font-mono mt-0.5">
-                          By {ded.createdBy || "Admin"} • {ded.createdAt ? new Date(ded.createdAt).toLocaleString() : "Recently"}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-gray-900 dark:text-white">
-                        ₦{rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold text-gray-800 dark:text-gray-200">{processed} / {eligible} Processed</div>
-                        {failed > 0 ? (
-                          <span className="text-[10px] font-black text-rose-500">{failed} Failed</span>
-                        ) : (
-                          <span className="text-[10px] font-semibold text-emerald-600">0 Failed</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-emerald-600">
-                        ₦{recovered.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-amber-500">
-                        ₦{outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={cn(
-                          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block",
-                          ded.status === "COMPLETED"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                            : ded.status === "PARTIAL"
-                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
-                            : ded.status === "PROCESSING"
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 animate-pulse"
-                            : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
-                        )}>
-                          {ded.status || "COMPLETED"}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => handleViewUserRecords(ded)}
-                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl text-[11px] font-bold transition-all cursor-pointer border-0"
-                        >
-                          User Audit
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <button
+          onClick={() => setActiveTab("logs")}
+          className={cn(
+            "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer border-0",
+            activeTab === "logs"
+              ? "bg-[#FC7A00] text-white shadow-sm"
+              : isDark ? "text-gray-400 hover:text-white bg-gray-900" : "text-gray-600 hover:text-black bg-gray-100"
+          )}
+        >
+          <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+          Admin Audit Logs
+        </button>
       </div>
+
+      {/* TAB 1: MASTER HISTORY TABLE WITH SEARCH & PAGINATION */}
+      {activeTab === "history" && (
+        <div className={cn("rounded-3xl border overflow-hidden", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200 shadow-sm")}>
+          {/* Table Header Controls */}
+          <div className={cn("p-4 sm:p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3", isDark ? "border-gray-800" : "border-gray-100")}>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#FC7A00]">manage_search</span>
+              <h2 className={cn("font-black text-sm uppercase tracking-wider", isDark ? "text-white" : "text-gray-900")}>
+                Global Deduction Master Records
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <span className="material-symbols-outlined text-gray-400 text-[18px] absolute left-3 top-1/2 -translate-y-1/2">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search title, ID, creator..."
+                  className={cn(
+                    "w-full pl-9 pr-3 py-2 rounded-xl text-xs font-semibold outline-none transition-all",
+                    isDark ? "bg-gray-800 text-white border-gray-700 focus:border-[#FC7A00]" : "bg-gray-50 text-gray-900 border-gray-200 focus:border-[#FC7A00]"
+                  )}
+                />
+              </div>
+
+              <button
+                onClick={fetchDeductions}
+                className="p-2.5 rounded-xl text-xs font-bold text-[#FC7A00] hover:bg-orange-500/10 transition-all flex items-center justify-center cursor-pointer bg-transparent border-0"
+                title="Refresh"
+              >
+                <span className="material-symbols-outlined text-[18px]">refresh</span>
+              </button>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="p-12 text-center text-gray-400 animate-pulse">
+              <span className="material-symbols-outlined text-4xl animate-spin mb-2">progress_activity</span>
+              <p className="text-xs font-bold uppercase tracking-wider">Loading Deduction Audit History...</p>
+            </div>
+          ) : deductions.length === 0 ? (
+            <div className="p-12 text-center text-gray-400 space-y-2">
+              <span className="material-symbols-outlined text-4xl text-gray-300">payments</span>
+              <p className="text-sm font-bold text-gray-600 dark:text-gray-400">No Global Deductions Found</p>
+              <p className="text-xs text-gray-400">No master deduction records matched your query filter.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className={cn("border-b text-[10px] font-black uppercase tracking-wider text-gray-400", isDark ? "border-gray-800 bg-gray-950/50" : "border-gray-100 bg-gray-50")}>
+                      <th className="py-3.5 px-4">Deduction Info</th>
+                      <th className="py-3.5 px-4">Rate / User</th>
+                      <th className="py-3.5 px-4">Users Breakdown</th>
+                      <th className="py-3.5 px-4">Immediate Recovery</th>
+                      <th className="py-3.5 px-4">Debt Created</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-medium">
+                    {deductions.map((ded) => {
+                      const eligible = ded.eligibleUsersCount ?? 0;
+                      const processed = ded.processedUsersCount ?? eligible;
+                      const failed = ded.failedUsersCount ?? 0;
+                      const rate = ded.amount ?? 0;
+                      const recovered = ded.totalRecoveredAmount ?? 0;
+                      const outstanding = ded.totalOutstandingAmount ?? 0;
+
+                      return (
+                        <tr key={ded.id} className={cn("hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors", isDark ? "text-gray-200" : "text-gray-700")}>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-gray-900 dark:text-white">{ded.name}</div>
+                            <div className="text-[11px] text-gray-400 truncate max-w-xs">{ded.description || "All Active Users"}</div>
+                            <div className="text-[9.5px] text-gray-400 font-mono mt-0.5">
+                              ID: {ded.deductionId} • By {ded.createdBy || "Admin"} • {ded.createdAt ? new Date(ded.createdAt).toLocaleString() : "Recently"}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-gray-900 dark:text-white">
+                            ₦{rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-gray-800 dark:text-gray-200">{processed} / {eligible} Processed</div>
+                            {failed > 0 ? (
+                              <span className="text-[10px] font-black text-rose-500">{failed} Failed</span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-emerald-600">0 Failed</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-emerald-600">
+                            ₦{recovered.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-amber-500">
+                            ₦{outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={cn(
+                              "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block",
+                              ded.status === "COMPLETED"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                : ded.status === "PARTIAL"
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400"
+                                : ded.status === "PROCESSING"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 animate-pulse"
+                                : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
+                            )}>
+                              {ded.status || "COMPLETED"}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleViewUserRecords(ded)}
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-xl text-[11px] font-bold transition-all cursor-pointer border-0"
+                              >
+                                User Audit
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setAdminPassword("");
+                                  setDeleteDeduction(ded);
+                                }}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all cursor-pointer border-0"
+                                title="Delete Master History Record"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Table Pagination Controls */}
+              <div className={cn("p-4 border-t flex items-center justify-between text-xs font-bold", isDark ? "border-gray-800 text-gray-400" : "border-gray-100 text-gray-600")}>
+                <span>
+                  Showing page {page} of {totalPages} ({totalRecords} total master records)
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 font-black cursor-pointer"
+                  >
+                    ← Previous
+                  </button>
+
+                  <button
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 font-black cursor-pointer"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: DEDICATED ADMIN AUDIT LOGS TABLE */}
+      {activeTab === "logs" && (
+        <div className={cn("rounded-3xl border overflow-hidden", isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200 shadow-sm")}>
+          <div className={cn("p-4 sm:p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3", isDark ? "border-gray-800" : "border-gray-100")}>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#FC7A00]">admin_panel_settings</span>
+              <div>
+                <h2 className={cn("font-black text-sm uppercase tracking-wider", isDark ? "text-white" : "text-gray-900")}>
+                  Deductions Administrator Audit Trail
+                </h2>
+                <p className="text-[11px] text-gray-400 font-semibold">
+                  Detailed audit records for deduction creation, execution, and deletion with full admin details.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <span className="material-symbols-outlined text-gray-400 text-[18px] absolute left-3 top-1/2 -translate-y-1/2">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={logSearch}
+                  onChange={(e) => {
+                    setLogSearch(e.target.value);
+                    setLogPage(1);
+                  }}
+                  placeholder="Search admin, email, action..."
+                  className={cn(
+                    "w-full pl-9 pr-3 py-2 rounded-xl text-xs font-semibold outline-none transition-all",
+                    isDark ? "bg-gray-800 text-white border-gray-700 focus:border-[#FC7A00]" : "bg-gray-50 text-gray-900 border-gray-200 focus:border-[#FC7A00]"
+                  )}
+                />
+              </div>
+
+              <button
+                onClick={fetchAuditLogs}
+                className="p-2.5 rounded-xl text-xs font-bold text-[#FC7A00] hover:bg-orange-500/10 transition-all flex items-center justify-center cursor-pointer bg-transparent border-0"
+                title="Refresh Logs"
+              >
+                <span className="material-symbols-outlined text-[18px]">refresh</span>
+              </button>
+            </div>
+          </div>
+
+          {isLoadingAuditLogs ? (
+            <div className="p-12 text-center text-gray-400 animate-pulse">
+              <span className="material-symbols-outlined text-4xl animate-spin mb-2">progress_activity</span>
+              <p className="text-xs font-bold uppercase tracking-wider">Loading Administrator Audit Logs...</p>
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div className="p-12 text-center text-gray-400 space-y-2">
+              <span className="material-symbols-outlined text-4xl text-gray-300">receipt_long</span>
+              <p className="text-sm font-bold text-gray-600 dark:text-gray-400">No Deduction Audit Logs Found</p>
+              <p className="text-xs text-gray-400">No administrator action logs were recorded for this filter.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className={cn("border-b text-[10px] font-black uppercase tracking-wider text-gray-400", isDark ? "border-gray-800 bg-gray-950/50" : "border-gray-100 bg-gray-50")}>
+                      <th className="py-3.5 px-4">Date & Time</th>
+                      <th className="py-3.5 px-4">Administrator</th>
+                      <th className="py-3.5 px-4">Action Performed</th>
+                      <th className="py-3.5 px-4">Target Deduction</th>
+                      <th className="py-3.5 px-4">Execution Breakdown</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-medium">
+                    {auditLogs.map((log) => {
+                      const isDelete = log.action.includes("deleted");
+                      return (
+                        <tr key={log.id} className={cn("hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors", isDark ? "text-gray-200" : "text-gray-700")}>
+                          <td className="py-3.5 px-4 font-mono text-[11px] text-gray-500 whitespace-nowrap">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-gray-900 dark:text-white">{log.adminName}</div>
+                            <div className="text-[10px] text-gray-400">{log.adminEmail}</div>
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-500 border border-orange-500/20 inline-block mt-0.5">
+                              {log.adminRole}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className={cn(
+                              "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block",
+                              isDelete
+                                ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
+                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            )}>
+                              {isDelete ? "DELETED MASTER RECORD" : "EXECUTED DEDUCTION"}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-gray-800 dark:text-gray-200">
+                            <div>{log.details?.name || log.deductionId}</div>
+                            <div className="text-[10px] font-mono text-gray-400">{log.deductionId}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-[11px] text-gray-600 dark:text-gray-300">
+                            {isDelete ? (
+                              <span className="text-rose-500 font-semibold">
+                                Deleted at ₦{(log.details?.amount ?? 0).toLocaleString()} rate per user.
+                              </span>
+                            ) : (
+                              <div>
+                                <span className="font-bold">Rate: ₦{(log.details?.amount ?? 0).toLocaleString()}</span> • Users: {log.details?.processedUsersCount ?? 0} • Recovered: <span className="text-emerald-600 font-bold">₦{(log.details?.totalRecoveredAmount ?? 0).toLocaleString()}</span>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Audit Log Pagination Controls */}
+              <div className={cn("p-4 border-t flex items-center justify-between text-xs font-bold", isDark ? "border-gray-800 text-gray-400" : "border-gray-100 text-gray-600")}>
+                <span>
+                  Showing log page {logPage} of {logTotalPages} ({logTotalRecords} total audit logs)
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={logPage <= 1}
+                    onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 font-black cursor-pointer"
+                  >
+                    ← Previous
+                  </button>
+
+                  <button
+                    disabled={logPage >= logTotalPages}
+                    onClick={() => setLogPage((p) => Math.min(logTotalPages, p + 1))}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 disabled:opacity-40 font-black cursor-pointer"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* CREATE & PREVIEW MODAL */}
       <AnimatePresence>
@@ -560,6 +915,104 @@ export default function GlobalDeductionsPage() {
                   </div>
                 </div>
               )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* DELETE MASTER HISTORY AUTHORIZATION MODAL */}
+      <AnimatePresence>
+        {deleteDeduction && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteDeduction(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[99998]"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 max-w-md w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[32px] p-6 shadow-2xl z-[99999] font-hanken overflow-hidden"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[24px]">lock_reset</span>
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-gray-900 dark:text-white">
+                      Delete Master History Record
+                    </h3>
+                    <p className="text-[11px] text-rose-500 font-semibold">
+                      Authorization Required
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setDeleteDeduction(null)}
+                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer border-0"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleDeleteMasterDeduction} className="space-y-4 pt-4">
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/30 rounded-2xl">
+                  <p className="text-xs text-rose-900 dark:text-rose-300 font-bold">
+                    You are deleting master history record: <strong className="underline">{deleteDeduction.name}</strong> ({deleteDeduction.deductionId})
+                  </p>
+                  <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80 font-medium mt-1">
+                    Please enter your administrator account password to confirm this action.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-rose-600">
+                    Administrator Password *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Enter your admin account password"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-xs text-gray-900 dark:text-white outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteDeduction(null)}
+                    className="py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-0"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isDeleting}
+                    className="py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 border-0"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                        Confirm Delete
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </>
         )}
