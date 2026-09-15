@@ -370,16 +370,8 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
             {/* Drawer Top Header Bar */}
             <div className="px-5 py-4 flex items-center justify-between flex-shrink-0 border-b border-gray-100 bg-white/95 backdrop-blur-md">
               <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer border-0"
-                  title="Back"
-                >
-                  <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-                </button>
-                <div className="w-8 h-8 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00]">
-                  <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                <div className="w-9 h-9 rounded-full bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] flex-shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">description</span>
                 </div>
                 <div>
                   <h2 className="font-hanken font-extrabold text-base text-black uppercase tracking-wide">
@@ -393,7 +385,7 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
               <button
                 type="button"
                 onClick={onClose}
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0"
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-black transition-colors cursor-pointer border-0 flex-shrink-0"
                 title="Close"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
