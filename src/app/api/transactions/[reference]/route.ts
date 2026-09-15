@@ -37,6 +37,14 @@ export async function GET(
 
     const cleanRef = reference.trim();
 
+    // Validate safe transaction reference format (alphanumeric, hyphens, underscores)
+    if (!/^[A-Za-z0-9_\-]+$/.test(cleanRef) || cleanRef.length > 128) {
+      return NextResponse.json(
+        { error: "Invalid or malformed transaction reference." },
+        { status: 400 }
+      );
+    }
+
     // 2. Fetch target transaction document from Firestore
     let docData: any = null;
     let docId = "";
@@ -75,40 +83,26 @@ export async function GET(
       );
     }
 
-    // 3. MANDATORY SERVER-SIDE AUTHORIZATION CHECK
-    // Verify that the currently authenticated user is authorized to access this transaction
+    // 3. MANDATORY STRICT SERVER-SIDE UID AUTHORIZATION CHECK
+    // Authorization MUST be based strictly on an explicit trusted UID relationship.
+    // Phone numbers, customer IDs, recipient names, or text matching are NEVER independent proof of ownership.
     let isAuthorized = false;
 
     // Direct owner check
-    if (docData.userId && docData.userId === uid) {
+    if (docData.userId && typeof docData.userId === "string" && docData.userId === uid) {
       isAuthorized = true;
     }
 
     // Recipient user check
-    if (!isAuthorized && docData.recipientUserId && docData.recipientUserId === uid) {
+    if (!isAuthorized && docData.recipientUserId && typeof docData.recipientUserId === "string" && docData.recipientUserId === uid) {
       isAuthorized = true;
     }
 
-    // Metadata sender / recipient checks
+    // Explicit metadata UID checks
     const meta = docData.metadata || {};
-    if (!isAuthorized && (meta.recipientUserId === uid || meta.senderUserId === uid || meta.userId === uid)) {
-      isAuthorized = true;
-    }
-
-    // Secondary phone number or account check against user profile
-    if (!isAuthorized) {
-      try {
-        const userDoc = await adminDb.collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          const uData = userDoc.data() || {};
-          const userPhone = (uData.phoneNumber || uData.phone || "").replace(/\D/g, "");
-          const txPhone = (docData.phoneNumber || docData.customerId || "").replace(/\D/g, "");
-          if (userPhone && txPhone && userPhone.length >= 7 && txPhone.length >= 7 && userPhone.slice(-10) === txPhone.slice(-10)) {
-            isAuthorized = true;
-          }
-        }
-      } catch (uErr) {
-        console.warn("[Transactions Route] Failed to check user profile secondary authorization:", uErr);
+    if (!isAuthorized && typeof meta === "object") {
+      if (meta.recipientUserId === uid || meta.senderUserId === uid || meta.userId === uid) {
+        isAuthorized = true;
       }
     }
 
