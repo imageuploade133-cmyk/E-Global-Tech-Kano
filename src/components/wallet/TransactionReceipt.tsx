@@ -167,6 +167,109 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     desc.includes("card funding") ||
     (transaction.recipientName && transaction.recipientName.toLowerCase().includes("virtual card"))
   );
+
+  const refUpper = (transaction.reference || "").toUpperCase();
+  const bType = (transaction.billerType || (transaction.metadata as any)?.billerType || "").toLowerCase();
+
+  const isPhoneRecipient = (rec?: string) => {
+    if (!rec) return false;
+    const clean = rec.replace(/\s+/g, "");
+    return /^(\+?234|0)[789][01]\d{8}$/.test(clean);
+  };
+
+  const isHasBankDetails = Boolean(
+    transaction.beneficiaryBankName ||
+    transaction.recipientBankName ||
+    transaction.beneficiaryAccountNumber ||
+    transaction.recipientAccountNumber ||
+    (resolvedTransferToBank && resolvedTransferToBank !== "Bank")
+  );
+
+  const isBillRefund = isRefund && !isCardRefund && (
+    cat === "BILLS" || cat === "AIRTIME" || cat === "DATA" || cat === "CABLE" || cat === "ELECTRICITY" || cat === "WAEC" || cat === "VTU" ||
+    txType === "BILL_REFUND" ||
+    refUpper.includes("BILL") ||
+    refUpper.includes("VTU") ||
+    refUpper.includes("AIRTIME") ||
+    refUpper.includes("DATA") ||
+    refUpper.includes("CABLE") ||
+    refUpper.includes("ELEC") ||
+    refUpper.includes("WAEC") ||
+    Boolean(transaction.billerCode) ||
+    Boolean(transaction.billerType) ||
+    Boolean(transaction.network) ||
+    Boolean(transaction.phoneNumber) ||
+    Boolean(transaction.meterNumber) ||
+    Boolean(transaction.smartcardNumber) ||
+    desc.includes("bill") ||
+    desc.includes("airtime") ||
+    desc.includes("data") ||
+    desc.includes("recharge") ||
+    desc.includes("electricity") ||
+    desc.includes("meter") ||
+    desc.includes("cable") ||
+    desc.includes("dstv") ||
+    desc.includes("gotv") ||
+    desc.includes("startimes") ||
+    desc.includes("waec") ||
+    desc.includes("vtu") ||
+    (!isHasBankDetails && isPhoneRecipient(transaction.recipientName)) ||
+    (!isHasBankDetails && isPhoneRecipient(transaction.customerId))
+  );
+
+  const isDataRefund = isBillRefund && (
+    refUpper.includes("DATA") ||
+    bType === "data" ||
+    cat === "DATA" ||
+    desc.includes("data") ||
+    desc.includes("gig") ||
+    desc.includes("sme")
+  );
+
+  const isAirtimeRefund = isBillRefund && !isDataRefund && (
+    refUpper.includes("AIR") ||
+    refUpper.includes("VTU-AIR") ||
+    bType === "airtime" ||
+    cat === "AIRTIME" ||
+    desc.includes("airtime") ||
+    desc.includes("recharge") ||
+    desc.includes("top-up") ||
+    desc.includes("topup") ||
+    (!isHasBankDetails && isPhoneRecipient(transaction.recipientName)) ||
+    (!isHasBankDetails && isPhoneRecipient(transaction.phoneNumber)) ||
+    (!isHasBankDetails && isPhoneRecipient(transaction.customerId)) ||
+    Boolean(transaction.network)
+  );
+
+  const isElectricityRefund = isBillRefund && !isAirtimeRefund && !isDataRefund && (
+    refUpper.includes("ELEC") ||
+    bType === "electricity" || bType === "utility" ||
+    cat === "ELECTRICITY" ||
+    Boolean(transaction.meterNumber) ||
+    desc.includes("electricity") ||
+    desc.includes("meter") ||
+    desc.includes("disco")
+  );
+
+  const isCableRefund = isBillRefund && !isAirtimeRefund && !isDataRefund && !isElectricityRefund && (
+    refUpper.includes("CABLE") ||
+    bType === "cable" ||
+    cat === "CABLE" ||
+    Boolean(transaction.smartcardNumber) ||
+    desc.includes("cable") ||
+    desc.includes("dstv") ||
+    desc.includes("gotv") ||
+    desc.includes("startimes")
+  );
+
+  const isWaecRefund = isBillRefund && !isAirtimeRefund && !isDataRefund && !isElectricityRefund && !isCableRefund && (
+    refUpper.includes("WAEC") ||
+    bType === "waec" ||
+    cat === "WAEC" ||
+    desc.includes("waec") ||
+    desc.includes("exam")
+  );
+
   const isStore = !isRefund && (txType.includes("STORE") || cat.includes("STORE") || desc.includes("store"));
   const isAirtime = !isSwap && !isRefund && (txType === "AIRTIME" || cat === "AIRTIME" || desc.includes("airtime") || desc.includes("recharge"));
   const isData = !isSwap && !isRefund && (txType === "DATA" || cat === "DATA" || desc.includes("data") || desc.includes("gig") || desc.includes("sme"));
@@ -262,7 +365,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     ? getBillerLogo("investment")
     : isDeposit
     ? (getBillerLogo("deposit") || getBillerLogo("Cash Deposit") || getBankLogo(resolvedTransferFromBank))
-    : isBill
+    : (isBill || isBillRefund)
     ? (getBillerLogo(detectedNetworkName) || getBillerLogo(transaction.billerName || "") || getBillerLogo(desc))
     : (getBankLogo(resolvedTransferToBank) || getBankLogo(desc));
 
@@ -536,6 +639,18 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     : isRefund
                     ? (isCardRefund
                         ? `Refund for Failed ${transaction.beneficiaryName || transaction.recipientName || "Virtual Card Issuing"}`
+                        : isAirtimeRefund
+                        ? `Refund for Failed Airtime Purchase${detectedNetworkName ? ` (${detectedNetworkName})` : ""}`
+                        : isDataRefund
+                        ? `Refund for Failed Data Recharge${detectedNetworkName ? ` (${detectedNetworkName})` : ""}`
+                        : isElectricityRefund
+                        ? `Refund for Failed Electricity Payment${transaction.billerName ? ` (${transaction.billerName})` : ""}`
+                        : isCableRefund
+                        ? `Refund for Failed Cable Subscription${transaction.billerName ? ` (${transaction.billerName})` : ""}`
+                        : isWaecRefund
+                        ? "Refund for Failed WAEC Scratch Card Purchase"
+                        : isBillRefund
+                        ? "Refund for Failed Bill Payment"
                         : `Reversal for Failed ${transaction.beneficiaryName || transaction.recipientName ? `Transfer to ${transaction.beneficiaryName || transaction.recipientName}` : "Transaction"}`)
                     : isSwap
                     ? "Currency Exchange Swap"
@@ -1062,14 +1177,20 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
                   const rawTarget = transaction.beneficiaryName || transaction.recipientName;
                   const isCardRef = isCardRefund || (rawTarget && rawTarget.toLowerCase().includes("virtual card"));
-                  const targetName = isCardRef ? "VIRTUAL CARD ISSUING" : rawTarget;
-                  const isBankTransferRefund = !isCardRef && (transaction.beneficiaryBankName || transaction.recipientBankName || (resolvedTransferToBank && resolvedTransferToBank !== "Bank"));
+                  const targetName = isCardRef
+                    ? "VIRTUAL CARD ISSUING"
+                    : isBillRefund
+                    ? (detectedNetworkName || transaction.billerName || "VTU SERVICE")
+                    : rawTarget;
+                  const isBankTransferRefund = !isCardRef && !isBillRefund && (transaction.beneficiaryBankName || transaction.recipientBankName || (resolvedTransferToBank && resolvedTransferToBank !== "Bank"));
+
+                  const targetPhoneOrId = resolvedMobileNumber || transaction.phoneNumber || transaction.meterNumber || transaction.smartcardNumber || transaction.customerId;
 
                   return (
                     <>
                       {targetName && (
                         <div className="flex justify-between items-start text-gray-500 font-semibold">
-                          <span>Reversal Target</span>
+                          <span>{isCardRef ? "Reversal Target" : isBillRefund ? (isAirtimeRefund || isDataRefund ? "Network Operator" : "Biller Provider") : "Reversal Target"}</span>
                           <div className="flex flex-col items-end text-right max-w-[220px]">
                             <span className="text-black font-bold uppercase">
                               {targetName}
@@ -1095,13 +1216,28 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                         </div>
                       )}
 
+                      {isBillRefund && targetPhoneOrId && (
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>
+                            {isAirtimeRefund || isDataRefund
+                              ? "Mobile Number"
+                              : isElectricityRefund
+                              ? "Meter Number"
+                              : isCableRefund
+                              ? "Smartcard / IUC"
+                              : "Customer ID"}
+                          </span>
+                          <span className="font-mono text-black font-bold">{targetPhoneOrId}</span>
+                        </div>
+                      )}
+
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
                         <span>Principal Amount</span>
                         <span className="text-black font-bold">{currencySymbol}{refundPrincipal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
-                        <span>Transfer Fee Refunded</span>
+                        <span>{isBillRefund ? "Service Fee Refunded" : "Transfer Fee Refunded"}</span>
                         <span className="text-black font-bold">{currencySymbol}{refundFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
 
