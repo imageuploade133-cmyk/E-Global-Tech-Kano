@@ -93,8 +93,11 @@ export class NotificationService {
               title: payload.title,
               body: payload.body,
               type: payload.type,
-              url: payload.url || "",
-              click_action: payload.url || "",
+              url: payload.reference ? `/?txRef=${payload.reference}` : (payload.url || ""),
+              click_action: payload.reference ? `/?txRef=${payload.reference}` : (payload.url || ""),
+              reference: payload.reference || "",
+              transactionReference: payload.reference || "",
+              txRef: payload.reference || "",
             },
             android: {
               priority: "high" as const,

@@ -146,11 +146,22 @@ export function useFcm() {
         const body = payload.notification?.body || payload.data?.body || "You have a new transaction alert.";
         const targetUrl = payload.data?.url || payload.data?.click_action || "";
 
+        const txRef = payload.data?.reference || payload.data?.transactionReference || payload.data?.txRef;
+
         // Display a high-fidelity, customized Sonner toast with a progress activity indicator
         toast.info(title, {
           description: body,
           duration: 6000,
-          action: targetUrl ? {
+          action: txRef ? {
+            label: "View Receipt",
+            onClick: () => {
+              if (typeof window !== "undefined" && (window as any).__openNotificationTransaction) {
+                (window as any).__openNotificationTransaction(txRef);
+              } else {
+                router.push(`/?txRef=${encodeURIComponent(txRef)}`);
+              }
+            },
+          } : targetUrl ? {
             label: "View",
             onClick: () => router.push(targetUrl),
           } : undefined,

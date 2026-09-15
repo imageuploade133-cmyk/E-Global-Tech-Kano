@@ -34,8 +34,13 @@ self.addEventListener("notificationclick", (event) => {
   console.log("[Service Worker] Notification clicked:", event);
   event.notification.close();
 
-  // Extract navigation URL from FCM payload data
-  const targetUrl = event.notification.data?.url || event.notification.data?.click_action || "/";
+  // Extract transaction reference or target URL safely
+  const txRef = event.notification.data?.reference || event.notification.data?.transactionReference || event.notification.data?.txRef;
+  let targetUrl = event.notification.data?.url || event.notification.data?.click_action || "/";
+
+  if (txRef && !targetUrl.includes("txRef")) {
+    targetUrl = `/?txRef=${encodeURIComponent(txRef)}`;
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
