@@ -171,6 +171,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const refUpper = (transaction.reference || "").toUpperCase();
   const bType = (transaction.billerType || (transaction.metadata as any)?.billerType || "").toLowerCase();
 
+  const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");
+  const resolvedTransferFromBank = resolveBankName(transaction, banks, "TRANSFER_FROM");
+
   const isPhoneRecipient = (rec?: string) => {
     if (!rec) return false;
     const clean = rec.replace(/\s+/g, "");
@@ -304,9 +307,6 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const totalDebited = (storedTotalDebited > 0 && storedTotalDebited >= transaction.amount + fee + vat)
     ? storedTotalDebited
     : (transaction.amount + fee + vat);
-
-  const resolvedTransferToBank = resolveBankName(transaction, banks, "TRANSFER_TO");
-  const resolvedTransferFromBank = resolveBankName(transaction, banks, "TRANSFER_FROM");
 
   // Phone Number Resolution for VTU Airtime and Data
   const resolveAirtimePhoneNumber = (tx: Transaction): string | null => {
