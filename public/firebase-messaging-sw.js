@@ -29,31 +29,59 @@ messaging.onBackgroundMessage((payload) => {
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Handle background notification clicks and routing
+// Handle background notification clicks and routing securely
 self.addEventListener("notificationclick", (event) => {
   console.log("[Service Worker] Notification clicked:", event);
   event.notification.close();
 
-  // Extract transaction reference or target URL safely
-  const txRef = event.notification.data?.reference || event.notification.data?.transactionReference || event.notification.data?.txRef;
-  let targetUrl = event.notification.data?.url || event.notification.data?.click_action || "/";
+  const data = event.notification.data || {};
+  const rawTxRef = data.reference || data.transactionReference || data.txRef || "";
+  const rawUrl = data.url || data.click_action || "/";
 
-  if (txRef && !targetUrl.includes("txRef")) {
-    targetUrl = `/?txRef=${encodeURIComponent(txRef)}`;
+  const appOrigin = self.location.origin;
+  let destinationUrl = appOrigin + "/";
+
+  // Validate transaction reference format if provided
+  if (typeof rawTxRef === "string" && rawTxRef.trim() && /^[A-Za-z0-9_\-]+$/.test(rawTxRef.trim())) {
+    const cleanRef = rawTxRef.trim();
+    const safeUrl = new URL("/", appOrigin);
+    safeUrl.searchParams.set("txRef", cleanRef);
+    destinationUrl = safeUrl.toString();
+  } else {
+    // Validate rawUrl origin and path strictly using URL parsing
+    try {
+      const parsed = new URL(rawUrl, appOrigin);
+      if (parsed.origin === appOrigin && (parsed.pathname === "/" || parsed.pathname === "")) {
+        const txParam = parsed.searchParams.get("txRef") || parsed.searchParams.get("transactionReference") || parsed.searchParams.get("reference");
+        if (txParam && /^[A-Za-z0-9_\-]+$/.test(txParam)) {
+          const safeUrl = new URL("/", appOrigin);
+          safeUrl.searchParams.set("txRef", txParam);
+          destinationUrl = safeUrl.toString();
+        } else {
+          destinationUrl = appOrigin + "/";
+        }
+      }
+    } catch {
+      destinationUrl = appOrigin + "/";
+    }
   }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      // If there's an existing window open on the domain, focus it and navigate
+      // Find existing window matching exact origin
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
-        if (client.url.includes(self.location.origin) && "focus" in client) {
-          return client.navigate(targetUrl).then((navigatedClient) => navigatedClient.focus());
+        try {
+          const clientUrl = new URL(client.url);
+          if (clientUrl.origin === appOrigin && "focus" in client) {
+            return client.navigate(destinationUrl).then((navigatedClient) => navigatedClient.focus());
+          }
+        } catch {
+          // Ignore invalid window client URLs
         }
       }
-      // Otherwise, open a brand new window to the target URL
       if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
+        return self.clients.openWindow(destinationUrl);
       }
     })
   );
