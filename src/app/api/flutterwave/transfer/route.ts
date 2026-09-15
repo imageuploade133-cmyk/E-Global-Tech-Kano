@@ -425,68 +425,83 @@ export async function POST(req: Request) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         try {
-          const finalTxSnap = await adminDb.collection("transactions").doc(`tx-${trfReference}`).get();
-          const finalTxData = finalTxSnap.exists ? finalTxSnap.data() || {} : {};
-          const finalTxStatus = String(finalTxData.status || "").toUpperCase();
+          const txRefDoc = adminDb.collection("transactions").doc(`tx-${trfReference}`);
 
-          if (finalTxStatus === "SUCCESS") {
-            // 1. Sender Notification (Idempotent: check senderNotified flag)
-            if (!finalTxData.senderNotified) {
-              NotificationService.sendPushNotification(uid, {
-                title: "💸 Bank Transfer Sent",
-                body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
-                type: "transaction",
-                url: "/history",
-                amount: trfAmount,
-                currency: trfCurrency || "NGN",
-                reference: trfReference,
-                recipientName: trfName,
-                bankName: trfBankName || "Bank Transfer",
-                channel: "Outward Transfer",
-              }).catch(() => {});
-            }
+          // Atomic Claim Transaction to prevent concurrent notification races
+          let shouldNotifySender = false;
+          let shouldNotifyRecipient = false;
 
-            // 2. Recipient Notification (Idempotent: check recipientNotified flag)
-            if (!finalTxData.recipientNotified) {
-              try {
-                const recipientUser = await resolveInternalUserByAccount(trfAccount);
-                if (recipientUser && recipientUser.uid !== uid) {
-                  const senderSnap = await adminDb.collection("users").doc(uid).get();
-                  const senderUserData = senderSnap.exists ? senderSnap.data() || {} : {};
-                  const senderName = senderUserData.name || senderUserData.displayName || senderUserData.fullName || "E-Global Pay User";
+          await adminDb.runTransaction(async (claimTx) => {
+            const snap = await claimTx.get(txRefDoc);
+            if (!snap.exists) return;
+            const data = snap.data() || {};
+            const statusUpper = String(data.status || "").toUpperCase();
 
-                  NotificationService.sendPushNotification(recipientUser.uid, {
-                    title: "Money Received 💰",
-                    body: `You received ₦${trfAmount.toLocaleString()} from ${senderName}`,
-                    type: "transaction",
-                    url: "/history",
-                    amount: trfAmount,
-                    currency: trfCurrency || "NGN",
-                    reference: trfReference,
-                    recipientName: "Main Wallet",
-                    bankName: trfBankName || "E-Global Pay",
-                    channel: "Inward Transfer",
-                  }).catch(() => {});
-                  console.log(`[Transfer API] Dispatched recipient notification to userId=${recipientUser.uid} for ref=${trfReference}`);
-                }
-              } catch (recErr: any) {
-                console.error("[Transfer API Recipient Notif Error]:", recErr.message);
+            if (statusUpper === "SUCCESS") {
+              if (!data.senderNotified) {
+                shouldNotifySender = true;
+              }
+              if (!data.recipientNotified) {
+                shouldNotifyRecipient = true;
+              }
+
+              if (shouldNotifySender || shouldNotifyRecipient) {
+                claimTx.update(txRefDoc, {
+                  senderNotified: true,
+                  recipientNotified: true,
+                  notifiedAt: new Date().toISOString(),
+                });
               }
             }
+          });
 
-            // Update transaction flags to prevent duplicate notifications on retry
-            await adminDb.collection("transactions").doc(`tx-${trfReference}`).update({
-              senderNotified: true,
-              recipientNotified: true,
-              notifiedAt: new Date().toISOString(),
+          // 1. Sender Notification (Dispatched only if atomically claimed)
+          if (shouldNotifySender) {
+            NotificationService.sendPushNotification(uid, {
+              title: "💸 Bank Transfer Sent",
+              body: `Your transfer of ₦${trfAmount.toLocaleString()} to ${trfName} is successful.`,
+              type: "transaction",
+              url: "/history",
+              amount: trfAmount,
+              currency: trfCurrency || "NGN",
+              reference: trfReference,
+              recipientName: trfName,
+              bankName: trfBankName || "Bank Transfer",
+              channel: "Outward Transfer",
             }).catch(() => {});
-
-            console.log(`[Transfer API] Processed notifications for 100% successful transfer ref=${trfReference}`);
-          } else {
-            console.warn(`[Transfer API] Skipping notification dispatch: transfer ref=${trfReference} status is '${finalTxStatus}' (not 100% SUCCESS)`);
           }
+
+          // 2. Recipient Notification (Dispatched only if atomically claimed)
+          if (shouldNotifyRecipient) {
+            try {
+              const recipientUser = await resolveInternalUserByAccount(trfAccount);
+              if (recipientUser && recipientUser.uid !== uid) {
+                const senderSnap = await adminDb.collection("users").doc(uid).get();
+                const senderUserData = senderSnap.exists ? senderSnap.data() || {} : {};
+                const senderName = senderUserData.name || senderUserData.displayName || senderUserData.fullName || "E-Global Pay User";
+
+                NotificationService.sendPushNotification(recipientUser.uid, {
+                  title: "Money Received 💰",
+                  body: `You received ₦${trfAmount.toLocaleString()} from ${senderName}`,
+                  type: "transaction",
+                  url: "/history",
+                  amount: trfAmount,
+                  currency: trfCurrency || "NGN",
+                  reference: trfReference,
+                  recipientName: "Main Wallet",
+                  bankName: trfBankName || "E-Global Pay",
+                  channel: "Inward Transfer",
+                }).catch(() => {});
+                console.log(`[Transfer API] Dispatched recipient notification to userId=${recipientUser.uid} for ref=${trfReference}`);
+              }
+            } catch (recErr: any) {
+              console.error("[Transfer API Recipient Notif Error]:", recErr.message);
+            }
+          }
+
+          console.log(`[Transfer API] Processed notifications (claimed sender=${shouldNotifySender}, recipient=${shouldNotifyRecipient}) for ref=${trfReference}`);
         } catch (notifErr: any) {
-          console.error("[Notification Warning] Failed to dispatch real transfer notification:", notifErr.message);
+          console.error("[Notification Warning] Failed to process real transfer notification:", notifErr.message);
         }
 
         return NextResponse.json({

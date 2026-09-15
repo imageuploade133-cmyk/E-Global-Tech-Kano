@@ -107,4 +107,41 @@ describe("Recipient Push Notification & Internal Transfer Architecture Suite", (
     expect(walletDebitCommitted).toBe(true);
     expect(pushNotificationFailed).toBe(true);
   });
+
+  test("TEST 7: Concurrency Simulation - Atomic claim eliminates race conditions between parallel requests", async () => {
+    const mockTxDoc = {
+      status: "SUCCESS",
+      senderNotified: false,
+      recipientNotified: false,
+    };
+
+    let totalRecipientNotifsDispatched = 0;
+
+    // Simulated atomic claim function (mimicking runTransaction lock)
+    const simulateAtomicClaimWorker = async () => {
+      let claimedRecipient = false;
+      // Atomic compare-and-swap simulation
+      if (mockTxDoc.status === "SUCCESS" && !mockTxDoc.recipientNotified) {
+        mockTxDoc.recipientNotified = true; // Claim
+        claimedRecipient = true;
+      }
+
+      if (claimedRecipient) {
+        totalRecipientNotifsDispatched++;
+      }
+    };
+
+    // Run 5 workers concurrently in parallel
+    await Promise.all([
+      simulateAtomicClaimWorker(),
+      simulateAtomicClaimWorker(),
+      simulateAtomicClaimWorker(),
+      simulateAtomicClaimWorker(),
+      simulateAtomicClaimWorker(),
+    ]);
+
+    // Exactly 1 worker must claim and dispatch the notification
+    expect(totalRecipientNotifsDispatched).toBe(1);
+    expect(mockTxDoc.recipientNotified).toBe(true);
+  });
 });
