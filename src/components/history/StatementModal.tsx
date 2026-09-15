@@ -8,6 +8,7 @@ import { useAppConfig } from "@/lib/ConfigContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Transaction } from "@/components/wallet/TransactionReceipt";
 import { formatTransactionDateTime } from "@/lib/date-utils";
 import { isCreditTransaction, getTransactionDisplayAmount } from "@/lib/transaction-status-normalizer";
@@ -123,158 +124,198 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
           loadImage(watermarkUrl),
         ]);
 
-        // Generate PDF
-        const doc = new jsPDF();
+        // Calculate Total Inflow vs Total Outflow
+        let totalInflow = 0;
+        let totalOutflow = 0;
+        txList.forEach((tx) => {
+          const displayAmt = getTransactionDisplayAmount(tx);
+          if (isCreditTransaction(tx)) totalInflow += displayAmt;
+          else totalOutflow += displayAmt;
+        });
 
-        // Helper to render centered traditional background watermark logo on A4 page
-        const renderPageWatermark = (pdfDoc: jsPDF) => {
-          if (!watermarkImg) return;
-          try {
-            const naturalWidth = watermarkImg.naturalWidth || watermarkImg.width || 100;
-            const naturalHeight = watermarkImg.naturalHeight || watermarkImg.height || 100;
-            const aspectRatio = naturalHeight / naturalWidth;
-
-            let w = watermarkSize; // size in mm on A4 210mm page
-            let h = watermarkSize * aspectRatio;
-
-            if (h > 240) {
-              h = 240;
-              w = 240 / aspectRatio;
-            }
-
-            const x = (210 - w) / 2;
-            const y = (297 - h) / 2;
-
-            const gState = new (pdfDoc as any).GState({ opacity: watermarkOpacity });
-            pdfDoc.setGState(gState);
-            pdfDoc.addImage(watermarkImg, "PNG", x, y, w, h);
-            pdfDoc.setGState(new (pdfDoc as any).GState({ opacity: 1.0 }));
-          } catch (err) {
-            console.warn("[Statement Watermark Render Warning]:", err);
-          }
-        };
-
-        // Render Watermark for Page 1
-        renderPageWatermark(doc);
+        // Generate PDF using jsPDF + autoTable
+        const doc = new jsPDF({
+          orientation: "p",
+          unit: "mm",
+          format: "a4",
+        });
 
         // Brand Banner Bar
         doc.setFillColor(252, 122, 0); // #FC7A00
-        doc.rect(0, 0, 210, 28, "F");
+        doc.rect(14, 12, 182, 24, "F");
 
         if (logoImg) {
           try {
-            doc.addImage(logoImg, "PNG", 12, 4, 20, 20);
-          } catch {
-            // Fallback text if addImage fails
-          }
+            doc.addImage(logoImg, "PNG", 18, 14, 20, 20);
+          } catch {}
         }
 
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(18);
-        doc.setFont("helvetica", "bold");
-        doc.text("E-GLOBAL PAY", logoImg ? 36 : 14, 18);
+        doc.text("E-GLOBAL PAY", logoImg ? 42 : 20, 23);
 
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text("OFFICIAL STATEMENT OF ACCOUNT", 130, 18);
-
-        // Account & Statement Details Summary Card
-        doc.setTextColor(30, 41, 59);
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.text(`Account Holder: ${userName}`, 14, 38);
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Email: ${userEmail}`, 14, 44);
-        doc.text(`Period Range: ${fromDate} to ${toDate}`, 14, 50);
-        doc.text(`Total Transactions: ${txList.length} Record(s)`, 14, 56);
-        doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 62);
-
-        // Table Header
-        let yPos = 74;
-        doc.setFillColor(241, 245, 249);
-        doc.rect(14, yPos - 5, 182, 8, "F");
         doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(71, 85, 105);
-        doc.text("DATE & TIME", 16, yPos);
-        doc.text("DESCRIPTION", 60, yPos);
-        doc.text("TYPE", 130, yPos);
-        doc.text("AMOUNT (NGN)", 165, yPos);
-
-        yPos += 8;
         doc.setFont("helvetica", "normal");
+        doc.text("OFFICIAL ELECTRONIC BANK STATEMENT OF ACCOUNT", logoImg ? 42 : 20, 29);
+
+        // Overview Summary Box
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(14, 40, 182, 28, 3, 3, "F");
+
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 116, 139);
+        doc.text("ACCOUNT HOLDER", 20, 47);
+        doc.text("EMAIL", 85, 47);
+        doc.text("STATEMENT PERIOD", 145, 47);
+
+        doc.setFontSize(8.5);
         doc.setTextColor(15, 23, 42);
+        doc.text(String(userName).slice(0, 32), 20, 53);
+        doc.text(String(userEmail).slice(0, 28), 85, 53);
+        doc.text(`${fromDate} to ${toDate}`, 145, 53);
 
-        txList.forEach((tx) => {
-          if (yPos > 240) {
-            doc.addPage();
-            renderPageWatermark(doc);
-            yPos = 20;
-          }
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 116, 139);
+        doc.text("TOTAL TRANSACTIONS", 20, 60);
+        doc.text("TOTAL MONEY IN", 85, 60);
+        doc.text("TOTAL MONEY OUT", 145, 60);
 
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(252, 122, 0);
+        doc.text(`${txList.length} Record(s)`, 20, 65);
+
+        doc.setTextColor(16, 185, 129);
+        doc.text(`+N${totalInflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 85, 65);
+
+        doc.setTextColor(15, 23, 42);
+        doc.text(`-N${totalOutflow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 145, 65);
+
+        // Table Body Data
+        const tableBody = txList.map((tx) => {
           const { dateTime } = formatTransactionDateTime(tx.createdAt, tx.date, tx.time);
           const isCredit = isCreditTransaction(tx);
           const displayAmt = getTransactionDisplayAmount(tx);
+          const sign = isCredit ? "+" : "-";
 
-          doc.setFontSize(7.5);
-          doc.text(dateTime.slice(0, 20), 16, yPos);
-          doc.text((tx.description || tx.title || "Transaction").slice(0, 35), 60, yPos);
-          doc.text((tx.type || "PAYMENT").slice(0, 15), 130, yPos);
-
-          doc.setFont("helvetica", "bold");
-          if (isCredit) {
-            doc.setTextColor(16, 185, 129);
-            doc.text(`+${displayAmt.toLocaleString()}`, 165, yPos);
-          } else {
-            doc.setTextColor(15, 23, 42);
-            doc.text(`-${displayAmt.toLocaleString()}`, 165, yPos);
-          }
-
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(15, 23, 42);
-          yPos += 7;
+          return [
+            dateTime,
+            String(tx.reference || tx.id || "").slice(0, 20),
+            String(tx.description || tx.title || "Transaction"),
+            String(tx.type || "PAYMENT").toUpperCase(),
+            `${sign}N${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          ];
         });
 
-        // Add Signature and Official Stamp if present
-        if (yPos > 240) {
+        autoTable(doc, {
+          startY: 74,
+          margin: { left: 14, right: 14, top: 20, bottom: 25 },
+          head: [["DATE & TIME", "REFERENCE", "DESCRIPTION", "TYPE", "AMOUNT (NGN)"]],
+          body: tableBody,
+          headStyles: {
+            fillColor: [252, 122, 0], // #FC7A00
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+            fontSize: 8,
+            halign: "left",
+          },
+          bodyStyles: {
+            fontSize: 7.5,
+            textColor: [15, 23, 42],
+            cellPadding: 3,
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+          columnStyles: {
+            0: { cellWidth: 32 },
+            1: { cellWidth: 32, fontStyle: "bold" },
+            2: { cellWidth: 62 },
+            3: { cellWidth: 22, fontStyle: "bold" },
+            4: { cellWidth: 34, halign: "right", fontStyle: "bold" },
+          },
+          didParseCell: (data) => {
+            if (data.section === "body" && data.column.index === 4) {
+              const rawVal = String(data.cell.raw || "");
+              const isCredit = rawVal.startsWith("+");
+              data.cell.styles.textColor = isCredit ? [16, 185, 129] : [15, 23, 42];
+            }
+          },
+          didDrawPage: () => {
+            if (watermarkImg) {
+              try {
+                const naturalWidth = watermarkImg.naturalWidth || watermarkImg.width || 100;
+                const naturalHeight = watermarkImg.naturalHeight || watermarkImg.height || 100;
+                const aspectRatio = naturalHeight / naturalWidth;
+
+                let w = watermarkSize;
+                let h = watermarkSize * aspectRatio;
+                if (h > 240) {
+                  h = 240;
+                  w = 240 / aspectRatio;
+                }
+                const x = (210 - w) / 2;
+                const y = (297 - h) / 2;
+
+                doc.saveGraphicsState();
+                const gState = new (doc as any).GState({ opacity: watermarkOpacity });
+                doc.setGState(gState);
+                doc.addImage(watermarkImg, "PNG", x, y, w, h);
+                doc.restoreGraphicsState();
+              } catch (err) {
+                console.warn("[Statement Watermark Render Warning]:", err);
+              }
+            }
+          },
+        });
+
+        let finalY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : 200;
+
+        if (finalY > 250) {
           doc.addPage();
-          renderPageWatermark(doc);
-          yPos = 30;
-        } else {
-          yPos += 12;
+          finalY = 30;
         }
 
+        // Add Signature & Official Stamp
         if (sigImg || stampImg) {
           doc.setDrawColor(226, 232, 240);
-          doc.line(14, yPos, 196, yPos);
-          yPos += 10;
+          doc.line(14, finalY, 196, finalY);
+          finalY += 6;
 
           if (sigImg) {
             try {
-              doc.setFontSize(8);
+              doc.setFontSize(7.5);
               doc.setFont("helvetica", "bold");
               doc.setTextColor(100, 116, 139);
-              doc.text("AUTHORIZED SIGNATORY", 16, yPos);
-              doc.addImage(sigImg, "PNG", 16, yPos + 2, 35, 18);
+              doc.text("AUTHORIZED SIGNATORY", 16, finalY);
+              doc.addImage(sigImg, "PNG", 16, finalY + 2, 35, 16);
             } catch {}
           }
 
           if (stampImg) {
             try {
-              doc.setFontSize(8);
+              doc.setFontSize(7.5);
               doc.setFont("helvetica", "bold");
               doc.setTextColor(100, 116, 139);
-              doc.text("OFFICIAL STAMP", 145, yPos);
-              doc.addImage(stampImg, "PNG", 145, yPos + 2, 25, 25);
+              doc.text("OFFICIAL STAMP", 148, finalY);
+              doc.addImage(stampImg, "PNG", 148, finalY + 2, 24, 24);
             } catch {}
           }
         }
 
-        // Footer
-        doc.setFontSize(7);
-        doc.setTextColor(148, 163, 184);
-        doc.text("Official E-Global Pay Automated Electronic Statement • Confidential", 14, 288);
+        // Add Page Numbers
+        const totalPages = (doc as any).internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+          doc.setPage(i);
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(148, 163, 184);
+          doc.text("Official E-Global Pay Automated Electronic Bank Statement • Confidential", 14, 288);
+          doc.text(`Page ${i} of ${totalPages}`, 196, 288, { align: "right" });
+        }
 
         doc.save(`EGlobalPay_Statement_${fromDate}_to_${toDate}.pdf`);
         toast.dismiss("statement-gen");

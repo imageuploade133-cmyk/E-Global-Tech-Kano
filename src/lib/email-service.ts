@@ -230,7 +230,14 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
           replyTo: params.replyTo || "",
           fromName: senderName,
           fromEmail: senderEmail,
-          attachments: params.attachments || [],
+          attachments: (params.attachments || []).map((att) => ({
+            filename: att.filename,
+            name: att.filename,
+            content: att.content,
+            encoding: "base64",
+            type: att.contentType || "application/pdf",
+            contentType: att.contentType || "application/pdf",
+          })),
         }),
         signal: controller.signal,
       });
