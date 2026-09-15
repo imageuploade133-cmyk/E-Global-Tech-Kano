@@ -266,9 +266,6 @@ export default function BillsHistoryPage() {
               >
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FFF5EB] to-[#FFF0E0] border border-[#FFD0A1] flex items-center justify-center flex-shrink-0 shadow-none">
-                <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">manage_search</span>
-              </div>
               <div className="min-w-0 flex-1">
                 <h2 className="font-bodoni font-extrabold text-lg text-black leading-tight truncate">Bills History</h2>
                 <p className="font-hanken text-[10.5px] text-gray-400 font-bold uppercase tracking-wider truncate">Airtime, Data & Utility Logs</p>
