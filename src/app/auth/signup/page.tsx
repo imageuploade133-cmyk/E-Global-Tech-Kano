@@ -537,28 +537,32 @@ export default function SignUpPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5 text-left">
                     <label htmlFor="firstName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">First Name <span className="text-red-500">*</span></label>
-                    <input
-                      id="firstName"
-                      type="text"
-                      required
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                      placeholder="John"
-                    />
+                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                      <input
+                        id="firstName"
+                        type="text"
+                        required
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+                        placeholder="John"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 text-left">
                     <label htmlFor="lastName" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Last Name <span className="text-red-500">*</span></label>
-                    <input
-                      id="lastName"
-                      type="text"
-                      required
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                      placeholder="Doe"
-                    />
+                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                      <input
+                        id="lastName"
+                        type="text"
+                        required
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+                        placeholder="Doe"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -578,31 +582,35 @@ export default function SignUpPage() {
                 <div className="space-y-1.5 text-left">
                   <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
                   <div className="flex gap-2">
-                    <select
-                      id="phonePrefix"
-                      value={phonePrefix}
-                      onChange={(e) => setPhonePrefix(e.target.value)}
-                      className="bg-white border border-black rounded-2xl px-3.5 outline-none text-xs font-black text-black appearance-none shadow-sm"
-                      aria-label="Phone Prefix"
-                    >
-                      <option value="+234">🇳🇬 +234</option>
-                      <option value="+227">🇳🇪 +227</option>
-                    </select>
-                    <input
-                      id="phoneNumber"
-                      type="tel"
-                      required
-                      value={phoneNumber}
-                      onChange={(e) => {
-                        let val = e.target.value.replace(/\D/g, "");
-                        if (val.startsWith("0")) {
-                          val = val.slice(1);
-                        }
-                        setPhoneNumber(val);
-                      }}
-                      className="flex-grow bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all font-mono"
-                      placeholder="8012345678"
-                    />
+                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                      <select
+                        id="phonePrefix"
+                        value={phonePrefix}
+                        onChange={(e) => setPhonePrefix(e.target.value)}
+                        className="bg-white border-0 rounded-[14px] px-3.5 py-3.5 outline-none text-xs font-black text-black appearance-none cursor-pointer"
+                        aria-label="Phone Prefix"
+                      >
+                        <option value="+234">🇳🇬 +234</option>
+                        <option value="+227">🇳🇪 +227</option>
+                      </select>
+                    </div>
+                    <div className="flex-grow p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                      <input
+                        id="phoneNumber"
+                        type="tel"
+                        required
+                        value={phoneNumber}
+                        onChange={(e) => {
+                          let val = e.target.value.replace(/\D/g, "");
+                          if (val.startsWith("0")) {
+                            val = val.slice(1);
+                          }
+                          setPhoneNumber(val);
+                        }}
+                        className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none font-mono"
+                        placeholder="8012345678"
+                      />
+                    </div>
                   </div>
                   <p className="text-[9.5px] text-amber-600 font-bold leading-tight mt-1">
                     ⚠️ Note: This phone number must be registered on WhatsApp to receive the verification OTP.
@@ -621,8 +629,11 @@ export default function SignUpPage() {
                         <button
                           type="button"
                           disabled={isSendingOtp || !phoneNumber}
-                          onClick={handleRequestOtp}
-                          className="bg-black text-white hover:bg-gray-900 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5"
+                          onClick={(e) => {
+                            handleButtonClick(e);
+                            handleRequestOtp();
+                          }}
+                          className="relative overflow-hidden bg-black text-white hover:bg-gray-900 active:scale-95 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5"
                         >
                           {isSendingOtp ? (
                             <>
@@ -663,32 +674,34 @@ export default function SignUpPage() {
                           {/* 6 Individual OTP Digit Inputs */}
                           <div className="flex items-center justify-between gap-1.5 sm:gap-2">
                             {[0, 1, 2, 3, 4, 5].map((idx) => (
-                              <input
-                                key={idx}
-                                ref={(el) => {
-                                  otpInputsRef.current[idx] = el;
-                                }}
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                maxLength={1}
-                                value={otpDigits[idx]}
-                                disabled={isVerifyingOtp}
-                                onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
-                                onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                                onPaste={handleOtpPaste}
-                                className={`w-10 h-12 sm:w-11 sm:h-12 bg-white border ${
-                                  otpDigits[idx] ? "border-[#FC7A00] bg-orange-50/20" : "border-gray-300"
-                                } rounded-xl text-center font-mono font-black text-lg text-black outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20 transition-all shadow-xs disabled:opacity-50`}
-                              />
+                              <div key={idx} className="p-[1.5px] rounded-xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                                <input
+                                  ref={(el) => {
+                                    otpInputsRef.current[idx] = el;
+                                  }}
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  maxLength={1}
+                                  value={otpDigits[idx]}
+                                  disabled={isVerifyingOtp}
+                                  onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                                  onPaste={handleOtpPaste}
+                                  className="w-9 h-11 sm:w-10 sm:h-12 bg-white rounded-[10px] text-center font-mono font-black text-lg text-black outline-none border-0"
+                                />
+                              </div>
                             ))}
                           </div>
 
                           <button
                             type="button"
                             disabled={isVerifyingOtp || otpCode.length !== 6}
-                            onClick={handleVerifyOtp}
-                            className="w-full bg-[#FC7A00] text-white hover:brightness-105 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                            onClick={(e) => {
+                              handleButtonClick(e);
+                              handleVerifyOtp();
+                            }}
+                            className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white hover:brightness-105 active:scale-95 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                           >
                             {isVerifyingOtp ? (
                               <>
@@ -720,28 +733,32 @@ export default function SignUpPage() {
                 {/* Email Address */}
                 <div className="space-y-1.5 text-left">
                   <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address <span className="text-red-500">*</span></label>
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
-                    placeholder="doe@example.com"
-                  />
+                  <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                    <input
+                      id="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+                      placeholder="doe@example.com"
+                    />
+                  </div>
                 </div>
 
                 {/* Referral Account ID */}
                 <div className="space-y-1.5 text-left">
                   <label htmlFor="referralCode" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Referral Account ID (Optional)</label>
-                  <input
-                    id="referralCode"
-                    type="text"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
-                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all font-mono"
-                    placeholder="ET-XXXXXX"
-                  />
+                  <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                    <input
+                      id="referralCode"
+                      type="text"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value.trim().toUpperCase())}
+                      className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none font-mono"
+                      placeholder="ET-XXXXXX"
+                    />
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -759,14 +776,14 @@ export default function SignUpPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5 text-left">
                     <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password <span className="text-red-500">*</span></label>
-                    <div className="relative">
+                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
                       <input
                         id="password"
                         type={showPassword ? "text" : "password"}
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                        className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
                         placeholder="••••••••"
                       />
                       <button
@@ -783,20 +800,20 @@ export default function SignUpPage() {
 
                   <div className="space-y-1.5 text-left">
                     <label htmlFor="confirmPassword" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Confirm Password <span className="text-red-500">*</span></label>
-                    <div className="relative">
+                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
                       <input
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                        className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
                         placeholder="••••••••"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
                       >
                         <span className="material-symbols-outlined text-[18px]">
                           {showConfirmPassword ? "visibility" : "visibility_off"}
@@ -872,8 +889,11 @@ export default function SignUpPage() {
             {currentStep > 1 && (
               <button
                 type="button"
-                onClick={handlePrevStep}
-                className="flex-1 py-4 bg-white border border-black hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-none cursor-pointer text-center"
+                onClick={(e) => {
+                  handleButtonClick(e);
+                  handlePrevStep();
+                }}
+                className="relative overflow-hidden flex-1 py-4 bg-white border border-black hover:bg-gray-50 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-none cursor-pointer text-center"
               >
                 Back
               </button>
@@ -882,9 +902,25 @@ export default function SignUpPage() {
             {currentStep < 3 ? (
               <button
                 type="button"
-                onClick={handleNextStep}
-                className="flex-grow py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-none cursor-pointer flex items-center justify-center gap-1.5"
+                onClick={(e) => {
+                  handleButtonClick(e);
+                  handleNextStep();
+                }}
+                className="relative overflow-hidden flex-grow py-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-none cursor-pointer flex items-center justify-center gap-1.5"
               >
+                {ripples.map((ripple) => (
+                  <span
+                    key={ripple.id}
+                    className="absolute bg-white/30 rounded-full pointer-events-none animate-ripple"
+                    style={{
+                      left: ripple.x,
+                      top: ripple.y,
+                      width: 100,
+                      height: 100,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  />
+                ))}
                 Next Step
                 <span className="material-symbols-outlined text-[16px] font-bold">chevron_right</span>
               </button>

@@ -76,16 +76,18 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-1.5 text-left">
             <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address</label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-4 px-4 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-black text-xs font-semibold"
-              placeholder="doe@example.com"
-              aria-label="Email Address"
-            />
+            <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full appearance-none bg-white border-0 py-3.5 px-4 rounded-[14px] outline-none text-black text-xs font-semibold placeholder-gray-400"
+                placeholder="doe@example.com"
+                aria-label="Email Address"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5 text-left">
@@ -93,27 +95,30 @@ export default function LoginPage() {
               <label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password</label>
               <button
                 type="button"
-                onClick={() => setIsForgotOpen(true)}
-                className="text-xs text-[#FC7A00] hover:underline font-bold cursor-pointer bg-transparent border-none outline-none"
+                onClick={(e) => {
+                  handleButtonClick(e);
+                  setIsForgotOpen(true);
+                }}
+                className="text-xs text-[#FC7A00] hover:underline font-bold cursor-pointer bg-transparent border-none outline-none active:scale-95 transition-transform"
               >
                 Forgot Password?
               </button>
             </div>
-            <div className="relative">
+            <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full appearance-none bg-gray-50/50 border border-gray-200 py-4 pl-4 pr-10 rounded-2xl outline-none focus:border-[#FC7A00] focus:bg-white focus:ring-1 focus:ring-[#FC7A00]/20 transition-all duration-300 text-black text-xs font-semibold"
+                className="w-full appearance-none bg-white border-0 py-3.5 pl-4 pr-10 rounded-[14px] outline-none text-black text-xs font-semibold placeholder-gray-400"
                 placeholder="••••••••"
                 aria-label="Password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#FC7A00] cursor-pointer transition-colors p-1"
                 aria-label={showPassword ? "Hide Password" : "Show Password"}
               >
                 <span className="material-symbols-outlined text-[20px]">
