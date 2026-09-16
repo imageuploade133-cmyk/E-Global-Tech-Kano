@@ -159,8 +159,8 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
 }
 
 /**
- * Extracts and verifies ID Token from the Authorization header of an incoming HTTP Request.
- * Supports fallback to mock-token if mock parameters or mock sessionStorage is active on the request context.
+ * Extracts, verifies Firebase ID Token, AND validates that the user's active session in Firestore match.
+ * Enforces single active session rule server-side.
  */
 export async function authenticateUserRequest(req: Request): Promise<DecodedTokenResult> {
   let idToken = "";
@@ -179,5 +179,26 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   }
 
   const decoded = await verifyFirebaseIdToken(idToken);
+
+  // Single Active Device / Session Verification
+  const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
+  if (decoded.uid && decoded.uid !== "mock-uid" && decoded.uid !== "mock-admin-uid") {
+    try {
+      const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
+      if (userDoc.exists) {
+        const activeSessionId = userDoc.data()?.activeSessionId;
+        // If an active session exists in Firestore, provided Session ID must match it
+        if (activeSessionId && providedSessionId !== activeSessionId) {
+          throw new Error("REVOKED_SESSION: Your account was signed in on another device. You have been logged out on this device.");
+        }
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes("REVOKED_SESSION")) {
+        throw err;
+      }
+      console.warn(`[authenticateUserRequest Warning] Session check warning for ${decoded.uid}:`, err.message);
+    }
+  }
+
   return decoded;
 }
