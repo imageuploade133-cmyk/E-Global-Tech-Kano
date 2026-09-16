@@ -1,3 +1,4 @@
+import { getMessaging } from "firebase-admin/messaging";
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
@@ -45,7 +46,6 @@ export async function POST(req: Request) {
       try {
         const tokensSnap = await adminDb.collection("fcm_tokens").where("userId", "==", uid).get();
         if (!tokensSnap.empty) {
-          const { getMessaging } = require("firebase-admin/messaging");
           const messaging = getMessaging();
 
           for (const docSnap of tokensSnap.docs) {
