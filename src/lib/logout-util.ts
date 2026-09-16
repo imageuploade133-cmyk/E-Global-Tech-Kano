@@ -40,8 +40,12 @@ export async function handleAppSignOut(router: any) {
         if (flutterToken && !tokensToUnregister.includes(flutterToken)) {
           tokensToUnregister.push(flutterToken);
         }
+        // Directly invoke native Flutter handler to unregister token on mobile device
+        await (window as any).flutter_inappwebview.callHandler("unregisterFcmToken").catch((err: any) => {
+          console.warn("[SignOut Warning] Native unregisterFcmToken call failed:", err?.message || err);
+        });
       } catch (err: any) {
-        console.warn("[SignOut Warning] Failed to get Flutter token for unregistering:", err.message);
+        console.warn("[SignOut Warning] Failed to get Flutter token or invoke native unregister handler:", err.message);
       }
     }
 
