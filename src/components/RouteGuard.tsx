@@ -446,9 +446,17 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const isNotificationDeepLink = typeof window !== "undefined" && (
+        window.location.search.includes("txRef=") ||
+        window.location.search.includes("transactionReference=") ||
+        window.location.search.includes("reference=") ||
+        Boolean(sessionStorage.getItem("pending_notification_tx_ref")) ||
+        Boolean(sessionStorage.getItem("notification_receipt_active"))
+      );
+
       if (!hasPin && pathname !== "/auth/pin-setup") {
         router.push("/auth/pin-setup");
-      } else if (hasPin && isPinRequired && !isPinVerified && pathname !== "/auth/pin") {
+      } else if (hasPin && isPinRequired && !isPinVerified && pathname !== "/auth/pin" && !isNotificationDeepLink) {
         router.push("/auth/pin");
       } else if (
         (hasPin && isPinVerified && (pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/pin" || pathname === "/auth/pin-setup")) ||
