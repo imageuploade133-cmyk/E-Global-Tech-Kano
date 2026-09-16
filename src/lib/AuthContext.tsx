@@ -4,6 +4,9 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User, updateProfile } from "firebase/auth";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { handleAppSignOut } from "@/lib/logout-util";
+import { toast } from "sonner";
+
 
 interface UserData {
   name?: string;
@@ -92,10 +95,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        // Set up real-time listener for user data
+        // 1. Establish or register active session with backend API
+        (async () => {
+          try {
+            const localSess = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
+            const idToken = await currentUser.getIdToken();
+            const res = await fetch("/api/auth/session", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({
+                deviceName: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
+              }),
+            });
+            const sessData = await res.json().catch(() => ({}));
+            if (res.ok && sessData.sessionId) {
+              if (typeof window !== "undefined") {
+                localStorage.setItem("active_session_id", sessData.sessionId);
+              }
+            }
+          } catch (sessErr: any) {
+            console.warn("[AuthContext Session Setup Error]:", sessErr.message);
+          }
+        })();
+
+        // 2. Set up real-time listener for user data & active session revocation
         unsubscribeSnapshot = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data() as UserData;
+
+            // Single Active Device / Session Revocation Check
+            const localSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
+            const remoteActiveSessionId = data.activeSessionId as string | undefined;
+
+            if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
+              console.warn("[Session Revoked] Remote active session changed. Triggering client logout...");
+              toast.error("Your account was signed in on another device. You have been logged out on this device.");
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("active_session_id");
+              }
+              handleAppSignOut(null);
+              return;
+            }
+
             setUserData({
               isPinRequired: true,
               isFaceIdEnabled: false,
@@ -105,7 +149,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               ...data
             });
           } else {
-            // Document does not exist yet (brand new registration before Firestore write completes)
             setUserData({
               isPinRequired: true,
               isFaceIdEnabled: false,
