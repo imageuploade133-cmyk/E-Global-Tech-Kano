@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       }, { merge: true });
     });
 
-    // Notify previous session/device if a previous session existed
+    // Target FCM tokens belonging to the previous session specifically, or tokens not associated with the new session
     if (previousSessionId && previousSessionId !== newSessionId) {
       try {
         const tokensSnap = await adminDb.collection("fcm_tokens").where("userId", "==", uid).get();
@@ -50,21 +50,25 @@ export async function POST(req: Request) {
 
           for (const docSnap of tokensSnap.docs) {
             const tData = docSnap.data();
-            if (tData.token) {
-              await messaging.send({
-                token: tData.token,
-                notification: {
-                  title: "⚠️ Session Revoked",
-                  body: "Your account was signed in on another device. You have been logged out on this device.",
-                },
-                data: {
-                  type: "session_revoked",
-                  title: "⚠️ Session Revoked",
-                  body: "Your account was signed in on another device. You have been logged out on this device.",
-                },
-                android: { priority: "high" },
-                apns: { payload: { aps: { sound: "default" } } },
-              }).catch(() => {});
+            // Do NOT send the revocation push to tokens registered under the new active session ID
+            if (tData.token && tData.sessionId !== newSessionId) {
+              // If previousSessionId was recorded, target matching previous session tokens or tokens with older session IDs
+              if (!tData.sessionId || tData.sessionId === previousSessionId) {
+                await messaging.send({
+                  token: tData.token,
+                  notification: {
+                    title: "⚠️ Session Revoked",
+                    body: "Your account was signed in on another device. You have been logged out on this device.",
+                  },
+                  data: {
+                    type: "session_revoked",
+                    title: "⚠️ Session Revoked",
+                    body: "Your account was signed in on another device. You have been logged out on this device.",
+                  },
+                  android: { priority: "high" },
+                  apns: { payload: { aps: { sound: "default" } } },
+                }).catch(() => {});
+              }
             }
           }
         }

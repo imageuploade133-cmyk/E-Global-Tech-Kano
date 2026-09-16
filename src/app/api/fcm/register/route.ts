@@ -12,7 +12,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { token, platform } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { token, platform } = body;
+    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || body.sessionId || null;
 
     if (!token) {
       return NextResponse.json({ error: "FCM token is required." }, { status: 400 });
@@ -28,6 +30,7 @@ export async function POST(req: Request) {
       userId: uid,
       token: cleanToken,
       platform: platform || "web",
+      sessionId: sessionId || null,
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
