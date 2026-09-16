@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User, updateProfile } from "firebase/auth";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import "@/lib/init-fetch-interceptor";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { toast } from "sonner";
 
