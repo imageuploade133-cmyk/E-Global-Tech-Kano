@@ -14,10 +14,27 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const { token, platform } = body;
-    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || body.sessionId || null;
 
     if (!token) {
       return NextResponse.json({ error: "FCM token is required." }, { status: 400 });
+    }
+
+    // Resolve server-authoritative active session ID directly from Firestore users/{uid}
+    let authoritativeSessionId: string | null = null;
+    if (uid !== "mock-uid" && uid !== "mock-admin-uid") {
+      try {
+        const userDoc = await adminDb.collection("users").doc(uid).get();
+        if (userDoc.exists) {
+          authoritativeSessionId = userDoc.data()?.activeSessionId || null;
+        }
+      } catch (docErr: any) {
+        console.warn(`[FCM API Warning] Failed to fetch active session for user ${uid}:`, docErr.message);
+      }
+    }
+
+    // Fall back to validated X-Session-ID header if Firestore lookup returned null
+    if (!authoritativeSessionId) {
+      authoritativeSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || null;
     }
 
     const cleanToken = token.trim();
@@ -30,7 +47,7 @@ export async function POST(req: Request) {
       userId: uid,
       token: cleanToken,
       platform: platform || "web",
-      sessionId: sessionId || null,
+      sessionId: authoritativeSessionId,
       createdAt: now,
       updatedAt: now,
     }, { merge: true });

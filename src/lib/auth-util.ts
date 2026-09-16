@@ -216,27 +216,31 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   if (!isSessionEstablishment) {
     const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
     if (!providedSessionId) {
-      throw new Error("REVOKED_SESSION: Missing session ID. You have been logged out on this device.");
+      throw new Error("REVOKED_SESSION: Missing session ID header. You have been logged out on this device.");
     }
 
     try {
       const userDoc = await adminDb.collection("users").doc(uid).get();
       if (!userDoc.exists) {
-        throw new Error("REVOKED_SESSION: Account record not found.");
+        throw new Error("REVOKED_SESSION: User account document missing.");
       }
 
       const activeSessionId = userDoc.data()?.activeSessionId;
 
-      if (!activeSessionId || providedSessionId !== activeSessionId) {
-        throw new Error("REVOKED_SESSION: Your account was signed in on another device. You have been logged out on this device.");
+      if (!activeSessionId) {
+        throw new Error("REVOKED_SESSION: Active session record missing.");
+      }
+
+      if (providedSessionId !== activeSessionId) {
+        throw new Error("REVOKED_SESSION: Provided session ID does not match active session ID.");
       }
     } catch (err: any) {
       if (err.message && err.message.includes("REVOKED_SESSION")) {
         throw err;
       }
       console.error(`[authenticateUserRequest Error] Session validation failed for ${uid}:`, err.message);
-      // FAIL CLOSED: Never fall back to Firebase-token-only authorization on Firestore/session error
-      throw new Error(`REVOKED_SESSION: Session validation failed (${err.message}).`);
+      // FAIL CLOSED: Immediately reject request on any Firestore/read error or validation exception
+      throw new Error(`REVOKED_SESSION: Session validation error (${err.message}).`);
     }
   }
 
