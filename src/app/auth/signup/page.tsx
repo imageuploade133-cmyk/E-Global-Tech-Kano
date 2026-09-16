@@ -170,6 +170,9 @@ export default function SignUpPage() {
         if (data.devFallback) {
           toast.info("Local Test Mode: OTP logged to server terminal.");
         }
+        setTimeout(() => {
+          otpInputsRef.current[0]?.focus();
+        }, 150);
       }
     } catch (err) {
       console.error("Error sending WhatsApp OTP:", err);
@@ -619,44 +622,73 @@ export default function SignUpPage() {
 
                 {/* OTP Request and Verify Control Panel */}
                 {!isOtpVerified ? (
-                  <div className="space-y-3.5 text-left bg-gray-50 border border-gray-150 p-4 rounded-2xl">
+                  <div className="space-y-4 text-left bg-gray-50/80 border border-gray-200 p-4 sm:p-5 rounded-2xl shadow-xs">
                     {!isOtpRequested ? (
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="space-y-0.5">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">WhatsApp Verification</p>
-                          <p className="text-[9px] text-gray-400 font-semibold leading-tight">Verify your WhatsApp number to secure your account registration.</p>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                            <span className="material-symbols-outlined text-[16px] font-bold">chat</span>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-wider text-gray-800">WhatsApp Security Verification</p>
+                            <p className="text-[10px] text-gray-500 font-semibold">
+                              Send a 6-digit verification code to <span className="font-mono text-black font-bold">{phonePrefix} {phoneNumber || "your phone number"}</span>
+                            </p>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          disabled={isSendingOtp || !phoneNumber}
-                          onClick={(e) => {
-                            handleButtonClick(e);
-                            handleRequestOtp();
-                          }}
-                          className="relative overflow-hidden bg-black text-white hover:bg-gray-900 active:scale-95 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5"
-                        >
-                          {isSendingOtp ? (
-                            <>
-                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Sending...</span>
-                            </>
-                          ) : (
-                            "Send OTP"
-                          )}
-                        </button>
+
+                        {/* Animated Loading Feedback Banner when sending OTP */}
+                        {isSendingOtp ? (
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 animate-pulse">
+                            <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                            <div className="space-y-0.5">
+                              <p className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Dispatching WhatsApp OTP...</p>
+                              <p className="text-[10px] text-emerald-700 font-medium">Please wait while we connect to WhatsApp servers.</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!phoneNumber}
+                            onClick={(e) => {
+                              handleButtonClick(e);
+                              handleRequestOtp();
+                            }}
+                            className="relative overflow-hidden w-full bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:brightness-105 active:scale-98 text-white font-black py-3.5 px-4 rounded-xl text-xs uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          >
+                            {ripples.map((ripple) => (
+                              <span
+                                key={ripple.id}
+                                className="absolute bg-white/30 rounded-full pointer-events-none animate-ripple"
+                                style={{
+                                  left: ripple.x,
+                                  top: ripple.y,
+                                  width: 100,
+                                  height: 100,
+                                  transform: "translate(-50%, -50%)",
+                                }}
+                              />
+                            ))}
+                            <span className="material-symbols-outlined text-[18px] font-bold">send</span>
+                            <span>Send OTP via WhatsApp</span>
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[#FC7A00]">Enter Verification OTP</p>
+                        <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[16px] text-[#FC7A00] font-bold">mark_email_read</span>
+                            <p className="text-[11px] font-black uppercase tracking-wider text-black">Enter WhatsApp OTP</p>
+                          </div>
                           {otpCooldown > 0 ? (
-                            <span className="text-[9px] text-gray-400 font-bold">Resend in {otpCooldown}s</span>
+                            <span className="text-[10px] text-gray-500 font-mono font-bold bg-gray-200/60 px-2 py-0.5 rounded-full">Resend in {otpCooldown}s</span>
                           ) : (
                             <button
                               type="button"
                               disabled={isSendingOtp}
                               onClick={handleRequestOtp}
-                              className="text-[9px] text-[#FC7A00] hover:underline font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              className="text-[10px] text-[#FC7A00] hover:underline font-extrabold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                             >
                               {isSendingOtp ? (
                                 <>
@@ -670,7 +702,11 @@ export default function SignUpPage() {
                           )}
                         </div>
 
-                        <div className="space-y-2.5">
+                        <p className="text-[10px] text-gray-500 font-medium">
+                          Enter the 6-digit code sent to <span className="font-mono text-black font-bold">{phonePrefix} {phoneNumber}</span> on WhatsApp.
+                        </p>
+
+                        <div className="space-y-3">
                           {/* 6 Individual OTP Digit Inputs */}
                           <div className="flex items-center justify-between gap-1.5 sm:gap-2">
                             {[0, 1, 2, 3, 4, 5].map((idx) => (
@@ -701,12 +737,12 @@ export default function SignUpPage() {
                               handleButtonClick(e);
                               handleVerifyOtp();
                             }}
-                            className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white hover:brightness-105 active:scale-95 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                            className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white hover:brightness-105 active:scale-98 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-40 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs"
                           >
                             {isVerifyingOtp ? (
                               <>
-                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                <span>Verifying...</span>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Verifying OTP Code...</span>
                               </>
                             ) : (
                               "Verify OTP Code"
@@ -715,17 +751,19 @@ export default function SignUpPage() {
                         </div>
 
                         {otpError && (
-                          <p className="text-[9px] text-red-500 font-bold">{otpError}</p>
+                          <p className="text-[10px] text-red-500 font-bold bg-red-50 border border-red-200 p-2 rounded-xl text-center">{otpError}</p>
                         )}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl text-emerald-800 text-left">
-                    <span className="material-symbols-outlined text-[18px] text-emerald-600 font-bold">verified</span>
+                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl text-emerald-800 text-left shadow-xs">
+                    <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
+                      <span className="material-symbols-outlined text-[18px] font-bold">verified</span>
+                    </div>
                     <div className="space-y-0.5">
-                      <p className="text-[10px] font-black uppercase tracking-widest">WhatsApp Number Verified</p>
-                      <p className="text-[9px] text-emerald-600 font-semibold leading-none">Your WhatsApp number is successfully secured and verified.</p>
+                      <p className="text-[11px] font-black uppercase tracking-wider">WhatsApp Number Verified</p>
+                      <p className="text-[10px] text-emerald-700 font-semibold leading-tight">Your WhatsApp number is successfully secured and verified.</p>
                     </div>
                   </div>
                 )}
