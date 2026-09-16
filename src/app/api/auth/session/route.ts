@@ -41,40 +41,35 @@ export async function POST(req: Request) {
       }, { merge: true });
     });
 
-    // Target FCM tokens belonging to the previous session specifically, or tokens not associated with the new session
-    if (previousSessionId && previousSessionId !== newSessionId) {
-      try {
-        const tokensSnap = await adminDb.collection("fcm_tokens").where("userId", "==", uid).get();
-        if (!tokensSnap.empty) {
-          const messaging = getMessaging();
+    // Target FCM tokens belonging to the previous device/session(s) strictly; EXCLUDE new active device session ID
+    try {
+      const tokensSnap = await adminDb.collection("fcm_tokens").where("userId", "==", uid).get();
+      if (!tokensSnap.empty) {
+        const messaging = getMessaging();
 
-          for (const docSnap of tokensSnap.docs) {
-            const tData = docSnap.data();
-            // Do NOT send the revocation push to tokens registered under the new active session ID
-            if (tData.token && tData.sessionId !== newSessionId) {
-              // If previousSessionId was recorded, target matching previous session tokens or tokens with older session IDs
-              if (!tData.sessionId || tData.sessionId === previousSessionId) {
-                await messaging.send({
-                  token: tData.token,
-                  notification: {
-                    title: "⚠️ Session Revoked",
-                    body: "Your account was signed in on another device. You have been logged out on this device.",
-                  },
-                  data: {
-                    type: "session_revoked",
-                    title: "⚠️ Session Revoked",
-                    body: "Your account was signed in on another device. You have been logged out on this device.",
-                  },
-                  android: { priority: "high" },
-                  apns: { payload: { aps: { sound: "default" } } },
-                }).catch(() => {});
-              }
-            }
+        for (const docSnap of tokensSnap.docs) {
+          const tData = docSnap.data();
+          // STRICT RULE: Never send revocation push to tokens registered under the new active session ID
+          if (tData.token && tData.sessionId !== newSessionId) {
+            await messaging.send({
+              token: tData.token,
+              notification: {
+                title: "⚠️ Session Revoked",
+                body: "Your account was signed in on another device. You have been logged out on this device.",
+              },
+              data: {
+                type: "session_revoked",
+                title: "⚠️ Session Revoked",
+                body: "Your account was signed in on another device. You have been logged out on this device.",
+              },
+              android: { priority: "high" },
+              apns: { payload: { aps: { sound: "default" } } },
+            }).catch(() => {});
           }
         }
-      } catch (fcmErr) {
-        console.warn("[Session API] Realtime session revocation push notice exception:", fcmErr);
       }
+    } catch (fcmErr) {
+      console.warn("[Session API] Realtime session revocation push notice exception:", fcmErr);
     }
 
     console.log(`[Session API] Atomically created new active session for user ${uid}. Session ID: ${newSessionId}`);

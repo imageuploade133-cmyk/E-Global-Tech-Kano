@@ -159,7 +159,7 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
 }
 
 /**
- * Extracts, verifies Firebase ID Token, AND validates that the user's active session in Firestore match.
+ * Extracts, verifies Firebase ID Token, AND validates that the user's active session in Firestore matches.
  * Enforces single active session rule server-side.
  */
 export async function authenticateUserRequest(req: Request): Promise<DecodedTokenResult> {
@@ -170,36 +170,73 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   }
 
   if (!idToken) {
-    const url = new URL(req.url);
-    idToken = url.searchParams.get("idToken") || "";
+    try {
+      const dummyBase = "http://localhost";
+      const url = new URL(req.url, dummyBase);
+      idToken = url.searchParams.get("idToken") || "";
+    } catch {
+      idToken = "";
+    }
   }
 
   if (!idToken) {
     throw new Error("Missing Firebase ID token in Authorization header.");
   }
 
+  // 1. Verify Firebase ID Token first & derive UID exclusively from verified token
   const decoded = await verifyFirebaseIdToken(idToken);
+  const uid = decoded.uid;
 
-  // Single Active Device / Session Verification
-  const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
-  const isSessionEstablishmentUrl = req.url ? req.url.includes("/api/auth/session") : false;
+  if (!uid) {
+    throw new Error("Invalid token: UID claim missing.");
+  }
 
-  if (!isSessionEstablishmentUrl && decoded.uid && decoded.uid !== "mock-uid" && decoded.uid !== "mock-admin-uid") {
+  // Allow mock uids for development/testing if needed
+  if (uid === "mock-uid" || uid === "mock-admin-uid") {
+    return decoded;
+  }
+
+  // 2. Determine if this request is /api/auth/session POST (session establishment/replacement)
+  let isSessionEstablishment = false;
+  if (req.method === "POST" && req.url) {
     try {
-      const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
-      if (userDoc.exists) {
-        const activeSessionId = userDoc.data()?.activeSessionId;
-        // If an active session exists in Firestore, provided Session ID must match it
-        if (activeSessionId && providedSessionId !== activeSessionId) {
-          throw new Error("REVOKED_SESSION: Your account was signed in on another device. You have been logged out on this device.");
-        }
+      const reqUrl = new URL(req.url, "http://localhost");
+      if (reqUrl.pathname.endsWith("/api/auth/session")) {
+        isSessionEstablishment = true;
+      }
+    } catch {
+      if (req.url.includes("/api/auth/session")) {
+        isSessionEstablishment = true;
+      }
+    }
+  }
+
+  // 3. For POST /api/auth/session, session establishment is permitted without an existing session ID.
+  // For EVERY other protected endpoint (and DELETE /api/auth/session), X-Session-ID is strictly required & validated.
+  if (!isSessionEstablishment) {
+    const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
+    if (!providedSessionId) {
+      throw new Error("REVOKED_SESSION: Missing session ID. You have been logged out on this device.");
+    }
+
+    try {
+      const userDoc = await adminDb.collection("users").doc(uid).get();
+      if (!userDoc.exists) {
+        throw new Error("REVOKED_SESSION: Account record not found.");
+      }
+
+      const activeSessionId = userDoc.data()?.activeSessionId;
+
+      if (!activeSessionId || providedSessionId !== activeSessionId) {
+        throw new Error("REVOKED_SESSION: Your account was signed in on another device. You have been logged out on this device.");
       }
     } catch (err: any) {
       if (err.message && err.message.includes("REVOKED_SESSION")) {
         throw err;
       }
-      console.error(`[authenticateUserRequest Error] Session validation failed for ${decoded.uid}:`, err.message);
-      throw err;
+      console.error(`[authenticateUserRequest Error] Session validation failed for ${uid}:`, err.message);
+      // FAIL CLOSED: Never fall back to Firebase-token-only authorization on Firestore/session error
+      throw new Error(`REVOKED_SESSION: Session validation failed (${err.message}).`);
     }
   }
 
