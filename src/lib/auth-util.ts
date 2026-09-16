@@ -182,7 +182,9 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
 
   // Single Active Device / Session Verification
   const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
-  if (decoded.uid && decoded.uid !== "mock-uid" && decoded.uid !== "mock-admin-uid") {
+  const isSessionEstablishmentUrl = req.url ? req.url.includes("/api/auth/session") : false;
+
+  if (!isSessionEstablishmentUrl && decoded.uid && decoded.uid !== "mock-uid" && decoded.uid !== "mock-admin-uid") {
     try {
       const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
       if (userDoc.exists) {
@@ -196,7 +198,8 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
       if (err.message && err.message.includes("REVOKED_SESSION")) {
         throw err;
       }
-      console.warn(`[authenticateUserRequest Warning] Session check warning for ${decoded.uid}:`, err.message);
+      console.error(`[authenticateUserRequest Error] Session validation failed for ${decoded.uid}:`, err.message);
+      throw err;
     }
   }
 
