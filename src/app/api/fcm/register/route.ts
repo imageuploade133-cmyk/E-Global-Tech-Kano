@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
     // Resolve server-authoritative active session ID directly from Firestore users/{uid}
     let authoritativeSessionId: string | null = null;
-    if (uid === "mock-uid" || uid === "mock-admin-uid") {
+    if (process.env.NODE_ENV !== "production" && (uid === "mock-uid" || uid === "mock-admin-uid")) {
       authoritativeSessionId = "mock-session-id";
     } else {
       try {
