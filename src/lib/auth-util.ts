@@ -180,7 +180,13 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   }
 
   // 1. Verify Firebase ID Token first & derive UID exclusively from verified token
-  const decoded = await verifyFirebaseIdToken(idToken);
+  let decoded: DecodedTokenResult;
+  try {
+    decoded = await verifyFirebaseIdToken(idToken);
+  } catch (tokenErr: any) {
+    throw new Error(`REVOKED_SESSION: ${tokenErr.message || "Invalid or expired Firebase ID token."}`);
+  }
+
   const uid = decoded.uid;
 
   if (!uid) {
