@@ -166,17 +166,7 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   let idToken = "";
   const authHeader = req.headers.get("Authorization");
   if (authHeader && authHeader.startsWith("Bearer ")) {
-    idToken = authHeader.split("Bearer ")[1];
-  }
-
-  if (!idToken) {
-    try {
-      const dummyBase = "http://localhost";
-      const url = new URL(req.url, dummyBase);
-      idToken = url.searchParams.get("idToken") || "";
-    } catch {
-      idToken = "";
-    }
+    idToken = authHeader.split("Bearer ")[1].trim();
   }
 
   if (!idToken) {
