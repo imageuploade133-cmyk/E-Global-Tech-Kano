@@ -25,11 +25,16 @@ export async function POST(req: Request) {
 
     // Atomically replace active session inside Firestore transaction
     let previousSessionId: string | null = null;
+    let prevDeviceName: string | null = null;
+    let prevCreatedAt: string | null = null;
+
     await adminDb.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userRef);
       if (userDoc.exists) {
         const data = userDoc.data() || {};
         previousSessionId = data.activeSessionId || null;
+        prevDeviceName = data.activeSessionDevice || null;
+        prevCreatedAt = data.activeSessionCreatedAt || null;
       }
 
       transaction.set(userRef, {
@@ -37,6 +42,8 @@ export async function POST(req: Request) {
         activeSessionCreatedAt: nowIso,
         activeSessionDevice: deviceName,
         activeSessionUserAgent: userAgent,
+        previousSessionDevice: prevDeviceName,
+        previousSessionRevokedAt: nowIso,
         updatedAt: nowIso,
       }, { merge: true });
     });
@@ -55,13 +62,13 @@ export async function POST(req: Request) {
               await messaging.send({
                 token: tData.token,
                 notification: {
-                  title: "⚠️ Session Revoked",
-                  body: "Your account was signed in on another device. You have been logged out on this device.",
+                  title: "⚠️ Account Signed In On Another Device",
+                  body: "Your account was accessed from a new device. This session has been logged out.",
                 },
                 data: {
                   type: "session_revoked",
-                  title: "⚠️ Session Revoked",
-                  body: "Your account was signed in on another device. You have been logged out on this device.",
+                  title: "⚠️ Account Signed In On Another Device",
+                  body: "Your account was accessed from a new device. This session has been logged out.",
                 },
                 android: { priority: "high" },
                 apns: { payload: { aps: { sound: "default" } } },

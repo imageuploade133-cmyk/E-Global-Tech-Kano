@@ -47,7 +47,9 @@ export function SessionRevokedModal({
 
   const handleAcknowledgeLogout = () => {
     if (onClose) onClose();
-    handleAppSignOut(null);
+    if (typeof window !== "undefined") {
+      window.location.href = "/auth/login";
+    }
   };
 
   const handleReportSupport = () => {
@@ -137,7 +139,7 @@ export function SessionRevokedModal({
               onClick={handleAcknowledgeLogout}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:opacity-95 text-white font-bold text-base shadow-lg shadow-[#FC7A00]/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Acknowledge & Sign In Again</span>
+              <span>Continue to Login</span>
               <span className="material-symbols-outlined text-lg">arrow_forward</span>
             </button>
 

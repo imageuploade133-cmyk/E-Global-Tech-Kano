@@ -135,21 +135,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const remoteActiveSessionId = data.activeSessionId as string | undefined;
 
             if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
-              console.warn("[Session Revoked] Remote active session changed. Opening SessionRevokedModal...");
+              console.warn("[Session Revoked] Remote active session changed. Executing immediate security logout & opening modal...");
+
+              // 1. Immediately clear local session ID so no subsequent API request can use it
               if (typeof window !== "undefined") {
                 localStorage.removeItem("active_session_id");
               }
 
-              const prevDeviceName = (data.activeSessionDevice as string) || "Mobile App / Web Browser";
-              const prevCreatedAt = (data.activeSessionCreatedAt as string) || new Date().toISOString();
+              // 2. Read previous session metadata stored in Firestore doc during session replacement
+              const revokedDevice = (data.previousSessionDevice as string) || "Mobile App / Web Browser";
+              const revokedAtTime = (data.previousSessionRevokedAt as string) || new Date().toISOString();
+              const newActiveDevice = (data.activeSessionDevice as string) || "New Active Device";
+              const newActiveTime = (data.activeSessionCreatedAt as string) || new Date().toISOString();
 
               setRevokedSessionData({
-                previousDevice: prevDeviceName,
-                previousCreatedAt: prevCreatedAt,
-                currentDevice: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
-                currentCreatedAt: new Date().toISOString(),
+                previousDevice: revokedDevice,
+                previousCreatedAt: revokedAtTime,
+                currentDevice: newActiveDevice,
+                currentCreatedAt: newActiveTime,
               });
               setIsRevokedModalOpen(true);
+
+              // 3. IMMEDIATELY execute security logout from Firebase Auth
+              handleAppSignOut(null);
               return;
             }
 
