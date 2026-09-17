@@ -7,6 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import "@/lib/init-fetch-interceptor";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { toast } from "sonner";
+import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
 
 
 interface UserData {
@@ -37,6 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
+  const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
 
   // Load custom mock data from sessionStorage if present
   const getStoredMockData = (): UserData => {
@@ -132,12 +135,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const remoteActiveSessionId = data.activeSessionId as string | undefined;
 
             if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
-              console.warn("[Session Revoked] Remote active session changed. Triggering client logout...");
-              toast.error("Your account was signed in on another device. You have been logged out on this device.");
+              console.warn("[Session Revoked] Remote active session changed. Opening SessionRevokedModal...");
               if (typeof window !== "undefined") {
                 localStorage.removeItem("active_session_id");
               }
-              handleAppSignOut(null);
+
+              const prevDeviceName = (data.activeSessionDevice as string) || "Mobile App / Web Browser";
+              const prevCreatedAt = (data.activeSessionCreatedAt as string) || new Date().toISOString();
+
+              setRevokedSessionData({
+                previousDevice: prevDeviceName,
+                previousCreatedAt: prevCreatedAt,
+                currentDevice: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
+                currentCreatedAt: new Date().toISOString(),
+              });
+              setIsRevokedModalOpen(true);
               return;
             }
 
@@ -216,6 +228,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      <SessionRevokedModal
+        isOpen={isRevokedModalOpen}
+        sessionData={revokedSessionData}
+        onClose={() => setIsRevokedModalOpen(false)}
+      />
     </AuthContext.Provider>
   );
 }
