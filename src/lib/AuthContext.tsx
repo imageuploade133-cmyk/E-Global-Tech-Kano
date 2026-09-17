@@ -8,6 +8,7 @@ import "@/lib/init-fetch-interceptor";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { toast } from "sonner";
 import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
+import { NewDeviceOtpModal } from "@/components/layout/NewDeviceOtpModal";
 
 
 interface UserData {
@@ -40,6 +41,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
   const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
+
+  // New Device OTP Challenge Modal State
+  const [isNewDeviceOtpOpen, setIsNewDeviceOtpOpen] = useState(false);
+  const [newDeviceChallenge, setNewDeviceChallenge] = useState<{
+    challengeId: string;
+    channel: "whatsapp" | "email";
+    maskedDestination: string;
+    channels: Array<{ type: "whatsapp" | "email"; label: string; masked: string }>;
+  } | null>(null);
 
   // Load custom mock data from sessionStorage if present
   const getStoredMockData = (): UserData => {
@@ -111,11 +121,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 "Authorization": `Bearer ${idToken}`,
               },
               body: JSON.stringify({
+                action: "establish",
                 deviceName: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
               }),
             });
             const sessData = await res.json().catch(() => ({}));
-            if (res.ok && sessData.sessionId) {
+
+            if (res.ok && sessData.requiresOtp && sessData.challengeId) {
+              // Server detected an existing active session on another device -> Open OTP Modal!
+              setNewDeviceChallenge({
+                challengeId: sessData.challengeId,
+                channel: sessData.channel || "whatsapp",
+                maskedDestination: sessData.maskedDestination || "",
+                channels: sessData.channels || [],
+              });
+              setIsNewDeviceOtpOpen(true);
+            } else if (res.ok && sessData.sessionId) {
               if (typeof window !== "undefined") {
                 localStorage.setItem("active_session_id", sessData.sessionId);
               }
@@ -248,6 +269,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionData={revokedSessionData}
         onClose={() => setIsRevokedModalOpen(false)}
       />
+
+      {newDeviceChallenge && (
+        <NewDeviceOtpModal
+          isOpen={isNewDeviceOtpOpen}
+          challengeId={newDeviceChallenge.challengeId}
+          initialChannel={newDeviceChallenge.channel}
+          maskedDestination={newDeviceChallenge.maskedDestination}
+          channels={newDeviceChallenge.channels}
+          onVerifiedSuccess={(newSessId) => {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("active_session_id", newSessId);
+            }
+            setIsNewDeviceOtpOpen(false);
+            setNewDeviceChallenge(null);
+            toast.success("New device verified! Welcome to E-Global Pay.");
+          }}
+          onCancel={() => {
+            setIsNewDeviceOtpOpen(false);
+            setNewDeviceChallenge(null);
+            handleAppSignOut(null);
+          }}
+        />
+      )}
     </AuthContext.Provider>
   );
 }
