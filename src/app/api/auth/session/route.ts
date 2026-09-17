@@ -97,12 +97,36 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
     }
 
+    const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
+    if (!providedSessionId) {
+      return NextResponse.json({ error: "REVOKED_SESSION: Missing session ID header." }, { status: 401 });
+    }
+
     const userRef = adminDb.collection("users").doc(uid);
-    await userRef.set({
-      activeSessionId: null,
-      activeSessionRevokedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    const nowIso = new Date().toISOString();
+
+    // Atomically clear active session ONLY IF the provided X-Session-ID matches the currently active server session
+    let revoked = false;
+    await adminDb.runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error("REVOKED_SESSION: User account document missing.");
+      }
+
+      const activeSessionId = userDoc.data()?.activeSessionId;
+
+      if (!activeSessionId || activeSessionId !== providedSessionId) {
+        throw new Error("REVOKED_SESSION: Cannot revoke an inactive or already replaced session.");
+      }
+
+      transaction.update(userRef, {
+        activeSessionId: null,
+        activeSessionRevokedAt: nowIso,
+        updatedAt: nowIso,
+      });
+
+      revoked = true;
+    });
 
     console.log(`[Session API] Atomically revoked active session for user ${uid}`);
 
@@ -113,6 +137,7 @@ export async function DELETE(req: Request) {
 
   } catch (err: any) {
     console.error("[Session API Delete Exception]:", err.message);
-    return NextResponse.json({ error: err.message || "Failed to revoke session." }, { status: 500 });
+    const status = err.message && err.message.includes("REVOKED_SESSION") ? 401 : 500;
+    return NextResponse.json({ error: err.message || "Failed to revoke session." }, { status });
   }
 }
