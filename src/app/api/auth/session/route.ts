@@ -5,7 +5,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import crypto from "crypto";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
-const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
 
 // Helper to mask sensitive destinations (e.g. 23480***1234 or j***s@gmail.com)
 function maskPhone(phone: string): string {
@@ -23,16 +23,20 @@ function maskEmail(email: string): string {
   return `${maskedName}@${domain}`;
 }
 
+const HMAC_SECRET = process.env.CPANEL_SESSION_SECRET || process.env.JWT_SECRET;
+
 function hashOtp(otp: string): string {
-  return crypto.createHash("sha256").update(otp.trim()).digest("hex");
+  if (!HMAC_SECRET) {
+    throw new Error("Configuration Error: CPANEL_SESSION_SECRET or JWT_SECRET is required.");
+  }
+  return crypto.createHmac("sha256", HMAC_SECRET).update(otp.trim()).digest("hex");
 }
 
 async function dispatchOtpToChannel(
   channel: "whatsapp" | "email",
   destination: string,
   rawOtp: string,
-  uid: string,
-  idToken: string
+  uid: string
 ): Promise<boolean> {
   if (channel === "whatsapp") {
     try {
@@ -259,6 +263,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Challenge already consumed. Please sign in again." }, { status: 400 });
       }
 
+      if (chData.attempts >= 3) {
+        return NextResponse.json({ error: "Too many failed attempts. Security challenge locked. Please generate a new login request." }, { status: 403 });
+      }
+
       // Check 60-second resend cooldown
       const lastSentAtMs = chData.lastSentAtMs || 0;
       if (now - lastSentAtMs < 60000) {
@@ -289,11 +297,10 @@ export async function POST(req: Request) {
         destination: targetDestination,
         lastSentAtMs: now,
         expiresAtMs,
-        attempts: 0,
         updatedAt: nowIso,
       }, { merge: true });
 
-      const dispatched = await dispatchOtpToChannel(targetChannel, targetDestination, rawOtp, uid, idToken);
+      const dispatched = await dispatchOtpToChannel(targetChannel, targetDestination, rawOtp, uid);
 
       if (!dispatched) {
         return NextResponse.json({ error: `Failed to deliver verification code via ${targetChannel}. Please try again later.` }, { status: 502 });
@@ -342,11 +349,46 @@ export async function POST(req: Request) {
     // IF AN ACTIVE SESSION ALREADY EXISTS -> GATED NEW-DEVICE OTP CHALLENGE REQUIRED!
     console.log(`[Session API] Active session already exists for user ${uid}. Generating New-Device Security Challenge...`);
 
+    // Enforce 24-hour security hold on newly modified recovery contacts to defend against account takeover
+    const lastContactChangeAt = userData.lastSecurityContactChangedAt ? new Date(userData.lastSecurityContactChangedAt).getTime() : 0;
+    if (lastContactChangeAt && now - lastContactChangeAt < 24 * 60 * 60 * 1000) {
+      const hoursRemaining = Math.ceil((24 * 60 * 60 * 1000 - (now - lastContactChangeAt)) / (60 * 60 * 1000));
+      return NextResponse.json({
+        error: `Security Hold Active: Your recovery contact was updated recently. New device logins are locked for ${hoursRemaining} hour(s) to protect against account takeover.`
+      }, { status: 403 });
+    }
+
     const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
     const registeredEmail = (userData.email || authResult.email || "").trim();
 
-    if (!registeredPhone && !registeredEmail) {
+    // Verify channel is marked verified (defaulting true if user completed registration)
+    const isPhoneVerified = userData.phoneVerified !== false && !!registeredPhone;
+    const isEmailVerified = userData.emailVerified !== false && !!registeredEmail;
+
+    if (!isPhoneVerified && !isEmailVerified) {
       return NextResponse.json({ error: "Security Error: No verified contact channels configured on your account. Please contact support." }, { status: 400 });
+    }
+
+    // Check for recent active unexpired challenge created for this user in the last 60 seconds (rate limiting)
+    const existingChallenges = await adminDb.collection("new_device_challenges")
+      .where("uid", "==", uid)
+      .where("consumed", "==", false)
+      .get();
+
+    if (!existingChallenges.empty) {
+      for (const cDoc of existingChallenges.docs) {
+        const cData = cDoc.data();
+        if (cData.createdAtMs && now - cData.createdAtMs < 60000) {
+          const remaining = Math.ceil((60000 - (now - cData.createdAtMs)) / 1000);
+          return NextResponse.json({
+            error: `Security Rate Limit: Please wait ${remaining} second(s) before generating a new security challenge.`,
+            requiresOtp: true,
+            challengeId: cDoc.id,
+            channel: cData.channel,
+            maskedDestination: cData.channel === "whatsapp" ? maskPhone(cData.destination) : maskEmail(cData.destination),
+          }, { status: 429 });
+        }
+      }
     }
 
     // Default channel: WhatsApp if phone exists, otherwise Email
@@ -377,7 +419,7 @@ export async function POST(req: Request) {
 
     await adminDb.collection("new_device_challenges").doc(challengeId).set(challengeDoc);
 
-    const dispatched = await dispatchOtpToChannel(defaultChannel, defaultDestination, rawOtp, uid, idToken);
+    const dispatched = await dispatchOtpToChannel(defaultChannel, defaultDestination, rawOtp, uid);
 
     if (!dispatched) {
       await adminDb.collection("new_device_challenges").doc(challengeId).delete();

@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
-const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
 
 function maskPhone(phone: string): string {
   const clean = phone.replace(/\D/g, "");
@@ -22,8 +22,13 @@ function maskEmail(email: string): string {
   return `${maskedName}@${domain}`;
 }
 
+const HMAC_SECRET = process.env.CPANEL_SESSION_SECRET || process.env.JWT_SECRET;
+
 function hashOtp(otp: string): string {
-  return crypto.createHash("sha256").update(otp.trim()).digest("hex");
+  if (!HMAC_SECRET) {
+    throw new Error("Configuration Error: CPANEL_SESSION_SECRET or JWT_SECRET is required.");
+  }
+  return crypto.createHmac("sha256", HMAC_SECRET).update(otp.trim()).digest("hex");
 }
 
 export async function POST(req: Request) {
@@ -250,8 +255,12 @@ export async function POST(req: Request) {
         if (chData.contactType === "phone") {
           updatePayload.phoneNumber = chData.newContact;
           updatePayload.phone = chData.newContact;
+          updatePayload.phoneVerified = true;
+          updatePayload.lastSecurityContactChangedAt = nowIso;
         } else {
           updatePayload.email = chData.newContact;
+          updatePayload.emailVerified = true;
+          updatePayload.lastSecurityContactChangedAt = nowIso;
         }
 
         transaction.update(userRef, updatePayload);
