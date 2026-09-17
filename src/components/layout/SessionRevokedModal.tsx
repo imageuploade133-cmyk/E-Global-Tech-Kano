@@ -3,7 +3,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
-import { handleAppSignOut } from "@/lib/logout-util";
 
 export interface SessionRevokedData {
   previousDevice?: string;

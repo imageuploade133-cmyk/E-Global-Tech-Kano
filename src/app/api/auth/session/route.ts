@@ -26,7 +26,6 @@ export async function POST(req: Request) {
     // Atomically replace active session inside Firestore transaction
     let previousSessionId: string | null = null;
     let prevDeviceName: string | null = null;
-    let prevCreatedAt: string | null = null;
 
     await adminDb.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userRef);
@@ -34,7 +33,6 @@ export async function POST(req: Request) {
         const data = userDoc.data() || {};
         previousSessionId = data.activeSessionId || null;
         prevDeviceName = data.activeSessionDevice || null;
-        prevCreatedAt = data.activeSessionCreatedAt || null;
       }
 
       transaction.set(userRef, {
