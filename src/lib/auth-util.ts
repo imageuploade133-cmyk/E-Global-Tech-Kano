@@ -7,7 +7,7 @@ const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_
  * Checks if the user's KYC status is strictly APPROVED or VERIFIED.
  */
 export async function verifyUserKycApproved(userId: string): Promise<boolean> {
-  if (userId === "mock-admin-uid" || userId === "mock-uid") {
+  if (process.env.NODE_ENV !== "production" && (userId === "mock-admin-uid" || userId === "mock-uid")) {
     return true;
   }
   try {
@@ -191,8 +191,8 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
     throw new Error("Invalid token: UID claim missing.");
   }
 
-  // Allow mock uids for development/testing if needed
-  if (uid === "mock-uid" || uid === "mock-admin-uid") {
+  // Allow mock uids only in non-production environments
+  if (process.env.NODE_ENV !== "production" && (uid === "mock-uid" || uid === "mock-admin-uid")) {
     return decoded;
   }
 
