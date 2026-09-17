@@ -21,20 +21,22 @@ export async function POST(req: Request) {
 
     // Resolve server-authoritative active session ID directly from Firestore users/{uid}
     let authoritativeSessionId: string | null = null;
-    if (uid !== "mock-uid" && uid !== "mock-admin-uid") {
+    if (uid === "mock-uid" || uid === "mock-admin-uid") {
+      authoritativeSessionId = "mock-session-id";
+    } else {
       try {
         const userDoc = await adminDb.collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          authoritativeSessionId = userDoc.data()?.activeSessionId || null;
+        if (!userDoc.exists) {
+          return NextResponse.json({ error: "Unauthorized: User document missing." }, { status: 401 });
+        }
+        authoritativeSessionId = userDoc.data()?.activeSessionId || null;
+        if (!authoritativeSessionId) {
+          return NextResponse.json({ error: "Unauthorized: Active session missing." }, { status: 401 });
         }
       } catch (docErr: any) {
-        console.warn(`[FCM API Warning] Failed to fetch active session for user ${uid}:`, docErr.message);
+        console.error(`[FCM API Error] Failed to fetch active session for user ${uid}:`, docErr.message);
+        return NextResponse.json({ error: "Unauthorized: Failed to resolve active session." }, { status: 401 });
       }
-    }
-
-    // Fall back to validated X-Session-ID header if Firestore lookup returned null
-    if (!authoritativeSessionId) {
-      authoritativeSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || null;
     }
 
     const cleanToken = token.trim();
