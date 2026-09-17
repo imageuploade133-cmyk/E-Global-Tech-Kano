@@ -104,7 +104,7 @@ export function SessionRevokedModal({
                 <p className="text-sm font-semibold text-white truncate">{prevDevice}</p>
                 <p className="text-xs text-slate-400 flex items-center gap-1">
                   <span className="material-symbols-outlined text-xs">schedule</span>
-                  Logged active: {prevTime}
+                  Session revoked: {prevTime}
                 </p>
               </div>
             </div>

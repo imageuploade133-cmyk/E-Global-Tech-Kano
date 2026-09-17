@@ -148,12 +148,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const newActiveDevice = (data.activeSessionDevice as string) || "New Active Device";
               const newActiveTime = (data.activeSessionCreatedAt as string) || new Date().toISOString();
 
-              setRevokedSessionData({
+              const revokedPayload = {
                 previousDevice: revokedDevice,
                 previousCreatedAt: revokedAtTime,
                 currentDevice: newActiveDevice,
                 currentCreatedAt: newActiveTime,
-              });
+              };
+
+              // Persist revoked session payload to sessionStorage so LoginPage renders notice post-redirect
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("session_revoked_notice", JSON.stringify(revokedPayload));
+              }
+
+              setRevokedSessionData(revokedPayload);
               setIsRevokedModalOpen(true);
 
               // 3. IMMEDIATELY execute security logout from Firebase Auth
