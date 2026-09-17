@@ -11,6 +11,7 @@ import Image from "next/image";
 import { AppLogo } from "@/components/AppLogo";
 import { formatFirebaseError } from "@/lib/utils";
 import { ForgotPasswordDrawer } from "@/components/layout/ForgotPasswordDrawer";
+import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,6 +19,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
+  const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
   const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const router = useRouter();
 
@@ -26,6 +29,19 @@ export default function LoginPage() {
       const params = new URLSearchParams(window.location.search);
       if (params.get("forgot") === "true") {
         setIsForgotOpen(true);
+      }
+
+      // Check if session was revoked and stored in sessionStorage for post-logout notice
+      const storedRevokedData = sessionStorage.getItem("session_revoked_notice");
+      if (storedRevokedData) {
+        try {
+          const parsedData = JSON.parse(storedRevokedData);
+          setRevokedSessionData(parsedData);
+          setIsRevokedModalOpen(true);
+          sessionStorage.removeItem("session_revoked_notice");
+        } catch {
+          sessionStorage.removeItem("session_revoked_notice");
+        }
       }
     }
   }, []);
@@ -178,6 +194,12 @@ export default function LoginPage() {
       <ForgotPasswordDrawer
         isOpen={isForgotOpen}
         onClose={() => setIsForgotOpen(false)}
+      />
+
+      <SessionRevokedModal
+        isOpen={isRevokedModalOpen}
+        sessionData={revokedSessionData}
+        onClose={() => setIsRevokedModalOpen(false)}
       />
     </div>
   );

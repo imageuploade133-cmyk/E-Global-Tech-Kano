@@ -7,6 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import "@/lib/init-fetch-interceptor";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { toast } from "sonner";
+import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
 
 
 interface UserData {
@@ -37,6 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
+  const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
 
   // Load custom mock data from sessionStorage if present
   const getStoredMockData = (): UserData => {
@@ -132,11 +135,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const remoteActiveSessionId = data.activeSessionId as string | undefined;
 
             if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
-              console.warn("[Session Revoked] Remote active session changed. Triggering client logout...");
-              toast.error("Your account was signed in on another device. You have been logged out on this device.");
+              console.warn("[Session Revoked] Remote active session changed. Executing immediate security logout & opening modal...");
+
+              // 1. Immediately clear local session ID so no subsequent API request can use it
               if (typeof window !== "undefined") {
                 localStorage.removeItem("active_session_id");
               }
+
+              // 2. Read previous session metadata stored in Firestore doc during session replacement
+              const revokedDevice = (data.previousSessionDevice as string) || "Mobile App / Web Browser";
+              const revokedAtTime = (data.previousSessionRevokedAt as string) || new Date().toISOString();
+              const newActiveDevice = (data.activeSessionDevice as string) || "New Active Device";
+              const newActiveTime = (data.activeSessionCreatedAt as string) || new Date().toISOString();
+
+              const revokedPayload = {
+                previousDevice: revokedDevice,
+                previousCreatedAt: revokedAtTime,
+                currentDevice: newActiveDevice,
+                currentCreatedAt: newActiveTime,
+              };
+
+              // Persist revoked session payload to sessionStorage so LoginPage renders notice post-redirect
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("session_revoked_notice", JSON.stringify(revokedPayload));
+              }
+
+              setRevokedSessionData(revokedPayload);
+              setIsRevokedModalOpen(true);
+
+              // 3. IMMEDIATELY execute security logout from Firebase Auth
               handleAppSignOut(null);
               return;
             }
@@ -216,6 +243,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      <SessionRevokedModal
+        isOpen={isRevokedModalOpen}
+        sessionData={revokedSessionData}
+        onClose={() => setIsRevokedModalOpen(false)}
+      />
     </AuthContext.Provider>
   );
 }
