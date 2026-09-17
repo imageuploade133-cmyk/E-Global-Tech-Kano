@@ -43,7 +43,6 @@ async function getGooglePublicCertificates(): Promise<Record<string, string>> {
     throw new Error("Failed to fetch public certificates from Google.");
   }
 
-  // Parse Cache-Control header for max-age
   let maxAgeSeconds = 3600; // Default 1 hour fallback
   const cacheControl = certsRes.headers.get("cache-control");
   if (cacheControl) {
@@ -79,7 +78,6 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
 
   const [headerB64, payloadB64, signatureB64] = parts;
 
-  // 1. Base64 URL decode header and payload safely using "base64url"
   let headerJson: any;
   let payloadJson: any;
 
@@ -90,7 +88,6 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     throw new Error("Invalid JWT: Failed to parse header or payload JSON.");
   }
 
-  // 2. Validate Header: Algorithm MUST be RS256
   if (headerJson.alg !== "RS256") {
     throw new Error(`Invalid algorithm '${headerJson.alg}'. Firebase ID tokens must use 'RS256'.`);
   }
@@ -100,12 +97,10 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     throw new Error("Missing 'kid' claim in JWT header.");
   }
 
-  // 3. Fetch Google's public certificates (cached safely according to Cache-Control max-age)
   let certs = await getGooglePublicCertificates();
   let activeCert = certs[kid];
 
   if (!activeCert) {
-    // Certificate not found in cache; invalidate cache and re-fetch once to support key rotation
     certsCache = null;
     certs = await getGooglePublicCertificates();
     activeCert = certs[kid];
@@ -114,7 +109,6 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     }
   }
 
-  // 4. Verify RS256 signature using native Node.js crypto
   const verify = crypto.createVerify("RSA-SHA256");
   verify.update(`${headerB64}.${payloadB64}`);
 
@@ -127,14 +121,12 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     throw new Error("Signature verification failed. Token has been tampered with or corrupted.");
   }
 
-  // 5. Validate all standard JWT claims
   const now = Math.floor(Date.now() / 1000);
 
   if (!payloadJson.exp || typeof payloadJson.exp !== "number" || payloadJson.exp < now) {
     throw new Error(`Token has expired. Expired at: ${payloadJson.exp}, current time: ${now}`);
   }
 
-  // Allow up to 5 minutes of clock drift
   if (payloadJson.iat && payloadJson.iat > now + 300) {
     throw new Error("Token issued in the future (clock drift limit exceeded).");
   }
@@ -160,17 +152,31 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
 
 /**
  * Extracts, verifies Firebase ID Token, AND validates that the user's active session in Firestore matches.
- * Enforces single active session rule server-side.
+ * Enforces single active session rule server-side. Fail-closed.
  */
 export async function authenticateUserRequest(req: Request): Promise<DecodedTokenResult> {
+  // STRICT RULE: Reject tokens passed via URL query parameters
+  if (req.url) {
+    try {
+      const parsedUrl = new URL(req.url, "http://localhost");
+      if (parsedUrl.searchParams.has("token") || parsedUrl.searchParams.has("bearer") || parsedUrl.searchParams.has("idToken") || parsedUrl.searchParams.has("authorization")) {
+        throw new Error("REVOKED_SESSION: Query parameter tokens are prohibited.");
+      }
+    } catch (urlErr: any) {
+      if (urlErr.message && urlErr.message.includes("REVOKED_SESSION")) {
+        throw urlErr;
+      }
+    }
+  }
+
   let idToken = "";
-  const authHeader = req.headers.get("Authorization");
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
   if (authHeader && authHeader.startsWith("Bearer ")) {
     idToken = authHeader.split("Bearer ")[1].trim();
   }
 
   if (!idToken) {
-    throw new Error("Missing Firebase ID token in Authorization header.");
+    throw new Error("REVOKED_SESSION: Missing Firebase ID token in Authorization header.");
   }
 
   // 1. Verify Firebase ID Token first & derive UID exclusively from verified token
@@ -178,15 +184,15 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   const uid = decoded.uid;
 
   if (!uid) {
-    throw new Error("Invalid token: UID claim missing.");
+    throw new Error("REVOKED_SESSION: Invalid token: UID claim missing.");
   }
 
-  // Allow mock uids only in non-production environments
+  // Allow mock uids strictly outside production environment
   if (process.env.NODE_ENV !== "production" && (uid === "mock-uid" || uid === "mock-admin-uid")) {
     return decoded;
   }
 
-  // 2. Determine if this request is /api/auth/session POST (session establishment/replacement)
+  // 2. Determine if this request is POST /api/auth/session (session establishment/replacement)
   let isSessionEstablishment = false;
   if (req.method === "POST" && req.url) {
     try {
@@ -202,7 +208,7 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
   }
 
   // 3. For POST /api/auth/session, session establishment is permitted without an existing session ID.
-  // For EVERY other protected endpoint (and DELETE /api/auth/session), X-Session-ID is strictly required & validated.
+  // For EVERY other protected endpoint (including DELETE /api/auth/session), X-Session-ID is strictly required & validated.
   if (!isSessionEstablishment) {
     const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
     if (!providedSessionId) {
