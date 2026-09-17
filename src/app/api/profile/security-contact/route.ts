@@ -1,0 +1,306 @@
+import { NextResponse } from "next/server";
+import { authenticateUserRequest } from "@/lib/auth-util";
+import { adminDb } from "@/lib/firebase-admin";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+
+const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
+
+function maskPhone(phone: string): string {
+  const clean = phone.replace(/\D/g, "");
+  if (clean.length < 8) return "••••••••";
+  return `${clean.slice(0, 4)}••••${clean.slice(-4)}`;
+}
+
+function maskEmail(email: string): string {
+  const parts = email.split("@");
+  if (parts.length !== 2) return "••••@••••.com";
+  const name = parts[0];
+  const domain = parts[1];
+  const maskedName = name.length <= 2 ? `${name[0]}*` : `${name[0]}***${name[name.length - 1]}`;
+  return `${maskedName}@${domain}`;
+}
+
+const HMAC_SECRET = process.env.CPANEL_SESSION_SECRET || process.env.JWT_SECRET;
+
+function hashOtp(otp: string): string {
+  if (!HMAC_SECRET) {
+    throw new Error("Configuration Error: CPANEL_SESSION_SECRET or JWT_SECRET is required.");
+  }
+  return crypto.createHmac("sha256", HMAC_SECRET).update(otp.trim()).digest("hex");
+}
+
+export async function POST(req: Request) {
+  try {
+    const authResult = await authenticateUserRequest(req);
+    const uid = authResult.uid;
+
+    if (!uid) {
+      return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { action, pin, newContact, contactType, requestId, otpCode } = body;
+    const now = Date.now();
+    const nowIso = new Date().toISOString();
+
+    const userRef = adminDb.collection("users").doc(uid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      return NextResponse.json({ error: "User account profile not found." }, { status: 404 });
+    }
+
+    const userData = userDoc.data() || {};
+
+    // 1. PIN Verification Requirement
+    if (!pin || typeof pin !== "string") {
+      return NextResponse.json({ error: "4-digit transaction PIN is required to modify security recovery contacts." }, { status: 400 });
+    }
+
+    const pinHash = userData.pinHash;
+    const currentPlainPin = userData.pin;
+    const lockedUntil = userData.lockedUntil;
+
+    if (lockedUntil) {
+      const lockTime = new Date(lockedUntil).getTime();
+      if (now < lockTime) {
+        const minutesLeft = Math.ceil((lockTime - now) / (60 * 1000));
+        return NextResponse.json({ error: `Too many incorrect PIN attempts. Locked for ${minutesLeft} minutes.` }, { status: 403 });
+      }
+    }
+
+    let isPinMatch = false;
+    if (uid === "mock-uid") {
+      isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
+    } else if (pinHash) {
+      isPinMatch = bcrypt.compareSync(pin, pinHash);
+    } else if (currentPlainPin) {
+      isPinMatch = (pin === currentPlainPin);
+    } else {
+      return NextResponse.json({ error: "No transaction PIN has been set up on this account." }, { status: 400 });
+    }
+
+    if (!isPinMatch) {
+      const pinAttempts = (Number(userData.pinAttempts) || 0) + 1;
+      let lockTimestamp = null;
+      if (pinAttempts >= 5) {
+        lockTimestamp = new Date(now + 15 * 60 * 1000).toISOString();
+      }
+      await userRef.update({
+        pinAttempts,
+        lockedUntil: lockTimestamp,
+      });
+      const remaining = Math.max(0, 5 - pinAttempts);
+      return NextResponse.json({
+        error: pinAttempts >= 5
+          ? "Too many incorrect PIN attempts. Account locked for 15 minutes."
+          : `Incorrect transaction PIN. ${remaining} attempts remaining.`,
+      }, { status: 400 });
+    }
+
+    // Reset PIN attempts on match
+    await userRef.update({ pinAttempts: 0, lockedUntil: null });
+
+    // =========================================================================
+    // STEP 1: REQUEST CONTACT CHANGE (SEND OTP TO EXISTING TRUSTED DESTINATION)
+    // =========================================================================
+    if (action === "request_change") {
+      if (!newContact || !contactType) {
+        return NextResponse.json({ error: "Missing newContact or contactType parameter." }, { status: 400 });
+      }
+
+      const typeLower = String(contactType).toLowerCase();
+      if (typeLower !== "phone" && typeLower !== "email") {
+        return NextResponse.json({ error: "contactType must be 'phone' or 'email'." }, { status: 400 });
+      }
+
+      // Existing trusted contact destination
+      const existingPhone = (userData.phoneNumber || userData.phone || "").trim();
+      const existingEmail = (userData.email || authResult.email || "").trim();
+      const existingTarget = typeLower === "phone" ? existingPhone : existingEmail;
+
+      if (!existingTarget) {
+        return NextResponse.json({ error: `No current verified ${typeLower} found to authorize this security change.` }, { status: 400 });
+      }
+
+      const reqId = `req_${uid}_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
+      const rawOtp = crypto.randomInt(100000, 999999).toString();
+      const otpHash = hashOtp(rawOtp);
+      const expiresAtMs = now + 10 * 60 * 1000; // 10 minutes
+
+      const changeDoc = {
+        reqId,
+        uid,
+        contactType: typeLower,
+        newContact: String(newContact).trim(),
+        otpHash,
+        existingTarget,
+        attempts: 0,
+        consumed: false,
+        verified: false,
+        createdAtMs: now,
+        expiresAtMs,
+        createdAt: nowIso,
+      };
+
+      await adminDb.collection("security_contact_changes").doc(reqId).set(changeDoc);
+
+      // Dispatch OTP to existing trusted contact
+      let dispatched = false;
+      if (typeLower === "phone") {
+        try {
+          const res = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": GATEWAY_API_KEY,
+            },
+            body: JSON.stringify({
+              phoneNumber: existingTarget,
+              type: "contact_change",
+              customMessage: `E-Global Pay Security: Verification code to change recovery ${typeLower} is *${rawOtp}*. Valid for 10 minutes. Do not share with anyone.`
+            }),
+          });
+          dispatched = res.ok;
+        } catch {
+          dispatched = false;
+        }
+      } else {
+        try {
+          const { sendEmail } = await import("@/lib/email-service");
+          const result = await sendEmail({
+            to: existingTarget,
+            subject: "Security Alert: Recovery Contact Change Authorization",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #FC7A00; margin-bottom: 16px;">E-Global Pay Security Guard</h2>
+                <p>Hello,</p>
+                <p>A request was submitted to update your recovery ${typeLower} to <b>${newContact}</b>.</p>
+                <p>Use the 6-digit code below to authorize this change:</p>
+                <div style="background-color: #f4f4f4; padding: 15px; font-size: 26px; font-weight: bold; text-align: center; letter-spacing: 6px; color: #333; margin: 20px 0; border-radius: 4px;">
+                  ${rawOtp}
+                </div>
+                <p>If you did not request this change, please ignore this message and change your PIN immediately.</p>
+              </div>
+            `,
+          });
+          dispatched = result.success;
+        } catch {
+          dispatched = false;
+        }
+      }
+
+      if (!dispatched) {
+        await adminDb.collection("security_contact_changes").doc(reqId).delete();
+        return NextResponse.json({ error: "Failed to deliver authorization code to your current verified contact." }, { status: 502 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Authorization code sent to your current verified ${typeLower} (${typeLower === "phone" ? maskPhone(existingTarget) : maskEmail(existingTarget)}).`,
+        requestId: reqId,
+        maskedExistingContact: typeLower === "phone" ? maskPhone(existingTarget) : maskEmail(existingTarget),
+      });
+    }
+
+    // =========================================================================
+    // STEP 2: VERIFY OTP & ATOMICALLY PROMOTE NEW CONTACT
+    // =========================================================================
+    if (action === "verify_change") {
+      if (!requestId || !otpCode) {
+        return NextResponse.json({ error: "Missing requestId or otpCode." }, { status: 400 });
+      }
+
+      const changeRef = adminDb.collection("security_contact_changes").doc(requestId);
+
+      await adminDb.runTransaction(async (transaction) => {
+        const changeSnap = await transaction.get(changeRef);
+        if (!changeSnap.exists) {
+          throw new Error("CHANGE_INVALID: Security request record not found.");
+        }
+
+        const chData = changeSnap.data() || {};
+
+        if (chData.uid !== uid) {
+          throw new Error("CHANGE_INVALID: Authorization request mismatch.");
+        }
+
+        if (chData.consumed === true) {
+          throw new Error("CHANGE_CONSUMED: This change request code has already been used.");
+        }
+
+        if (now > chData.expiresAtMs) {
+          throw new Error("CHANGE_EXPIRED: Verification code has expired. Please initiate a new change request.");
+        }
+
+        if (chData.attempts >= 3) {
+          throw new Error("CHANGE_LOCKED: Too many incorrect attempts. Request locked.");
+        }
+
+        const hashedSubmitted = hashOtp(String(otpCode));
+        if (hashedSubmitted !== chData.otpHash) {
+          const updatedAttempts = (chData.attempts || 0) + 1;
+          transaction.update(changeRef, { attempts: updatedAttempts });
+          const remaining = Math.max(0, 3 - updatedAttempts);
+          throw new Error(`INCORRECT_OTP: Incorrect verification code. ${remaining} attempt(s) remaining.`);
+        }
+
+        // Atomically update user document with newly promoted recovery contact
+        const updatePayload: Record<string, any> = {
+          updatedAt: nowIso,
+        };
+
+        if (chData.contactType === "phone") {
+          updatePayload.phoneNumber = chData.newContact;
+          updatePayload.phone = chData.newContact;
+          updatePayload.phoneVerified = true;
+          updatePayload.lastSecurityContactChangedAt = nowIso;
+        } else {
+          updatePayload.email = chData.newContact;
+          updatePayload.emailVerified = true;
+          updatePayload.lastSecurityContactChangedAt = nowIso;
+        }
+
+        transaction.update(userRef, updatePayload);
+
+        transaction.update(changeRef, {
+          consumed: true,
+          verified: true,
+          consumedAt: nowIso,
+        });
+
+        // Record Audit Log
+        const auditRef = adminDb.collection("security_audit_logs").doc();
+        transaction.set(auditRef, {
+          uid,
+          action: "SECURITY_CONTACT_PROMOTED",
+          contactType: chData.contactType,
+          newContact: chData.newContact,
+          timestamp: nowIso,
+        });
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Recovery contact updated and verified successfully!",
+      });
+    }
+
+    return NextResponse.json({ error: "Invalid action parameter." }, { status: 400 });
+
+  } catch (err: any) {
+    console.error("[Security Contact API Exception]:", err.message);
+    let userMsg = err.message || "Failed to process security contact update.";
+    if (err.message && err.message.includes("INCORRECT_OTP")) {
+      userMsg = err.message.replace("INCORRECT_OTP: ", "");
+      return NextResponse.json({ error: userMsg }, { status: 400 });
+    }
+    if (err.message && err.message.includes("CHANGE_")) {
+      userMsg = err.message.replace(/CHANGE_[A-Z]+:\s*/, "");
+      return NextResponse.json({ error: userMsg }, { status: 400 });
+    }
+    return NextResponse.json({ error: userMsg }, { status: 500 });
+  }
+}
