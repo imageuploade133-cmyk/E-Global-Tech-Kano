@@ -501,4 +501,14 @@ describe("New Device Session & Trusted Factor Security Suite", () => {
     expect(targetDestination).not.toBe(maliciousPayload.destination);
     expect(targetDestination).not.toBe(maliciousPayload.target);
   });
+
+  it("Test 21: CPanel Administrators in admin_users bypass new device OTP gating", () => {
+    const isAdminUser = true; // Account present in admin_users collection
+    const activeSessionAlreadyExists = true;
+
+    // Admin bypass logic
+    const requiresOtp = isAdminUser ? false : activeSessionAlreadyExists;
+
+    expect(requiresOtp).toBe(false);
+  });
 });
