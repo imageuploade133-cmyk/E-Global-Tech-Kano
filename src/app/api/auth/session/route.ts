@@ -79,7 +79,7 @@ async function dispatchOtpToChannel(
           </div>
         `,
       });
-      return result.success;
+      return result;
     } catch (err) {
       console.error("[New Device OTP] Email dispatch error:", err);
       return false;
