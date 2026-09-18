@@ -150,6 +150,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 channels: sessData.channels || [],
               });
               setIsNewDeviceOtpOpen(true);
+
+              if (sessData.dispatchWarning) {
+                toast.warning(sessData.dispatchWarning);
+              }
             } else if (res.ok && sessData.sessionId) {
               setDeviceAuthState("AUTHENTICATED_VERIFIED");
               if (typeof window !== "undefined") {

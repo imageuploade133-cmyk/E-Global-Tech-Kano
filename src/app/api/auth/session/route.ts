@@ -497,11 +497,6 @@ export async function POST(req: Request) {
       transaction.set(challengeRefNew, challengeDoc);
     });
 
-    if (!dispatched) {
-      await adminDb.collection("new_device_challenges").doc(challengeId).delete().catch(() => {});
-      return NextResponse.json({ error: "Failed to deliver security verification OTP. Please ensure your recovery channel is active or try switching channels." }, { status: 502 });
-    }
-
     // Audit Log
     await adminDb.collection("security_audit_logs").add({
       uid,
@@ -509,6 +504,7 @@ export async function POST(req: Request) {
       challengeId,
       channel: defaultChannel,
       maskedDestination: defaultChannel === "whatsapp" ? maskPhone(defaultDestination) : maskEmail(defaultDestination),
+      dispatched,
       timestamp: nowIso,
     });
 
@@ -535,9 +531,13 @@ export async function POST(req: Request) {
       channel: defaultChannel,
       maskedDestination: defaultChannel === "whatsapp" ? maskPhone(defaultDestination) : maskEmail(defaultDestination),
       channels,
-      cooldownSeconds: 60,
+      dispatched,
+      dispatchWarning: !dispatched ? `Failed to deliver verification code via ${defaultChannel.toUpperCase()}. Please select another verification channel below.` : null,
+      cooldownSeconds: dispatched ? 60 : 0, // Allow instant channel switch if initial dispatch failed
       expiresInSeconds: 300,
-      message: `Security Verification Required: Verification code sent via ${defaultChannel.toUpperCase()}.`,
+      message: dispatched
+        ? `Security Verification Required: Verification code sent via ${defaultChannel.toUpperCase()}.`
+        : `Security Verification Required: Code delivery via ${defaultChannel.toUpperCase()} was unsuccessful. Please select an alternative verification channel below.`,
     });
 
   } catch (err: any) {
