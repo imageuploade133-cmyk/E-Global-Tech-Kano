@@ -440,17 +440,8 @@ export async function POST(req: Request) {
     const otpHash = hashOtp(rawOtp);
     const expiresAtMs = now + 5 * 60 * 1000; // 5 minutes
 
-    // Attempt initial dispatch via primary channel (WhatsApp if available, or Email)
-    let dispatched = await dispatchOtpToChannel(defaultChannel, defaultDestination, rawOtp, uid);
-
-    // Automatic fallback: If primary WhatsApp dispatch fails, fall back to Email if email is available!
-    if (!dispatched && defaultChannel === "whatsapp" && isEmailVerified) {
-      console.warn(`[Session API] Primary WhatsApp OTP dispatch failed for user ${uid}. Executing automatic fallback to Email OTP.`);
-      defaultChannel = "email";
-      defaultDestination = registeredEmail;
-      dispatched = await dispatchOtpToChannel("email", registeredEmail, rawOtp, uid);
-    }
-
+    // Do NOT auto-send OTP on initial challenge creation.
+    // User will select channel and click "Send Verification Code" manually.
     const challengeDoc = {
       challengeId,
       uid,
@@ -464,12 +455,12 @@ export async function POST(req: Request) {
       consumed: false,
       verified: false,
       createdAtMs: now,
-      lastSentAtMs: now,
+      lastSentAtMs: 0, // Not sent yet
       expiresAtMs,
       createdAt: nowIso,
     };
 
-    // Execute race-safe creation & cooldown check inside a Firestore transaction
+    // Execute race-safe creation check inside a Firestore transaction
     await adminDb.runTransaction(async (transaction) => {
       const existingQuery = adminDb.collection("new_device_challenges")
         .where("uid", "==", uid)
@@ -479,11 +470,6 @@ export async function POST(req: Request) {
 
       if (!existingSnaps.empty) {
         for (const cDoc of existingSnaps.docs) {
-          const cData = cDoc.data();
-          if (cData.createdAtMs && now - cData.createdAtMs < 60000) {
-            const remaining = Math.ceil((60000 - (now - cData.createdAtMs)) / 1000);
-            throw new Error(`CHALLENGE_COOLDOWN:${remaining}:${cDoc.id}:${cData.channel}:${cData.channel === "whatsapp" ? maskPhone(cData.destination) : maskEmail(cData.destination)}`);
-          }
           // Invalidate/consume previous unconsumed challenges for this user so only 1 active challenge exists
           transaction.update(cDoc.ref, {
             consumed: true,
@@ -504,7 +490,6 @@ export async function POST(req: Request) {
       challengeId,
       channel: defaultChannel,
       maskedDestination: defaultChannel === "whatsapp" ? maskPhone(defaultDestination) : maskEmail(defaultDestination),
-      dispatched,
       timestamp: nowIso,
     });
 
@@ -531,13 +516,10 @@ export async function POST(req: Request) {
       channel: defaultChannel,
       maskedDestination: defaultChannel === "whatsapp" ? maskPhone(defaultDestination) : maskEmail(defaultDestination),
       channels,
-      dispatched,
-      dispatchWarning: !dispatched ? `Failed to deliver verification code via ${defaultChannel.toUpperCase()}. Please select another verification channel below.` : null,
-      cooldownSeconds: dispatched ? 60 : 0, // Allow instant channel switch if initial dispatch failed
+      otpSent: false,
+      cooldownSeconds: 0,
       expiresInSeconds: 300,
-      message: dispatched
-        ? `Security Verification Required: Verification code sent via ${defaultChannel.toUpperCase()}.`
-        : `Security Verification Required: Code delivery via ${defaultChannel.toUpperCase()} was unsuccessful. Please select an alternative verification channel below.`,
+      message: "Security Verification Required: Please select your preferred channel and click Send Code.",
     });
 
   } catch (err: any) {

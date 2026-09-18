@@ -26,10 +26,11 @@ export function NewDeviceOtpModal({
 }: NewDeviceOtpModalProps) {
   const [activeChannel, setActiveChannel] = useState<"whatsapp" | "email">(initialChannel);
   const [activeDestination, setActiveDestination] = useState<string>(maskedDestination);
+  const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [cooldown, setCooldown] = useState(60);
+  const [cooldown, setCooldown] = useState(0);
 
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -39,7 +40,8 @@ export function NewDeviceOtpModal({
     setActiveChannel(initialChannel);
     setActiveDestination(maskedDestination);
     setOtp(Array(6).fill(""));
-    setCooldown(60);
+    setOtpSent(false);
+    setCooldown(0);
   }, [challengeId, initialChannel, maskedDestination]);
 
   // Cooldown countdown timer
@@ -137,8 +139,8 @@ export function NewDeviceOtpModal({
     }
   };
 
-  const handleResendOrSwitchChannel = async (targetChannel: "whatsapp" | "email") => {
-    if (cooldown > 0 && targetChannel === activeChannel) {
+  const handleSendOrSwitchChannel = async (targetChannel: "whatsapp" | "email") => {
+    if (cooldown > 0 && targetChannel === activeChannel && otpSent) {
       toast.info(`Please wait ${cooldown} seconds before requesting a new code.`);
       return;
     }
@@ -178,9 +180,12 @@ export function NewDeviceOtpModal({
       setActiveChannel(data.channel || targetChannel);
       setActiveDestination(data.maskedDestination || maskedDestination);
       setCooldown(data.cooldownSeconds || 60);
+      setOtpSent(true);
       setOtp(Array(6).fill(""));
-      toast.success(data.message || "New verification code sent!");
-      inputRefs.current[0]?.focus();
+      toast.success(data.message || `Verification code sent via ${targetChannel === "whatsapp" ? "WhatsApp" : "Email"}!`);
+      setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 150);
 
     } catch (err: any) {
       toast.error(err.message || "Failed to resend code.");
@@ -192,62 +197,66 @@ export function NewDeviceOtpModal({
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[200000] w-full h-full bg-slate-900/95 backdrop-blur-xl flex flex-col justify-between overflow-y-auto p-4 sm:p-6 text-white"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 15 }}
+        className="fixed inset-0 z-[200000] w-full h-full bg-white flex flex-col justify-between overflow-y-auto p-4 sm:p-6 text-black"
       >
         <div className="max-w-md w-full mx-auto my-auto flex flex-col items-center text-center py-6">
           {/* Header Icon Badge */}
-          <div className="w-16 h-16 rounded-2xl bg-[#FC7A00]/15 border border-[#FC7A00]/30 flex items-center justify-center text-[#FC7A00] mb-5 shadow-lg shadow-[#FC7A00]/10">
-            <span className="material-symbols-outlined text-3xl">verified_user</span>
+          <div className="w-16 h-16 rounded-2xl bg-[#FC7A00]/10 border border-[#FC7A00]/30 flex items-center justify-center text-[#FC7A00] mb-4 shadow-sm">
+            <span className="material-symbols-outlined text-3xl font-bold">verified_user</span>
           </div>
 
-          <span className="px-3 py-0.5 rounded-full text-[10px] font-bold bg-[#FC7A00]/20 text-[#FC7A00] border border-[#FC7A00]/30 uppercase tracking-widest mb-2">
+          <span className="px-3 py-0.5 rounded-full text-[10px] font-black bg-[#FC7A00]/15 text-[#FC7A00] border border-[#FC7A00]/30 uppercase tracking-widest mb-2">
             Verify It&apos;s You
           </span>
 
-          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight mb-2">
+          <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight mb-2">
             New Device Login Security
           </h2>
 
-          <p className="text-xs text-slate-300 leading-relaxed mb-6">
-            A new device is logging into your account. We sent a 6-digit verification code to your verified channel:
+          <p className="text-xs text-gray-500 font-medium leading-relaxed mb-6">
+            A new device is logging into your account. Please select your verification method and click Send Code to receive your 6-digit OTP:
           </p>
 
-          {/* Explicit Full-Width Channel Selector Cards */}
-          <div className="w-full space-y-2.5 mb-6">
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider text-left pl-1">
+          {/* Select Verification Method Cards */}
+          <div className="w-full space-y-2.5 mb-6 text-left">
+            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest pl-1">
               Select Verification Method
             </p>
+
             <div className="grid grid-cols-1 gap-2.5 w-full">
               {/* Phone Number OTP Option */}
               {channels.some(c => c.type === "whatsapp") && (
                 <button
                   type="button"
-                  onClick={() => handleResendOrSwitchChannel("whatsapp")}
-                  disabled={resending}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                  onClick={() => {
+                    setActiveChannel("whatsapp");
+                    const ch = channels.find(c => c.type === "whatsapp");
+                    if (ch) setActiveDestination(ch.masked);
+                  }}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between shadow-xs ${
                     activeChannel === "whatsapp"
-                      ? "bg-[#FC7A00]/15 border-[#FC7A00] text-white shadow-lg shadow-[#FC7A00]/10 ring-1 ring-[#FC7A00]"
-                      : "bg-slate-800/80 border-slate-700/80 text-slate-300 hover:bg-slate-800"
+                      ? "bg-[#FC7A00]/10 border-[#FC7A00] text-black ring-2 ring-[#FC7A00]/30"
+                      : "bg-gray-50/80 border-gray-200/80 text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3.5">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      activeChannel === "whatsapp" ? "bg-[#FC7A00] text-white" : "bg-slate-700 text-slate-300"
+                      activeChannel === "whatsapp" ? "bg-[#FC7A00] text-white" : "bg-gray-200 text-gray-600"
                     }`}>
                       <span className="material-symbols-outlined text-xl">smartphone</span>
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-white">Phone Number OTP</p>
-                      <p className="text-[11px] text-slate-300 font-mono">
+                      <p className="text-xs font-black text-black">Phone Number OTP</p>
+                      <p className="text-[11px] text-gray-500 font-mono font-semibold">
                         {channels.find(c => c.type === "whatsapp")?.masked || activeDestination}
                       </p>
                     </div>
                   </div>
                   {activeChannel === "whatsapp" && (
-                    <span className="material-symbols-outlined text-[#FC7A00] text-xl">check_circle</span>
+                    <span className="material-symbols-outlined text-[#FC7A00] text-xl font-bold">check_circle</span>
                   )}
                 </button>
               )}
@@ -256,99 +265,117 @@ export function NewDeviceOtpModal({
               {channels.some(c => c.type === "email") && (
                 <button
                   type="button"
-                  onClick={() => handleResendOrSwitchChannel("email")}
-                  disabled={resending}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                  onClick={() => {
+                    setActiveChannel("email");
+                    const ch = channels.find(c => c.type === "email");
+                    if (ch) setActiveDestination(ch.masked);
+                  }}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between shadow-xs ${
                     activeChannel === "email"
-                      ? "bg-[#FC7A00]/15 border-[#FC7A00] text-white shadow-lg shadow-[#FC7A00]/10 ring-1 ring-[#FC7A00]"
-                      : "bg-slate-800/80 border-slate-700/80 text-slate-300 hover:bg-slate-800"
+                      ? "bg-[#FC7A00]/10 border-[#FC7A00] text-black ring-2 ring-[#FC7A00]/30"
+                      : "bg-gray-50/80 border-gray-200/80 text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3.5">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      activeChannel === "email" ? "bg-[#FC7A00] text-white" : "bg-slate-700 text-slate-300"
+                      activeChannel === "email" ? "bg-[#FC7A00] text-white" : "bg-gray-200 text-gray-600"
                     }`}>
                       <span className="material-symbols-outlined text-xl">mail</span>
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-white">Email OTP</p>
-                      <p className="text-[11px] text-slate-300 font-mono">
+                      <p className="text-xs font-black text-black">Email OTP</p>
+                      <p className="text-[11px] text-gray-500 font-mono font-semibold">
                         {channels.find(c => c.type === "email")?.masked || activeDestination}
                       </p>
                     </div>
                   </div>
                   {activeChannel === "email" && (
-                    <span className="material-symbols-outlined text-[#FC7A00] text-xl">check_circle</span>
+                    <span className="material-symbols-outlined text-[#FC7A00] text-xl font-bold">check_circle</span>
                   )}
                 </button>
               )}
             </div>
           </div>
 
-          {/* Active Status Callout */}
-          <div className="p-3.5 rounded-2xl bg-slate-800/90 border border-slate-700/80 w-full mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="material-symbols-outlined text-[#FC7A00] text-lg">
-                {activeChannel === "whatsapp" ? "smartphone" : "mail"}
-              </span>
-              <div className="text-left">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  Active Channel: {activeChannel === "whatsapp" ? "Phone Number OTP" : "Email OTP"}
-                </p>
-                <p className="text-xs font-bold text-white font-mono">{activeDestination}</p>
+          {/* Send Verification Code Action Box */}
+          <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/80 w-full mb-6 text-left">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#FC7A00] text-lg">
+                  {activeChannel === "whatsapp" ? "smartphone" : "mail"}
+                </span>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">
+                    {activeChannel === "whatsapp" ? "Phone Verification" : "Email Verification"}
+                  </p>
+                  <p className="text-xs font-bold text-black font-mono">{activeDestination}</p>
+                </div>
               </div>
+              {otpSent && cooldown > 0 && (
+                <span className="text-[10px] text-gray-500 font-mono font-bold bg-gray-200/80 px-2.5 py-1 rounded-full">
+                  Resend in {cooldown}s
+                </span>
+              )}
             </div>
-            {cooldown > 0 ? (
-              <span className="text-[11px] text-slate-400 font-mono font-semibold">
-                Resend in {cooldown}s
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleResendOrSwitchChannel(activeChannel)}
-                disabled={resending}
-                className="text-xs font-bold text-[#FC7A00] hover:underline cursor-pointer bg-transparent border-0"
-              >
-                {resending ? "Sending..." : "Resend Code"}
-              </button>
-            )}
+
+            <button
+              type="button"
+              disabled={resending || (otpSent && cooldown > 0)}
+              onClick={() => handleSendOrSwitchChannel(activeChannel)}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-98 text-white font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+            >
+              {resending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Dispatching Security Code...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-base">send</span>
+                  <span>{otpSent ? "Resend Code" : "Send Verification Code"}</span>
+                </>
+              )}
+            </button>
           </div>
 
-          {/* 6-Digit OTP Box Grid */}
-          <div className="flex items-center justify-center gap-2 sm:gap-3 w-full mb-6">
-            {otp.map((digit, idx) => (
-              <input
-                key={idx}
-                ref={(el) => {
-                  inputRefs.current[idx] = el;
-                }}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleOtpChange(idx, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(idx, e)}
-                onPaste={handlePaste}
-                className="w-11 h-12 sm:w-13 sm:h-14 rounded-xl bg-slate-800 border-2 border-slate-700 text-center font-mono font-bold text-xl text-white outline-none focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/30 transition-all shadow-inner"
-              />
-            ))}
+          {/* 6-Digit OTP Input Grid */}
+          <div className="space-y-2 w-full mb-6">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 text-left pl-1">
+              Enter 6-Digit OTP Code
+            </p>
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full">
+              {otp.map((digit, idx) => (
+                <div key={idx} className="p-[1.5px] rounded-xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs flex-1">
+                  <input
+                    ref={(el) => {
+                      inputRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={1}
+                    value={digit}
+                    disabled={!otpSent || loading}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(idx, e)}
+                    onPaste={handlePaste}
+                    className="w-full h-12 sm:h-13 bg-white rounded-[10px] text-center font-mono font-black text-xl text-black outline-none border-0 disabled:bg-gray-100 disabled:opacity-60"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Verify Action Button */}
+          {/* Verify & Activate Device Action Button */}
           <button
             type="button"
-            disabled={loading || otp.join("").length !== 6}
+            disabled={loading || !otpSent || otp.join("").length !== 6}
             onClick={handleVerifyOtp}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:opacity-95 text-white font-bold text-sm shadow-lg shadow-[#FC7A00]/25 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer mb-3"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-98 text-white font-black text-xs uppercase tracking-widest transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2 shadow-xs mb-3"
           >
             {loading ? (
               <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-                  className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
-                />
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 <span>Verifying Security Code...</span>
               </>
             ) : (
@@ -356,7 +383,7 @@ export function NewDeviceOtpModal({
             )}
           </button>
 
-          {/* Report Support Button */}
+          {/* Report to Support Button */}
           <button
             type="button"
             onClick={() => {
@@ -364,7 +391,7 @@ export function NewDeviceOtpModal({
                 window.location.href = "/support";
               }
             }}
-            className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full py-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">gavel</span>
             <span>Didn&apos;t attempt login? Report to Support</span>
@@ -372,9 +399,9 @@ export function NewDeviceOtpModal({
         </div>
 
         {/* Footer Security Notice */}
-        <div className="max-w-md w-full mx-auto text-center pt-3 border-t border-slate-800">
-          <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
-            <span className="material-symbols-outlined text-emerald-400 text-xs">shield</span>
+        <div className="max-w-md w-full mx-auto text-center pt-3 border-t border-gray-200">
+          <p className="text-[11px] text-gray-500 font-semibold flex items-center justify-center gap-1">
+            <span className="material-symbols-outlined text-emerald-600 text-xs font-bold">shield</span>
             E-Global Pay Enterprise Security Guard • Device Isolation
           </p>
         </div>
