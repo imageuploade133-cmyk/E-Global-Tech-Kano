@@ -237,7 +237,7 @@ export async function POST(req: Request) {
     // =========================================================================
     // STEP 2: AUTHORIZE EXISTING TRUSTED FACTOR & DISPATCH STAGE 2 OTP TO NEW CONTACT
     // =========================================================================
-    if (action === "authorize_existing" || action === "verify_change") {
+    if (action === "authorize_existing") {
       if (!requestId || !otpCode) {
         return NextResponse.json({ error: "Missing requestId or otpCode." }, { status: 400 });
       }
@@ -248,7 +248,7 @@ export async function POST(req: Request) {
       let stage2Destination = "";
       let stage2RawOtp = "";
 
-      const txResult = await adminDb.runTransaction(async (transaction) => {
+      await adminDb.runTransaction(async (transaction) => {
         const changeSnap = await transaction.get(changeRef);
         if (!changeSnap.exists) {
           throw new Error("CHANGE_INVALID: Security request record not found.");
@@ -264,18 +264,16 @@ export async function POST(req: Request) {
           throw new Error("CHANGE_CONSUMED: This change request code has already been used or completed.");
         }
 
+        if (chData.stage !== "AUTHORIZE_EXISTING" || chData.stage1Verified === true) {
+          throw new Error("CHANGE_INVALID_STAGE: Stage 1 has already been authorized.");
+        }
+
         if (now > chData.expiresAtMs) {
           throw new Error("CHANGE_EXPIRED: Verification code has expired. Please initiate a new change request.");
         }
 
         if (chData.attempts >= 3) {
           throw new Error("CHANGE_LOCKED: Too many incorrect attempts. Request locked.");
-        }
-
-        // Check stage
-        if (chData.stage === "VERIFY_NEW_CONTACT" || chData.stage1Verified === true) {
-          // Proceed to Step 3 handler if already in stage 2
-          return { proceedToStage2: true, chData };
         }
 
         const hashedSubmitted = hashOtp(String(otpCode));
@@ -299,79 +297,73 @@ export async function POST(req: Request) {
           attempts: 0, // Reset attempt counter for Stage 2
           updatedAt: nowIso,
         });
-
-        return { proceedToStage2: false, stage2Channel, stage2Destination, stage2RawOtp };
       });
 
-      if (txResult.proceedToStage2) {
-        // Fallthrough to Stage 2 verification below
+      // Dispatch Stage 2 OTP directly to NEW UNVERIFIED contact
+      let dispatchedStage2 = false;
+      if (stage2Channel === "phone") {
+        try {
+          const res = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": GATEWAY_API_KEY,
+            },
+            body: JSON.stringify({
+              phoneNumber: stage2Destination,
+              type: "contact_verification",
+              customMessage: `E-Global Pay Security: Stage 2 Verification code to confirm your NEW recovery ${stage2Channel} is *${stage2RawOtp}*. Valid for 10 minutes.`
+            }),
+          });
+          dispatchedStage2 = res.ok;
+        } catch {
+          dispatchedStage2 = false;
+        }
       } else {
-        // Dispatch Stage 2 OTP directly to NEW UNVERIFIED contact
-        let dispatchedStage2 = false;
-        if (stage2Channel === "phone") {
-          try {
-            const res = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-api-key": GATEWAY_API_KEY,
-              },
-              body: JSON.stringify({
-                phoneNumber: stage2Destination,
-                type: "contact_verification",
-                customMessage: `E-Global Pay Security: Stage 2 Verification code to confirm your NEW recovery ${stage2Channel} is *${stage2RawOtp}*. Valid for 10 minutes.`
-              }),
-            });
-            dispatchedStage2 = res.ok;
-          } catch {
-            dispatchedStage2 = false;
-          }
-        } else {
-          try {
-            const escapeHtml = (str: string) => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-            const safeTypeLower = escapeHtml(stage2Channel);
-            const safeRawOtp = escapeHtml(stage2RawOtp);
+        try {
+          const escapeHtml = (str: string) => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+          const safeTypeLower = escapeHtml(stage2Channel);
+          const safeRawOtp = escapeHtml(stage2RawOtp);
 
-            const { sendEmail } = await import("@/lib/email-service");
-            const result = await sendEmail({
-              to: stage2Destination,
-              subject: "Security Verification: Confirm New Recovery Contact",
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                  <h2 style="color: #FC7A00; margin-bottom: 16px;">E-Global Pay Security Guard</h2>
-                  <p>Hello,</p>
-                  <p>Use the Stage 2 verification code below sent directly to this NEW ${safeTypeLower} to complete registration of your new recovery contact:</p>
-                  <div style="background-color: #f4f4f4; padding: 15px; font-size: 26px; font-weight: bold; text-align: center; letter-spacing: 6px; color: #333; margin: 20px 0; border-radius: 4px;">
-                    ${safeRawOtp}
-                  </div>
-                  <p>This code confirms that you have direct control of this destination.</p>
+          const { sendEmail } = await import("@/lib/email-service");
+          const result = await sendEmail({
+            to: stage2Destination,
+            subject: "Security Verification: Confirm New Recovery Contact",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #FC7A00; margin-bottom: 16px;">E-Global Pay Security Guard</h2>
+                <p>Hello,</p>
+                <p>Use the Stage 2 verification code below sent directly to this NEW ${safeTypeLower} to complete registration of your new recovery contact:</p>
+                <div style="background-color: #f4f4f4; padding: 15px; font-size: 26px; font-weight: bold; text-align: center; letter-spacing: 6px; color: #333; margin: 20px 0; border-radius: 4px;">
+                  ${safeRawOtp}
                 </div>
-              `,
-            });
-            dispatchedStage2 = result;
-          } catch {
-            dispatchedStage2 = false;
-          }
+                <p>This code confirms that you have direct control of this destination.</p>
+              </div>
+            `,
+          });
+          dispatchedStage2 = result;
+        } catch {
+          dispatchedStage2 = false;
         }
-
-        if (!dispatchedStage2) {
-          return NextResponse.json({ error: `Failed to deliver verification code to your NEW ${stage2Channel} destination. Please check the address/number and try again.` }, { status: 502 });
-        }
-
-        return NextResponse.json({
-          success: true,
-          stage: "VERIFY_NEW_CONTACT",
-          message: `Stage 1 authorized! Verification code sent to your NEW ${stage2Channel} (${stage2Channel === "phone" ? maskPhone(stage2Destination) : maskEmail(stage2Destination)}). Please enter the code to complete update.`,
-          requestId,
-          maskedNewContact: stage2Channel === "phone" ? maskPhone(stage2Destination) : maskEmail(stage2Destination),
-        });
       }
+
+      if (!dispatchedStage2) {
+        return NextResponse.json({ error: `Failed to deliver verification code to your NEW ${stage2Channel} destination. Please check the address/number and try again.` }, { status: 502 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        stage: "VERIFY_NEW_CONTACT",
+        message: `Stage 1 authorized! Verification code sent to your NEW ${stage2Channel} (${stage2Channel === "phone" ? maskPhone(stage2Destination) : maskEmail(stage2Destination)}). Please enter the code to complete update.`,
+        requestId,
+        maskedNewContact: stage2Channel === "phone" ? maskPhone(stage2Destination) : maskEmail(stage2Destination),
+      });
     }
 
     // =========================================================================
     // STEP 3: VERIFY NEW UNVERIFIED DESTINATION OTP & ATOMICALLY PROMOTE NEW CONTACT
     // =========================================================================
-    if (action === "verify_new_contact" || action === "verify_change") {
+    if (action === "verify_new_contact") {
       if (!requestId || !otpCode) {
         return NextResponse.json({ error: "Missing requestId or otpCode." }, { status: 400 });
       }
