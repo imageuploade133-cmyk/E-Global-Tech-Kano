@@ -397,7 +397,7 @@ export function NewDeviceOtpModal({
             )}
           </button>
 
-          {/* Report to Support Button */}
+          {/* Report and Support Button */}
           <button
             type="button"
             onClick={() => {
@@ -405,10 +405,10 @@ export function NewDeviceOtpModal({
                 window.location.href = "/support";
               }
             }}
-            className="w-full py-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="w-full py-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-[#FC7A00]/30 text-[#FC7A00] font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-sm">gavel</span>
-            <span>Didn&apos;t attempt login? Report to Support</span>
+            <span className="material-symbols-outlined text-sm">support_agent</span>
+            <span>Report and Support</span>
           </button>
         </div>
 
