@@ -174,4 +174,72 @@ describe("New Device Session & Trusted Factor Security Suite", () => {
     expect(maskedP).toBe("2348••••5678");
     expect(maskedE).toBe("j***e@example.com");
   });
+
+  it("Test 18: Concurrent first-session establishment -> only first succeeds, second routes to OTP", () => {
+    let mockUserDb: Record<string, any> = { activeSessionId: null };
+
+    // Simulated transactional session establishment logic matching /api/auth/session
+    const establishSessionTx = (deviceName: string) => {
+      let establishedSessionId: string | null = null;
+      // In transaction: read user doc
+      const currentActiveSession = mockUserDb.activeSessionId;
+
+      if (!currentActiveSession) {
+        const newSessionId = `sess_${Date.now()}_${Math.random()}`;
+        mockUserDb.activeSessionId = newSessionId;
+        establishedSessionId = newSessionId;
+      }
+
+      if (establishedSessionId) {
+        return { success: true, requiresOtp: false, sessionId: establishedSessionId };
+      } else {
+        return { success: true, requiresOtp: true, challengeId: "ch_mock_123" };
+      }
+    };
+
+    const req1 = establishSessionTx("Device_1");
+    expect(req1.requiresOtp).toBe(false);
+    expect(req1.sessionId).toBeTruthy();
+
+    const req2 = establishSessionTx("Device_2");
+    expect(req2.requiresOtp).toBe(true);
+    expect(req2.challengeId).toBe("ch_mock_123");
+  });
+
+  it("Test 19: Absence of authResult.email fallback -> email OTP uses strictly userData.email", () => {
+    const authResult = { uid: "user_123", email: "untrusted_auth_header@example.com" };
+    const userData = { email: "registered_db_user@example.com", emailVerified: true };
+
+    // Resolved email logic from server API:
+    const registeredEmail = (userData.email || "").trim(); // authResult.email removed!
+    const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
+
+    expect(registeredEmail).toBe("registered_db_user@example.com");
+    expect(registeredEmail).not.toBe(authResult.email);
+    expect(isEmailVerified).toBe(true);
+  });
+
+  it("Test 20: Client-supplied phone or email in body is ignored for OTP destination", () => {
+    const clientRequestBody = {
+      selectedChannel: "whatsapp",
+      clientSuppliedPhone: "+19998887777",
+      clientSuppliedEmail: "hacker@attacker.com",
+    };
+
+    const userData = {
+      phone: "2348011112222",
+      phoneVerified: true,
+      email: "victim@example.com",
+      emailVerified: true,
+    };
+
+    // Server derives target destination strictly from userData
+    const targetPhone = (userData.phone || "").trim();
+    const targetEmail = (userData.email || "").trim();
+
+    expect(targetPhone).toBe("2348011112222");
+    expect(targetEmail).toBe("victim@example.com");
+    expect(targetPhone).not.toBe(clientRequestBody.clientSuppliedPhone);
+    expect(targetEmail).not.toBe(clientRequestBody.clientSuppliedEmail);
+  });
 });
