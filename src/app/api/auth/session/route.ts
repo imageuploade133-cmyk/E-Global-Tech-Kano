@@ -120,10 +120,7 @@ export async function POST(req: Request) {
       const challengeRef = adminDb.collection("new_device_challenges").doc(challengeId);
 
       const newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
-      let previousSessionId: string | null = null;
-      let prevDeviceName: string | null = null;
-
-      await adminDb.runTransaction(async (transaction) => {
+      const txRes = await adminDb.runTransaction(async (transaction) => {
         const challengeSnap = await transaction.get(challengeRef);
         if (!challengeSnap.exists) {
           throw new Error("CHALLENGE_INVALID: Security challenge document not found.");
@@ -176,11 +173,13 @@ export async function POST(req: Request) {
         });
 
         // Read previous active session metadata before replacing
+        let prevSessId: string | null = null;
+        let prevDevName: string | null = null;
         const userDoc = await transaction.get(userRef);
         if (userDoc.exists) {
           const uData = userDoc.data() || {};
-          previousSessionId = uData.activeSessionId || null;
-          prevDeviceName = uData.activeSessionDevice || null;
+          prevSessId = uData.activeSessionId || null;
+          prevDevName = uData.activeSessionDevice || null;
         }
 
         // Atomically activate new session
@@ -189,7 +188,7 @@ export async function POST(req: Request) {
           activeSessionCreatedAt: nowIso,
           activeSessionDevice: deviceName,
           activeSessionUserAgent: userAgent,
-          previousSessionDevice: prevDeviceName,
+          previousSessionDevice: prevDevName,
           previousSessionRevokedAt: nowIso,
           updatedAt: nowIso,
         }, { merge: true });
@@ -203,7 +202,11 @@ export async function POST(req: Request) {
           deviceName,
           timestamp: nowIso,
         });
+
+        return { previousSessionId: prevSessId, prevDeviceName: prevDevName };
       });
+
+      const previousSessionId = txRes.previousSessionId;
 
       // Target FCM tokens belonging to the previous active session strictly; EXCLUDE new active device session ID
       if (previousSessionId && previousSessionId !== newSessionId) {
@@ -257,12 +260,8 @@ export async function POST(req: Request) {
 
       const challengeRef = adminDb.collection("new_device_challenges").doc(challengeId);
 
-      let targetChannel: "whatsapp" | "email" = "whatsapp";
-      let targetDestination = "";
-      let rawOtp = "";
-
       // Execute race-safe transactional check and update
-      await adminDb.runTransaction(async (transaction) => {
+      const resendRes = await adminDb.runTransaction(async (transaction) => {
         const challengeSnap = await transaction.get(challengeRef);
         if (!challengeSnap.exists) {
           throw new Error("CHALLENGE_INVALID: Security challenge document not found.");
@@ -299,47 +298,54 @@ export async function POST(req: Request) {
         const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
         const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
 
+        let channelToUse: "whatsapp" | "email" = "whatsapp";
+        let destToUse = "";
+
         // Server-side channel verification: require target channel to be explicitly verified
         if (selectedChannel === "email") {
           if (!isEmailVerified) {
             throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: Email channel is not explicitly verified on this account.");
           }
-          targetChannel = "email";
-          targetDestination = registeredEmail;
+          channelToUse = "email";
+          destToUse = registeredEmail;
         } else if (selectedChannel === "whatsapp") {
           if (!isPhoneVerified) {
             throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: WhatsApp channel is not explicitly verified on this account.");
           }
-          targetChannel = "whatsapp";
-          targetDestination = registeredPhone;
+          channelToUse = "whatsapp";
+          destToUse = registeredPhone;
         } else {
           // Default based on verified status
           if (isPhoneVerified) {
-            targetChannel = "whatsapp";
-            targetDestination = registeredPhone;
+            channelToUse = "whatsapp";
+            destToUse = registeredPhone;
           } else if (isEmailVerified) {
-            targetChannel = "email";
-            targetDestination = registeredEmail;
+            channelToUse = "email";
+            destToUse = registeredEmail;
           } else {
             throw new Error("CHALLENGE_NO_VERIFIED_CHANNEL: No verified contact channels available on this account.");
           }
         }
 
-        rawOtp = crypto.randomInt(100000, 999999).toString();
-        const otpHash = hashOtp(rawOtp);
+        const generatedOtp = crypto.randomInt(100000, 999999).toString();
+        const otpHash = hashOtp(generatedOtp);
         const expiresAtMs = now + 5 * 60 * 1000; // 5 minutes
 
         transaction.update(challengeRef, {
           otpHash,
-          channel: targetChannel,
-          destination: targetDestination,
+          channel: channelToUse,
+          destination: destToUse,
           lastSentAtMs: now,
           expiresAtMs,
           attempts: 0, // Reset single-code attempt count for new OTP
           // totalFailedAttempts is PRESERVED and NOT reset across resends!
           updatedAt: nowIso,
         });
+
+        return { targetChannel: channelToUse, targetDestination: destToUse, rawOtp: generatedOtp };
       });
+
+      const { targetChannel, targetDestination, rawOtp } = resendRes;
 
       const dispatched = await dispatchOtpToChannel(targetChannel, targetDestination, rawOtp, uid);
 
@@ -360,14 +366,11 @@ export async function POST(req: Request) {
     // =========================================================================
     // ACTION 3: INITIAL ESTABLISHMENT (DETECT EXISTING SESSION & GATE WITH OTP)
     // =========================================================================
-    let establishedSessionId: string | null = null;
-    let userData: Record<string, any> = {};
-
-    await adminDb.runTransaction(async (transaction) => {
+    const establishResult = await adminDb.runTransaction(async (transaction) => {
       const userSnap = await transaction.get(userRef);
-      userData = userSnap.exists ? userSnap.data() || {} : {};
+      const uData = userSnap.exists ? userSnap.data() || {} : {};
 
-      const currentActiveSession = userData.activeSessionId as string | undefined;
+      const currentActiveSession = uData.activeSessionId as string | undefined;
 
       if (!currentActiveSession) {
         // First active session creation inside transaction
@@ -380,9 +383,13 @@ export async function POST(req: Request) {
           updatedAt: nowIso,
         }, { merge: true });
 
-        establishedSessionId = newSessionId;
+        return { establishedSessionId: newSessionId, userData: uData };
       }
+
+      return { establishedSessionId: null, userData: uData };
     });
+
+    const { establishedSessionId, userData } = establishResult;
 
     // IF NO ACTIVE SESSION EXISTED -> Normal First Device Login Established Atomically
     if (establishedSessionId) {
@@ -571,7 +578,6 @@ export async function DELETE(req: Request) {
     const nowIso = new Date().toISOString();
 
     // Atomically clear active session ONLY IF the provided X-Session-ID matches the currently active server session
-    let revoked = false;
     await adminDb.runTransaction(async (transaction) => {
       const userDoc = await transaction.get(userRef);
       if (!userDoc.exists) {
@@ -589,8 +595,7 @@ export async function DELETE(req: Request) {
         activeSessionRevokedAt: nowIso,
         updatedAt: nowIso,
       });
-
-      revoked = true;
+      return true;
     });
 
     console.log(`[Session API] Atomically revoked active session for user ${uid}`);

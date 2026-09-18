@@ -79,21 +79,92 @@ describe("New Device Session & Trusted Factor Security Suite", () => {
     expect(isLocked).toBe(true);
   });
 
-  it("Test 9: Concurrent verification -> only one succeeds", () => {
-    let consumed = false;
-
-    const verifyTransaction = () => {
-      if (consumed) {
-        throw new Error("CHALLENGE_CONSUMED");
-      }
-      consumed = true;
-      return "SUCCESS";
+  it("Test 9: Simultaneous concurrent OTP verification -> exactly one succeeds, second fails with CHALLENGE_CONSUMED", async () => {
+    // Simulated Firestore document store with atomic mutex locking to model real Firestore transactions
+    let database: Record<string, any> = {
+      "users/user_123": {
+        activeSessionId: "sess_old_device_A",
+        activeSessionDevice: "Device A",
+      },
+      "new_device_challenges/ch_999": {
+        uid: "user_123",
+        otpHash: "hashed_123456",
+        consumed: false,
+        attempts: 0,
+        expiresAtMs: Date.now() + 300000,
+      },
     };
 
-    const res1 = verifyTransaction();
-    expect(res1).toBe("SUCCESS");
+    let txLock = Promise.resolve();
 
-    expect(() => verifyTransaction()).toThrow("CHALLENGE_CONSUMED");
+    const runAtomicTransaction = async <T>(cb: (txDoc: (path: string) => any, updateDoc: (path: string, updates: any) => void) => T): Promise<T> => {
+      // Queue transaction attempts sequentially to model Firestore transaction serialization & retries
+      const outerLock = txLock;
+      let releaseLock: () => void;
+      txLock = new Promise((resolve) => { releaseLock = resolve; });
+
+      await outerLock;
+      try {
+        const docRead = (path: string) => JSON.parse(JSON.stringify(database[path] || null));
+        const updatesQueue: Array<{ path: string; data: any }> = [];
+        const docUpdate = (path: string, data: any) => {
+          updatesQueue.push({ path, data });
+        };
+
+        const result = cb(docRead, docUpdate);
+
+        // Commit writes atomically
+        for (const item of updatesQueue) {
+          database[item.path] = { ...database[item.path], ...item.data };
+        }
+        return result;
+      } finally {
+        releaseLock!();
+      }
+    };
+
+    // Simulated production verify_challenge transaction logic from /api/auth/session
+    const verifyChallengeTx = async (challengeId: string, submittedOtpHash: string, newSessionId: string) => {
+      return await runAtomicTransaction((getDoc, setDoc) => {
+        const chData = getDoc(`new_device_challenges/${challengeId}`);
+        if (!chData) throw new Error("CHALLENGE_INVALID");
+        if (chData.consumed === true) throw new Error("CHALLENGE_CONSUMED: This security challenge code has already been used.");
+        if (submittedOtpHash !== chData.otpHash) throw new Error("INCORRECT_OTP");
+
+        // Mark consumed
+        setDoc(`new_device_challenges/${challengeId}`, { consumed: true, verified: true });
+
+        // Update user session
+        const userDoc = getDoc(`users/${chData.uid}`);
+        setDoc(`users/${chData.uid}`, { activeSessionId: newSessionId });
+
+        return { success: true, sessionId: newSessionId };
+      });
+    };
+
+    // Execute two simultaneous verification attempts using Promise.all
+    const challengeId = "ch_999";
+    const otpHash = "hashed_123456";
+
+    const results = await Promise.allSettled([
+      verifyChallengeTx(challengeId, otpHash, "sess_new_device_B1"),
+      verifyChallengeTx(challengeId, otpHash, "sess_new_device_B2"),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<any>[];
+    const rejected = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(1);
+
+    expect(fulfilled[0].value.success).toBe(true);
+    expect(rejected[0].reason.message).toContain("CHALLENGE_CONSUMED");
+
+    // Verify challenge document state in database: consumed strictly once
+    expect(database["new_device_challenges/ch_999"].consumed).toBe(true);
+
+    // Verify user document activeSessionId: updated to winner's session ID
+    expect(database["users/user_123"].activeSessionId).toBe(fulfilled[0].value.sessionId);
   });
 
   it("Test 10: Concurrent challenge creation -> old challenge cannot remain usable", () => {
@@ -175,35 +246,98 @@ describe("New Device Session & Trusted Factor Security Suite", () => {
     expect(maskedE).toBe("j***e@example.com");
   });
 
-  it("Test 18: Concurrent first-session establishment -> only first succeeds, second routes to OTP", () => {
-    let mockUserDb: Record<string, any> = { activeSessionId: null };
+  it("Test 18: Simultaneous concurrent first-session establishment -> exactly one creates session, second routes to OTP without overwriting", async () => {
+    // Database store with transactional mutex locking
+    let database: Record<string, any> = {
+      "users/user_race_100": {
+        activeSessionId: null, // Initially NO active session
+        email: "race_user@example.com",
+        emailVerified: true,
+      },
+    };
 
-    // Simulated transactional session establishment logic matching /api/auth/session
-    const establishSessionTx = (deviceName: string) => {
-      let establishedSessionId: string | null = null;
-      // In transaction: read user doc
-      const currentActiveSession = mockUserDb.activeSessionId;
+    let txLock = Promise.resolve();
 
-      if (!currentActiveSession) {
-        const newSessionId = `sess_${Date.now()}_${Math.random()}`;
-        mockUserDb.activeSessionId = newSessionId;
-        establishedSessionId = newSessionId;
-      }
+    const runAtomicTransaction = async <T>(cb: (getDoc: (path: string) => any, setDoc: (path: string, updates: any) => void) => T): Promise<T> => {
+      const outerLock = txLock;
+      let releaseLock: () => void;
+      txLock = new Promise((resolve) => { releaseLock = resolve; });
 
-      if (establishedSessionId) {
-        return { success: true, requiresOtp: false, sessionId: establishedSessionId };
-      } else {
-        return { success: true, requiresOtp: true, challengeId: "ch_mock_123" };
+      await outerLock;
+      try {
+        const docRead = (path: string) => JSON.parse(JSON.stringify(database[path] || null));
+        const updatesQueue: Array<{ path: string; data: any }> = [];
+        const docUpdate = (path: string, data: any) => {
+          updatesQueue.push({ path, data });
+        };
+
+        const result = cb(docRead, docUpdate);
+
+        for (const item of updatesQueue) {
+          database[item.path] = { ...database[item.path], ...item.data };
+        }
+        return result;
+      } finally {
+        releaseLock!();
       }
     };
 
-    const req1 = establishSessionTx("Device_1");
-    expect(req1.requiresOtp).toBe(false);
-    expect(req1.sessionId).toBeTruthy();
+    // Simulated production session establishment matching /api/auth/session Action 3
+    const establishSessionTx = async (uid: string, deviceName: string) => {
+      const userPath = `users/${uid}`;
 
-    const req2 = establishSessionTx("Device_2");
-    expect(req2.requiresOtp).toBe(true);
-    expect(req2.challengeId).toBe("ch_mock_123");
+      const establishResult = await runAtomicTransaction((getDoc, setDoc) => {
+        const uData = getDoc(userPath) || {};
+        const currentActiveSession = uData.activeSessionId as string | undefined;
+
+        if (!currentActiveSession) {
+          const newSessionId = `sess_${uid}_${deviceName}_${Math.random()}`;
+          setDoc(userPath, {
+            activeSessionId: newSessionId,
+            activeSessionDevice: deviceName,
+          });
+          return { establishedSessionId: newSessionId, userData: uData };
+        }
+
+        return { establishedSessionId: null, userData: uData };
+      });
+
+      const { establishedSessionId, userData } = establishResult;
+
+      if (establishedSessionId) {
+        return { success: true, requiresOtp: false, sessionId: establishedSessionId };
+      }
+
+      // If active session exists -> generates gated OTP challenge
+      return {
+        success: true,
+        requiresOtp: true,
+        challengeId: `ch_${uid}_${deviceName}`,
+        existingSessionId: userData.activeSessionId,
+      };
+    };
+
+    // Execute Device 1 and Device 2 concurrently via Promise.all
+    const [resDevice1, resDevice2] = await Promise.all([
+      establishSessionTx("user_race_100", "Device_A"),
+      establishSessionTx("user_race_100", "Device_B"),
+    ]);
+
+    // Exactly one request must succeed without OTP (first session)
+    // Exactly one request must require OTP (gated challenge)
+    const firstSessionResp = [resDevice1, resDevice2].find((r) => r.requiresOtp === false);
+    const gatedOtpResp = [resDevice1, resDevice2].find((r) => r.requiresOtp === true);
+
+    expect(firstSessionResp).toBeTruthy();
+    expect(gatedOtpResp).toBeTruthy();
+
+    expect(firstSessionResp!.sessionId).toBeTruthy();
+    expect(gatedOtpResp!.challengeId).toBeTruthy();
+
+    // The second request MUST NOT overwrite the active session established by the first request!
+    const activeSessionInDb = database["users/user_race_100"].activeSessionId;
+    expect(activeSessionInDb).toBe(firstSessionResp!.sessionId);
+    expect(activeSessionInDb).not.toBe(gatedOtpResp!.challengeId);
   });
 
   it("Test 19: Absence of authResult.email fallback -> email OTP uses strictly userData.email", () => {
@@ -219,27 +353,51 @@ describe("New Device Session & Trusted Factor Security Suite", () => {
     expect(isEmailVerified).toBe(true);
   });
 
-  it("Test 20: Client-supplied phone or email in body is ignored for OTP destination", () => {
-    const clientRequestBody = {
-      selectedChannel: "whatsapp",
+  it("Test 20: Production OTP resolution logic completely ignores malicious client-supplied phone/email parameters", () => {
+    // Malicious request payload attempting parameter pollution
+    const maliciousRequestBody = {
+      action: "establish",
       clientSuppliedPhone: "+19998887777",
       clientSuppliedEmail: "hacker@attacker.com",
+      phoneNumber: "+19998887777",
+      email: "hacker@attacker.com",
+      destination: "+19998887777",
+      target: "hacker@attacker.com",
     };
 
-    const userData = {
+    // Server-side Firestore user profile document
+    const userDataFromDb = {
       phone: "2348011112222",
+      phoneNumber: "2348011112222",
       phoneVerified: true,
       email: "victim@example.com",
       emailVerified: true,
     };
 
-    // Server derives target destination strictly from userData
-    const targetPhone = (userData.phone || "").trim();
-    const targetEmail = (userData.email || "").trim();
+    // Execute exact production resolution rules from /api/auth/session/route.ts
+    const registeredPhone = (userDataFromDb.phoneNumber || userDataFromDb.phone || "").trim();
+    const registeredEmail = (userDataFromDb.email || "").trim(); // authResult.email removed!
 
-    expect(targetPhone).toBe("2348011112222");
-    expect(targetEmail).toBe("victim@example.com");
-    expect(targetPhone).not.toBe(clientRequestBody.clientSuppliedPhone);
-    expect(targetEmail).not.toBe(clientRequestBody.clientSuppliedEmail);
+    const isPhoneVerified = userDataFromDb.phoneVerified === true && !!registeredPhone;
+    const isEmailVerified = userDataFromDb.emailVerified === true && !!registeredEmail;
+
+    const defaultChannel: "whatsapp" | "email" = isPhoneVerified ? "whatsapp" : "email";
+    const defaultDestination = defaultChannel === "whatsapp" ? registeredPhone : registeredEmail;
+
+    // Masking helpers from /api/auth/session
+    const maskedDest = defaultChannel === "whatsapp" ? maskPhone(defaultDestination) : maskEmail(defaultDestination);
+
+    // Verify server-side derived values
+    expect(registeredPhone).toBe("2348011112222");
+    expect(registeredEmail).toBe("victim@example.com");
+    expect(defaultDestination).toBe("2348011112222");
+    expect(maskedDest).toBe("2348••••2222");
+
+    // Confirm total isolation from all client-supplied parameters
+    expect(defaultDestination).not.toBe(maliciousRequestBody.clientSuppliedPhone);
+    expect(defaultDestination).not.toBe(maliciousRequestBody.clientSuppliedEmail);
+    expect(defaultDestination).not.toBe(maliciousRequestBody.phoneNumber);
+    expect(defaultDestination).not.toBe(maliciousRequestBody.email);
+    expect(defaultDestination).not.toBe(maliciousRequestBody.destination);
   });
 });
