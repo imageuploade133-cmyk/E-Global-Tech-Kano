@@ -502,13 +502,19 @@ describe("New Device Session & Trusted Factor Security Suite", () => {
     expect(targetDestination).not.toBe(maliciousPayload.target);
   });
 
-  it("Test 21: CPanel Administrators in admin_users bypass new device OTP gating", () => {
-    const isAdminUser = true; // Account present in admin_users collection
+  it("Test 21: CPanel Administrators accessing the public wallet app undergo new-device OTP verification using admin_users contacts", () => {
+    const adminUserData = { email: "admin@eglobalpay.com", phone: "+2348000000000" };
     const activeSessionAlreadyExists = true;
 
-    // Admin bypass logic
-    const requiresOtp = isAdminUser ? false : activeSessionAlreadyExists;
+    const registeredEmail = (adminUserData.email || "").trim();
+    const registeredPhone = (adminUserData.phone || "").trim();
 
-    expect(requiresOtp).toBe(false);
+    const isPhoneVerified = !!registeredPhone;
+    const isEmailVerified = !!registeredEmail;
+    const requiresOtp = activeSessionAlreadyExists;
+
+    expect(requiresOtp).toBe(true);
+    expect(isPhoneVerified).toBe(true);
+    expect(isEmailVerified).toBe(true);
   });
 });
