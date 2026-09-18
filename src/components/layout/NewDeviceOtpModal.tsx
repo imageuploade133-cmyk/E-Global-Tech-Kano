@@ -215,42 +215,85 @@ export function NewDeviceOtpModal({
             A new device is logging into your account. We sent a 6-digit verification code to your verified channel:
           </p>
 
-          {/* Channel Selector Pills */}
-          {channels.length > 1 && (
-            <div className="grid grid-cols-2 gap-2 w-full mb-6">
-              {channels.map((ch) => {
-                const isActive = ch.type === activeChannel;
-                return (
-                  <button
-                    key={ch.type}
-                    type="button"
-                    onClick={() => handleResendOrSwitchChannel(ch.type)}
-                    disabled={resending}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-[#FC7A00] border-[#FC7A00] text-white shadow-md shadow-[#FC7A00]/20"
-                        : "bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-sm">
-                      {ch.type === "whatsapp" ? "chat" : "mail"}
-                    </span>
-                    <span className="truncate">{ch.masked}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Explicit Full-Width Channel Selector Cards */}
+          <div className="w-full space-y-2.5 mb-6">
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider text-left pl-1">
+              Select Verification Method
+            </p>
+            <div className="grid grid-cols-1 gap-2.5 w-full">
+              {/* Phone Number OTP Option */}
+              {channels.some(c => c.type === "whatsapp") && (
+                <button
+                  type="button"
+                  onClick={() => handleResendOrSwitchChannel("whatsapp")}
+                  disabled={resending}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                    activeChannel === "whatsapp"
+                      ? "bg-[#FC7A00]/15 border-[#FC7A00] text-white shadow-lg shadow-[#FC7A00]/10 ring-1 ring-[#FC7A00]"
+                      : "bg-slate-800/80 border-slate-700/80 text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      activeChannel === "whatsapp" ? "bg-[#FC7A00] text-white" : "bg-slate-700 text-slate-300"
+                    }`}>
+                      <span className="material-symbols-outlined text-xl">smartphone</span>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">Phone Number OTP</p>
+                      <p className="text-[11px] text-slate-300 font-mono">
+                        {channels.find(c => c.type === "whatsapp")?.masked || activeDestination}
+                      </p>
+                    </div>
+                  </div>
+                  {activeChannel === "whatsapp" && (
+                    <span className="material-symbols-outlined text-[#FC7A00] text-xl">check_circle</span>
+                  )}
+                </button>
+              )}
 
-          {/* Destination Callout Box */}
+              {/* Email OTP Option */}
+              {channels.some(c => c.type === "email") && (
+                <button
+                  type="button"
+                  onClick={() => handleResendOrSwitchChannel("email")}
+                  disabled={resending}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                    activeChannel === "email"
+                      ? "bg-[#FC7A00]/15 border-[#FC7A00] text-white shadow-lg shadow-[#FC7A00]/10 ring-1 ring-[#FC7A00]"
+                      : "bg-slate-800/80 border-slate-700/80 text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      activeChannel === "email" ? "bg-[#FC7A00] text-white" : "bg-slate-700 text-slate-300"
+                    }`}>
+                      <span className="material-symbols-outlined text-xl">mail</span>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">Email OTP</p>
+                      <p className="text-[11px] text-slate-300 font-mono">
+                        {channels.find(c => c.type === "email")?.masked || activeDestination}
+                      </p>
+                    </div>
+                  </div>
+                  {activeChannel === "email" && (
+                    <span className="material-symbols-outlined text-[#FC7A00] text-xl">check_circle</span>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Active Status Callout */}
           <div className="p-3.5 rounded-2xl bg-slate-800/90 border border-slate-700/80 w-full mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-[#FC7A00] text-lg">
-                {activeChannel === "whatsapp" ? "chat" : "mail"}
+                {activeChannel === "whatsapp" ? "smartphone" : "mail"}
               </span>
               <div className="text-left">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  Sending via {activeChannel.toUpperCase()}
+                  Active Channel: {activeChannel === "whatsapp" ? "Phone Number OTP" : "Email OTP"}
                 </p>
                 <p className="text-xs font-bold text-white font-mono">{activeDestination}</p>
               </div>
