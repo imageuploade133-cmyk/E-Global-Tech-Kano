@@ -12,6 +12,7 @@ import { SupportNoticeSection } from "@/components/support/SupportNoticeSection"
 import { ContactHotlinesSection } from "@/components/support/ContactHotlinesSection";
 import { QuickDisputeSection } from "@/components/support/QuickDisputeSection";
 import { SupportFaqSection } from "@/components/support/SupportFaqSection";
+import { SupportChatSection } from "@/components/support/SupportChatSection";
 
 export default function SupportPage() {
   const { userData, user } = useAuth();
@@ -85,6 +86,9 @@ export default function SupportPage() {
 
           {/* Premium Hero Card */}
           <SupportHeroSection userName={userName} />
+
+          {/* Real-time Administrator Support Chat */}
+          <SupportChatSection />
 
           {/* Core Instruction Steps */}
           <SupportNoticeSection />
