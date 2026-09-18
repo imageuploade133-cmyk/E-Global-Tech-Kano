@@ -101,6 +101,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
     }
 
+    // Check if user is a CPanel Administrator in admin_users BEFORE any user-device gating
+    const adminSnap = await adminDb.collection("admin_users").doc(uid).get();
+    if (adminSnap.exists) {
+      console.log(`[Session API] Account ${uid} is a CPanel Administrator. Bypassing public user new-device OTP gating.`);
+      const adminSessionId = `sess_admin_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+
+      return NextResponse.json({
+        success: true,
+        requiresOtp: false,
+        sessionId: adminSessionId,
+        message: "Administrator active session established successfully.",
+      });
+    }
+
     const body = await req.json().catch(() => ({}));
     const action = body.action || "establish";
     const deviceName = body.deviceName || body.platform || "Web/Mobile Browser";
@@ -407,26 +421,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Check if account is a CPanel Administrator in admin_users -> Administrators bypass user new-device OTP gating
-    const adminSnap = await adminDb.collection("admin_users").doc(uid).get();
-    if (adminSnap.exists) {
-      console.log(`[Session API] Account ${uid} is a CPanel Administrator. Establishing session directly without user OTP challenge.`);
-      const adminSessionId = `sess_admin_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
-      await userRef.set({
-        activeSessionId: adminSessionId,
-        activeSessionCreatedAt: nowIso,
-        activeSessionDevice: deviceName,
-        activeSessionUserAgent: userAgent,
-        updatedAt: nowIso,
-      }, { merge: true });
-
-      return NextResponse.json({
-        success: true,
-        requiresOtp: false,
-        sessionId: adminSessionId,
-        message: "Administrator active session established successfully.",
-      });
-    }
 
     // IF AN ACTIVE SESSION ALREADY EXISTS -> GATED NEW-DEVICE OTP CHALLENGE REQUIRED!
     console.log(`[Session API] Active session already exists for user ${uid}. Generating New-Device Security Challenge...`);
