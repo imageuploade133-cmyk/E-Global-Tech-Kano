@@ -119,7 +119,7 @@ export async function POST(req: Request) {
 
       const challengeRef = adminDb.collection("new_device_challenges").doc(challengeId);
 
-      let newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+      const newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
       let previousSessionId: string | null = null;
       let prevDeviceName: string | null = null;
 
