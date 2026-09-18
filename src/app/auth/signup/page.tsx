@@ -62,7 +62,8 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
-  // WhatsApp OTP Verification States
+  // OTP Verification Channel Selector States ("whatsapp" | "email")
+  const [otpChannel, setOtpChannel] = useState<"whatsapp" | "email">("whatsapp");
   const [isOtpRequested, setIsOtpRequested] = useState(false);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const otpInputsRef = React.useRef<(HTMLInputElement | null)[]>([]);
@@ -124,40 +125,58 @@ export default function SignUpPage() {
     return () => clearInterval(timer);
   }, [otpCooldown]);
 
-  // Reset verification states if phone number or prefix changes
+  // Reset verification states if contact parameters or channel change
   useEffect(() => {
     setIsOtpVerified(false);
     setIsOtpRequested(false);
     setOtpDigits(["", "", "", "", "", ""]);
     setOtpError("");
-  }, [phonePrefix, phoneNumber]);
+  }, [phonePrefix, phoneNumber, email, otpChannel]);
 
-  const handleRequestOtp = async () => {
+  const handleRequestOtp = async (targetChannel: "whatsapp" | "email" = otpChannel) => {
     if (isSendingOtp || otpCooldown > 0) return;
 
-    if (!phoneNumber || phoneNumber.trim().length === 0) {
-      toast.error("Please enter your phone number first.");
-      return;
+    if (targetChannel === "whatsapp") {
+      if (!phoneNumber || phoneNumber.trim().length === 0) {
+        toast.error("Please enter your phone number first.");
+        return;
+      }
+
+      let cleanPhone = phoneNumber.trim().replace(/\D/g, "");
+      if (cleanPhone.startsWith("0")) {
+        cleanPhone = cleanPhone.slice(1);
+      }
+
+      const requiredLength = phonePrefix === "+234" ? 10 : 8;
+      if (cleanPhone.length < requiredLength) {
+        toast.error(`The phone number you entered is not up to the correct number of digits (should be exactly ${requiredLength} digits for ${phonePrefix === "+234" ? "Nigeria" : "Niger"}).`);
+        return;
+      }
+    } else {
+      if (!email || !email.includes("@")) {
+        toast.error("Please enter a valid email address first.");
+        return;
+      }
     }
+
+    setIsSendingOtp(true);
+    setOtpError("");
 
     let cleanPhone = phoneNumber.trim().replace(/\D/g, "");
     if (cleanPhone.startsWith("0")) {
       cleanPhone = cleanPhone.slice(1);
     }
 
-    const requiredLength = phonePrefix === "+234" ? 10 : 8;
-    if (cleanPhone.length < requiredLength) {
-      toast.error(`The phone number you entered is not up to the correct number of digits (should be exactly ${requiredLength} digits for ${phonePrefix === "+234" ? "Nigeria" : "Niger"}).`);
-      return;
-    }
-
-    setIsSendingOtp(true);
-    setOtpError("");
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phonePrefix, phoneNumber: cleanPhone }),
+        body: JSON.stringify({
+          channel: targetChannel,
+          phonePrefix,
+          phoneNumber: cleanPhone,
+          email: email.trim().toLowerCase(),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -166,16 +185,13 @@ export default function SignUpPage() {
       } else {
         setIsOtpRequested(true);
         setOtpCooldown(60);
-        toast.success("Verification code sent to WhatsApp!");
-        if (data.devFallback) {
-          toast.info("Local Test Mode: OTP logged to server terminal.");
-        }
+        toast.success(data.message || `Verification code sent to ${targetChannel === "whatsapp" ? "WhatsApp" : "Email"}!`);
         setTimeout(() => {
           otpInputsRef.current[0]?.focus();
         }, 150);
       }
     } catch (err) {
-      console.error("Error sending WhatsApp OTP:", err);
+      console.error("Error sending OTP:", err);
       toast.error("Failed to connect to the server.");
     } finally {
       setIsSendingOtp(false);
@@ -199,7 +215,13 @@ export default function SignUpPage() {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phonePrefix, phoneNumber: cleanPhone, otpCode }),
+        body: JSON.stringify({
+          channel: otpChannel,
+          phonePrefix,
+          phoneNumber: cleanPhone,
+          email: email.trim().toLowerCase(),
+          otpCode,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -207,10 +229,10 @@ export default function SignUpPage() {
         toast.error(data.error || "Incorrect code.");
       } else {
         setIsOtpVerified(true);
-        toast.success("WhatsApp number verified successfully!");
+        toast.success(data.message || "Account contact verified successfully!");
       }
     } catch (err) {
-      console.error("Error verifying WhatsApp OTP:", err);
+      console.error("Error verifying OTP:", err);
       toast.error("Failed to verify code.");
     } finally {
       setIsVerifyingOtp(false);
@@ -581,43 +603,113 @@ export default function SignUpPage() {
                 exit={{ opacity: 0, x: 10 }}
                 className="space-y-5"
               >
-                {/* Phone Input with WhatsApp Note */}
-                <div className="space-y-1.5 text-left">
-                  <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
-                  <div className="flex gap-2">
-                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
-                      <select
-                        id="phonePrefix"
-                        value={phonePrefix}
-                        onChange={(e) => setPhonePrefix(e.target.value)}
-                        className="bg-white border-0 rounded-[14px] px-3.5 py-3.5 outline-none text-xs font-black text-black appearance-none cursor-pointer"
-                        aria-label="Phone Prefix"
-                      >
-                        <option value="+234">🇳🇬 +234</option>
-                        <option value="+227">🇳🇪 +227</option>
-                      </select>
+                {/* Contact Inputs */}
+                <div className="space-y-4">
+                  {/* Phone Input */}
+                  <div className="space-y-1.5 text-left">
+                    <label htmlFor="phoneNumber" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Phone Number <span className="text-red-500">*</span></label>
+                    <div className="flex gap-2">
+                      <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                        <select
+                          id="phonePrefix"
+                          value={phonePrefix}
+                          onChange={(e) => setPhonePrefix(e.target.value)}
+                          className="bg-white border-0 rounded-[14px] px-3.5 py-3.5 outline-none text-xs font-black text-black appearance-none cursor-pointer"
+                          aria-label="Phone Prefix"
+                        >
+                          <option value="+234">🇳🇬 +234</option>
+                          <option value="+227">🇳🇪 +227</option>
+                        </select>
+                      </div>
+                      <div className="flex-grow p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                        <input
+                          id="phoneNumber"
+                          type="tel"
+                          required
+                          value={phoneNumber}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/\D/g, "");
+                            if (val.startsWith("0")) {
+                              val = val.slice(1);
+                            }
+                            setPhoneNumber(val);
+                          }}
+                          className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none font-mono"
+                          placeholder="8012345678"
+                        />
+                      </div>
                     </div>
-                    <div className="flex-grow p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
+                  </div>
+
+                  {/* Email Address Input */}
+                  <div className="space-y-1.5 text-left">
+                    <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address <span className="text-red-500">*</span></label>
+                    <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
                       <input
-                        id="phoneNumber"
-                        type="tel"
+                        id="email"
+                        type="email"
                         required
-                        value={phoneNumber}
-                        onChange={(e) => {
-                          let val = e.target.value.replace(/\D/g, "");
-                          if (val.startsWith("0")) {
-                            val = val.slice(1);
-                          }
-                          setPhoneNumber(val);
-                        }}
-                        className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none font-mono"
-                        placeholder="8012345678"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
+                        placeholder="doe@example.com"
                       />
                     </div>
                   </div>
-                  <p className="text-[9.5px] text-amber-600 font-bold leading-tight mt-1">
-                    ⚠️ Note: This phone number must be registered on WhatsApp to receive the verification OTP.
+                </div>
+
+                {/* Interactive Dual-Channel Verification Method Selector */}
+                <div className="space-y-3 text-left pt-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Choose Verification Method <span className="text-red-500">*</span>
                   </p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* WhatsApp Channel Card */}
+                    <button
+                      type="button"
+                      onClick={() => setOtpChannel("whatsapp")}
+                      className={cn(
+                        "p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-xs",
+                        otpChannel === "whatsapp"
+                          ? "bg-[#FC7A00]/10 border-[#FC7A00] text-[#FC7A00] ring-1 ring-[#FC7A00]"
+                          : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="material-symbols-outlined text-xl">chat</span>
+                        {otpChannel === "whatsapp" && (
+                          <span className="material-symbols-outlined text-base">check_circle</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-extrabold">WhatsApp OTP</p>
+                        <p className="text-[9.5px] opacity-80 font-medium">Verify via WhatsApp</p>
+                      </div>
+                    </button>
+
+                    {/* Email Channel Card */}
+                    <button
+                      type="button"
+                      onClick={() => setOtpChannel("email")}
+                      className={cn(
+                        "p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-xs",
+                        otpChannel === "email"
+                          ? "bg-[#FC7A00]/10 border-[#FC7A00] text-[#FC7A00] ring-1 ring-[#FC7A00]"
+                          : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="material-symbols-outlined text-xl">mail</span>
+                        {otpChannel === "email" && (
+                          <span className="material-symbols-outlined text-base">check_circle</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-extrabold">Email OTP</p>
+                        <p className="text-[9.5px] opacity-80 font-medium">Verify via Email</p>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
                 {/* OTP Request and Verify Control Panel */}
@@ -626,35 +718,46 @@ export default function SignUpPage() {
                     {!isOtpRequested ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                            <span className="material-symbols-outlined text-[16px] font-bold">chat</span>
+                          <div className="w-7 h-7 rounded-full bg-[#FC7A00]/15 flex items-center justify-center text-[#FC7A00] shrink-0">
+                            <span className="material-symbols-outlined text-[16px] font-bold">
+                              {otpChannel === "whatsapp" ? "chat" : "mail"}
+                            </span>
                           </div>
                           <div>
-                            <p className="text-[11px] font-black uppercase tracking-wider text-gray-800">WhatsApp Security Verification</p>
+                            <p className="text-[11px] font-black uppercase tracking-wider text-gray-800">
+                              {otpChannel === "whatsapp" ? "WhatsApp Verification" : "Email Verification"}
+                            </p>
                             <p className="text-[10px] text-gray-500 font-semibold">
-                              Send a 6-digit verification code to <span className="font-mono text-black font-bold">{phonePrefix} {phoneNumber || "your phone number"}</span>
+                              Send code to{" "}
+                              <span className="font-mono text-black font-bold">
+                                {otpChannel === "whatsapp" ? `${phonePrefix} ${phoneNumber || "your phone number"}` : (email || "your email address")}
+                              </span>
                             </p>
                           </div>
                         </div>
 
                         {/* Animated Loading Feedback Banner when sending OTP */}
                         {isSendingOtp ? (
-                          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 animate-pulse">
-                            <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center gap-3 animate-pulse">
+                            <div className="w-5 h-5 border-2 border-[#FC7A00] border-t-transparent rounded-full animate-spin shrink-0" />
                             <div className="space-y-0.5">
-                              <p className="text-[11px] font-black uppercase tracking-wide text-emerald-800">Dispatching WhatsApp OTP...</p>
-                              <p className="text-[10px] text-emerald-700 font-medium">Please wait while we connect to WhatsApp servers.</p>
+                              <p className="text-[11px] font-black uppercase tracking-wide text-amber-900">
+                                Dispatching {otpChannel === "whatsapp" ? "WhatsApp" : "Email"} OTP...
+                              </p>
+                              <p className="text-[10px] text-amber-800 font-medium">
+                                Please wait while we dispatch your verification code.
+                              </p>
                             </div>
                           </div>
                         ) : (
                           <button
                             type="button"
-                            disabled={!phoneNumber}
+                            disabled={otpChannel === "whatsapp" ? !phoneNumber : !email}
                             onClick={(e) => {
                               handleButtonClick(e);
-                              handleRequestOtp();
+                              handleRequestOtp(otpChannel);
                             }}
-                            className="relative overflow-hidden w-full bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:brightness-105 active:scale-98 text-white font-black py-3.5 px-4 rounded-xl text-xs uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                            className="relative overflow-hidden w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-98 text-white font-black py-3.5 px-4 rounded-xl text-xs uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                           >
                             {ripples.map((ripple) => (
                               <span
@@ -670,7 +773,7 @@ export default function SignUpPage() {
                               />
                             ))}
                             <span className="material-symbols-outlined text-[18px] font-bold">send</span>
-                            <span>Send OTP via WhatsApp</span>
+                            <span>Send OTP via {otpChannel === "whatsapp" ? "WhatsApp" : "Email"}</span>
                           </button>
                         )}
                       </div>
@@ -679,7 +782,9 @@ export default function SignUpPage() {
                         <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
                           <div className="flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-[16px] text-[#FC7A00] font-bold">mark_email_read</span>
-                            <p className="text-[11px] font-black uppercase tracking-wider text-black">Enter WhatsApp OTP</p>
+                            <p className="text-[11px] font-black uppercase tracking-wider text-black">
+                              Enter {otpChannel === "whatsapp" ? "WhatsApp" : "Email"} OTP
+                            </p>
                           </div>
                           {otpCooldown > 0 ? (
                             <span className="text-[10px] text-gray-500 font-mono font-bold bg-gray-200/60 px-2 py-0.5 rounded-full">Resend in {otpCooldown}s</span>
@@ -687,7 +792,7 @@ export default function SignUpPage() {
                             <button
                               type="button"
                               disabled={isSendingOtp}
-                              onClick={handleRequestOtp}
+                              onClick={() => handleRequestOtp(otpChannel)}
                               className="text-[10px] text-[#FC7A00] hover:underline font-extrabold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                             >
                               {isSendingOtp ? (
@@ -703,7 +808,10 @@ export default function SignUpPage() {
                         </div>
 
                         <p className="text-[10px] text-gray-500 font-medium">
-                          Enter the 6-digit code sent to <span className="font-mono text-black font-bold">{phonePrefix} {phoneNumber}</span> on WhatsApp.
+                          Enter the 6-digit code sent to{" "}
+                          <span className="font-mono text-black font-bold">
+                            {otpChannel === "whatsapp" ? `${phonePrefix} ${phoneNumber}` : email}
+                          </span>.
                         </p>
 
                         <div className="space-y-3">
@@ -762,27 +870,15 @@ export default function SignUpPage() {
                       <span className="material-symbols-outlined text-[18px] font-bold">verified</span>
                     </div>
                     <div className="space-y-0.5">
-                      <p className="text-[11px] font-black uppercase tracking-wider">WhatsApp Number Verified</p>
-                      <p className="text-[10px] text-emerald-700 font-semibold leading-tight">Your WhatsApp number is successfully secured and verified.</p>
+                      <p className="text-[11px] font-black uppercase tracking-wider">
+                        {otpChannel === "whatsapp" ? "WhatsApp Number Verified" : "Email Address Verified"}
+                      </p>
+                      <p className="text-[10px] text-emerald-700 font-semibold leading-tight">
+                        Your account contact details are successfully verified.
+                      </p>
                     </div>
                   </div>
                 )}
-
-                {/* Email Address */}
-                <div className="space-y-1.5 text-left">
-                  <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address <span className="text-red-500">*</span></label>
-                  <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
-                    <input
-                      id="email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
-                      placeholder="doe@example.com"
-                    />
-                  </div>
-                </div>
 
                 {/* Referral Account ID */}
                 <div className="space-y-1.5 text-left">
