@@ -432,13 +432,24 @@ export async function POST(req: Request) {
     // Default channel selection logic:
     // - verified phone exists -> WhatsApp default
     // - verified email exists (and no verified phone) -> email default
-    const defaultChannel: "whatsapp" | "email" = isPhoneVerified ? "whatsapp" : "email";
-    const defaultDestination = defaultChannel === "whatsapp" ? registeredPhone : registeredEmail;
+    let defaultChannel: "whatsapp" | "email" = isPhoneVerified ? "whatsapp" : "email";
+    let defaultDestination = defaultChannel === "whatsapp" ? registeredPhone : registeredEmail;
 
     const challengeId = `ch_${uid}_${Date.now()}_${crypto.randomBytes(8).toString("hex")}`;
     const rawOtp = crypto.randomInt(100000, 999999).toString();
     const otpHash = hashOtp(rawOtp);
     const expiresAtMs = now + 5 * 60 * 1000; // 5 minutes
+
+    // Attempt initial dispatch via primary channel (WhatsApp if available, or Email)
+    let dispatched = await dispatchOtpToChannel(defaultChannel, defaultDestination, rawOtp, uid);
+
+    // Automatic fallback: If primary WhatsApp dispatch fails, fall back to Email if email is available!
+    if (!dispatched && defaultChannel === "whatsapp" && isEmailVerified) {
+      console.warn(`[Session API] Primary WhatsApp OTP dispatch failed for user ${uid}. Executing automatic fallback to Email OTP.`);
+      defaultChannel = "email";
+      defaultDestination = registeredEmail;
+      dispatched = await dispatchOtpToChannel("email", registeredEmail, rawOtp, uid);
+    }
 
     const challengeDoc = {
       challengeId,
@@ -486,11 +497,9 @@ export async function POST(req: Request) {
       transaction.set(challengeRefNew, challengeDoc);
     });
 
-    const dispatched = await dispatchOtpToChannel(defaultChannel, defaultDestination, rawOtp, uid);
-
     if (!dispatched) {
-      await adminDb.collection("new_device_challenges").doc(challengeId).delete();
-      return NextResponse.json({ error: "Failed to deliver security verification OTP. Please ensure your recovery channel is active or try again later." }, { status: 502 });
+      await adminDb.collection("new_device_challenges").doc(challengeId).delete().catch(() => {});
+      return NextResponse.json({ error: "Failed to deliver security verification OTP. Please ensure your recovery channel is active or try switching channels." }, { status: 502 });
     }
 
     // Audit Log
@@ -507,14 +516,14 @@ export async function POST(req: Request) {
     if (isPhoneVerified) {
       channels.push({
         type: "whatsapp",
-        label: `WhatsApp (${maskPhone(registeredPhone)})`,
+        label: `Phone Number OTP (${maskPhone(registeredPhone)})`,
         masked: maskPhone(registeredPhone),
       });
     }
     if (isEmailVerified) {
       channels.push({
         type: "email",
-        label: `Email (${maskEmail(registeredEmail)})`,
+        label: `Email OTP (${maskEmail(registeredEmail)})`,
         masked: maskEmail(registeredEmail),
       });
     }
