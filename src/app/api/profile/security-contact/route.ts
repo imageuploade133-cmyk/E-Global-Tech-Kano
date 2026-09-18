@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     }
 
     let isPinMatch = false;
-    if (uid === "mock-uid") {
+    if (process.env.NODE_ENV !== "production" && uid === "mock-uid") {
       isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
     } else if (pinHash) {
       isPinMatch = bcrypt.compareSync(pin, pinHash);
