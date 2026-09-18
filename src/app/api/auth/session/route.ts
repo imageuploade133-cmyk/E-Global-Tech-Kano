@@ -123,7 +123,10 @@ export async function POST(req: Request) {
 
       const newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
       const txRes = await adminDb.runTransaction(async (transaction) => {
+        // MUST execute ALL Firestore reads BEFORE any write operations inside a transaction
         const challengeSnap = await transaction.get(challengeRef);
+        const userDoc = await transaction.get(userRef);
+
         if (!challengeSnap.exists) {
           throw new Error("CHALLENGE_INVALID: Security challenge document not found.");
         }
@@ -167,22 +170,21 @@ export async function POST(req: Request) {
           throw new Error(`INCORRECT_OTP: Incorrect verification code. You have ${remaining} attempt(s) remaining.`);
         }
 
-        // Mark challenge consumed atomically
-        transaction.update(challengeRef, {
-          consumed: true,
-          consumedAt: nowIso,
-          verified: true,
-        });
-
-        // Read previous active session metadata before replacing
+        // Extract previous session info from the userDoc read executed at top of transaction
         let prevSessId: string | null = null;
         let prevDevName: string | null = null;
-        const userDoc = await transaction.get(userRef);
         if (userDoc.exists) {
           const uData = userDoc.data() || {};
           prevSessId = uData.activeSessionId || null;
           prevDevName = uData.activeSessionDevice || null;
         }
+
+        // All reads complete -> execute writes
+        transaction.update(challengeRef, {
+          consumed: true,
+          consumedAt: nowIso,
+          verified: true,
+        });
 
         // Atomically activate new session
         transaction.set(userRef, {
