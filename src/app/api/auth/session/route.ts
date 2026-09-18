@@ -59,6 +59,9 @@ async function dispatchOtpToChannel(
     }
   } else {
     try {
+      const escapeHtml = (str: string) => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      const safeRawOtp = escapeHtml(rawOtp);
+
       const { sendEmail } = await import("@/lib/email-service");
       const result = await sendEmail({
         to: destination,
@@ -69,7 +72,7 @@ async function dispatchOtpToChannel(
             <p>Hello,</p>
             <p>A new device is attempting to log into your account. Use the 6-digit code below to verify and authorize this device:</p>
             <div style="background-color: #f4f4f4; padding: 15px; font-size: 26px; font-weight: bold; text-align: center; letter-spacing: 6px; color: #333; margin: 20px 0; border-radius: 4px;">
-              ${rawOtp}
+              ${safeRawOtp}
             </div>
             <p>This verification code expires in 5 minutes. Do not share this code with anyone.</p>
             <p style="color: #d9534f; font-size: 12px; margin-top: 24px;">If you did not initiate this login, please change your PIN and contact support immediately.</p>
@@ -247,58 +250,88 @@ export async function POST(req: Request) {
       }
 
       const challengeRef = adminDb.collection("new_device_challenges").doc(challengeId);
-      const challengeSnap = await challengeRef.get();
 
-      if (!challengeSnap.exists) {
-        return NextResponse.json({ error: "Invalid challenge ID." }, { status: 400 });
-      }
+      let targetChannel: "whatsapp" | "email" = "whatsapp";
+      let targetDestination = "";
+      let rawOtp = "";
 
-      const chData = challengeSnap.data() || {};
+      // Execute race-safe transactional check and update
+      await adminDb.runTransaction(async (transaction) => {
+        const challengeSnap = await transaction.get(challengeRef);
+        if (!challengeSnap.exists) {
+          throw new Error("CHALLENGE_INVALID: Security challenge document not found.");
+        }
 
-      if (chData.uid !== uid) {
-        return NextResponse.json({ error: "Forbidden: Challenge ownership mismatch." }, { status: 403 });
-      }
+        const chData = challengeSnap.data() || {};
 
-      if (chData.consumed === true) {
-        return NextResponse.json({ error: "Challenge already consumed. Please sign in again." }, { status: 400 });
-      }
+        if (chData.uid !== uid) {
+          throw new Error("CHALLENGE_INVALID: Challenge ownership mismatch.");
+        }
 
-      if (chData.attempts >= 3) {
-        return NextResponse.json({ error: "Too many failed attempts. Security challenge locked. Please generate a new login request." }, { status: 403 });
-      }
+        if (chData.consumed === true) {
+          throw new Error("CHALLENGE_CONSUMED: Challenge already consumed. Please sign in again.");
+        }
 
-      // Check 60-second resend cooldown
-      const lastSentAtMs = chData.lastSentAtMs || 0;
-      if (now - lastSentAtMs < 60000) {
-        const remaining = Math.ceil((60000 - (now - lastSentAtMs)) / 1000);
-        return NextResponse.json({ error: `Please wait ${remaining} second(s) before requesting a new code.` }, { status: 429 });
-      }
+        if (chData.attempts >= 3) {
+          throw new Error("CHALLENGE_LOCKED: Too many failed attempts. Security challenge locked. Please generate a new login request.");
+        }
 
-      const userSnap = await userRef.get();
-      const userData = userSnap.exists ? userSnap.data() || {} : {};
+        // Check 60-second resend cooldown inside transaction to prevent concurrent bypass
+        const lastSentAtMs = chData.lastSentAtMs || 0;
+        if (now - lastSentAtMs < 60000) {
+          const remaining = Math.ceil((60000 - (now - lastSentAtMs)) / 1000);
+          throw new Error(`CHALLENGE_COOLDOWN: Please wait ${remaining} second(s) before requesting a new code.`);
+        }
 
-      const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-      const registeredEmail = (userData.email || authResult.email || "").trim();
+        const userSnap = await transaction.get(userRef);
+        const userData = userSnap.exists ? userSnap.data() || {} : {};
 
-      const targetChannel = (selectedChannel === "email" && registeredEmail) ? "email" : "whatsapp";
-      const targetDestination = targetChannel === "email" ? registeredEmail : registeredPhone;
+        const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
+        const registeredEmail = (userData.email || authResult.email || "").trim();
 
-      if (!targetDestination) {
-        return NextResponse.json({ error: `No registered ${targetChannel} destination found on this profile.` }, { status: 400 });
-      }
+        const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
+        const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
 
-      const rawOtp = crypto.randomInt(100000, 999999).toString();
-      const otpHash = hashOtp(rawOtp);
-      const expiresAtMs = now + 5 * 60 * 1000; // 5 minutes
+        // Server-side channel verification: require target channel to be explicitly verified
+        if (selectedChannel === "email") {
+          if (!isEmailVerified) {
+            throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: Email channel is not explicitly verified on this account.");
+          }
+          targetChannel = "email";
+          targetDestination = registeredEmail;
+        } else if (selectedChannel === "whatsapp") {
+          if (!isPhoneVerified) {
+            throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: WhatsApp channel is not explicitly verified on this account.");
+          }
+          targetChannel = "whatsapp";
+          targetDestination = registeredPhone;
+        } else {
+          // Default based on verified status
+          if (isPhoneVerified) {
+            targetChannel = "whatsapp";
+            targetDestination = registeredPhone;
+          } else if (isEmailVerified) {
+            targetChannel = "email";
+            targetDestination = registeredEmail;
+          } else {
+            throw new Error("CHALLENGE_NO_VERIFIED_CHANNEL: No verified contact channels available on this account.");
+          }
+        }
 
-      await challengeRef.set({
-        otpHash,
-        channel: targetChannel,
-        destination: targetDestination,
-        lastSentAtMs: now,
-        expiresAtMs,
-        updatedAt: nowIso,
-      }, { merge: true });
+        rawOtp = crypto.randomInt(100000, 999999).toString();
+        const otpHash = hashOtp(rawOtp);
+        const expiresAtMs = now + 5 * 60 * 1000; // 5 minutes
+
+        transaction.update(challengeRef, {
+          otpHash,
+          channel: targetChannel,
+          destination: targetDestination,
+          lastSentAtMs: now,
+          expiresAtMs,
+          attempts: 0, // Reset attempt count for new OTP
+          updatedAt: nowIso,
+        });
+      });
 
       const dispatched = await dispatchOtpToChannel(targetChannel, targetDestination, rawOtp, uid);
 
@@ -361,38 +394,18 @@ export async function POST(req: Request) {
     const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
     const registeredEmail = (userData.email || authResult.email || "").trim();
 
-    // Verify channel is marked verified (defaulting true if user completed registration)
-    const isPhoneVerified = userData.phoneVerified !== false && !!registeredPhone;
-    const isEmailVerified = userData.emailVerified !== false && !!registeredEmail;
+    // Verify channel is explicitly verified (userData.phoneVerified === true / userData.emailVerified === true)
+    const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
+    const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
 
     if (!isPhoneVerified && !isEmailVerified) {
       return NextResponse.json({ error: "Security Error: No verified contact channels configured on your account. Please contact support." }, { status: 400 });
     }
 
-    // Check for recent active unexpired challenge created for this user in the last 60 seconds (rate limiting)
-    const existingChallenges = await adminDb.collection("new_device_challenges")
-      .where("uid", "==", uid)
-      .where("consumed", "==", false)
-      .get();
-
-    if (!existingChallenges.empty) {
-      for (const cDoc of existingChallenges.docs) {
-        const cData = cDoc.data();
-        if (cData.createdAtMs && now - cData.createdAtMs < 60000) {
-          const remaining = Math.ceil((60000 - (now - cData.createdAtMs)) / 1000);
-          return NextResponse.json({
-            error: `Security Rate Limit: Please wait ${remaining} second(s) before generating a new security challenge.`,
-            requiresOtp: true,
-            challengeId: cDoc.id,
-            channel: cData.channel,
-            maskedDestination: cData.channel === "whatsapp" ? maskPhone(cData.destination) : maskEmail(cData.destination),
-          }, { status: 429 });
-        }
-      }
-    }
-
-    // Default channel: WhatsApp if phone exists, otherwise Email
-    const defaultChannel: "whatsapp" | "email" = registeredPhone ? "whatsapp" : "email";
+    // Default channel selection logic:
+    // - verified phone exists -> WhatsApp default
+    // - verified email exists (and no verified phone) -> email default
+    const defaultChannel: "whatsapp" | "email" = isPhoneVerified ? "whatsapp" : "email";
     const defaultDestination = defaultChannel === "whatsapp" ? registeredPhone : registeredEmail;
 
     const challengeId = `ch_${uid}_${Date.now()}_${crypto.randomBytes(8).toString("hex")}`;
@@ -417,7 +430,33 @@ export async function POST(req: Request) {
       createdAt: nowIso,
     };
 
-    await adminDb.collection("new_device_challenges").doc(challengeId).set(challengeDoc);
+    // Execute race-safe creation & cooldown check inside a Firestore transaction
+    await adminDb.runTransaction(async (transaction) => {
+      const existingQuery = adminDb.collection("new_device_challenges")
+        .where("uid", "==", uid)
+        .where("consumed", "==", false);
+
+      const existingSnaps = await transaction.get(existingQuery);
+
+      if (!existingSnaps.empty) {
+        for (const cDoc of existingSnaps.docs) {
+          const cData = cDoc.data();
+          if (cData.createdAtMs && now - cData.createdAtMs < 60000) {
+            const remaining = Math.ceil((60000 - (now - cData.createdAtMs)) / 1000);
+            throw new Error(`CHALLENGE_COOLDOWN:${remaining}:${cDoc.id}:${cData.channel}:${cData.channel === "whatsapp" ? maskPhone(cData.destination) : maskEmail(cData.destination)}`);
+          }
+          // Invalidate/consume previous unconsumed challenges for this user so only 1 active challenge exists
+          transaction.update(cDoc.ref, {
+            consumed: true,
+            consumedReason: "SUPERSEDED_BY_NEW_CHALLENGE",
+            consumedAt: nowIso,
+          });
+        }
+      }
+
+      const challengeRefNew = adminDb.collection("new_device_challenges").doc(challengeId);
+      transaction.set(challengeRefNew, challengeDoc);
+    });
 
     const dispatched = await dispatchOtpToChannel(defaultChannel, defaultDestination, rawOtp, uid);
 
@@ -437,14 +476,14 @@ export async function POST(req: Request) {
     });
 
     const channels = [];
-    if (registeredPhone) {
+    if (isPhoneVerified) {
       channels.push({
         type: "whatsapp",
         label: `WhatsApp (${maskPhone(registeredPhone)})`,
         masked: maskPhone(registeredPhone),
       });
     }
-    if (registeredEmail) {
+    if (isEmailVerified) {
       channels.push({
         type: "email",
         label: `Email (${maskEmail(registeredEmail)})`,
@@ -467,12 +506,29 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("[Session API Exception]:", err.message);
     let userMsg = err.message || "Failed to process session request.";
+
+    if (err.message && err.message.startsWith("CHALLENGE_COOLDOWN:")) {
+      const parts = err.message.split(":");
+      const remaining = parts[1] || "60";
+      const challengeId = parts[2] || "";
+      const channel = parts[3] || "whatsapp";
+      const maskedDestination = parts[4] || "";
+
+      return NextResponse.json({
+        error: `Security Rate Limit: Please wait ${remaining} second(s) before generating a new security challenge.`,
+        requiresOtp: true,
+        challengeId,
+        channel,
+        maskedDestination,
+      }, { status: 429 });
+    }
+
     if (err.message && err.message.includes("INCORRECT_OTP")) {
       userMsg = err.message.replace("INCORRECT_OTP: ", "");
       return NextResponse.json({ error: userMsg }, { status: 400 });
     }
     if (err.message && err.message.includes("CHALLENGE_")) {
-      userMsg = err.message.replace(/CHALLENGE_[A-Z]+:\s*/, "");
+      userMsg = err.message.replace(/CHALLENGE_[A-Z_]+:\s*/, "");
       return NextResponse.json({ error: userMsg }, { status: 400 });
     }
     return NextResponse.json({ error: userMsg }, { status: 500 });

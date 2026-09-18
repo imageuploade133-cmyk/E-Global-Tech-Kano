@@ -32,7 +32,7 @@ const ButtonSpinner = () => (
 );
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, isPinVerified, userData, updateUserData } = useAuth();
+  const { user, loading, isPinVerified, userData, updateUserData, deviceAuthState } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
   const pathname = usePathname();
@@ -427,7 +427,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     };
   }, [user, userData]);
 
-  // Route protection rules for standard login status
+  // Route protection rules for standard login status & pending device verification
   useEffect(() => {
     const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
     if ((loading || (user && !userData)) && !isMock) return;
@@ -439,6 +439,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         router.push("/auth/login");
       }
     } else if (user && userData) {
+      // If user is authenticated but device verification is pending, restrict access completely
+      if (deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION") {
+        return; // Modal handles input; do not allow navigating into wallet routes
+      }
+
       const hasPin = Boolean(userData?.pin || userData?.pinHash);
       const isPinRequired = userData?.isPinRequired !== false;
 
@@ -465,7 +470,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         router.push("/");
       }
     }
-  }, [user, loading, isPinVerified, userData, pathname, router]);
+  }, [user, loading, isPinVerified, userData, pathname, router, deviceAuthState]);
 
 
   // Re-login trigger inside the Suspend Overlay

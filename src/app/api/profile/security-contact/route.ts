@@ -116,12 +116,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "contactType must be 'phone' or 'email'." }, { status: 400 });
       }
 
-      // Existing trusted contact destination
+      // Existing trusted contact destination - require explicit verification flag (=== true)
       const existingPhone = (userData.phoneNumber || userData.phone || "").trim();
       const existingEmail = (userData.email || authResult.email || "").trim();
+
+      const isPhoneVerified = userData.phoneVerified === true && !!existingPhone;
+      const isEmailVerified = userData.emailVerified === true && !!existingEmail;
+
+      const isTargetVerified = typeLower === "phone" ? isPhoneVerified : isEmailVerified;
       const existingTarget = typeLower === "phone" ? existingPhone : existingEmail;
 
-      if (!existingTarget) {
+      if (!isTargetVerified || !existingTarget) {
         return NextResponse.json({ error: `No current verified ${typeLower} found to authorize this security change.` }, { status: 400 });
       }
 
@@ -169,6 +174,11 @@ export async function POST(req: Request) {
         }
       } else {
         try {
+          const escapeHtml = (str: string) => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+          const safeTypeLower = escapeHtml(typeLower);
+          const safeNewContact = escapeHtml(newContact);
+          const safeRawOtp = escapeHtml(rawOtp);
+
           const { sendEmail } = await import("@/lib/email-service");
           const result = await sendEmail({
             to: existingTarget,
@@ -177,10 +187,10 @@ export async function POST(req: Request) {
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
                 <h2 style="color: #FC7A00; margin-bottom: 16px;">E-Global Pay Security Guard</h2>
                 <p>Hello,</p>
-                <p>A request was submitted to update your recovery ${typeLower} to <b>${newContact}</b>.</p>
+                <p>A request was submitted to update your recovery ${safeTypeLower} to <b>${safeNewContact}</b>.</p>
                 <p>Use the 6-digit code below to authorize this change:</p>
                 <div style="background-color: #f4f4f4; padding: 15px; font-size: 26px; font-weight: bold; text-align: center; letter-spacing: 6px; color: #333; margin: 20px 0; border-radius: 4px;">
-                  ${rawOtp}
+                  ${safeRawOtp}
                 </div>
                 <p>If you did not request this change, please ignore this message and change your PIN immediately.</p>
               </div>
@@ -271,13 +281,13 @@ export async function POST(req: Request) {
           consumedAt: nowIso,
         });
 
-        // Record Audit Log
+        // Record Audit Log with masked sensitive contact
         const auditRef = adminDb.collection("security_audit_logs").doc();
         transaction.set(auditRef, {
           uid,
           action: "SECURITY_CONTACT_PROMOTED",
           contactType: chData.contactType,
-          newContact: chData.newContact,
+          maskedContact: chData.contactType === "phone" ? maskPhone(chData.newContact) : maskEmail(chData.newContact),
           timestamp: nowIso,
         });
       });
