@@ -101,20 +101,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
     }
 
-    // Check if user is a CPanel Administrator in admin_users BEFORE any user-device gating
-    const adminSnap = await adminDb.collection("admin_users").doc(uid).get();
-    if (adminSnap.exists) {
-      console.log(`[Session API] Account ${uid} is a CPanel Administrator. Bypassing public user new-device OTP gating.`);
-      const adminSessionId = `sess_admin_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
-
-      return NextResponse.json({
-        success: true,
-        requiresOtp: false,
-        sessionId: adminSessionId,
-        message: "Administrator active session established successfully.",
-      });
-    }
-
     const body = await req.json().catch(() => ({}));
     const action = body.action || "establish";
     const deviceName = body.deviceName || body.platform || "Web/Mobile Browser";
@@ -310,8 +296,18 @@ export async function POST(req: Request) {
         const userSnap = await transaction.get(userRef);
         const userData = userSnap.exists ? userSnap.data() || {} : {};
 
-        const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-        const registeredEmail = (userData.email || authResult.email || "").trim();
+        // Resolve registered contact details from user document, admin_users document, or authResult token
+        let registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
+        let registeredEmail = (userData.email || authResult.email || "").trim();
+
+        if (!registeredPhone || !registeredEmail) {
+          const adminSnap = await transaction.get(adminDb.collection("admin_users").doc(uid));
+          if (adminSnap.exists) {
+            const adminData = adminSnap.data() || {};
+            if (!registeredPhone) registeredPhone = (adminData.phoneNumber || adminData.phone || "").trim();
+            if (!registeredEmail) registeredEmail = (adminData.email || authResult.email || "").trim();
+          }
+        }
 
         const isPhoneVerified = !!registeredPhone;
         const isEmailVerified = !!registeredEmail;
@@ -434,8 +430,18 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
-    const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-    const registeredEmail = (userData.email || authResult.email || "").trim();
+    // Resolve registered contact details from user document, admin_users document, or authResult token
+    let registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
+    let registeredEmail = (userData.email || authResult.email || "").trim();
+
+    if (!registeredPhone || !registeredEmail) {
+      const adminSnap = await adminDb.collection("admin_users").doc(uid).get();
+      if (adminSnap.exists) {
+        const adminData = adminSnap.data() || {};
+        if (!registeredPhone) registeredPhone = (adminData.phoneNumber || adminData.phone || "").trim();
+        if (!registeredEmail) registeredEmail = (adminData.email || authResult.email || "").trim();
+      }
+    }
 
     // Verify channel has valid destination registered on account
     // Any non-empty registered phone or email associated with the authenticated account acts as a valid factor
