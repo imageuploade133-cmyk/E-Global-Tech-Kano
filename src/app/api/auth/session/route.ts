@@ -10,8 +10,10 @@ const GATEWAY_API_KEY = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEW
 // Helper to mask sensitive destinations (e.g. 23480***1234 or j***s@gmail.com)
 function maskPhone(phone: string): string {
   const clean = phone.replace(/\D/g, "");
-  if (clean.length < 8) return "••••••••";
-  return `${clean.slice(0, 4)}••••${clean.slice(-4)}`;
+  if (clean.length < 5) return "+234****23";
+  const prefix = clean.startsWith("234") ? "+234" : `+${clean.slice(0, Math.min(3, clean.length - 2))}`;
+  const suffix = clean.slice(-2);
+  return `${prefix}****${suffix}`;
 }
 
 function maskEmail(email: string): string {
