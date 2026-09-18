@@ -147,16 +147,24 @@ export async function POST(req: Request) {
           throw new Error("CHALLENGE_LOCKED: Too many incorrect attempts. Please generate a new security challenge.");
         }
 
+        // Validate cumulative failure limit across all resends for this challenge
+        const currentTotalFailed = chData.totalFailedAttempts || chData.attempts || 0;
+        if (currentTotalFailed >= 3) {
+          throw new Error("CHALLENGE_LOCKED: Too many incorrect attempts. Please generate a new security challenge.");
+        }
+
         // Validate cryptographically hashed OTP code
         const hashedSubmitted = hashOtp(String(otpCode));
         if (hashedSubmitted !== chData.otpHash) {
           const updatedAttempts = (chData.attempts || 0) + 1;
+          const updatedTotalFailed = currentTotalFailed + 1;
           transaction.update(challengeRef, {
             attempts: updatedAttempts,
+            totalFailedAttempts: updatedTotalFailed,
             lastFailedAt: nowIso,
           });
 
-          const remaining = Math.max(0, 3 - updatedAttempts);
+          const remaining = Math.max(0, 3 - updatedTotalFailed);
           throw new Error(`INCORRECT_OTP: Incorrect verification code. You have ${remaining} attempt(s) remaining.`);
         }
 
@@ -186,15 +194,13 @@ export async function POST(req: Request) {
           updatedAt: nowIso,
         }, { merge: true });
 
-        // Audit Log
+        // Audit Log - DO NOT write raw session IDs to audit logs
         const auditRef = adminDb.collection("security_audit_logs").doc();
         transaction.set(auditRef, {
           uid,
           action: "NEW_DEVICE_SESSION_ACTIVATED",
           challengeId,
           deviceName,
-          previousSessionId,
-          newSessionId,
           timestamp: nowIso,
         });
       });
@@ -231,7 +237,7 @@ export async function POST(req: Request) {
         }
       }
 
-      console.log(`[Session API] Successfully verified OTP and activated new session for user ${uid}. Session ID: ${newSessionId}`);
+      console.log(`[Session API] Successfully verified OTP and activated new session for user ${uid}.`);
 
       return NextResponse.json({
         success: true,
@@ -272,7 +278,8 @@ export async function POST(req: Request) {
           throw new Error("CHALLENGE_CONSUMED: Challenge already consumed. Please sign in again.");
         }
 
-        if (chData.attempts >= 3) {
+        const cumulativeFailures = chData.totalFailedAttempts || chData.attempts || 0;
+        if (chData.attempts >= 3 || cumulativeFailures >= 3) {
           throw new Error("CHALLENGE_LOCKED: Too many failed attempts. Security challenge locked. Please generate a new login request.");
         }
 
@@ -328,7 +335,8 @@ export async function POST(req: Request) {
           destination: targetDestination,
           lastSentAtMs: now,
           expiresAtMs,
-          attempts: 0, // Reset attempt count for new OTP
+          attempts: 0, // Reset single-code attempt count for new OTP
+          // totalFailedAttempts is PRESERVED and NOT reset across resends!
           updatedAt: nowIso,
         });
       });
@@ -369,7 +377,7 @@ export async function POST(req: Request) {
         updatedAt: nowIso,
       }, { merge: true });
 
-      console.log(`[Session API] Established FIRST active session for user ${uid}. Session ID: ${newSessionId}`);
+      console.log(`[Session API] Established FIRST active session for user ${uid}.`);
 
       return NextResponse.json({
         success: true,
@@ -422,6 +430,7 @@ export async function POST(req: Request) {
       deviceName,
       userAgent,
       attempts: 0,
+      totalFailedAttempts: 0,
       consumed: false,
       verified: false,
       createdAtMs: now,
