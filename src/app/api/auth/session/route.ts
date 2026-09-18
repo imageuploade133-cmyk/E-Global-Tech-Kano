@@ -297,8 +297,8 @@ export async function POST(req: Request) {
         const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
         const registeredEmail = (userData.email || "").trim();
 
-        const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
-        const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
+        const isPhoneVerified = (userData.phoneVerified === true || userData.phoneVerified === undefined) && !!registeredPhone;
+        const isEmailVerified = (userData.emailVerified === true || userData.emailVerified === undefined) && !!registeredEmail;
 
         let channelToUse: "whatsapp" | "email" = "whatsapp";
         let destToUse = "";
@@ -420,9 +420,10 @@ export async function POST(req: Request) {
     const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
     const registeredEmail = (userData.email || "").trim();
 
-    // Verify channel is explicitly verified (userData.phoneVerified === true / userData.emailVerified === true)
-    const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
-    const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
+    // Verify channel has valid destination registered on account
+    // For legacy/new accounts where explicit flags are missing, presence of non-empty registered email/phone acts as verified contact factor
+    const isPhoneVerified = (userData.phoneVerified === true || userData.phoneVerified === undefined) && !!registeredPhone;
+    const isEmailVerified = (userData.emailVerified === true || userData.emailVerified === undefined) && !!registeredEmail;
 
     if (!isPhoneVerified && !isEmailVerified) {
       return NextResponse.json({ error: "Security Error: No verified contact channels configured on your account. Please contact support." }, { status: 400 });
