@@ -23,6 +23,8 @@ interface UserData {
   [key: string]: unknown;
 }
 
+export type DeviceAuthState = "AUTHENTICATED_VERIFIED" | "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" | "UNAUTHENTICATED";
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -30,6 +32,7 @@ interface AuthContextType {
   setPinVerified: (verified: boolean) => void;
   userData: UserData | null;
   updateUserData: (updates: Partial<UserData>) => Promise<void>;
+  deviceAuthState: DeviceAuthState;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,7 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
   const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
 
-  // New Device OTP Challenge Modal State
+  // New Device OTP Challenge Modal State & Device Auth State
+  const [deviceAuthState, setDeviceAuthState] = useState<DeviceAuthState>("UNAUTHENTICATED");
   const [isNewDeviceOtpOpen, setIsNewDeviceOtpOpen] = useState(false);
   const [newDeviceChallenge, setNewDeviceChallenge] = useState<{
     challengeId: string;
@@ -128,7 +132,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const sessData = await res.json().catch(() => ({}));
 
             if (res.ok && sessData.requiresOtp && sessData.challengeId) {
-              // Server detected an existing active session on another device -> Open OTP Modal!
+              // Server detected an existing active session on another device -> Transition into AUTHENTICATED_PENDING_DEVICE_VERIFICATION
+              setDeviceAuthState("AUTHENTICATED_PENDING_DEVICE_VERIFICATION");
+              setIsPinVerified(false);
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("active_session_id");
+              }
               setNewDeviceChallenge({
                 challengeId: sessData.challengeId,
                 channel: sessData.channel || "whatsapp",
@@ -137,9 +146,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               });
               setIsNewDeviceOtpOpen(true);
             } else if (res.ok && sessData.sessionId) {
+              setDeviceAuthState("AUTHENTICATED_VERIFIED");
               if (typeof window !== "undefined") {
                 localStorage.setItem("active_session_id", sessData.sessionId);
               }
+            } else if (!res.ok) {
+              // Fail closed: if session establishment returns error, sign out
+              toast.error(sessData.error || "Session verification failed.");
+              handleAppSignOut(null);
             }
           } catch (sessErr: any) {
             console.warn("[AuthContext Session Setup Error]:", sessErr.message);
@@ -261,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPinVerified: setIsPinVerified,
         userData,
         updateUserData,
+        deviceAuthState,
       }}
     >
       {children}
@@ -281,6 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (typeof window !== "undefined") {
               localStorage.setItem("active_session_id", newSessId);
             }
+            setDeviceAuthState("AUTHENTICATED_VERIFIED");
             setIsNewDeviceOtpOpen(false);
             setNewDeviceChallenge(null);
             toast.success("New device verified! Welcome to E-Global Pay.");
@@ -288,6 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           onCancel={() => {
             setIsNewDeviceOtpOpen(false);
             setNewDeviceChallenge(null);
+            setDeviceAuthState("UNAUTHENTICATED");
             handleAppSignOut(null);
           }}
         />
