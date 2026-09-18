@@ -432,8 +432,8 @@ export async function POST(req: Request) {
     // Default channel selection logic:
     // - verified phone exists -> WhatsApp default
     // - verified email exists (and no verified phone) -> email default
-    let defaultChannel: "whatsapp" | "email" = isPhoneVerified ? "whatsapp" : "email";
-    let defaultDestination = defaultChannel === "whatsapp" ? registeredPhone : registeredEmail;
+    const defaultChannel: "whatsapp" | "email" = isPhoneVerified ? "whatsapp" : "email";
+    const defaultDestination = defaultChannel === "whatsapp" ? registeredPhone : registeredEmail;
 
     const challengeId = `ch_${uid}_${Date.now()}_${crypto.randomBytes(8).toString("hex")}`;
     const rawOtp = crypto.randomInt(100000, 999999).toString();
