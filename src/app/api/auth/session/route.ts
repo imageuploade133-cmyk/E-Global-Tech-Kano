@@ -344,7 +344,7 @@ export async function POST(req: Request) {
         message: `New verification code sent via ${targetChannel.toUpperCase()}.`,
         challengeId,
         channel: targetChannel,
-        maskedDestination: targetChannel === "email" ? maskEmail(targetDestination) : maskPhone(targetDestination),
+        maskedDestination: (targetChannel as string) === "email" ? maskEmail(targetDestination) : maskPhone(targetDestination),
         cooldownSeconds: 60,
       });
     }
