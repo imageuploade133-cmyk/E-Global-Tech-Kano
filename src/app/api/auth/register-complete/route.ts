@@ -56,6 +56,8 @@ export async function POST(req: Request) {
       lastName: cleanLastName,
       email: cleanEmail,
       phoneNumber: fullPhone,
+      emailVerified: true,
+      phoneVerified: fullPhone ? true : false,
       createdAt: userSnap.exists && userSnap.data()?.createdAt ? userSnap.data()?.createdAt : new Date().toISOString(),
       balance: userSnap.exists && typeof userSnap.data()?.balance === "number" ? userSnap.data()?.balance : 0.00,
       bonusBalance: userSnap.exists && typeof userSnap.data()?.bonusBalance === "number" ? userSnap.data()?.bonusBalance : 0.00,
