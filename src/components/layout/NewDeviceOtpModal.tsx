@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { SupportChatModal } from "@/components/support/SupportChatModal";
 import { toast } from "sonner";
 
 export interface NewDeviceOtpModalProps {
@@ -31,6 +32,7 @@ export function NewDeviceOtpModal({
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
 
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -400,11 +402,7 @@ export function NewDeviceOtpModal({
           {/* Report and Support Button */}
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                window.location.href = "/support";
-              }
-            }}
+            onClick={() => setIsSupportChatOpen(true)}
             className="w-full py-3 rounded-xl bg-orange-50 hover:bg-orange-100 border border-[#FC7A00]/30 text-[#FC7A00] font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">support_agent</span>
@@ -420,6 +418,12 @@ export function NewDeviceOtpModal({
           </p>
         </div>
       </motion.div>
+
+      {/* Full-Screen Support Chat Drawer Modal */}
+      <SupportChatModal
+        isOpen={isSupportChatOpen}
+        onClose={() => setIsSupportChatOpen(false)}
+      />
     </AnimatePresence>
   );
 }
