@@ -76,15 +76,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check if mock query parameter or session is active (run only on client to avoid SSR hydration mismatch)
-    const hasMockQuery = window.location.search.includes("mock=true");
-    const hasMockSession = sessionStorage.getItem("mock") === "true";
+    // Mock mode is strictly restricted to development/testing environments to prevent production authentication bypass
+    const isDevEnv = process.env.NODE_ENV !== "production";
+    const hasMockQuery = isDevEnv && typeof window !== "undefined" && window.location.search.includes("mock=true");
+    const hasMockSession = isDevEnv && typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
 
     if (hasMockQuery) {
       sessionStorage.setItem("mock", "true");
     }
 
-    if (hasMockQuery || hasMockSession) {
+    if (isDevEnv && (hasMockQuery || hasMockSession)) {
       setUser({
         uid: "mock-uid",
         displayName: "JULES VERNE",
