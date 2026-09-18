@@ -235,6 +235,128 @@ export async function POST(req: Request) {
     }
 
     // =========================================================================
+    // RESEND STAGE 2 OTP TO NEW UNVERIFIED CONTACT (FAIL-SAFE RETRY RECOVERY)
+    // =========================================================================
+    if (action === "resend_stage2") {
+      if (!requestId) {
+        return NextResponse.json({ error: "Missing required parameter: requestId." }, { status: 400 });
+      }
+
+      const changeRef = adminDb.collection("security_contact_changes").doc(requestId);
+
+      let targetChannel: "phone" | "email" = "phone";
+      let targetDestination = "";
+      let newStage2RawOtp = "";
+
+      const resendResult = await adminDb.runTransaction(async (transaction) => {
+        const changeSnap = await transaction.get(changeRef);
+        if (!changeSnap.exists) {
+          throw new Error("CHANGE_INVALID: Security request record not found.");
+        }
+
+        const chData = changeSnap.data() || {};
+
+        if (chData.uid !== uid) {
+          throw new Error("CHANGE_INVALID: Authorization request mismatch.");
+        }
+
+        if (chData.consumed === true) {
+          throw new Error("CHANGE_CONSUMED: This change request has already been completed.");
+        }
+
+        if (chData.stage !== "VERIFY_NEW_CONTACT" || chData.stage1Verified !== true) {
+          throw new Error("CHANGE_INVALID_STAGE: Stage 1 authorization must be completed before resending code to the new contact.");
+        }
+
+        // 60-second rate limit cooldown check inside transaction
+        const lastSentAtMs = chData.lastSentAtMs || 0;
+        if (now - lastSentAtMs < 60000) {
+          const remaining = Math.ceil((60000 - (now - lastSentAtMs)) / 1000);
+          throw new Error(`CHANGE_COOLDOWN: Please wait ${remaining} second(s) before requesting a new code.`);
+        }
+
+        if (chData.attempts >= 3) {
+          throw new Error("CHANGE_LOCKED: Too many failed attempts. Security contact change locked. Please generate a new request.");
+        }
+
+        targetChannel = chData.contactType;
+        targetDestination = chData.newContact; // Destination is IMMUTABLE and read from server change document
+        newStage2RawOtp = crypto.randomInt(100000, 999999).toString();
+        const stage2Hash = hashOtp(newStage2RawOtp);
+        const expiresAtMs = now + 10 * 60 * 1000; // 10 minutes
+
+        transaction.update(changeRef, {
+          stage2Hash,
+          lastSentAtMs: now,
+          expiresAtMs,
+          attempts: 0, // Reset single-code attempts for fresh code
+          updatedAt: nowIso,
+        });
+
+        return { targetChannel, targetDestination, newStage2RawOtp };
+      });
+
+      // Dispatch fresh Stage 2 OTP directly to NEW UNVERIFIED contact
+      let dispatchedResend = false;
+      if (resendResult.targetChannel === "phone") {
+        try {
+          const res = await fetch(`${GATEWAY_URL}/api/auth/send-otp`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": GATEWAY_API_KEY,
+            },
+            body: JSON.stringify({
+              phoneNumber: resendResult.targetDestination,
+              type: "contact_verification",
+              customMessage: `E-Global Pay Security: Stage 2 Verification code to confirm your NEW recovery ${resendResult.targetChannel} is *${resendResult.newStage2RawOtp}*. Valid for 10 minutes.`
+            }),
+          });
+          dispatchedResend = res.ok;
+        } catch {
+          dispatchedResend = false;
+        }
+      } else {
+        try {
+          const escapeHtml = (str: string) => String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+          const safeTypeLower = escapeHtml(resendResult.targetChannel);
+          const safeRawOtp = escapeHtml(resendResult.newStage2RawOtp);
+
+          const { sendEmail } = await import("@/lib/email-service");
+          const result = await sendEmail({
+            to: resendResult.targetDestination,
+            subject: "Security Verification: Confirm New Recovery Contact (Resent Code)",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #FC7A00; margin-bottom: 16px;">E-Global Pay Security Guard</h2>
+                <p>Hello,</p>
+                <p>A new Stage 2 verification code was requested for this NEW ${safeTypeLower}:</p>
+                <div style="background-color: #f4f4f4; padding: 15px; font-size: 26px; font-weight: bold; text-align: center; letter-spacing: 6px; color: #333; margin: 20px 0; border-radius: 4px;">
+                  ${safeRawOtp}
+                </div>
+                <p>This code confirms that you have direct control of this destination.</p>
+              </div>
+            `,
+          });
+          dispatchedResend = result;
+        } catch {
+          dispatchedResend = false;
+        }
+      }
+
+      if (!dispatchedResend) {
+        return NextResponse.json({ error: `Failed to deliver verification code to your NEW ${resendResult.targetChannel}. Please try again later.` }, { status: 502 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `New Stage 2 verification code sent to your NEW ${resendResult.targetChannel} (${resendResult.targetChannel === "phone" ? maskPhone(resendResult.targetDestination) : maskEmail(resendResult.targetDestination)}).`,
+        requestId,
+        maskedNewContact: resendResult.targetChannel === "phone" ? maskPhone(resendResult.targetDestination) : maskEmail(resendResult.targetDestination),
+      });
+    }
+
+    // =========================================================================
     // STEP 2: AUTHORIZE EXISTING TRUSTED FACTOR & DISPATCH STAGE 2 OTP TO NEW CONTACT
     // =========================================================================
     if (action === "authorize_existing") {

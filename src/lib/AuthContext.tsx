@@ -150,13 +150,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (typeof window !== "undefined") {
                 localStorage.setItem("active_session_id", sessData.sessionId);
               }
-            } else if (!res.ok) {
-              // Fail closed: if session establishment returns error, sign out
+            } else {
+              // Fail closed: if session establishment returns error or unexpected payload, sign out immediately
               toast.error(sessData.error || "Session verification failed.");
+              setDeviceAuthState("UNAUTHENTICATED");
               handleAppSignOut(null);
             }
           } catch (sessErr: any) {
-            console.warn("[AuthContext Session Setup Error]:", sessErr.message);
+            console.error("[AuthContext Session Setup Error]:", sessErr.message);
+            // FAIL CLOSED: Immediately reject access on any network/server exception
+            toast.error("Session establishment error. Signing out for security.");
+            setDeviceAuthState("UNAUTHENTICATED");
+            handleAppSignOut(null);
           }
         })();
 
