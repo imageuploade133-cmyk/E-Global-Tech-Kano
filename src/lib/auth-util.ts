@@ -198,50 +198,46 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
     return decoded;
   }
 
-  // 2. Determine if this request is POST /api/auth/session (session establishment/replacement)
-  let isSessionEstablishment = false;
+  // 2. Determine if this request is session establishment or registration finalization
+  let isSessionExempt = false;
   if (req.method === "POST" && req.url) {
     try {
       const reqUrl = new URL(req.url, "http://localhost");
-      if (reqUrl.pathname.endsWith("/api/auth/session")) {
-        isSessionEstablishment = true;
+      if (reqUrl.pathname.endsWith("/api/auth/session") || reqUrl.pathname.endsWith("/api/auth/register-complete")) {
+        isSessionExempt = true;
       }
     } catch {
-      if (req.url.includes("/api/auth/session")) {
-        isSessionEstablishment = true;
+      if (req.url.includes("/api/auth/session") || req.url.includes("/api/auth/register-complete")) {
+        isSessionExempt = true;
       }
     }
   }
 
-  // 3. For POST /api/auth/session, session establishment is permitted without an existing session ID.
-  // For EVERY other protected endpoint (including DELETE /api/auth/session), X-Session-ID is strictly required & validated.
-  if (!isSessionEstablishment) {
+  // 3. For session/registration endpoints, pre-existing X-Session-ID is exempt.
+  // For other protected endpoints, validate X-Session-ID if present or if activeSessionId is set on user document.
+  if (!isSessionExempt) {
     const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
-    if (!providedSessionId) {
-      throw new Error("REVOKED_SESSION: Missing session ID header. You have been logged out on this device.");
-    }
 
     try {
       const userDoc = await adminDb.collection("users").doc(uid).get();
-      if (!userDoc.exists) {
-        throw new Error("REVOKED_SESSION: User account document missing.");
-      }
+      if (userDoc.exists) {
+        const activeSessionId = userDoc.data()?.activeSessionId;
 
-      const activeSessionId = userDoc.data()?.activeSessionId;
-
-      if (!activeSessionId) {
-        throw new Error("REVOKED_SESSION: Active session record missing.");
-      }
-
-      if (providedSessionId !== activeSessionId) {
-        throw new Error("REVOKED_SESSION: Provided session ID does not match active session ID.");
+        // If user document has an active session established, enforce X-Session-ID match
+        if (activeSessionId) {
+          if (!providedSessionId) {
+            throw new Error("REVOKED_SESSION: Missing session ID header. You have been logged out on this device.");
+          }
+          if (providedSessionId !== activeSessionId) {
+            throw new Error("REVOKED_SESSION: Provided session ID does not match active session ID.");
+          }
+        }
       }
     } catch (err: any) {
       if (err.message && err.message.includes("REVOKED_SESSION")) {
         throw err;
       }
       console.error(`[authenticateUserRequest Error] Session validation failed for ${uid}:`, err.message);
-      // FAIL CLOSED: Immediately reject request on any Firestore/read error or validation exception
       throw new Error(`REVOKED_SESSION: Session validation error (${err.message}).`);
     }
   }
