@@ -295,10 +295,10 @@ export async function POST(req: Request) {
         const userData = userSnap.exists ? userSnap.data() || {} : {};
 
         const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-        const registeredEmail = (userData.email || "").trim();
+        const registeredEmail = (userData.email || authResult.email || "").trim();
 
-        const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
-        const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
+        const isPhoneVerified = !!registeredPhone;
+        const isEmailVerified = !!registeredEmail;
 
         let channelToUse: "whatsapp" | "email" = "whatsapp";
         let destToUse = "";
@@ -418,12 +418,12 @@ export async function POST(req: Request) {
     }
 
     const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-    const registeredEmail = (userData.email || "").trim();
+    const registeredEmail = (userData.email || authResult.email || "").trim();
 
     // Verify channel has valid destination registered on account
-    // For legacy/new accounts where explicit flags are missing, presence of non-empty registered email/phone acts as verified contact factor
-    const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
-    const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
+    // Any non-empty registered phone or email associated with the authenticated account acts as a valid factor
+    const isPhoneVerified = !!registeredPhone;
+    const isEmailVerified = !!registeredEmail;
 
     if (!isPhoneVerified && !isEmailVerified) {
       return NextResponse.json({ error: "Security Error: No verified contact channels configured on your account. Please contact support." }, { status: 400 });
