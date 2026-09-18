@@ -220,81 +220,81 @@ export function NewDeviceOtpModal({
             A new device is logging into your account. Please select your verification method and click Send Code to receive your 6-digit OTP:
           </p>
 
-          {/* Select Verification Method Cards */}
-          <div className="w-full space-y-2.5 mb-6 text-left">
-            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest pl-1">
-              Select Verification Method
-            </p>
-
-            <div className="grid grid-cols-1 gap-2.5 w-full">
-              {/* Phone Number OTP Option */}
-              {channels.some(c => c.type === "whatsapp") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveChannel("whatsapp");
-                    const ch = channels.find(c => c.type === "whatsapp");
-                    if (ch) setActiveDestination(ch.masked);
-                  }}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between shadow-xs ${
-                    activeChannel === "whatsapp"
-                      ? "bg-[#FC7A00]/10 border-[#FC7A00] text-black ring-2 ring-[#FC7A00]/30"
-                      : "bg-gray-50/80 border-gray-200/80 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      activeChannel === "whatsapp" ? "bg-[#FC7A00] text-white" : "bg-gray-200 text-gray-600"
-                    }`}>
-                      <span className="material-symbols-outlined text-xl">smartphone</span>
-                    </div>
-                    <div>
-                      <p className="text-xs font-black text-black">Phone Number OTP</p>
-                      <p className="text-[11px] text-gray-500 font-mono font-semibold">
-                        {channels.find(c => c.type === "whatsapp")?.masked || activeDestination}
-                      </p>
-                    </div>
+          {/* Select Verification Method Cards (Economized & Styled exactly like Forgot PIN) */}
+          <div className="w-full flex flex-col gap-3 mb-6">
+            {/* Email OTP Option Card */}
+            {channels.some(c => c.type === "email") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveChannel("email");
+                  const ch = channels.find(c => c.type === "email");
+                  if (ch) setActiveDestination(ch.masked);
+                }}
+                className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                  activeChannel === "email"
+                    ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
+                    : "border-gray-200 bg-white hover:bg-gray-50"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                  activeChannel === "email" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
+                }`}>
+                  <span className="material-symbols-outlined text-[20px]">mail</span>
+                </div>
+                <div className="flex-grow min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="font-hanken font-bold text-xs text-black truncate">Email OTP Code</p>
+                    <span className="font-mono font-bold text-[10px] text-[#FC7A00] bg-[#FC7A00]/10 px-2 py-0.5 rounded-full shrink-0">
+                      {channels.find(c => c.type === "email")?.masked || activeDestination}
+                    </span>
                   </div>
-                  {activeChannel === "whatsapp" && (
-                    <span className="material-symbols-outlined text-[#FC7A00] text-xl font-bold">check_circle</span>
-                  )}
-                </button>
-              )}
+                  <p className="font-hanken text-[11px] text-gray-400 mt-0.5">Send 6-digit secure code to registered email</p>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  activeChannel === "email" ? "border-[#FC7A00]" : "border-gray-300"
+                }`}>
+                  {activeChannel === "email" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
+                </div>
+              </button>
+            )}
 
-              {/* Email OTP Option */}
-              {channels.some(c => c.type === "email") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveChannel("email");
-                    const ch = channels.find(c => c.type === "email");
-                    if (ch) setActiveDestination(ch.masked);
-                  }}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between shadow-xs ${
-                    activeChannel === "email"
-                      ? "bg-[#FC7A00]/10 border-[#FC7A00] text-black ring-2 ring-[#FC7A00]/30"
-                      : "bg-gray-50/80 border-gray-200/80 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      activeChannel === "email" ? "bg-[#FC7A00] text-white" : "bg-gray-200 text-gray-600"
-                    }`}>
-                      <span className="material-symbols-outlined text-xl">mail</span>
-                    </div>
-                    <div>
-                      <p className="text-xs font-black text-black">Email OTP</p>
-                      <p className="text-[11px] text-gray-500 font-mono font-semibold">
-                        {channels.find(c => c.type === "email")?.masked || activeDestination}
-                      </p>
-                    </div>
+            {/* WhatsApp / Phone Number OTP Option Card */}
+            {channels.some(c => c.type === "whatsapp") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveChannel("whatsapp");
+                  const ch = channels.find(c => c.type === "whatsapp");
+                  if (ch) setActiveDestination(ch.masked);
+                }}
+                className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                  activeChannel === "whatsapp"
+                    ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
+                    : "border-gray-200 bg-white hover:bg-gray-50"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                  activeChannel === "whatsapp" ? "bg-[#FC7A00]/20 text-[#FC7A00]" : "bg-gray-100 text-gray-500"
+                }`}>
+                  <span className="material-symbols-outlined text-[20px]">chat</span>
+                </div>
+                <div className="flex-grow min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="font-hanken font-bold text-xs text-black truncate">WhatsApp OTP Code</p>
+                    <span className="font-mono font-bold text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
+                      {channels.find(c => c.type === "whatsapp")?.masked || activeDestination}
+                    </span>
                   </div>
-                  {activeChannel === "email" && (
-                    <span className="material-symbols-outlined text-[#FC7A00] text-xl font-bold">check_circle</span>
-                  )}
-                </button>
-              )}
-            </div>
+                  <p className="font-hanken text-[11px] text-gray-400 mt-0.5">Send 6-digit secure code on WhatsApp</p>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  activeChannel === "whatsapp" ? "border-[#FC7A00]" : "border-gray-300"
+                }`}>
+                  {activeChannel === "whatsapp" && <div className="w-2.5 h-2.5 rounded-full bg-[#FC7A00]" />}
+                </div>
+              </button>
+            )}
           </div>
 
           {/* Send Verification Code Action Box */}
