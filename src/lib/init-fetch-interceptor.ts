@@ -30,17 +30,29 @@ if (typeof window !== "undefined" && !(window as any).__fetchInterceptorInitiali
 
     const response = await originalFetch.call(this, input, init);
 
-    // Automatically intercept 401 REVOKED_SESSION responses
+    // Automatically intercept 401 REVOKED_SESSION responses safely
     if (response.status === 401) {
       try {
         const clonedRes = response.clone();
         const data = await clonedRes.json();
         if (data?.error && typeof data.error === "string" && data.error.includes("REVOKED_SESSION")) {
-          console.warn("[Fetch Interceptor] 401 REVOKED_SESSION received. Triggering sign out...");
-          localStorage.removeItem("active_session_id");
-          if (typeof window !== "undefined") {
-            const { handleAppSignOut } = await import("@/lib/logout-util");
-            handleAppSignOut("Your account was signed in on another device. You have been logged out on this device.");
+          const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+          const isAuthRoute = currentPath.startsWith("/auth");
+          const isAuthApi = urlStr.includes("/api/auth/");
+          const hasActiveSession = typeof window !== "undefined" && Boolean(localStorage.getItem("active_session_id"));
+
+          // Only trigger global session revocation logout if an active session WAS established
+          // and we are NOT on auth pages or initiating authentication APIs
+          if (hasActiveSession && !isAuthRoute && !isAuthApi) {
+            console.warn("[Fetch Interceptor] 401 REVOKED_SESSION received. Triggering sign out...");
+            localStorage.removeItem("active_session_id");
+            if (typeof window !== "undefined") {
+              const { handleAppSignOut } = await import("@/lib/logout-util");
+              handleAppSignOut("Your account was signed in on another device. You have been logged out on this device.");
+            }
+          } else {
+            console.warn("[Fetch Interceptor] Ignored 401 REVOKED_SESSION during unverified/pending state:", urlStr);
+            localStorage.removeItem("active_session_id");
           }
         }
       } catch {
