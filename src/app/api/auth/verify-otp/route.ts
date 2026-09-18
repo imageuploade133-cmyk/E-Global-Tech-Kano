@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import crypto from "crypto";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
@@ -47,7 +48,12 @@ export async function POST(req: Request) {
           throw new Error("Too many failed attempts. Please request a new verification code.");
         }
 
-        if (otpData.otpCode !== submittedOtp) {
+        const HMAC_SECRET = process.env.CPANEL_SESSION_SECRET || process.env.JWT_SECRET || "signup_otp_secret_key";
+        const hashedSubmitted = crypto.createHmac("sha256", HMAC_SECRET).update(submittedOtp).digest("hex");
+
+        const isValid = otpData.otpHash ? (otpData.otpHash === hashedSubmitted) : (otpData.otpCode === submittedOtp);
+
+        if (!isValid) {
           const updatedAttempts = (otpData.attempts || 0) + 1;
           transaction.update(otpDocRef, { attempts: updatedAttempts });
           const remaining = Math.max(0, 3 - updatedAttempts);

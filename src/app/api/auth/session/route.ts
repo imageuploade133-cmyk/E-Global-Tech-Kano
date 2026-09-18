@@ -297,27 +297,27 @@ export async function POST(req: Request) {
         const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
         const registeredEmail = (userData.email || "").trim();
 
-        const isPhoneVerified = (userData.phoneVerified === true || userData.phoneVerified === undefined) && !!registeredPhone;
-        const isEmailVerified = (userData.emailVerified === true || userData.emailVerified === undefined) && !!registeredEmail;
+        const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
+        const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
 
         let channelToUse: "whatsapp" | "email" = "whatsapp";
         let destToUse = "";
 
-        // Server-side channel verification: require target channel to be explicitly verified
+        // Server-side channel verification: enforce explicit phone/email verification flags
         if (selectedChannel === "email") {
           if (!isEmailVerified) {
-            throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: Email channel is not explicitly verified on this account.");
+            throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: Verified email address is not configured on this account.");
           }
           channelToUse = "email";
           destToUse = registeredEmail;
         } else if (selectedChannel === "whatsapp") {
           if (!isPhoneVerified) {
-            throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: WhatsApp channel is not explicitly verified on this account.");
+            throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: Verified phone number is not configured on this account.");
           }
           channelToUse = "whatsapp";
           destToUse = registeredPhone;
         } else {
-          // Default based on verified status
+          // Default based on explicit verified details
           if (isPhoneVerified) {
             channelToUse = "whatsapp";
             destToUse = registeredPhone;
@@ -422,8 +422,8 @@ export async function POST(req: Request) {
 
     // Verify channel has valid destination registered on account
     // For legacy/new accounts where explicit flags are missing, presence of non-empty registered email/phone acts as verified contact factor
-    const isPhoneVerified = (userData.phoneVerified === true || userData.phoneVerified === undefined) && !!registeredPhone;
-    const isEmailVerified = (userData.emailVerified === true || userData.emailVerified === undefined) && !!registeredEmail;
+    const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
+    const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
 
     if (!isPhoneVerified && !isEmailVerified) {
       return NextResponse.json({ error: "Security Error: No verified contact channels configured on your account. Please contact support." }, { status: 400 });
@@ -494,18 +494,18 @@ export async function POST(req: Request) {
     });
 
     const channels = [];
-    if (isPhoneVerified) {
-      channels.push({
-        type: "whatsapp",
-        label: `Phone Number OTP (${maskPhone(registeredPhone)})`,
-        masked: maskPhone(registeredPhone),
-      });
-    }
-    if (isEmailVerified) {
+    if (registeredEmail) {
       channels.push({
         type: "email",
         label: `Email OTP (${maskEmail(registeredEmail)})`,
         masked: maskEmail(registeredEmail),
+      });
+    }
+    if (registeredPhone) {
+      channels.push({
+        type: "whatsapp",
+        label: `Phone Number OTP (${maskPhone(registeredPhone)})`,
+        masked: maskPhone(registeredPhone),
       });
     }
 

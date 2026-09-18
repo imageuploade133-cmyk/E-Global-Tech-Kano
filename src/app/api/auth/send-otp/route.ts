@@ -41,11 +41,14 @@ export async function POST(req: Request) {
       const rawOtp = crypto.randomInt(100000, 999999).toString();
       const expiresAtMs = now + 5 * 60 * 1000; // 5 minutes
 
-      // Store in Firestore signup_email_otps
+      const HMAC_SECRET = process.env.CPANEL_SESSION_SECRET || process.env.JWT_SECRET || "signup_otp_secret_key";
+      const otpHash = crypto.createHmac("sha256", HMAC_SECRET).update(rawOtp.trim()).digest("hex");
+
+      // Store in Firestore signup_email_otps with hashed OTP
       const otpDocRef = adminDb.collection("signup_email_otps").doc(cleanEmail);
       await otpDocRef.set({
         email: cleanEmail,
-        otpCode: rawOtp,
+        otpHash,
         attempts: 0,
         consumed: false,
         createdAtMs: now,
