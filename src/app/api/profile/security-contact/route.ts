@@ -118,7 +118,7 @@ export async function POST(req: Request) {
 
       // Existing trusted contact destination - require explicit verification flag (=== true)
       const existingPhone = (userData.phoneNumber || userData.phone || "").trim();
-      const existingEmail = (userData.email || authResult.email || "").trim();
+      const existingEmail = (userData.email || "").trim();
 
       const isPhoneVerified = userData.phoneVerified === true && !!existingPhone;
       const isEmailVerified = userData.emailVerified === true && !!existingEmail;

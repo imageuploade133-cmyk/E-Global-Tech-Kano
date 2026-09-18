@@ -294,7 +294,7 @@ export async function POST(req: Request) {
         const userData = userSnap.exists ? userSnap.data() || {} : {};
 
         const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-        const registeredEmail = (userData.email || authResult.email || "").trim();
+        const registeredEmail = (userData.email || "").trim();
 
         const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
         const isEmailVerified = userData.emailVerified === true && !!registeredEmail;
@@ -360,29 +360,38 @@ export async function POST(req: Request) {
     // =========================================================================
     // ACTION 3: INITIAL ESTABLISHMENT (DETECT EXISTING SESSION & GATE WITH OTP)
     // =========================================================================
-    const userSnap = await userRef.get();
-    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    let establishedSessionId: string | null = null;
+    let userData: Record<string, any> = {};
 
-    const activeSessionId = userData.activeSessionId as string | undefined;
+    await adminDb.runTransaction(async (transaction) => {
+      const userSnap = await transaction.get(userRef);
+      userData = userSnap.exists ? userSnap.data() || {} : {};
 
-    // IF NO ACTIVE SESSION EXISTS -> Normal First Device Login
-    if (!activeSessionId) {
-      const newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+      const currentActiveSession = userData.activeSessionId as string | undefined;
 
-      await userRef.set({
-        activeSessionId: newSessionId,
-        activeSessionCreatedAt: nowIso,
-        activeSessionDevice: deviceName,
-        activeSessionUserAgent: userAgent,
-        updatedAt: nowIso,
-      }, { merge: true });
+      if (!currentActiveSession) {
+        // First active session creation inside transaction
+        const newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+        transaction.set(userRef, {
+          activeSessionId: newSessionId,
+          activeSessionCreatedAt: nowIso,
+          activeSessionDevice: deviceName,
+          activeSessionUserAgent: userAgent,
+          updatedAt: nowIso,
+        }, { merge: true });
 
+        establishedSessionId = newSessionId;
+      }
+    });
+
+    // IF NO ACTIVE SESSION EXISTED -> Normal First Device Login Established Atomically
+    if (establishedSessionId) {
       console.log(`[Session API] Established FIRST active session for user ${uid}.`);
 
       return NextResponse.json({
         success: true,
         requiresOtp: false,
-        sessionId: newSessionId,
+        sessionId: establishedSessionId,
         message: "First active session established successfully.",
       });
     }
@@ -400,7 +409,7 @@ export async function POST(req: Request) {
     }
 
     const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-    const registeredEmail = (userData.email || authResult.email || "").trim();
+    const registeredEmail = (userData.email || "").trim();
 
     // Verify channel is explicitly verified (userData.phoneVerified === true / userData.emailVerified === true)
     const isPhoneVerified = userData.phoneVerified === true && !!registeredPhone;
