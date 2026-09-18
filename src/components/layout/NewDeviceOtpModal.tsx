@@ -140,8 +140,8 @@ export function NewDeviceOtpModal({
   };
 
   const handleSendOrSwitchChannel = async (targetChannel: "whatsapp" | "email") => {
-    if (cooldown > 0 && targetChannel === activeChannel && otpSent) {
-      toast.info(`Please wait ${cooldown} seconds before requesting a new code.`);
+    if (cooldown > 0) {
+      toast.info(`Please wait ${cooldown} seconds before requesting a new code or changing channel.`);
       return;
     }
 
@@ -226,7 +226,12 @@ export function NewDeviceOtpModal({
             {channels.some(c => c.type === "email") && (
               <button
                 type="button"
+                disabled={cooldown > 0 && activeChannel !== "email"}
                 onClick={() => {
+                  if (cooldown > 0 && activeChannel !== "email") {
+                    toast.info(`Please wait ${cooldown} seconds before changing channel.`);
+                    return;
+                  }
                   setActiveChannel("email");
                   const ch = channels.find(c => c.type === "email");
                   if (ch) setActiveDestination(ch.masked);
@@ -234,6 +239,8 @@ export function NewDeviceOtpModal({
                 className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                   activeChannel === "email"
                     ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
+                    : cooldown > 0
+                    ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
                     : "border-gray-200 bg-white hover:bg-gray-50"
                 }`}
               >
@@ -263,7 +270,12 @@ export function NewDeviceOtpModal({
             {channels.some(c => c.type === "whatsapp") && (
               <button
                 type="button"
+                disabled={cooldown > 0 && activeChannel !== "whatsapp"}
                 onClick={() => {
+                  if (cooldown > 0 && activeChannel !== "whatsapp") {
+                    toast.info(`Please wait ${cooldown} seconds before changing channel.`);
+                    return;
+                  }
                   setActiveChannel("whatsapp");
                   const ch = channels.find(c => c.type === "whatsapp");
                   if (ch) setActiveDestination(ch.masked);
@@ -271,6 +283,8 @@ export function NewDeviceOtpModal({
                 className={`w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
                   activeChannel === "whatsapp"
                     ? "border-[#FC7A00] bg-[#FC7A00]/5 ring-1 ring-[#FC7A00]"
+                    : cooldown > 0
+                    ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
                     : "border-gray-200 bg-white hover:bg-gray-50"
                 }`}
               >
