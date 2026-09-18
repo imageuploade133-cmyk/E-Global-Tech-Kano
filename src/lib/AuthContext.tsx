@@ -76,15 +76,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check if mock query parameter or session is active (run only on client to avoid SSR hydration mismatch)
-    const hasMockQuery = window.location.search.includes("mock=true");
-    const hasMockSession = sessionStorage.getItem("mock") === "true";
+    // Mock mode is strictly restricted to development/testing environments to prevent production authentication bypass
+    const isDevEnv = process.env.NODE_ENV !== "production";
+    const hasMockQuery = isDevEnv && typeof window !== "undefined" && window.location.search.includes("mock=true");
+    const hasMockSession = isDevEnv && typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
 
     if (hasMockQuery) {
       sessionStorage.setItem("mock", "true");
     }
 
-    if (hasMockQuery || hasMockSession) {
+    if (isDevEnv && (hasMockQuery || hasMockSession)) {
       setUser({
         uid: "mock-uid",
         displayName: "JULES VERNE",
@@ -150,13 +151,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (typeof window !== "undefined") {
                 localStorage.setItem("active_session_id", sessData.sessionId);
               }
-            } else if (!res.ok) {
-              // Fail closed: if session establishment returns error, sign out
+            } else {
+              // Fail closed: if session establishment returns error or unexpected payload, sign out immediately
               toast.error(sessData.error || "Session verification failed.");
+              setDeviceAuthState("UNAUTHENTICATED");
               handleAppSignOut(null);
             }
           } catch (sessErr: any) {
-            console.warn("[AuthContext Session Setup Error]:", sessErr.message);
+            console.error("[AuthContext Session Setup Error]:", sessErr.message);
+            // FAIL CLOSED: Immediately reject access on any network/server exception
+            toast.error("Session establishment error. Signing out for security.");
+            setDeviceAuthState("UNAUTHENTICATED");
+            handleAppSignOut(null);
           }
         })();
 

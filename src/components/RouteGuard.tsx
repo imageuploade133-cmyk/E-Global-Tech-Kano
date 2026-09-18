@@ -790,6 +790,31 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   if (!user && !isPublicRoute && !isMockRoute) return null;
   if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) return <>{children}</>;
 
+  // RENDER-LEVEL SECURITY GATE 1: Pending New-Device Verification HARD BLOCK
+  // Prevents zero wallet children from mounting/rendering underneath, independent of PIN state or isPinRequired setting.
+  if (user && deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" && !isPublicRoute && !isMockRoute) {
+    return (
+      <div className="fixed inset-0 z-[99999] bg-white flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="flex flex-col items-center max-w-sm p-6 rounded-3xl bg-[#fdfdfd] border border-gray-100 shadow-sm space-y-4">
+          <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+            <span className="material-symbols-outlined text-[32px] animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>security</span>
+          </div>
+          <div className="space-y-1">
+            <h2 className="font-hanken font-extrabold text-base text-gray-900 uppercase tracking-wider">
+              NEW DEVICE DETECTED
+            </h2>
+            <p className="font-hanken text-xs text-amber-600 font-bold uppercase tracking-widest">
+              Security Verification Required
+            </p>
+          </div>
+          <p className="font-hanken text-xs text-gray-500 font-medium leading-relaxed">
+            For your security, wallet routes and protected financial services are locked on this unrecognized device until you verify the security code.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Wait for Firestore user data to arrive before making any PIN decision
   if (user && !userData && !isMockRoute) {
     return (
