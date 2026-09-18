@@ -114,10 +114,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
+        // Immediately clear any stale local session ID on auth state change before establishing
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("active_session_id");
+        }
+
         // 1. Establish or register active session with backend API
         (async () => {
           try {
-            const localSess = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
             const idToken = await currentUser.getIdToken();
             const res = await fetch("/api/auth/session", {
               method: "POST",
