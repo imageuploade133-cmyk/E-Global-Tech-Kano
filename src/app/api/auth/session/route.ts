@@ -464,6 +464,10 @@ export async function POST(req: Request) {
     };
 
     // Execute race-safe creation check inside a Firestore transaction
+    let activeChallengeId = challengeId;
+    let activeChannel = defaultChannel;
+    let activeDestination = defaultDestination;
+
     await adminDb.runTransaction(async (transaction) => {
       const existingQuery = adminDb.collection("new_device_challenges")
         .where("uid", "==", uid)
@@ -471,28 +475,41 @@ export async function POST(req: Request) {
 
       const existingSnaps = await transaction.get(existingQuery);
 
+      let foundRecent = false;
       if (!existingSnaps.empty) {
         for (const cDoc of existingSnaps.docs) {
-          // Invalidate/consume previous unconsumed challenges for this user so only 1 active challenge exists
-          transaction.update(cDoc.ref, {
-            consumed: true,
-            consumedReason: "SUPERSEDED_BY_NEW_CHALLENGE",
-            consumedAt: nowIso,
-          });
+          const cData = cDoc.data() || {};
+          const createdAgeMs = now - (cData.createdAtMs || 0);
+          // Reuse existing unconsumed challenge if created within the last 3 minutes
+          if (!foundRecent && createdAgeMs < 180000 && (cData.expiresAtMs || 0) > now) {
+            foundRecent = true;
+            activeChallengeId = cData.challengeId || cDoc.id;
+            activeChannel = cData.channel || defaultChannel;
+            activeDestination = cData.destination || defaultDestination;
+          } else {
+            // Supersede older stale unconsumed challenges
+            transaction.update(cDoc.ref, {
+              consumed: true,
+              consumedReason: "SUPERSEDED_BY_NEW_CHALLENGE",
+              consumedAt: nowIso,
+            });
+          }
         }
       }
 
-      const challengeRefNew = adminDb.collection("new_device_challenges").doc(challengeId);
-      transaction.set(challengeRefNew, challengeDoc);
+      if (!foundRecent) {
+        const challengeRefNew = adminDb.collection("new_device_challenges").doc(challengeId);
+        transaction.set(challengeRefNew, challengeDoc);
+      }
     });
 
     // Audit Log
     await adminDb.collection("security_audit_logs").add({
       uid,
       action: "NEW_DEVICE_CHALLENGE_CREATED",
-      challengeId,
-      channel: defaultChannel,
-      maskedDestination: defaultChannel === "whatsapp" ? maskPhone(defaultDestination) : maskEmail(defaultDestination),
+      challengeId: activeChallengeId,
+      channel: activeChannel,
+      maskedDestination: activeChannel === "whatsapp" ? maskPhone(activeDestination) : maskEmail(activeDestination),
       timestamp: nowIso,
     });
 
@@ -515,9 +532,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       requiresOtp: true,
-      challengeId,
-      channel: defaultChannel,
-      maskedDestination: defaultChannel === "whatsapp" ? maskPhone(defaultDestination) : maskEmail(defaultDestination),
+      challengeId: activeChallengeId,
+      channel: activeChannel,
+      maskedDestination: activeChannel === "whatsapp" ? maskPhone(activeDestination) : maskEmail(activeDestination),
       channels,
       otpSent: false,
       cooldownSeconds: 0,

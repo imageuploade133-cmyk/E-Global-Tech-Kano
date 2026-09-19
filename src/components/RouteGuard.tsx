@@ -367,8 +367,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       setIsNewDeviceBlocked(false);
 
       if (userData.currentDeviceId && userData.currentDeviceId !== deviceId) {
-        console.warn("[Device Guard] Active session changed to another device. Suspending active session.");
-        setIsSessionSuspended(true);
+        console.warn("[Device Guard] Active session changed to another device. Quietly signing out old device...");
+        handleAppSignOut(null);
         return;
       }
 
@@ -405,8 +405,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           const isVerifiedOnThisDevice = freshData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
 
           if (isVerifiedOnThisDevice && freshData.currentDeviceId && freshData.currentDeviceId !== deviceId) {
-            console.warn("[Instant Session Check] Session overtaken. Suspending active session.");
-            setIsSessionSuspended(true);
+            console.warn("[Instant Session Check] Session overtaken. Quietly signing out old device...");
+            handleAppSignOut(null);
           }
         }
       } catch (err) {
