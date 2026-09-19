@@ -214,105 +214,101 @@ export function SupportChatModal({ isOpen, onClose }: SupportChatModalProps) {
 
   return (
     <AnimatePresence>
-      {/* Backdrop */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[200050] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.25, ease: "easeInOut" }}
+        className="fixed inset-0 z-[200050] w-full h-full bg-white flex flex-col justify-between overflow-hidden text-black"
       >
-        {/* Modal Dialog Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 30, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 30, scale: 0.95 }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg h-[85vh] max-h-[680px] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-black border border-gray-100"
-        >
-          {/* Modal Header Bar */}
-          <div className="p-4 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white flex items-center justify-between shrink-0 shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0">
-                <span className="material-symbols-outlined text-2xl font-bold">support_agent</span>
-              </div>
-              <div>
-                <h2 className="font-extrabold text-base leading-tight">Live Support & Helpdesk</h2>
-                <p className="text-[11px] text-white/80 font-medium">Real-time Encrypted Support Channel</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500 text-white font-mono font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                Online
-              </span>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white cursor-pointer transition-colors"
-                title="Close"
-              >
-                <span className="material-symbols-outlined text-lg font-bold">close</span>
-              </button>
+        {/* Full Screen Top Header Bar */}
+        <div className="p-4 sm:px-6 bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white flex items-center justify-between shrink-0 shadow-md">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white cursor-pointer transition-all active:scale-95"
+              title="Close Support Chat"
+            >
+              <span className="material-symbols-outlined text-2xl font-bold">arrow_back</span>
+            </button>
+            <div>
+              <h2 className="font-extrabold text-base sm:text-lg leading-tight">Live Support & Helpdesk</h2>
+              <p className="text-[11px] text-white/90 font-medium">Real-time Encrypted Support Channel</p>
             </div>
           </div>
 
-          {/* Messages Stream */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-gray-50/60">
-            {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-400">
-                <div className="w-16 h-16 rounded-2xl bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-3">
-                  <span className="material-symbols-outlined text-3xl font-bold">forum</span>
-                </div>
-                <p className="text-sm font-extrabold text-gray-800">Support Administrator Live Chat</p>
-                <p className="text-xs text-gray-500 max-w-xs mt-1 leading-relaxed">
-                  Have an issue logging in or verifying your device? Send a message or voice note directly to our team.
-                </p>
+          <div className="flex items-center gap-3">
+            <span className="px-3 py-1 rounded-full bg-emerald-500 text-white font-mono font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              Online
+            </span>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 hidden sm:flex items-center justify-center text-white cursor-pointer transition-all"
+              title="Close"
+            >
+              <span className="material-symbols-outlined text-xl font-bold">close</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Messages Stream Container */}
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 bg-gray-50/70 max-w-4xl w-full mx-auto">
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-400 my-auto">
+              <div className="w-20 h-20 rounded-3xl bg-[#FC7A00]/10 flex items-center justify-center text-[#FC7A00] mb-4 shadow-sm">
+                <span className="material-symbols-outlined text-4xl font-bold">support_agent</span>
               </div>
-            ) : (
-              messages.map((msg, idx) => {
-                const isMe = msg.sender === "user";
-                return (
+              <p className="text-base font-extrabold text-gray-800">Administrator Live Support</p>
+              <p className="text-xs text-gray-500 max-w-sm mt-1.5 leading-relaxed">
+                Need help with your account, transactions, or new device verification? Send a message or record a voice note below. An administrator will respond in real time.
+              </p>
+            </div>
+          ) : (
+            messages.map((msg, idx) => {
+              const isMe = msg.sender === "user";
+              return (
+                <div
+                  key={msg.id || idx}
+                  className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                >
                   <div
-                    key={msg.id || idx}
-                    className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                    className={`max-w-[88%] sm:max-w-[70%] p-4 rounded-2xl text-xs font-medium shadow-2xs leading-relaxed ${
+                      isMe
+                        ? "bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white rounded-tr-none"
+                        : "bg-white border border-gray-200/80 text-gray-800 rounded-tl-none"
+                    }`}
                   >
-                    <div
-                      className={`max-w-[85%] p-3.5 rounded-2xl text-xs font-medium shadow-2xs leading-relaxed ${
-                        isMe
-                          ? "bg-gradient-to-r from-[#FC7A00] to-[#FF9022] text-white rounded-tr-none"
-                          : "bg-white border border-gray-200 text-gray-800 rounded-tl-none"
-                      }`}
-                    >
-                      <p className={`text-[10px] font-black uppercase mb-1 tracking-wider ${isMe ? "text-white/80" : "text-[#FC7A00]"}`}>
-                        {isMe ? "You" : "Support Administrator"}
-                      </p>
-                      {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
-                      {msg.audioUrl && (
-                        <div className="mt-1">
-                          <audio controls src={msg.audioUrl} className="w-full h-8 min-w-[180px]" />
-                        </div>
-                      )}
-                    </div>
+                    <p className={`text-[10px] font-black uppercase mb-1 tracking-wider ${isMe ? "text-white/80" : "text-[#FC7A00]"}`}>
+                      {isMe ? "You" : "Support Administrator"}
+                    </p>
+                    {msg.text && <p className="whitespace-pre-wrap text-xs leading-relaxed">{msg.text}</p>}
+                    {msg.audioUrl && (
+                      <div className="mt-1">
+                        <audio controls src={msg.audioUrl} className="w-full h-9 min-w-[200px]" />
+                      </div>
+                    )}
                   </div>
-                );
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-          {/* Input Bar Footer */}
-          <form onSubmit={handleSendTextMessage} className="p-3 bg-white border-t border-gray-200 flex items-center gap-2 shrink-0">
+        {/* Input Bar Footer */}
+        <div className="p-3 sm:p-4 bg-white border-t border-gray-200 shrink-0">
+          <form onSubmit={handleSendTextMessage} className="max-w-4xl w-full mx-auto flex items-center gap-2">
             {isRecording ? (
-              <div className="flex-1 flex items-center justify-between px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 animate-pulse">
+              <div className="flex-1 flex items-center justify-between px-4 py-2.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-600 animate-pulse">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping" />
-                  <span className="text-xs font-bold font-mono">Recording... ({recordingSeconds}s)</span>
+                  <span className="w-3 h-3 rounded-full bg-rose-600 animate-ping" />
+                  <span className="text-xs font-bold font-mono">Recording Voice Note... ({recordingSeconds}s)</span>
                 </div>
                 <button
                   type="button"
                   onClick={stopRecording}
-                  className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-bold cursor-pointer hover:bg-rose-700"
+                  className="px-4 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold cursor-pointer hover:bg-rose-700 active:scale-95 transition-all shadow-xs"
                 >
                   Stop & Send
                 </button>
@@ -324,29 +320,29 @@ export function SupportChatModal({ isOpen, onClose }: SupportChatModalProps) {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Describe your issue or ask for help..."
-                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs font-medium outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
+                  className="flex-1 px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-xs font-medium outline-none focus:border-[#FC7A00] focus:bg-white transition-all"
                 />
 
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                  className="w-11 h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                   title="Record Voice Note"
                 >
-                  <span className="material-symbols-outlined text-lg">mic</span>
+                  <span className="material-symbols-outlined text-xl">mic</span>
                 </button>
 
                 <button
                   type="submit"
                   disabled={sending || !inputMessage.trim()}
-                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white flex items-center justify-center shrink-0 transition-all disabled:opacity-40 cursor-pointer shadow-xs"
+                  className="w-11 h-11 rounded-2xl bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-105 active:scale-95 text-white flex items-center justify-center shrink-0 transition-all disabled:opacity-40 cursor-pointer shadow-xs"
                 >
-                  <span className="material-symbols-outlined text-lg">send</span>
+                  <span className="material-symbols-outlined text-xl">send</span>
                 </button>
               </>
             )}
           </form>
-        </motion.div>
+        </div>
       </motion.div>
     </AnimatePresence>
   );
