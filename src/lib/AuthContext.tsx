@@ -114,12 +114,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        // Immediately clear any stale local session ID on auth state change before establishing
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("active_session_id");
-        }
+        // Read existing local active_session_id to present on reloads/reopens
+        const existingSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
 
-        // 1. Establish or register active session with backend API
+        // 1. Establish or re-verify active session with backend API
         (async () => {
           try {
             const idToken = await currentUser.getIdToken();
@@ -128,9 +126,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${idToken}`,
+                ...(existingSessionId ? { "X-Session-ID": existingSessionId } : {}),
               },
               body: JSON.stringify({
                 action: "establish",
+                existingSessionId: existingSessionId || undefined,
                 deviceName: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
               }),
             });

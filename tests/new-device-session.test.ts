@@ -18,8 +18,16 @@ function maskEmail(email: string): string {
 describe("New Device Session & Trusted Factor Security Suite", () => {
   it("Test 1: Device B login with existing active session -> OTP required", () => {
     const existingActiveSessionId = "sess_userA_123456789";
-    const requiresOtp = Boolean(existingActiveSessionId);
+    const providedSessionIdByDeviceB = "";
+    const requiresOtp = Boolean(existingActiveSessionId && existingActiveSessionId !== providedSessionIdByDeviceB);
     expect(requiresOtp).toBe(true);
+  });
+
+  it("Test 1b: Same Device reload with matching existingSessionId -> OTP NOT required", () => {
+    const existingActiveSessionId = "sess_userA_123456789";
+    const providedSessionIdBySameDevice = "sess_userA_123456789";
+    const requiresOtp = Boolean(existingActiveSessionId && existingActiveSessionId !== providedSessionIdBySameDevice);
+    expect(requiresOtp).toBe(false);
   });
 
   it("Test 2: Device B cannot access wallet before OTP", () => {
@@ -433,7 +441,7 @@ describe("New Device Session & Trusted Factor Security Suite", () => {
     expect(gatedOtpResp).toBeTruthy();
 
     // Verify database activeSessionId matches winner and was NOT overwritten by loser
-    const finalSessionInDb = dbStore["users/user_race_200"].data.activeSessionId;
+    const finalSessionInDb = dbStore["user_race_200"] ? dbStore["user_race_200"].data.activeSessionId : dbStore["users/user_race_200"].data.activeSessionId;
     expect(finalSessionInDb).toBe(firstSessionResp!.sessionId);
     expect(finalSessionInDb).not.toBe(gatedOtpResp!.challengeId);
   });

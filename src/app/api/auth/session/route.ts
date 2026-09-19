@@ -105,6 +105,7 @@ export async function POST(req: Request) {
     const action = body.action || "establish";
     const deviceName = body.deviceName || body.platform || "Web/Mobile Browser";
     const userAgent = req.headers.get("user-agent") || "Unknown";
+    const providedSessionId = body.existingSessionId || req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
     const now = Date.now();
     const nowIso = new Date().toISOString();
 
@@ -386,8 +387,8 @@ export async function POST(req: Request) {
 
       const currentActiveSession = uData.activeSessionId as string | undefined;
 
+      // 1. If NO active session exists on account -> First active session creation
       if (!currentActiveSession) {
-        // First active session creation inside transaction
         const newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
         transaction.set(userRef, {
           activeSessionId: newSessionId,
@@ -397,29 +398,42 @@ export async function POST(req: Request) {
           updatedAt: nowIso,
         }, { merge: true });
 
-        return { establishedSessionId: newSessionId, userData: uData };
+        return { establishedSessionId: newSessionId, isExistingDevice: false, userData: uData };
       }
 
-      return { establishedSessionId: null, userData: uData };
+      // 2. If an active session exists AND matches the device's provided session ID -> SAME DEVICE RELOAD!
+      if (providedSessionId && currentActiveSession === providedSessionId) {
+        // Refresh session device / timestamp without triggering new device OTP challenge
+        transaction.set(userRef, {
+          activeSessionLastSeenAt: nowIso,
+          activeSessionDevice: deviceName,
+          activeSessionUserAgent: userAgent,
+        }, { merge: true });
+
+        return { establishedSessionId: currentActiveSession, isExistingDevice: true, userData: uData };
+      }
+
+      // 3. Otherwise -> ACTIVE SESSION BELONGS TO ANOTHER DEVICE (GENERATE OTP)
+      return { establishedSessionId: null, isExistingDevice: false, userData: uData };
     });
 
-    const { establishedSessionId, userData } = establishResult;
+    const { establishedSessionId, isExistingDevice, userData } = establishResult;
 
-    // IF NO ACTIVE SESSION EXISTED -> Normal First Device Login Established Atomically
+    // IF NO ACTIVE SESSION EXISTED OR SAME DEVICE RELOADED WITH VALID SESSION ID -> Access Granted!
     if (establishedSessionId) {
-      console.log(`[Session API] Established FIRST active session for user ${uid}.`);
+      console.log(`[Session API] ${isExistingDevice ? "Re-verified SAME DEVICE session" : "Established FIRST active session"} for user ${uid}.`);
 
       return NextResponse.json({
         success: true,
         requiresOtp: false,
         sessionId: establishedSessionId,
-        message: "First active session established successfully.",
+        message: isExistingDevice ? "Same device session re-verified successfully." : "First active session established successfully.",
       });
     }
 
 
-    // IF AN ACTIVE SESSION ALREADY EXISTS -> GATED NEW-DEVICE OTP CHALLENGE REQUIRED!
-    console.log(`[Session API] Active session already exists for user ${uid}. Generating New-Device Security Challenge...`);
+    // IF AN ACTIVE SESSION ALREADY EXISTS ON ANOTHER DEVICE -> GATED NEW-DEVICE OTP CHALLENGE REQUIRED!
+    console.log(`[Session API] Active session already exists on another device for user ${uid}. Generating New-Device Security Challenge...`);
 
     // Enforce 24-hour security hold on newly modified recovery contacts to defend against account takeover
     const lastContactChangeAt = userData.lastSecurityContactChangedAt ? new Date(userData.lastSecurityContactChangedAt).getTime() : 0;
