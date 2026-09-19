@@ -439,9 +439,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         router.push("/auth/login");
       }
     } else if (user && userData) {
-      // If user is authenticated but device verification is pending, restrict access completely
-      if (deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION") {
-        return; // Modal handles input; do not allow navigating into wallet routes
+      // If user is authenticated but session check is in progress OR device verification is pending, restrict access completely
+      if (deviceAuthState === "CHECKING_DEVICE_SESSION" || deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION") {
+        return; // Modal or splash handles view; do not allow navigating into wallet routes prematurely
       }
 
       const hasPin = Boolean(userData?.pin || userData?.pinHash);
@@ -815,8 +815,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Wait for Firestore user data to arrive before making any PIN decision
-  if (user && !userData && !isMockRoute) {
+  // Wait for Firestore user data & session state check before making any PIN decision
+  if (user && (deviceAuthState === "CHECKING_DEVICE_SESSION" || !userData) && !isMockRoute) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
         <div className="relative flex flex-col items-center">
