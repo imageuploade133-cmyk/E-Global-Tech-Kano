@@ -169,11 +169,13 @@ export default function PinPage() {
     try {
       const idToken = await user?.getIdToken();
       const channel = resetOption === "email" ? "email" : "whatsapp";
+      const activeSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
       const res = await fetch("/api/auth/pin-verify-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
+          "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {})
         },
         body: JSON.stringify({ otpCode: code, channel })
       });
@@ -204,11 +206,13 @@ export default function PinPage() {
     setIsSavingNewPin(true);
     try {
       const idToken = await user?.getIdToken();
+      const activeSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
       const res = await fetch("/api/auth/pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
+          "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {})
         },
         body: JSON.stringify({
           action: "reset",
@@ -304,11 +308,13 @@ export default function PinPage() {
 
       const idToken = await user?.getIdToken();
       const channel = resetOption === "email" ? "email" : "whatsapp";
+      const activeSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
       const res = await fetch("/api/auth/pin-reset-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
+          "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {})
         },
         body: JSON.stringify({ channel })
       });
