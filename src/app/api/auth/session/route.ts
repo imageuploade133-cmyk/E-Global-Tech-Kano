@@ -1,4 +1,3 @@
-import { getMessaging } from "firebase-admin/messaging";
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
@@ -211,45 +210,12 @@ export async function POST(req: Request) {
         return { previousSessionId: prevSessId, prevDeviceName: prevDevName };
       });
 
-      const previousSessionId = txRes.previousSessionId;
-
-      // Target FCM tokens belonging to the previous active session strictly; EXCLUDE new active device session ID
-      if (previousSessionId && previousSessionId !== newSessionId) {
-        try {
-          const tokensSnap = await adminDb.collection("fcm_tokens").where("userId", "==", uid).get();
-          if (!tokensSnap.empty) {
-            const messaging = getMessaging();
-
-            for (const docSnap of tokensSnap.docs) {
-              const tData = docSnap.data();
-              if (tData.token && tData.sessionId && tData.sessionId === previousSessionId && tData.sessionId !== newSessionId) {
-                await messaging.send({
-                  token: tData.token,
-                  notification: {
-                    title: "⚠️ Account Signed In On Another Device",
-                    body: "Your account was accessed from a new device. This session has been logged out.",
-                  },
-                  data: {
-                    type: "session_revoked",
-                    title: "⚠️ Account Signed In On Another Device",
-                    body: "Your account was accessed from a new device. This session has been logged out.",
-                  },
-                  android: { priority: "high" },
-                  apns: { payload: { aps: { sound: "default" } } },
-                }).catch(() => {});
-              }
-            }
-          }
-        } catch (fcmErr) {
-          console.warn("[Session API] Realtime session revocation push notice exception:", fcmErr);
-        }
-      }
-
       console.log(`[Session API] Successfully verified OTP and activated new session for user ${uid}.`);
 
       return NextResponse.json({
         success: true,
         sessionId: newSessionId,
+        previousDevice: txRes.prevDeviceName || undefined,
         message: "Device verification successful. Active session established.",
       });
     }
