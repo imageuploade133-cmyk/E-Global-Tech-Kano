@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { SupportChatModal } from "@/components/support/SupportChatModal";
+import { getDetailedDeviceName } from "@/lib/device-util";
 import { toast } from "sonner";
 
 export interface NewDeviceOtpModalProps {
@@ -118,7 +119,7 @@ export function NewDeviceOtpModal({
           action: "verify_challenge",
           challengeId,
           otpCode: fullOtp,
-          deviceName: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
+          deviceName: getDetailedDeviceName(),
         }),
       });
 

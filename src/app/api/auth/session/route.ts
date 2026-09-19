@@ -24,6 +24,29 @@ function maskEmail(email: string): string {
   return `${maskedName}@${domain}`;
 }
 
+function parseServerUserAgent(ua: string | null): string {
+  if (!ua) return "Mobile Device";
+  if (/android/i.test(ua)) {
+    const match = ua.match(/;\s*([A-Za-z0-9\s_\-\.]+?)\s*(?:Build|\)|\/)/i);
+    if (match && match[1]) {
+      const model = match[1].trim();
+      if (!/android|linux|wv|mobile|version|K|U;/i.test(model) && model.length > 2) {
+        if (/^SM-|^SAMSUNG/i.test(model)) return `Samsung ${model.replace(/^SAMSUNG\s*/i, "")}`;
+        if (/^M2|^REDMI|^POCO|^XIAOMI/i.test(model)) return `Redmi/Xiaomi (${model})`;
+        if (/^TECNO/i.test(model)) return `Tecno ${model}`;
+        if (/^INFINIX/i.test(model)) return `Infinix ${model}`;
+        return model;
+      }
+    }
+    return "Android Smartphone";
+  }
+  if (/iPhone/i.test(ua)) return "Apple iPhone";
+  if (/iPad/i.test(ua)) return "Apple iPad";
+  if (/Macintosh|Mac OS X/i.test(ua)) return "MacBook / Mac";
+  if (/Windows NT/i.test(ua)) return "Windows PC";
+  return "Mobile Device";
+}
+
 const HMAC_SECRET = process.env.CPANEL_SESSION_SECRET || process.env.JWT_SECRET;
 
 function hashOtp(otp: string): string {
@@ -102,8 +125,11 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || "establish";
-    const deviceName = body.deviceName || body.platform || "Web/Mobile Browser";
     const userAgent = req.headers.get("user-agent") || "Unknown";
+    const rawDeviceName = body.deviceName || body.platform || "";
+    const deviceName = (!rawDeviceName || rawDeviceName === "Web Browser" || rawDeviceName === "Web/Mobile Browser" || rawDeviceName === "Web")
+      ? parseServerUserAgent(userAgent)
+      : rawDeviceName;
     const providedSessionId = body.existingSessionId || req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
     const now = Date.now();
     const nowIso = new Date().toISOString();

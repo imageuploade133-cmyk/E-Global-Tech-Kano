@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
+import { getDetailedDeviceName } from "@/lib/device-util";
 
 export interface NewDeviceSuccessModalProps {
   isOpen: boolean;
@@ -24,8 +25,13 @@ export function NewDeviceSuccessModal({
 
   if (!isOpen) return null;
 
-  const prevDevice = previousDeviceName || "Previous Active Device";
-  const currDevice = currentDeviceName || (typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser");
+  const localDevice = getDetailedDeviceName();
+  const prevDevice = (!previousDeviceName || previousDeviceName === "Web Browser" || previousDeviceName === "Web/Mobile Browser")
+    ? "Previous Mobile Device"
+    : previousDeviceName;
+  const currDevice = (!currentDeviceName || currentDeviceName === "Web Browser" || currentDeviceName === "Web/Mobile Browser")
+    ? localDevice
+    : currentDeviceName;
 
   const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -74,36 +80,41 @@ export function NewDeviceSuccessModal({
           {/* Session Cards Breakdown */}
           <div className="w-full space-y-3 text-left">
             {/* Old Device Card (Revoked) */}
-            <div className="p-3.5 sm:p-4 rounded-2xl bg-gray-50 border border-gray-200 shadow-xs relative overflow-hidden">
-              <div className="flex items-center justify-between mb-1.5">
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 shadow-xs relative overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-rose-500 text-lg font-bold">logout</span>
-                  <span className="text-[10px] sm:text-xs font-black text-rose-600 uppercase tracking-wider">
+                  <div className="w-7 h-7 rounded-lg bg-rose-100/80 flex items-center justify-center text-rose-600 shrink-0">
+                    <span className="material-symbols-outlined text-base font-bold">phonelink_off</span>
+                  </div>
+                  <span className="text-[11px] font-black text-rose-600 uppercase tracking-wider">
                     Old Device Logged Out
                   </span>
                 </div>
-                <span className="text-[9px] bg-rose-100 text-rose-700 font-black px-2 py-0.5 rounded-full border border-rose-200">
+                <span className="text-[9px] bg-rose-100 text-rose-700 font-black px-2.5 py-0.5 rounded-full border border-rose-200 uppercase tracking-wider">
                   Signed Out
                 </span>
               </div>
-              <p className="text-xs font-bold text-black truncate pl-6 font-mono">{prevDevice}</p>
+              <p className="text-xs font-bold text-gray-900 truncate pl-9 font-mono tracking-tight">{prevDevice}</p>
             </div>
 
             {/* New Device Card (Active Now) */}
             <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] shadow-xs">
-              <div className="p-3.5 sm:p-4 rounded-[14px] bg-emerald-50/50 border border-emerald-200/60">
-                <div className="flex items-center justify-between mb-1.5">
+              <div className="p-4 rounded-[14px] bg-emerald-50/60 border border-emerald-200/80">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-emerald-600 text-lg font-bold">phonelink_ring</span>
-                    <span className="text-[10px] sm:text-xs font-black text-emerald-700 uppercase tracking-wider">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                      <span className="material-symbols-outlined text-base font-bold">smartphone</span>
+                    </div>
+                    <span className="text-[11px] font-black text-emerald-700 uppercase tracking-wider">
                       Current Device Active Now
                     </span>
                   </div>
-                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full border border-emerald-300">
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1 uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                     Active Now
                   </span>
                 </div>
-                <p className="text-xs font-bold text-black truncate pl-6 font-mono">{currDevice}</p>
+                <p className="text-xs font-bold text-black truncate pl-9 font-mono tracking-tight">{currDevice}</p>
               </div>
             </div>
           </div>
