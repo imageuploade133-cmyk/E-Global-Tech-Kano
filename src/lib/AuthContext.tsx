@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
 import { NewDeviceOtpModal } from "@/components/layout/NewDeviceOtpModal";
 import { NewDeviceSuccessModal } from "@/components/layout/NewDeviceSuccessModal";
+import { getDetailedDeviceName } from "@/lib/device-util";
 
 
 interface UserData {
@@ -139,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               body: JSON.stringify({
                 action: "establish",
                 existingSessionId: existingSessionId || undefined,
-                deviceName: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
+                deviceName: getDetailedDeviceName(),
               }),
             });
             const sessData = await res.json().catch(() => ({}));
