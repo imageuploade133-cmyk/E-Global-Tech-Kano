@@ -31,17 +31,9 @@ export default function LoginPage() {
         setIsForgotOpen(true);
       }
 
-      // Check if session was revoked and stored in sessionStorage for post-logout notice
-      const storedRevokedData = sessionStorage.getItem("session_revoked_notice");
-      if (storedRevokedData) {
-        try {
-          const parsedData = JSON.parse(storedRevokedData);
-          setRevokedSessionData(parsedData);
-          setIsRevokedModalOpen(true);
-          sessionStorage.removeItem("session_revoked_notice");
-        } catch {
-          sessionStorage.removeItem("session_revoked_notice");
-        }
+      // Clean up legacy session revoked notice if present
+      if (sessionStorage.getItem("session_revoked_notice")) {
+        sessionStorage.removeItem("session_revoked_notice");
       }
     }
   }, []);

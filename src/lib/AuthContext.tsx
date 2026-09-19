@@ -9,6 +9,7 @@ import { handleAppSignOut } from "@/lib/logout-util";
 import { toast } from "sonner";
 import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
 import { NewDeviceOtpModal } from "@/components/layout/NewDeviceOtpModal";
+import { NewDeviceSuccessModal } from "@/components/layout/NewDeviceSuccessModal";
 
 
 interface UserData {
@@ -45,9 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
   const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
 
-  // New Device OTP Challenge Modal State & Device Auth State
+  // New Device OTP Challenge & Activation Success State
   const [deviceAuthState, setDeviceAuthState] = useState<DeviceAuthState>("UNAUTHENTICATED");
   const [isNewDeviceOtpOpen, setIsNewDeviceOtpOpen] = useState(false);
+  const [isNewDeviceSuccessOpen, setIsNewDeviceSuccessOpen] = useState(false);
+  const [previousDeviceName, setPreviousDeviceName] = useState<string>("");
   const [newDeviceChallenge, setNewDeviceChallenge] = useState<{
     challengeId: string;
     channel: "whatsapp" | "email";
@@ -184,35 +187,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const remoteActiveSessionId = data.activeSessionId as string | undefined;
 
             if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
-              console.warn("[Session Revoked] Remote active session changed. Executing immediate security logout & opening modal...");
+              console.warn("[Session Revoked] Remote active session changed. Quietly executing security logout for old device...");
 
               // 1. Immediately clear local session ID so no subsequent API request can use it
               if (typeof window !== "undefined") {
                 localStorage.removeItem("active_session_id");
               }
 
-              // 2. Read previous session metadata stored in Firestore doc during session replacement
-              const revokedDevice = (data.previousSessionDevice as string) || "Mobile App / Web Browser";
-              const revokedAtTime = (data.previousSessionRevokedAt as string) || new Date().toISOString();
-              const newActiveDevice = (data.activeSessionDevice as string) || "New Active Device";
-              const newActiveTime = (data.activeSessionCreatedAt as string) || new Date().toISOString();
-
-              const revokedPayload = {
-                previousDevice: revokedDevice,
-                previousCreatedAt: revokedAtTime,
-                currentDevice: newActiveDevice,
-                currentCreatedAt: newActiveTime,
-              };
-
-              // Persist revoked session payload to sessionStorage so LoginPage renders notice post-redirect
-              if (typeof window !== "undefined") {
-                sessionStorage.setItem("session_revoked_notice", JSON.stringify(revokedPayload));
-              }
-
-              setRevokedSessionData(revokedPayload);
-              setIsRevokedModalOpen(true);
-
-              // 3. IMMEDIATELY execute security logout from Firebase Auth
+              // 2. Execute quiet security logout from Firebase Auth without showing modal on Device A
               handleAppSignOut(null);
               return;
             }
@@ -306,14 +288,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           initialChannel={newDeviceChallenge.channel}
           maskedDestination={newDeviceChallenge.maskedDestination}
           channels={newDeviceChallenge.channels}
-          onVerifiedSuccess={(newSessId) => {
+          onVerifiedSuccess={(newSessId, prevDev) => {
             if (typeof window !== "undefined") {
               localStorage.setItem("active_session_id", newSessId);
             }
-            setDeviceAuthState("AUTHENTICATED_VERIFIED");
             setIsNewDeviceOtpOpen(false);
             setNewDeviceChallenge(null);
-            toast.success("New device verified! Welcome to E-Global Pay.");
+            if (prevDev) {
+              setPreviousDeviceName(prevDev);
+            }
+            setIsNewDeviceSuccessOpen(true);
           }}
           onCancel={() => {
             setIsNewDeviceOtpOpen(false);
@@ -323,6 +307,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
+
+      <NewDeviceSuccessModal
+        isOpen={isNewDeviceSuccessOpen}
+        previousDeviceName={previousDeviceName}
+        onContinue={() => {
+          setIsNewDeviceSuccessOpen(false);
+          setDeviceAuthState("AUTHENTICATED_VERIFIED");
+          toast.success("Welcome to E-Global Pay!");
+        }}
+      />
     </AuthContext.Provider>
   );
 }

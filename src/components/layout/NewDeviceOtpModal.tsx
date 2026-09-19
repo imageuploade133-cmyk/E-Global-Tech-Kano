@@ -12,7 +12,7 @@ export interface NewDeviceOtpModalProps {
   initialChannel: "whatsapp" | "email";
   maskedDestination: string;
   channels: Array<{ type: "whatsapp" | "email"; label: string; masked: string }>;
-  onVerifiedSuccess: (sessionId: string) => void;
+  onVerifiedSuccess: (sessionId: string, previousDevice?: string) => void;
   onCancel: () => void;
 }
 
@@ -132,7 +132,7 @@ export function NewDeviceOtpModal({
       }
 
       toast.success("New device successfully verified!");
-      onVerifiedSuccess(data.sessionId);
+      onVerifiedSuccess(data.sessionId, data.previousDevice);
 
     } catch (err: any) {
       toast.error(err.message || "An unexpected error occurred during verification.");
