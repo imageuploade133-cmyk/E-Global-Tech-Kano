@@ -203,9 +203,9 @@ export function NewDeviceOtpModal({
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="fixed inset-0 z-[200000] w-full h-full bg-white flex flex-col justify-between overflow-hidden p-3 sm:p-5 text-black"
+        className="fixed inset-0 z-[200000] w-full h-full bg-white flex flex-col justify-between overflow-y-auto p-4 sm:p-6 text-black"
       >
-        <div className="max-w-md w-full mx-auto my-auto flex flex-col items-center text-center justify-center space-y-2.5 sm:space-y-3.5 py-1">
+        <div className="max-w-md w-full mx-auto my-auto flex flex-col items-center text-center justify-center space-y-3 sm:space-y-4 py-6 sm:py-8">
           {/* Header Icon Badge */}
           <div className="w-12 h-12 rounded-2xl bg-[#FC7A00]/10 border border-[#FC7A00]/30 flex items-center justify-center text-[#FC7A00] shadow-xs">
             <span className="material-symbols-outlined text-2xl font-bold">verified_user</span>
