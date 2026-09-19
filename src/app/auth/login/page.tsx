@@ -45,12 +45,11 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast.success("Welcome back!");
-      router.push("/auth/pin");
+      // RouteGuard handles seamless navigation once session verification resolves
     } catch (error: unknown) {
       console.error("Login Error:", error);
       const friendlyMessage = formatFirebaseError(error);
       toast.error(friendlyMessage);
-    } finally {
       setLoading(false);
     }
   };

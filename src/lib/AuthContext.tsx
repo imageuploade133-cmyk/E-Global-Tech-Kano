@@ -24,7 +24,7 @@ interface UserData {
   [key: string]: unknown;
 }
 
-export type DeviceAuthState = "AUTHENTICATED_VERIFIED" | "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" | "UNAUTHENTICATED";
+export type DeviceAuthState = "AUTHENTICATED_VERIFIED" | "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" | "CHECKING_DEVICE_SESSION" | "UNAUTHENTICATED";
 
 interface AuthContextType {
   user: User | null;
@@ -118,6 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
+        setDeviceAuthState("CHECKING_DEVICE_SESSION");
+
         // Read existing local active_session_id to present on reloads/reopens
         const existingSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
 
