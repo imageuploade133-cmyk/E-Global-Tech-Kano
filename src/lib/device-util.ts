@@ -12,7 +12,7 @@ export function getDetailedDeviceName(): string {
     // Try matching specific model string inside User-Agent (e.g., "; SM-G998B Build/" or "; Tecno CK7n Build/")
     const modelMatch = ua.match(/;\s*([A-Za-z0-9\s_\-\.]+?)\s*(?:Build|\)|\/)/i);
     if (modelMatch && modelMatch[1]) {
-      let rawModel = modelMatch[1].trim();
+      const rawModel = modelMatch[1].trim();
 
       // Clean up common prefix clutter
       if (!/android|linux|wv|mobile|version|K|U;/i.test(rawModel) && rawModel.length > 2) {
