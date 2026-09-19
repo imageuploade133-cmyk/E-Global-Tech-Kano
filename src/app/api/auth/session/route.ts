@@ -128,17 +128,17 @@ export async function POST(req: Request) {
         const userDoc = await transaction.get(userRef);
 
         if (!challengeSnap.exists) {
-          throw new Error("CHALLENGE_INVALID: Security challenge document not found.");
+          throw new Error("CHALLENGE_INVALID: Security verification document not found.");
         }
 
         const chData = challengeSnap.data() || {};
 
         if (chData.uid !== uid) {
-          throw new Error("CHALLENGE_INVALID: Challenge does not belong to authenticated user.");
+          throw new Error("CHALLENGE_INVALID: Security verification does not belong to authenticated user.");
         }
 
         if (chData.consumed === true) {
-          throw new Error("CHALLENGE_CONSUMED: This security challenge code has already been used.");
+          throw new Error("CHALLENGE_CONSUMED: This security verification code has already been used.");
         }
 
         if (now > chData.expiresAtMs) {
@@ -146,13 +146,13 @@ export async function POST(req: Request) {
         }
 
         if (chData.attempts >= 3) {
-          throw new Error("CHALLENGE_LOCKED: Too many incorrect attempts. Please generate a new security challenge.");
+          throw new Error("CHALLENGE_LOCKED: Too many incorrect attempts. Please request a new verification code.");
         }
 
         // Validate cumulative failure limit across all resends for this challenge
         const currentTotalFailed = chData.totalFailedAttempts || chData.attempts || 0;
         if (currentTotalFailed >= 3) {
-          throw new Error("CHALLENGE_LOCKED: Too many incorrect attempts. Please generate a new security challenge.");
+          throw new Error("CHALLENGE_LOCKED: Too many incorrect attempts. Please request a new verification code.");
         }
 
         // Validate cryptographically hashed OTP code
@@ -235,29 +235,29 @@ export async function POST(req: Request) {
       const resendRes = await adminDb.runTransaction(async (transaction) => {
         const challengeSnap = await transaction.get(challengeRef);
         if (!challengeSnap.exists) {
-          throw new Error("CHALLENGE_INVALID: Security challenge document not found.");
+          throw new Error("CHALLENGE_INVALID: Security verification document not found.");
         }
 
         const chData = challengeSnap.data() || {};
 
         if (chData.uid !== uid) {
-          throw new Error("CHALLENGE_INVALID: Challenge ownership mismatch.");
+          throw new Error("CHALLENGE_INVALID: Verification ownership mismatch.");
         }
 
         if (chData.consumed === true) {
-          throw new Error("CHALLENGE_CONSUMED: Challenge already consumed. Please sign in again.");
+          throw new Error("CHALLENGE_CONSUMED: Verification session expired or consumed. Please sign in again.");
         }
 
         const cumulativeFailures = chData.totalFailedAttempts || chData.attempts || 0;
         if (chData.attempts >= 3 || cumulativeFailures >= 3) {
-          throw new Error("CHALLENGE_LOCKED: Too many failed attempts. Security challenge locked. Please generate a new login request.");
+          throw new Error("CHALLENGE_LOCKED: Too many failed attempts. Security verification locked. Please generate a new login request.");
         }
 
         // Check 60-second resend cooldown inside transaction to prevent concurrent bypass
         const lastSentAtMs = chData.lastSentAtMs || 0;
         if (now - lastSentAtMs < 60000) {
           const remaining = Math.ceil((60000 - (now - lastSentAtMs)) / 1000);
-          throw new Error(`CHALLENGE_COOLDOWN: Please wait ${remaining} second(s) before requesting a new code.`);
+          throw new Error(`CHALLENGE_COOLDOWN: Please wait ${remaining} second(s) before requesting a new verification code.`);
         }
 
         const userSnap = await transaction.get(userRef);
@@ -554,7 +554,7 @@ export async function POST(req: Request) {
       const maskedDestination = parts[4] || "";
 
       return NextResponse.json({
-        error: `Security Rate Limit: Please wait ${remaining} second(s) before generating a new security challenge.`,
+        error: `Security Rate Limit: Please wait ${remaining} second(s) before requesting a new verification code.`,
         requiresOtp: true,
         challengeId,
         channel,
