@@ -43,39 +43,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email, password);
       toast.success("Welcome back!");
-
-      // Query session status prior to routing so new devices open New Device Login Security directly
-      try {
-        const idToken = await cred.user.getIdToken();
-        const existingSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
-
-        const res = await fetch("/api/auth/session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-            ...(existingSessionId ? { "X-Session-ID": existingSessionId } : {}),
-          },
-          body: JSON.stringify({
-            action: "establish",
-            existingSessionId: existingSessionId || undefined,
-            deviceName: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
-          }),
-        });
-
-        const sessData = await res.json().catch(() => ({}));
-
-        if (res.ok && sessData.requiresOtp) {
-          // New device detected -> stay on route and let AuthContext open New Device Login Security modal cleanly!
-          setLoading(false);
-          return;
-        }
-      } catch (sessErr) {
-        console.warn("[Login Session Check Exception]:", sessErr);
-      }
-
       router.push("/auth/pin");
     } catch (error: unknown) {
       console.error("Login Error:", error);

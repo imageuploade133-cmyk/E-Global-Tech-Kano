@@ -40,6 +40,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const inFlightEstablishRef = React.useRef<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -122,6 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // 1. Establish or re-verify active session with backend API
         (async () => {
+          if (inFlightEstablishRef.current) return;
+          inFlightEstablishRef.current = true;
           try {
             const idToken = await currentUser.getIdToken();
             const res = await fetch("/api/auth/session", {
@@ -174,6 +177,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             toast.error("Session establishment error. Signing out for security.");
             setDeviceAuthState("UNAUTHENTICATED");
             handleAppSignOut(null);
+          } finally {
+            inFlightEstablishRef.current = false;
           }
         })();
 
