@@ -198,22 +198,35 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
     return decoded;
   }
 
-  // 2. Determine if this request is session establishment or registration finalization
+  // 2. Determine if this request is session establishment, registration finalization, or PIN reset recovery
   let isSessionExempt = false;
   if (req.method === "POST" && req.url) {
     try {
       const reqUrl = new URL(req.url, "http://localhost");
-      if (reqUrl.pathname.endsWith("/api/auth/session") || reqUrl.pathname.endsWith("/api/auth/register-complete")) {
+      const pName = reqUrl.pathname;
+      if (
+        pName.endsWith("/api/auth/session") ||
+        pName.endsWith("/api/auth/register-complete") ||
+        pName.endsWith("/api/auth/pin-reset-otp") ||
+        pName.endsWith("/api/auth/pin-verify-otp") ||
+        pName.endsWith("/api/auth/pin")
+      ) {
         isSessionExempt = true;
       }
     } catch {
-      if (req.url.includes("/api/auth/session") || req.url.includes("/api/auth/register-complete")) {
+      if (
+        req.url.includes("/api/auth/session") ||
+        req.url.includes("/api/auth/register-complete") ||
+        req.url.includes("/api/auth/pin-reset-otp") ||
+        req.url.includes("/api/auth/pin-verify-otp") ||
+        req.url.includes("/api/auth/pin")
+      ) {
         isSessionExempt = true;
       }
     }
   }
 
-  // 3. For session/registration endpoints, pre-existing X-Session-ID is exempt.
+  // 3. For session, registration, and PIN recovery endpoints, pre-existing X-Session-ID is exempt.
   // For other protected endpoints, validate X-Session-ID if present or if activeSessionId is set on user document.
   if (!isSessionExempt) {
     const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
