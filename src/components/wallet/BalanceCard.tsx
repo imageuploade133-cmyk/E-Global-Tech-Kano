@@ -533,7 +533,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setRecentsLoading(true);
     try {
       // Fetch Recents with resilient fallback
-      let recentsList: SavedRecipientItem[] = [];
+      const recentsList: SavedRecipientItem[] = [];
       try {
         const recentsQuery = query(
           collection(db, "recents"),
@@ -565,7 +565,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       setRecents(recentsList);
 
       // Fetch Beneficiaries with resilient fallback
-      let benList: SavedRecipientItem[] = [];
+      const benList: SavedRecipientItem[] = [];
       try {
         const benQuery = query(
           collection(db, "beneficiaries"),
