@@ -224,10 +224,19 @@ export const BillCheckoutModal: React.FC<BillCheckoutModalProps> = ({
                 </div>
                 <div className="relative">
                   <input
-                    type="text"
+                    type={(pageCategory === "AIRTIME" || pageCategory === "DATA") ? "tel" : "text"}
+                    inputMode={(pageCategory === "AIRTIME" || pageCategory === "DATA") ? "numeric" : undefined}
+                    pattern={(pageCategory === "AIRTIME" || pageCategory === "DATA") ? "[0-9]*" : undefined}
                     placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
                     value={customerId}
-                    onChange={(e) => onCustomerIdChange(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (pageCategory === "AIRTIME" || pageCategory === "DATA") {
+                        onCustomerIdChange(val.replace(/\D/g, ""));
+                      } else {
+                        onCustomerIdChange(val);
+                      }
+                    }}
                     className={`w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all ${
                       (pageCategory === "AIRTIME" || pageCategory === "DATA") ? "pr-24" : customerId.length >= 6 ? "pr-20" : "pr-4"
                     }`}
