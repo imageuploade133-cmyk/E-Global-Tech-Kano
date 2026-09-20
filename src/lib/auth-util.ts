@@ -200,27 +200,15 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
 
   // 2. Determine if this request is session establishment, registration finalization, or PIN reset recovery
   let isSessionExempt = false;
-  if (req.method === "POST" && req.url) {
+  if (req.url) {
     try {
       const reqUrl = new URL(req.url, "http://localhost");
       const pName = reqUrl.pathname;
-      if (
-        pName.endsWith("/api/auth/session") ||
-        pName.endsWith("/api/auth/register-complete") ||
-        pName.endsWith("/api/auth/pin-reset-otp") ||
-        pName.endsWith("/api/auth/pin-verify-otp") ||
-        pName.endsWith("/api/auth/pin")
-      ) {
+      if (pName.includes("/api/auth/")) {
         isSessionExempt = true;
       }
     } catch {
-      if (
-        req.url.includes("/api/auth/session") ||
-        req.url.includes("/api/auth/register-complete") ||
-        req.url.includes("/api/auth/pin-reset-otp") ||
-        req.url.includes("/api/auth/pin-verify-otp") ||
-        req.url.includes("/api/auth/pin")
-      ) {
+      if (req.url.includes("/api/auth/")) {
         isSessionExempt = true;
       }
     }
