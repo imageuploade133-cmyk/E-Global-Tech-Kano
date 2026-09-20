@@ -511,7 +511,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         logging: false,
       });
 
-      canvas.toBlob((blob) => {
+      canvas.toBlob(async (blob) => {
         if (!blob) {
           console.error("Image generation failed: canvas.toBlob returned null.");
           toast.dismiss();
@@ -520,36 +520,43 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           return;
         }
 
-        const imageFileName = `Receipt_${transaction.reference}.png`;
-        const imageDataUri = canvas.toDataURL("image/png");
-        const bridge =
-          typeof window !== "undefined"
-            ? (window as any).flutter_inappwebview
-            : null;
+        try {
+          const imageFileName = `Receipt_${transaction.reference}.png`;
+          const imageDataUri = canvas.toDataURL("image/png");
+          const bridge =
+            typeof window !== "undefined"
+              ? (window as any).flutter_inappwebview
+              : null;
 
-        if (bridge && typeof bridge.callHandler === "function") {
-          const saved = await bridge.callHandler("downloadBase64File", {
-            data: imageDataUri,
-            fileName: imageFileName,
-            mimeType: "image/png",
-          });
-          if (saved !== true && !saved?.success) {
-            throw new Error("Native image download failed.");
+          if (bridge && typeof bridge.callHandler === "function") {
+            const saved = await bridge.callHandler("downloadBase64File", {
+              data: imageDataUri,
+              fileName: imageFileName,
+              mimeType: "image/png",
+            });
+            if (saved !== true && !saved?.success) {
+              throw new Error("Native image download failed.");
+            }
+          } else {
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = imageFileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
           }
-        } else {
-          const objectUrl = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = objectUrl;
-          link.download = imageFileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        }
 
-        toast.dismiss();
-        toast.success("Image downloaded!");
-        setGenerating(false);
+          toast.dismiss();
+          toast.success("Image downloaded!");
+          setGenerating(false);
+        } catch (err) {
+          console.error("Image download failed:", err);
+          toast.dismiss();
+          toast.error("Failed to download image.");
+          setGenerating(false);
+        }
       }, "image/png");
     } catch (err) {
       console.error("Image generation failed:", err);
