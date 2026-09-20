@@ -11,6 +11,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useScrollRestoration } from "@/lib/useScrollRestoration";
 
 // Persistently identify the device using sessionStorage instead of localStorage (Bypasses caching on Ctrl+F5)
 const getOrCreateDeviceId = (): string => {
@@ -36,6 +37,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { config } = useAppConfig();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Enable global scroll position persistence & back history scroll restoration
+  useScrollRestoration();
 
   const [flwVerifying, setFlwVerifying] = useState(false);
   const [flwMessage, setFlwMessage] = useState("");
