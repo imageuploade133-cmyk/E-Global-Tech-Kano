@@ -37,11 +37,6 @@ export default function GenericBillPage() {
   const [pagePreloading, setPagePreloading] = useState(true);
 
   useEffect(() => {
-    try {
-      window.scrollTo({ top: 0, behavior: "instant" });
-    } catch (err) {
-      console.warn("scrollTo failed:", err);
-    }
     const timer = setTimeout(() => {
       setPagePreloading(false);
     }, 1200);
