@@ -426,7 +426,26 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       pdf.addImage(imgData, "PNG", xPos, yPos, imgWidth, imgHeight, undefined, "FAST");
 
-      pdf.save(`Receipt_${transaction.reference}.pdf`);
+      const pdfFileName = `Receipt_${transaction.reference}.pdf`;
+      const pdfDataUri = pdf.output("datauristring");
+      const bridge =
+        typeof window !== "undefined"
+          ? (window as any).flutter_inappwebview
+          : null;
+
+      if (bridge && typeof bridge.callHandler === "function") {
+        const saved = await bridge.callHandler("downloadBase64File", {
+          data: pdfDataUri,
+          fileName: pdfFileName,
+          mimeType: "application/pdf",
+        });
+        if (saved !== true && !saved?.success) {
+          throw new Error("Native PDF download failed.");
+        }
+      } else {
+        pdf.save(pdfFileName);
+      }
+
       toast.dismiss();
       toast.success("HD PDF Receipt downloaded!");
     } catch (err) {
