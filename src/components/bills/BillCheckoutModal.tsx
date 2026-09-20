@@ -164,40 +164,74 @@ export const BillCheckoutModal: React.FC<BillCheckoutModalProps> = ({
                     Select Payment Wallet
                   </label>
                   <div className="grid grid-cols-2 gap-3">
+                    {/* Main NGN Wallet Card */}
                     <button
                       type="button"
                       onClick={() => onWalletTypeChange("MAIN")}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
+                      className={`p-[1.5px] rounded-2xl transition-all duration-300 cursor-pointer text-left ${
                         walletTypeSelected === "MAIN"
-                          ? "bg-orange-50/50 border-[#FC7A00]"
-                          : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                          ? "bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#E06600] shadow-md shadow-[#FC7A00]/15 scale-[1.02]"
+                          : "bg-gray-200/80 hover:bg-gray-300 opacity-90"
                       }`}
                     >
-                      <div>
-                        <span className="font-bold text-[8.5px] text-gray-400 uppercase">
-                          Main Wallet
-                        </span>
-                        <p className="font-mono text-xs font-bold text-black mt-1">
-                          ₦{balance.toLocaleString()}
+                      <div className={`p-3 rounded-[14.5px] h-full flex flex-col justify-between transition-colors ${
+                        walletTypeSelected === "MAIN" ? "bg-white" : "bg-gray-50/90"
+                      }`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`material-symbols-outlined text-base ${
+                              walletTypeSelected === "MAIN" ? "text-[#FC7A00]" : "text-gray-400"
+                            }`}>
+                              account_balance_wallet
+                            </span>
+                            <span className="font-extrabold text-[10px] text-gray-700 uppercase tracking-wider">
+                              Main Wallet
+                            </span>
+                          </div>
+                          {walletTypeSelected === "MAIN" && (
+                            <span className="material-symbols-outlined text-xs text-[#FC7A00] font-black">
+                              check_circle
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-mono text-sm font-black text-black tracking-tight">
+                          ₦{balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </button>
 
+                    {/* Bonus Reward Wallet Card */}
                     <button
                       type="button"
                       onClick={() => onWalletTypeChange("BONUS")}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all duration-300 cursor-pointer shadow-none ${
+                      className={`p-[1.5px] rounded-2xl transition-all duration-300 cursor-pointer text-left ${
                         walletTypeSelected === "BONUS"
-                          ? "bg-orange-50/50 border-[#FC7A00]"
-                          : "bg-gray-50/50 border-gray-150 hover:bg-gray-50"
+                          ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-[#70AC00] shadow-md shadow-emerald-500/15 scale-[1.02]"
+                          : "bg-gray-200/80 hover:bg-gray-300 opacity-90"
                       }`}
                     >
-                      <div>
-                        <span className="font-bold text-[8.5px] text-gray-400 uppercase">
-                          Bonus Wallet
-                        </span>
-                        <p className="font-mono text-xs font-bold text-emerald-600 mt-1">
-                          ₦{bonusBalance.toLocaleString()}
+                      <div className={`p-3 rounded-[14.5px] h-full flex flex-col justify-between transition-colors ${
+                        walletTypeSelected === "BONUS" ? "bg-white" : "bg-gray-50/90"
+                      }`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`material-symbols-outlined text-base ${
+                              walletTypeSelected === "BONUS" ? "text-emerald-600" : "text-gray-400"
+                            }`}>
+                              stars
+                            </span>
+                            <span className="font-extrabold text-[10px] text-gray-700 uppercase tracking-wider">
+                              Bonus Wallet
+                            </span>
+                          </div>
+                          {walletTypeSelected === "BONUS" && (
+                            <span className="material-symbols-outlined text-xs text-emerald-600 font-black">
+                              check_circle
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-mono text-sm font-black text-emerald-600 tracking-tight">
+                          ₦{bonusBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </button>
