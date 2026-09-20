@@ -126,6 +126,26 @@ export function SupportChatSection() {
   // Start Audio Recording
   const startRecording = async () => {
     try {
+      // Android/iOS WebView needs the native permission flow before getUserMedia.
+      const bridge =
+        typeof window !== "undefined"
+          ? (window as any).flutter_inappwebview
+          : null;
+
+      if (bridge && typeof bridge.callHandler === "function") {
+        const granted = await bridge.callHandler("requestMicrophonePermission");
+        if (granted === false) {
+          throw new Error("Microphone permission was denied.");
+        }
+      }
+
+      if (
+        !navigator.mediaDevices ||
+        typeof navigator.mediaDevices.getUserMedia !== "function"
+      ) {
+        throw new Error("Microphone recording is not supported on this device.");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
       const mediaRecorder = new MediaRecorder(stream);

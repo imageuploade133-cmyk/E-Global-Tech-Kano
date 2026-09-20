@@ -65,15 +65,75 @@ export const BillCheckoutModal: React.FC<BillCheckoutModalProps> = ({
   };
 
   const handlePickContact = async () => {
-    if (typeof window !== "undefined" && "contacts" in navigator && "select" in (navigator as any).contacts) {
+    // The mobile app provides a native contact picker because the Web Contact Picker
+    // API is not available in Android WebView on many devices.
+    if (typeof window !== "undefined") {
+      const bridge = (window as any).flutter_inappwebview;
+      if (bridge && typeof bridge.callHandler === "function") {
+        try {
+          const nativeContact = await bridge.callHandler("pickContact");
+          if (nativeContact && typeof nativeContact === "object") {
+            const rawPhone =
+              nativeContact.primaryPhone ||
+              nativeContact.phone ||
+              nativeContact.phoneNumber ||
+              (Array.isArray(nativeContact.phones) ? nativeContact.phones[0] : "");
+
+            if (typeof rawPhone === "string" && rawPhone.trim()) {
+              const formatted = formatPhoneNumberForVtu(rawPhone);
+              onCustomerIdChange(formatted);
+
+              const contactName =
+                nativeContact.displayName ||
+                nativeContact.name ||
+                "";
+
+              toast.success(
+                `Selected contact: ${contactName ? contactName + " " : ""}(${formatted})`,
+              );
+            } else {
+              toast.error("The selected contact has no phone number.");
+            }
+          }
+          return;
+        } catch (err) {
+          console.error("[Contact Picker] Native picker failed:", err);
+          toast.error("Unable to access contacts list.");
+          return;
+        }
+      }
+    }
+
+    // Normal browser fallback for platforms that implement Contact Picker.
+    if (
+      typeof window !== "undefined" &&
+      "contacts" in navigator &&
+      "select" in (navigator as any).contacts
+    ) {
       try {
-        const contacts = await (navigator as any).contacts.select(["tel", "name"], { multiple: false });
-        if (contacts && contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
+        const contacts = await (navigator as any).contacts.select(
+          ["tel", "name"],
+          { multiple: false },
+        );
+
+        if (
+          contacts &&
+          contacts.length > 0 &&
+          contacts[0].tel &&
+          contacts[0].tel.length > 0
+        ) {
           const rawTel = contacts[0].tel[0];
           const formatted = formatPhoneNumberForVtu(rawTel);
           onCustomerIdChange(formatted);
-          const contactName = contacts[0].name && contacts[0].name.length > 0 ? contacts[0].name[0] : "";
-          toast.success(`Selected contact: ${contactName ? contactName + " " : ""}(${formatted})`);
+
+          const contactName =
+            contacts[0].name && contacts[0].name.length > 0
+              ? contacts[0].name[0]
+              : "";
+
+          toast.success(
+            `Selected contact: ${contactName ? contactName + " " : ""}(${formatted})`,
+          );
         }
       } catch (err: any) {
         if (err.name !== "InvalidStateError" && err.name !== "AbortError") {
@@ -81,7 +141,9 @@ export const BillCheckoutModal: React.FC<BillCheckoutModalProps> = ({
         }
       }
     } else {
-      toast.info("Contact picker is not supported on this browser/device. Please enter the number manually.");
+      toast.info(
+        "Contact picker is not supported on this browser/device. Please enter the number manually.",
+      );
     }
   };
 
