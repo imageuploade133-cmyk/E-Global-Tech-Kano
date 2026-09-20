@@ -106,12 +106,12 @@ export function NewDeviceSuccessModal({
                       <span className="material-symbols-outlined text-base font-bold">smartphone</span>
                     </div>
                     <span className="text-[11px] font-black text-emerald-700 uppercase tracking-wider">
-                      Current Device Active Now
+                      Active Device Now
                     </span>
                   </div>
                   <span className="text-[9px] bg-emerald-100 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1 uppercase tracking-wider">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                    Active Now
+                    Active
                   </span>
                 </div>
                 <p className="text-xs font-bold text-black truncate pl-9 font-mono tracking-tight">{currDevice}</p>
