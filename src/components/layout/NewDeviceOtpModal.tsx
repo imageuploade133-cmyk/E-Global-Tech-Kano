@@ -206,26 +206,7 @@ export function NewDeviceOtpModal({
         transition={{ duration: 0.2, ease: "easeOut" }}
         className="fixed inset-0 z-[200000] w-full h-full bg-white flex flex-col justify-between overflow-y-auto p-4 sm:p-6 text-black"
       >
-        <div className="max-w-md w-full mx-auto my-auto flex flex-col items-center text-center justify-center space-y-3 sm:space-y-4 py-4 sm:py-6">
-          {/* Top Bar Clear Verification Action Header */}
-          <div className="w-full flex items-center justify-between border-b border-gray-100 pb-2 mb-1">
-            <div className="flex items-center gap-1.5 text-xs font-black text-gray-500 uppercase tracking-wider">
-              <span className="material-symbols-outlined text-sm text-[#FC7A00]">shield_lock</span>
-              <span>Device Security</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                toast.info("Verification cleared. Returning to login page...");
-                onCancel();
-              }}
-              className="px-2.5 py-1 rounded-xl bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-gray-200"
-            >
-              <span className="material-symbols-outlined text-sm">cancel</span>
-              <span>Clear Verification</span>
-            </button>
-          </div>
-
+        <div className="max-w-md w-full mx-auto my-auto flex flex-col items-center text-center justify-center space-y-3 sm:space-y-4 py-6 sm:py-8">
           {/* Header Icon Badge */}
           <div className="w-12 h-12 rounded-2xl bg-[#FC7A00]/10 border border-[#FC7A00]/30 flex items-center justify-center text-[#FC7A00] shadow-xs">
             <span className="material-symbols-outlined text-2xl font-bold">verified_user</span>
