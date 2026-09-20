@@ -3,6 +3,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Biller, BillItem, WalletType } from "./types";
+import { toast } from "sonner";
 
 interface BillCheckoutModalProps {
   isOpen: boolean;
@@ -54,6 +55,35 @@ export const BillCheckoutModal: React.FC<BillCheckoutModalProps> = ({
   getReviewModalTitle,
 }) => {
   if (!isOpen || !selectedItem || !selectedBiller) return null;
+
+  const formatPhoneNumberForVtu = (rawPhone: string): string => {
+    let cleaned = rawPhone.replace(/\D/g, "");
+    if (cleaned.startsWith("234") && cleaned.length > 10) {
+      cleaned = "0" + cleaned.slice(3);
+    }
+    return cleaned;
+  };
+
+  const handlePickContact = async () => {
+    if (typeof window !== "undefined" && "contacts" in navigator && "select" in (navigator as any).contacts) {
+      try {
+        const contacts = await (navigator as any).contacts.select(["tel", "name"], { multiple: false });
+        if (contacts && contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
+          const rawTel = contacts[0].tel[0];
+          const formatted = formatPhoneNumberForVtu(rawTel);
+          onCustomerIdChange(formatted);
+          const contactName = contacts[0].name && contacts[0].name.length > 0 ? contacts[0].name[0] : "";
+          toast.success(`Selected contact: ${contactName ? contactName + " " : ""}(${formatted})`);
+        }
+      } catch (err: any) {
+        if (err.name !== "InvalidStateError" && err.name !== "AbortError") {
+          toast.error("Unable to access contacts list.");
+        }
+      }
+    } else {
+      toast.info("Contact picker is not supported on this browser/device. Please enter the number manually.");
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -177,27 +207,53 @@ export const BillCheckoutModal: React.FC<BillCheckoutModalProps> = ({
 
               {/* Recipient Details Input Field */}
               <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                  {getCustomerFieldLabel()}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                    {getCustomerFieldLabel()}
+                  </label>
+                  {(pageCategory === "AIRTIME" || pageCategory === "DATA") && (
+                    <button
+                      type="button"
+                      onClick={handlePickContact}
+                      className="text-[10px] font-bold text-[#FC7A00] hover:text-[#E06600] flex items-center gap-1 cursor-pointer transition-colors bg-orange-50 px-2 py-0.5 rounded-lg border border-[#FC7A00]/20"
+                    >
+                      <span className="material-symbols-outlined text-xs">contacts</span>
+                      <span>Choose from Contacts</span>
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <input
                     type="text"
                     placeholder={`Enter your ${getCustomerFieldLabel().toLowerCase()}`}
                     value={customerId}
                     onChange={(e) => onCustomerIdChange(e.target.value)}
-                    className="w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all"
+                    className={`w-full bg-white border border-black rounded-2xl px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none focus:border-black/60 shadow-sm transition-all ${
+                      (pageCategory === "AIRTIME" || pageCategory === "DATA") ? "pr-24" : customerId.length >= 6 ? "pr-20" : "pr-4"
+                    }`}
                   />
-                  {customerId.length >= 6 && (
-                    <button
-                      type="button"
-                      onClick={onValidateCustomer}
-                      disabled={isValidating}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#FFF0E0] hover:bg-[#FFE0CC] text-primary text-[10px] font-black uppercase px-3 py-2 rounded-xl active:scale-95 transition-all"
-                    >
-                      {isValidating ? "Validating..." : "Verify"}
-                    </button>
-                  )}
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                    {(pageCategory === "AIRTIME" || pageCategory === "DATA") && (
+                      <button
+                        type="button"
+                        onClick={handlePickContact}
+                        title="Pick from Contacts"
+                        className="p-1.5 rounded-xl bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-[#FC7A00] transition-all cursor-pointer flex items-center justify-center border border-gray-200"
+                      >
+                        <span className="material-symbols-outlined text-base">contacts</span>
+                      </button>
+                    )}
+                    {customerId.length >= 6 && (
+                      <button
+                        type="button"
+                        onClick={onValidateCustomer}
+                        disabled={isValidating}
+                        className="bg-[#FFF0E0] hover:bg-[#FFE0CC] text-primary text-[10px] font-black uppercase px-2.5 py-1.5 rounded-xl active:scale-95 transition-all"
+                      >
+                        {isValidating ? "Validating..." : "Verify"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
