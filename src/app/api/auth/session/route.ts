@@ -152,6 +152,10 @@ export async function POST(req: Request) {
         // MUST execute ALL Firestore reads BEFORE any write operations inside a transaction
         const challengeSnap = await transaction.get(challengeRef);
         const userDoc = await transaction.get(userRef);
+        const pendingQuery = adminDb.collection("new_device_challenges")
+          .where("uid", "==", uid)
+          .where("consumed", "==", false);
+        const pendingSnap = await transaction.get(pendingQuery);
 
         if (!challengeSnap.exists) {
           throw new Error("CHALLENGE_INVALID: Security verification document not found.");
@@ -211,6 +215,19 @@ export async function POST(req: Request) {
           consumedAt: nowIso,
           verified: true,
         });
+
+        // Invalidate ALL OTHER pending/unconsumed challenges for this user so old challenges/devices are completely cleared
+        if (!pendingSnap.empty) {
+          for (const pDoc of pendingSnap.docs) {
+            if (pDoc.id !== challengeId) {
+              transaction.update(pDoc.ref, {
+                consumed: true,
+                consumedReason: "SUPERSEDED_BY_SUCCESSFUL_VERIFICATION",
+                consumedAt: nowIso,
+              });
+            }
+          }
+        }
 
         // Atomically activate new session
         transaction.set(userRef, {
