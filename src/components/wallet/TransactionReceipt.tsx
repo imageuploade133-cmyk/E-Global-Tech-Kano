@@ -596,17 +596,32 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           });
         } else {
           toast.dismiss();
-          const objectUrl = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = objectUrl;
-          link.download = `Receipt_${transaction.reference}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          const imageFileName = `Receipt_${transaction.reference}.png`;
+          const imageDataUri = canvas.toDataURL("image/png");
+          const bridge =
+            typeof window !== "undefined"
+              ? (window as any).flutter_inappwebview
+              : null;
 
-          setTimeout(() => {
-            URL.revokeObjectURL(objectUrl);
-          }, 1000);
+          if (bridge && typeof bridge.callHandler === "function") {
+            const saved = await bridge.callHandler("downloadBase64File", {
+              data: imageDataUri,
+              fileName: imageFileName,
+              mimeType: "image/png",
+            });
+            if (saved !== true && !saved?.success) {
+              throw new Error("Native image download failed.");
+            }
+          } else {
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = imageFileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          }
 
           toast.success("Downloaded HD receipt to device.");
         }
