@@ -483,11 +483,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   const [showTrfBankSelector, setShowTrfBankSelector] = useState(false);
 
   const handleOpenBankSelector = () => {
-    const activeAccount = isBulkMode ? bulkAccount : trfAccount;
-    if (!activeAccount || activeAccount.length !== 10) {
-      toast.error("Please enter a valid 10-digit account number first.");
-      return;
-    }
     setBankSearchQuery("");
     setShowTrfBankSelector(true);
   };
@@ -531,35 +526,74 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   useModalBackHandler(isUsdFundingOpen, () => setIsUsdFundingOpen(false), "usd-funding-modal");
 
   const loadRecentsAndBeneficiaries = async () => {
-    if (!user) return;
+    if (!user) {
+      setRecentsLoading(false);
+      return;
+    }
     setRecentsLoading(true);
     try {
-      // Fetch Recents
-      const recentsQuery = query(
-        collection(db, "recents"),
-        where("userId", "==", user.uid),
-        orderBy("createdAt", "desc"),
-        limit(20)
-      );
-      const recentsSnap = await getDocs(recentsQuery);
+      // Fetch Recents with resilient fallback
       const recentsList: SavedRecipientItem[] = [];
-      recentsSnap.forEach((doc) => {
-        recentsList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
-      });
+      try {
+        const recentsQuery = query(
+          collection(db, "recents"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(20)
+        );
+        const recentsSnap = await getDocs(recentsQuery);
+        recentsSnap.forEach((doc) => {
+          recentsList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
+        });
+      } catch (rErr) {
+        console.warn("[Recents Query Warning] Indexed query failed, trying unindexed fallback:", rErr);
+        try {
+          const fallbackQ = query(
+            collection(db, "recents"),
+            where("userId", "==", user.uid),
+            limit(20)
+          );
+          const snap = await getDocs(fallbackQ);
+          snap.forEach((doc) => {
+            recentsList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
+          });
+          recentsList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        } catch (fallbackErr) {
+          console.error("[Recents Fallback Query Error]:", fallbackErr);
+        }
+      }
       setRecents(recentsList);
 
-      // Fetch Beneficiaries
-      const benQuery = query(
-        collection(db, "beneficiaries"),
-        where("userId", "==", user.uid),
-        orderBy("createdAt", "desc"),
-        limit(20)
-      );
-      const benSnap = await getDocs(benQuery);
+      // Fetch Beneficiaries with resilient fallback
       const benList: SavedRecipientItem[] = [];
-      benSnap.forEach((doc) => {
-        benList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
-      });
+      try {
+        const benQuery = query(
+          collection(db, "beneficiaries"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(20)
+        );
+        const benSnap = await getDocs(benQuery);
+        benSnap.forEach((doc) => {
+          benList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
+        });
+      } catch (bErr) {
+        console.warn("[Beneficiaries Query Warning] Indexed query failed, trying unindexed fallback:", bErr);
+        try {
+          const fallbackQ = query(
+            collection(db, "beneficiaries"),
+            where("userId", "==", user.uid),
+            limit(20)
+          );
+          const snap = await getDocs(fallbackQ);
+          snap.forEach((doc) => {
+            benList.push({ id: doc.id, ...doc.data() } as SavedRecipientItem);
+          });
+          benList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        } catch (fallbackErr) {
+          console.error("[Beneficiaries Fallback Query Error]:", fallbackErr);
+        }
+      }
       setBeneficiaries(benList);
     } catch (err) {
       console.error("Failed to load recents and beneficiaries:", err);
@@ -570,7 +604,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
   useEffect(() => {
     if (isTransferOpen && user) {
-      loadRecentsAndBeneficiaries();
+      const safetyTimer = setTimeout(() => {
+        setRecentsLoading(false);
+      }, 2500);
+      loadRecentsAndBeneficiaries().finally(() => clearTimeout(safetyTimer));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTransferOpen, user]);
