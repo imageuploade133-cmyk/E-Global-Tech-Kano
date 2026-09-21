@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { WalletService } from "./wallet-service";
+import { NotificationService } from "./notification-service";
 
 export interface InvestmentSettings {
   minInvestment: number;
@@ -762,6 +763,20 @@ export class InvestmentService {
       };
     });
 
+    try {
+      await NotificationService.sendReversalNotification({
+        userId: result.record.userId,
+        reference: `admin-cancel-${investmentId}`,
+        originalReference: investmentId,
+        amount: result.refundAmount,
+        currency: result.record.currency || "NGN",
+        transactionLabel: "investment",
+        recipientName: result.record.optionName,
+      });
+    } catch (notificationError: any) {
+      console.warn("[Investment Reversal Notification] Admin cancellation notification failed:", notificationError?.message || notificationError);
+    }
+
     return result;
   }
 
@@ -895,6 +910,20 @@ export class InvestmentService {
         penaltyDeducted,
       };
     });
+
+    try {
+      await NotificationService.sendReversalNotification({
+        userId,
+        reference: `cancel-${investmentId}`,
+        originalReference: investmentId,
+        amount: result.refundAmount,
+        currency: result.record.currency || "NGN",
+        transactionLabel: "investment",
+        recipientName: result.record.optionName,
+      });
+    } catch (notificationError: any) {
+      console.warn("[Investment Reversal Notification] User cancellation notification failed:", notificationError?.message || notificationError);
+    }
 
     return result;
   }
