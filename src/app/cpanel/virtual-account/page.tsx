@@ -21,14 +21,28 @@ export default function VirtualAccountPage() {
 
   const { isDark, toggleTheme } = useCpanelTheme();
 
+  async function readApiResponse(response: Response, fallback: string) {
+    const contentType = response.headers.get("content-type") || "";
+    const text = await response.text();
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new Error(response.status === 404
+        ? "Virtual Account API is not deployed on the current website. Please refresh after deployment."
+        : `${fallback} (HTTP ${response.status})`);
+    }
+    try { return JSON.parse(text); }
+    catch { throw new Error(`${fallback} (invalid API response, HTTP ${response.status})`); }
+  }
+
   async function search() {
     const q=query.trim();
     if(q.length<2){ toast.error("Enter at least 2 characters."); return; }
     setLoading(true);
     try {
-      const r=await fetch(`/api/admin/virtual-accounts/search?q=${encodeURIComponent(q)}`,{cache:"no-store"});
-      const d=await r.json();
-      if(!r.ok) throw new Error(d.message||"Search failed.");
+      const r=await fetch(`/api/admin/virtual-accounts/search?q=${encodeURIComponent(q)}`,{
+        method:"GET", headers:{Accept:"application/json"}, cache:"no-store"
+      });
+      const d=await readApiResponse(r,"Search failed.");
+      if(!r.ok) throw new Error(d.message||d.error||`Search failed (HTTP ${r.status}).`);
       setUsers(d.users||[]);
       setSelected(null);
     } catch(e:any){ toast.error(e.message||"Search failed."); }
