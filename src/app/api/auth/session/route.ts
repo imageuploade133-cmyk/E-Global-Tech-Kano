@@ -308,8 +308,8 @@ export async function POST(req: Request) {
         const userData = userSnap.exists ? userSnap.data() || {} : {};
 
         // Resolve registered contact details from user document, admin_users document, or authResult token
-        let registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-        let registeredEmail = (userData.email || "").trim();
+        const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
+        const registeredEmail = (userData.email || "").trim();
 
         const isPhoneVerified = !!registeredPhone && userData.phoneVerified === true;
         const isEmailVerified = !!registeredEmail && userData.emailVerified === true;
