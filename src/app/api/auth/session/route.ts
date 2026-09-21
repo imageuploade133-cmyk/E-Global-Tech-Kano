@@ -232,6 +232,7 @@ export async function POST(req: Request) {
         // Atomically activate new session
         transaction.set(userRef, {
           activeSessionId: newSessionId,
+          pendingNewDevicePushSessionId: newSessionId,
           activeSessionCreatedAt: nowIso,
           activeSessionDevice: deviceName,
           activeSessionUserAgent: userAgent,
@@ -308,19 +309,10 @@ export async function POST(req: Request) {
 
         // Resolve registered contact details from user document, admin_users document, or authResult token
         let registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-        let registeredEmail = (userData.email || authResult.email || "").trim();
+        let registeredEmail = (userData.email || "").trim();
 
-        if (!registeredPhone || !registeredEmail) {
-          const adminSnap = await transaction.get(adminDb.collection("admin_users").doc(uid));
-          if (adminSnap.exists) {
-            const adminData = adminSnap.data() || {};
-            if (!registeredPhone) registeredPhone = (adminData.phoneNumber || adminData.phone || "").trim();
-            if (!registeredEmail) registeredEmail = (adminData.email || authResult.email || "").trim();
-          }
-        }
-
-        const isPhoneVerified = !!registeredPhone;
-        const isEmailVerified = !!registeredEmail;
+        const isPhoneVerified = !!registeredPhone && userData.phoneVerified === true;
+        const isEmailVerified = !!registeredEmail && userData.emailVerified === true;
 
         let channelToUse: "whatsapp" | "email" = "whatsapp";
         let destToUse = "";
@@ -455,21 +447,11 @@ export async function POST(req: Request) {
 
     // Resolve registered contact details from user document, admin_users document, or authResult token
     let registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-    let registeredEmail = (userData.email || authResult.email || "").trim();
+    let registeredEmail = (userData.email || "").trim();
 
-    if (!registeredPhone || !registeredEmail) {
-      const adminSnap = await adminDb.collection("admin_users").doc(uid).get();
-      if (adminSnap.exists) {
-        const adminData = adminSnap.data() || {};
-        if (!registeredPhone) registeredPhone = (adminData.phoneNumber || adminData.phone || "").trim();
-        if (!registeredEmail) registeredEmail = (adminData.email || authResult.email || "").trim();
-      }
-    }
-
-    // Verify channel has valid destination registered on account
-    // Any non-empty registered phone or email associated with the authenticated account acts as a valid factor
-    const isPhoneVerified = !!registeredPhone;
-    const isEmailVerified = !!registeredEmail;
+    // Only verified security contacts stored on users/{uid} are valid OTP factors.
+    const isPhoneVerified = !!registeredPhone && userData.phoneVerified === true;
+    const isEmailVerified = !!registeredEmail && userData.emailVerified === true;
 
     if (!isPhoneVerified && !isEmailVerified) {
       return NextResponse.json({ error: "Security Error: No verified contact channels configured on your account. Please contact support." }, { status: 400 });
