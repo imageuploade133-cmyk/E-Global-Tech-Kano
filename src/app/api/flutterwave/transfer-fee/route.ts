@@ -82,12 +82,14 @@ export async function GET(req: Request) {
       let baseFee = 10.00;
       const authHeader = req.headers.get("Authorization") || "";
       const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+      const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
 
       if (uid !== "mock-uid") {
         try {
           const feeRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer-fee?amount=${amount}&currency=NGN`, {
             headers: {
               "Authorization": `Bearer ${idToken}`,
+              ...(sessionId ? { "X-Session-ID": sessionId } : {}),
               "Content-Type": "application/json",
             },
           });
