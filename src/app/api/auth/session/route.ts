@@ -446,8 +446,8 @@ export async function POST(req: Request) {
     }
 
     // Resolve registered contact details from user document, admin_users document, or authResult token
-    let registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
-    let registeredEmail = (userData.email || "").trim();
+    const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
+    const registeredEmail = (userData.email || "").trim();
 
     // Only verified security contacts stored on users/{uid} are valid OTP factors.
     const isPhoneVerified = !!registeredPhone && userData.phoneVerified === true;
