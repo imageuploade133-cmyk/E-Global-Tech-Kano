@@ -854,7 +854,14 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   if (user && !(userData?.pin || userData?.pinHash) && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
-  if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
+  const isNotificationDeepLink = typeof window !== "undefined" && (
+    window.location.search.includes("txRef=") ||
+    window.location.search.includes("transactionReference=") ||
+    window.location.search.includes("reference=") ||
+    Boolean(sessionStorage.getItem("pending_notification_tx_ref")) ||
+    Boolean(sessionStorage.getItem("notification_receipt_active"))
+  );
+  if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin" && !isNotificationDeepLink) return null;
 
   return <>{children}</>;
 }
