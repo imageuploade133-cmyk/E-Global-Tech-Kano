@@ -252,6 +252,4 @@ export class NotificationService {
       console.error("[NotificationService] Reversal notification dispatch failed:", err?.message || err);
     }
   }
-
-  }
 }
