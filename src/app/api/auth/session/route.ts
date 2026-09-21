@@ -403,6 +403,39 @@ export async function POST(req: Request) {
       const uData = userSnap.exists ? userSnap.data() || {} : {};
       const adminUserData = adminUserSnap.exists ? adminUserSnap.data() || {} : {};
 
+      // Compatibility migration for legacy CPanel admins. These accounts predate
+      // users/{uid} verification flags. The source is the server-controlled,
+      // active admin_users record; new-device OTP remains mandatory.
+      const legacyAdminRoles = ["super_admin", "admin", "finance", "kyc_admin", "support", "read_only"];
+      const legacyAdminRole = String(adminUserData.role || uData.role || "").toLowerCase();
+      const isActiveLegacyAdmin = adminUserSnap.exists &&
+        adminUserData.status === "active" &&
+        legacyAdminRoles.includes(legacyAdminRole);
+      const legacyPhone = String(adminUserData.phoneNumber || adminUserData.phone || "").trim();
+      const legacyEmail = String(adminUserData.email || "").trim();
+
+      if (isActiveLegacyAdmin && (legacyPhone || legacyEmail)) {
+        const compatibilityUpdate: Record<string, unknown> = {};
+        if (!uData.phoneNumber && legacyPhone) {
+          compatibilityUpdate.phoneNumber = legacyPhone;
+          compatibilityUpdate.phone = legacyPhone;
+        }
+        if (uData.phoneVerified !== true && legacyPhone) {
+          compatibilityUpdate.phoneVerified = true;
+        }
+        if (!uData.email && legacyEmail) {
+          compatibilityUpdate.email = legacyEmail;
+        }
+        if (uData.emailVerified !== true && legacyEmail) {
+          compatibilityUpdate.emailVerified = true;
+        }
+        if (Object.keys(compatibilityUpdate).length > 0) {
+          compatibilityUpdate.updatedAt = nowIso;
+          transaction.set(userRef, compatibilityUpdate, { merge: true });
+          Object.assign(uData, compatibilityUpdate);
+        }
+      }
+
       const currentActiveSession = uData.activeSessionId as string | undefined;
 
       // 1. If NO active session exists on account -> First active session creation
