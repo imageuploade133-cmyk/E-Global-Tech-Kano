@@ -525,6 +525,7 @@ export async function POST(req: Request) {
       });
 
       // Rollback debit atomically inside transaction
+      let refundAmountForNotification = trfAmount;
       await adminDb.runTransaction(async (rollbackTx) => {
         const userDoc = await rollbackTx.get(userRef);
         const walletDoc = await rollbackTx.get(walletRef);
@@ -564,6 +565,8 @@ export async function POST(req: Request) {
           const origFee = Number(origData.fee) || (providerFee + transferProfitMargin);
           const origMarkup = Number(origData.markup) || transferProfitMargin;
 
+          refundAmountForNotification = exactRefundAmount;
+
           await WalletService.creditWallet(rollbackTx, {
             userId: uid,
             amount: origAmount,
@@ -601,7 +604,7 @@ export async function POST(req: Request) {
           userId: uid,
           reference: `REFUND-${trfReference}`,
           originalReference: trfReference,
-          amount: exactRefundAmount,
+          amount: refundAmountForNotification,
           currency: trfCurrency,
           transactionLabel: "bank transfer",
           recipientName: trfName,
