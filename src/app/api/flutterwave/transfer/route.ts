@@ -91,6 +91,7 @@ export async function POST(req: Request) {
 
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
 
     const isMock = uid === "mock-uid";
 
@@ -101,6 +102,7 @@ export async function POST(req: Request) {
         const feeRes = await fetch(`${gatewayUrl}/api/flutterwave/transfer-fee?amount=${trfAmount}&currency=${trfCurrency}`, {
           headers: {
             "Authorization": `Bearer ${idToken}`,
+            "X-Session-ID": sessionId,
             "Content-Type": "application/json",
           },
         });
@@ -379,6 +381,7 @@ export async function POST(req: Request) {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
+          "X-Session-ID": sessionId,
         },
         body: JSON.stringify(gatewayPayload),
       });

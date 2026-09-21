@@ -41,19 +41,6 @@ export async function GET(req: Request) {
         if (!tx.reference) continue;
 
         const refundRefId = `tx-REFUND-${tx.reference}`;
-        const refundDocRef = adminDb.collection("transactions").doc(refundRefId);
-        const refundDoc = await refundDocRef.get();
-
-        // Check if refund already processed
-        if (refundDoc.exists) continue;
-
-        // Double-check with a query just in case of different ID format
-        const refundQuery = await adminDb.collection("transactions")
-          .where("userId", "==", uid)
-          .where("reference", "==", `REFUND-${tx.reference}`)
-          .get();
-
-        if (!refundQuery.empty) continue;
 
         // Process the refund atomically
         const txCurrency = tx.currency || "NGN";
@@ -68,12 +55,17 @@ export async function GET(req: Request) {
         await adminDb.runTransaction(async (refundTransaction) => {
           const uRef = adminDb.collection("users").doc(uid);
           const wRef = adminDb.collection("wallets").doc(`${uid}_${txCurrency}`);
+          const refundDocRef = adminDb.collection("transactions").doc(refundRefId);
 
-          const [uSnap, wSnap] = await Promise.all([
+          // The refund ledger is the single atomic idempotency/claim record shared
+          // with gateway webhook and reconciliation refund paths.
+          const [uSnap, wSnap, refundSnap] = await Promise.all([
             refundTransaction.get(uRef),
-            refundTransaction.get(wRef)
+            refundTransaction.get(wRef),
+            refundTransaction.get(refundDocRef)
           ]);
 
+          if (refundSnap.exists) return;
           if (!uSnap.exists) return;
 
           const uData = uSnap.data() || {};
