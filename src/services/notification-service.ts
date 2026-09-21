@@ -162,7 +162,9 @@ export class NotificationService {
       return sentCount > 0;
     } catch (err: any) {
       console.error(`[NotificationService Exception] Failed to execute notification dispatch:`, err.message);
+      return false;
     }
+  }
 
   /**
    * Sends one idempotent push notification for a completed reversal/refund.
