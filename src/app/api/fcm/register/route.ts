@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
+import { getMessaging } from "firebase-admin/messaging";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -53,6 +54,32 @@ export async function POST(req: Request) {
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
+
+    // If this session was just authorized as a new device, deliver the security alert
+    // specifically to the newly registered token, then consume the one-time marker.
+    const userRef = adminDb.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+    const pendingSessionId = userSnap.exists ? userSnap.data()?.pendingNewDevicePushSessionId : null;
+    if (pendingSessionId && pendingSessionId === authoritativeSessionId) {
+      try {
+        await getMessaging().send({
+          token: cleanToken,
+          notification: {
+            title: "New Device Login",
+            body: "Your E-Global Pay account was successfully signed in on this device.",
+          },
+          data: {
+            type: "security",
+            event: "new_device_login",
+          },
+          android: { priority: "high" as const, notification: { sound: "default" } },
+          apns: { payload: { aps: { sound: "default" } } },
+        });
+        await userRef.update({ pendingNewDevicePushSessionId: null });
+      } catch (pushErr: any) {
+        console.error("[FCM API] New-device push dispatch failed:", pushErr.message);
+      }
+    }
 
     console.log(`[FCM API] Registered token for user ${uid}. Token ID: ${tokenDocId}`);
 
