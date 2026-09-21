@@ -22,7 +22,7 @@ export class NotificationService {
    * @param userId The ID of the recipient user.
    * @param payload The notification content (title, body, type, url).
    */
-  public static async sendPushNotification(userId: string, payload: NotificationPayload): Promise<void> {
+  public static async sendPushNotification(userId: string, payload: NotificationPayload): Promise<boolean> {
     try {
       const now = new Date().toISOString();
 
@@ -54,13 +54,13 @@ export class NotificationService {
       // 2. Fetch all registered tokens for this user
       if (!adminDb) {
         console.warn(`[NotificationService Warning] adminDb not initialized. Skipping FCM dispatch.`);
-        return;
+        return false;
       }
 
       const tokensSnapshot = await adminDb.collection("fcm_tokens").where("userId", "==", userId).get();
       if (tokensSnapshot.empty) {
         console.log(`[NotificationService] No active FCM tokens registered for user=${userId}`);
-        return;
+        return false;
       }
 
       const tokensList: { id: string; token: string; platform: string }[] = [];
@@ -80,6 +80,7 @@ export class NotificationService {
       // 3. Send notifications via FCM
       const messaging = getMessaging();
       const tokensToDelete: string[] = [];
+      let sentCount = 0;
 
       for (const t of tokensList) {
         try {
@@ -126,6 +127,7 @@ export class NotificationService {
           };
 
           const fcmResponse = await messaging.send(message);
+          sentCount += 1;
           console.log(`[NotificationService] Push successfully dispatched to platform=${t.platform} | fcmId=${fcmResponse}`);
         } catch (fcmErr: any) {
           const errMsg = fcmErr.message || "";
@@ -154,9 +156,10 @@ export class NotificationService {
           batch.delete(db.collection("fcm_tokens").doc(tokenId));
         });
         await batch.commit();
-        console.log(`[NotificationService] Automatically deleted ${tokensToDelete.length} invalid/expired FCM token(s).`);
+          console.log(`[NotificationService] Automatically deleted ${tokensToDelete.length} invalid/expired FCM token(s).`);
       }
 
+      return sentCount > 0;
     } catch (err: any) {
       console.error(`[NotificationService Exception] Failed to execute notification dispatch:`, err.message);
     }
@@ -207,7 +210,7 @@ export class NotificationService {
         maximumFractionDigits: 2,
       });
 
-      await this.sendPushNotification(params.userId, {
+      const delivered = await this.sendPushNotification(params.userId, {
         title: "🔄 Transaction Reversed",
         body: `Your ${params.transactionLabel} has been reversed. ₦${formattedAmount} has been refunded to your wallet.`,
         type: "transaction",
@@ -218,6 +221,15 @@ export class NotificationService {
         recipientName: params.recipientName || "Wallet",
         channel: "Reversal",
       });
+
+      if (!delivered) {
+        await reversalRef.set({
+          reversalNotificationStatus: "FAILED",
+          reversalNotificationLeaseExpiresAt: null,
+          reversalNotificationLastError: "No FCM token accepted the reversal notification",
+        }, { merge: true });
+        return;
+      }
 
       await reversalRef.set({
         reversalNotificationStatus: "SENT",
