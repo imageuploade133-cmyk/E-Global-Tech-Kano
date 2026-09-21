@@ -129,12 +129,22 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    // Safety fallback: Ensure page loading state NEVER stays stuck indefinitely
+    const safetyTimer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 2000);
+
     if (!loading) {
       const timer = setTimeout(() => {
         setIsPageLoading(false);
-      }, 1000);
-      return () => clearTimeout(timer);
+      }, 500);
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(safetyTimer);
+      };
     }
+
+    return () => clearTimeout(safetyTimer);
   }, [loading]);
 
   useEffect(() => {

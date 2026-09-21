@@ -423,7 +423,26 @@ export const StatementModal: React.FC<StatementModalProps> = ({ isOpen, onClose 
           doc.text(`Page ${i} of ${totalPages}`, 196, 288, { align: "right" });
         }
 
-        doc.save(`EGlobalPay_Statement_${fromDate}_to_${toDate}.pdf`);
+        const statementFileName = `EGlobalPay_Statement_${fromDate}_to_${toDate}.pdf`;
+        const statementDataUri = doc.output("datauristring");
+        const bridge =
+          typeof window !== "undefined"
+            ? (window as any).flutter_inappwebview
+            : null;
+
+        if (bridge && typeof bridge.callHandler === "function") {
+          const saved = await bridge.callHandler("downloadBase64File", {
+            data: statementDataUri,
+            fileName: statementFileName,
+            mimeType: "application/pdf",
+          });
+          if (saved !== true && !saved?.success) {
+            throw new Error("Native statement download failed.");
+          }
+        } else {
+          doc.save(statementFileName);
+        }
+
         toast.dismiss("statement-gen");
         toast.success("Bank Statement PDF generated and downloaded successfully!");
         onClose();

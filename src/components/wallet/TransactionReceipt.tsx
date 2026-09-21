@@ -426,7 +426,26 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
       pdf.addImage(imgData, "PNG", xPos, yPos, imgWidth, imgHeight, undefined, "FAST");
 
-      pdf.save(`Receipt_${transaction.reference}.pdf`);
+      const pdfFileName = `Receipt_${transaction.reference}.pdf`;
+      const pdfDataUri = pdf.output("datauristring");
+      const bridge =
+        typeof window !== "undefined"
+          ? (window as any).flutter_inappwebview
+          : null;
+
+      if (bridge && typeof bridge.callHandler === "function") {
+        const saved = await bridge.callHandler("downloadBase64File", {
+          data: pdfDataUri,
+          fileName: pdfFileName,
+          mimeType: "application/pdf",
+        });
+        if (saved !== true && !saved?.success) {
+          throw new Error("Native PDF download failed.");
+        }
+      } else {
+        pdf.save(pdfFileName);
+      }
+
       toast.dismiss();
       toast.success("HD PDF Receipt downloaded!");
     } catch (err) {
@@ -492,7 +511,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         logging: false,
       });
 
-      canvas.toBlob((blob) => {
+      canvas.toBlob(async (blob) => {
         if (!blob) {
           console.error("Image generation failed: canvas.toBlob returned null.");
           toast.dismiss();
@@ -501,21 +520,43 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           return;
         }
 
-        const objectUrl = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = objectUrl;
-        link.download = `Receipt_${transaction.reference}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        try {
+          const imageFileName = `Receipt_${transaction.reference}.png`;
+          const imageDataUri = canvas.toDataURL("image/png");
+          const bridge =
+            typeof window !== "undefined"
+              ? (window as any).flutter_inappwebview
+              : null;
 
-        setTimeout(() => {
-          URL.revokeObjectURL(objectUrl);
-        }, 1000);
+          if (bridge && typeof bridge.callHandler === "function") {
+            const saved = await bridge.callHandler("downloadBase64File", {
+              data: imageDataUri,
+              fileName: imageFileName,
+              mimeType: "image/png",
+            });
+            if (saved !== true && !saved?.success) {
+              throw new Error("Native image download failed.");
+            }
+          } else {
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = imageFileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          }
 
-        toast.dismiss();
-        toast.success("Image downloaded!");
-        setGenerating(false);
+          toast.dismiss();
+          toast.success("Image downloaded!");
+          setGenerating(false);
+        } catch (err) {
+          console.error("Image download failed:", err);
+          toast.dismiss();
+          toast.error("Failed to download image.");
+          setGenerating(false);
+        }
       }, "image/png");
     } catch (err) {
       console.error("Image generation failed:", err);
@@ -562,17 +603,32 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           });
         } else {
           toast.dismiss();
-          const objectUrl = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = objectUrl;
-          link.download = `Receipt_${transaction.reference}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          const imageFileName = `Receipt_${transaction.reference}.png`;
+          const imageDataUri = canvas.toDataURL("image/png");
+          const bridge =
+            typeof window !== "undefined"
+              ? (window as any).flutter_inappwebview
+              : null;
 
-          setTimeout(() => {
-            URL.revokeObjectURL(objectUrl);
-          }, 1000);
+          if (bridge && typeof bridge.callHandler === "function") {
+            const saved = await bridge.callHandler("downloadBase64File", {
+              data: imageDataUri,
+              fileName: imageFileName,
+              mimeType: "image/png",
+            });
+            if (saved !== true && !saved?.success) {
+              throw new Error("Native image download failed.");
+            }
+          } else {
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = imageFileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          }
 
           toast.success("Downloaded HD receipt to device.");
         }

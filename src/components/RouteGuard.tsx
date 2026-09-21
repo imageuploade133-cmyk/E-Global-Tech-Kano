@@ -11,6 +11,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useScrollRestoration } from "@/lib/useScrollRestoration";
 
 // Persistently identify the device using sessionStorage instead of localStorage (Bypasses caching on Ctrl+F5)
 const getOrCreateDeviceId = (): string => {
@@ -32,10 +33,13 @@ const ButtonSpinner = () => (
 );
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, isPinVerified, userData, updateUserData } = useAuth();
+  const { user, loading, isPinVerified, userData, updateUserData, deviceAuthState } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Enable global scroll position persistence & back history scroll restoration
+  useScrollRestoration();
 
   const [flwVerifying, setFlwVerifying] = useState(false);
   const [flwMessage, setFlwMessage] = useState("");
@@ -367,8 +371,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       setIsNewDeviceBlocked(false);
 
       if (userData.currentDeviceId && userData.currentDeviceId !== deviceId) {
-        console.warn("[Device Guard] Active session changed to another device. Suspending active session.");
-        setIsSessionSuspended(true);
+        console.warn("[Device Guard] Active session changed to another device. Quietly signing out old device...");
+        handleAppSignOut(null);
         return;
       }
 
@@ -405,8 +409,8 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
           const isVerifiedOnThisDevice = freshData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
 
           if (isVerifiedOnThisDevice && freshData.currentDeviceId && freshData.currentDeviceId !== deviceId) {
-            console.warn("[Instant Session Check] Session overtaken. Suspending active session.");
-            setIsSessionSuspended(true);
+            console.warn("[Instant Session Check] Session overtaken. Quietly signing out old device...");
+            handleAppSignOut(null);
           }
         }
       } catch (err) {
@@ -427,7 +431,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     };
   }, [user, userData]);
 
-  // Route protection rules for standard login status
+  // Route protection rules for standard login status & pending device verification
   useEffect(() => {
     const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
     if ((loading || (user && !userData)) && !isMock) return;
@@ -439,6 +443,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         router.push("/auth/login");
       }
     } else if (user && userData) {
+      // If user is authenticated but session check is in progress OR device verification is pending, restrict access completely
+      if (deviceAuthState === "CHECKING_DEVICE_SESSION" || deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION") {
+        return; // Modal or splash handles view; do not allow navigating into wallet routes prematurely
+      }
+
       const hasPin = Boolean(userData?.pin || userData?.pinHash);
       const isPinRequired = userData?.isPinRequired !== false;
 
@@ -465,7 +474,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         router.push("/");
       }
     }
-  }, [user, loading, isPinVerified, userData, pathname, router]);
+  }, [user, loading, isPinVerified, userData, pathname, router, deviceAuthState]);
 
 
   // Re-login trigger inside the Suspend Overlay
@@ -785,8 +794,33 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   if (!user && !isPublicRoute && !isMockRoute) return null;
   if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) return <>{children}</>;
 
-  // Wait for Firestore user data to arrive before making any PIN decision
-  if (user && !userData && !isMockRoute) {
+  // RENDER-LEVEL SECURITY GATE 1: Pending New-Device Verification HARD BLOCK
+  // Prevents zero wallet children from mounting/rendering underneath, independent of PIN state or isPinRequired setting.
+  if (user && deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" && !isPublicRoute && !isMockRoute) {
+    return (
+      <div className="fixed inset-0 z-[99999] bg-white flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="flex flex-col items-center max-w-sm p-6 rounded-3xl bg-[#fdfdfd] border border-gray-100 shadow-sm space-y-4">
+          <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+            <span className="material-symbols-outlined text-[32px] animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>security</span>
+          </div>
+          <div className="space-y-1">
+            <h2 className="font-hanken font-extrabold text-base text-gray-900 uppercase tracking-wider">
+              NEW DEVICE DETECTED
+            </h2>
+            <p className="font-hanken text-xs text-amber-600 font-bold uppercase tracking-widest">
+              Security Verification Required
+            </p>
+          </div>
+          <p className="font-hanken text-xs text-gray-500 font-medium leading-relaxed">
+            For your security, wallet routes and protected financial services are locked on this unrecognized device until you verify the security code.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Wait for Firestore user data & session state check before making any PIN decision
+  if (user && (deviceAuthState === "CHECKING_DEVICE_SESSION" || !userData) && !isMockRoute) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
         <div className="relative flex flex-col items-center">
@@ -820,7 +854,14 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
   if (user && !(userData?.pin || userData?.pinHash) && pathname !== "/auth/pin-setup") return null;
   const isPinRequired = userData?.isPinRequired !== false;
-  if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin") return null;
+  const isNotificationDeepLink = typeof window !== "undefined" && (
+    window.location.search.includes("txRef=") ||
+    window.location.search.includes("transactionReference=") ||
+    window.location.search.includes("reference=") ||
+    Boolean(sessionStorage.getItem("pending_notification_tx_ref")) ||
+    Boolean(sessionStorage.getItem("notification_receipt_active"))
+  );
+  if (user && (userData?.pin || userData?.pinHash) && isPinRequired && !isPinVerified && pathname !== "/auth/pin" && !isNotificationDeepLink) return null;
 
   return <>{children}</>;
 }

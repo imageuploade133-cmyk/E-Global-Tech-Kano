@@ -547,6 +547,21 @@ export async function POST(req: Request) {
         }
       });
 
+      // Reversal notification is best-effort and never affects the refund response.
+      try {
+        await NotificationService.sendReversalNotification({
+          userId: uid,
+          reference: `REFUND-${reference}`,
+          originalReference: reference,
+          amount: totalChargeAmount,
+          currency: "NGN",
+          transactionLabel: `${(biller_type || "bill").toString()} payment`,
+          recipientName: customer_id,
+        });
+      } catch (notificationError: any) {
+        console.warn("[Bills Reversal Notification] Dispatch failed:", notificationError?.message || notificationError);
+      }
+
       const sanitizedError = sanitizeBillErrorMessage(err.message, biller_type || "bill");
       return NextResponse.json({
         error: `${sanitizedError} Wallet funds have been successfully refunded.`

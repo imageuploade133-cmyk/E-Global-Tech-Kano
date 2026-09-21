@@ -4,8 +4,13 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User, updateProfile } from "firebase/auth";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import "@/lib/init-fetch-interceptor";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { toast } from "sonner";
+import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
+import { NewDeviceOtpModal } from "@/components/layout/NewDeviceOtpModal";
+import { NewDeviceSuccessModal } from "@/components/layout/NewDeviceSuccessModal";
+import { getDetailedDeviceName } from "@/lib/device-util";
 
 
 interface UserData {
@@ -20,6 +25,8 @@ interface UserData {
   [key: string]: unknown;
 }
 
+export type DeviceAuthState = "AUTHENTICATED_VERIFIED" | "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" | "CHECKING_DEVICE_SESSION" | "UNAUTHENTICATED";
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -27,15 +34,31 @@ interface AuthContextType {
   setPinVerified: (verified: boolean) => void;
   userData: UserData | null;
   updateUserData: (updates: Partial<UserData>) => Promise<void>;
+  deviceAuthState: DeviceAuthState;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const inFlightEstablishRef = React.useRef<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
+  const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
+
+  // New Device OTP Challenge & Activation Success State
+  const [deviceAuthState, setDeviceAuthState] = useState<DeviceAuthState>("UNAUTHENTICATED");
+  const [isNewDeviceOtpOpen, setIsNewDeviceOtpOpen] = useState(false);
+  const [isNewDeviceSuccessOpen, setIsNewDeviceSuccessOpen] = useState(false);
+  const [previousDeviceName, setPreviousDeviceName] = useState<string>("");
+  const [newDeviceChallenge, setNewDeviceChallenge] = useState<{
+    challengeId: string;
+    channel: "whatsapp" | "email";
+    maskedDestination: string;
+    channels: Array<{ type: "whatsapp" | "email"; label: string; masked: string }>;
+  } | null>(null);
 
   // Load custom mock data from sessionStorage if present
   const getStoredMockData = (): UserData => {
@@ -58,15 +81,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check if mock query parameter or session is active (run only on client to avoid SSR hydration mismatch)
-    const hasMockQuery = window.location.search.includes("mock=true");
-    const hasMockSession = sessionStorage.getItem("mock") === "true";
+    // Mock mode is strictly restricted to development/testing environments to prevent production authentication bypass
+    const isDevEnv = process.env.NODE_ENV !== "production";
+    const hasMockQuery = isDevEnv && typeof window !== "undefined" && window.location.search.includes("mock=true");
+    const hasMockSession = isDevEnv && typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
 
     if (hasMockQuery) {
       sessionStorage.setItem("mock", "true");
     }
 
-    if (hasMockQuery || hasMockSession) {
+    if (isDevEnv && (hasMockQuery || hasMockSession)) {
       setUser({
         uid: "mock-uid",
         displayName: "JULES VERNE",
@@ -95,29 +119,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        // 1. Establish or register active session with backend API
+        setDeviceAuthState("CHECKING_DEVICE_SESSION");
+
+        // Read existing local active_session_id to present on reloads/reopens
+        const existingSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
+
+        // 1. Establish or re-verify active session with backend API
         (async () => {
+          if (inFlightEstablishRef.current) return;
+          inFlightEstablishRef.current = true;
           try {
-            const localSess = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
             const idToken = await currentUser.getIdToken();
             const res = await fetch("/api/auth/session", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${idToken}`,
+                ...(existingSessionId ? { "X-Session-ID": existingSessionId } : {}),
               },
               body: JSON.stringify({
-                deviceName: typeof window !== "undefined" && (window as any).flutter_inappwebview ? "Mobile Native App" : "Web Browser",
+                action: "establish",
+                existingSessionId: existingSessionId || undefined,
+                deviceName: getDetailedDeviceName(),
               }),
             });
             const sessData = await res.json().catch(() => ({}));
-            if (res.ok && sessData.sessionId) {
+
+            if (res.ok && sessData.requiresOtp && sessData.challengeId) {
+              // Server detected an existing active session on another device -> Transition into AUTHENTICATED_PENDING_DEVICE_VERIFICATION
+              setDeviceAuthState("AUTHENTICATED_PENDING_DEVICE_VERIFICATION");
+              setIsPinVerified(false);
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("active_session_id");
+              }
+              setNewDeviceChallenge({
+                challengeId: sessData.challengeId,
+                channel: sessData.channel || "whatsapp",
+                maskedDestination: sessData.maskedDestination || "",
+                channels: sessData.channels || [],
+              });
+              setIsNewDeviceOtpOpen(true);
+
+              if (sessData.dispatchWarning) {
+                toast.warning(sessData.dispatchWarning);
+              }
+            } else if (res.ok && sessData.sessionId) {
+              setDeviceAuthState("AUTHENTICATED_VERIFIED");
               if (typeof window !== "undefined") {
                 localStorage.setItem("active_session_id", sessData.sessionId);
               }
+            } else {
+              // Fail closed: if session establishment returns error or unexpected payload, sign out immediately
+              toast.error(sessData.error || "Session verification failed.");
+              setDeviceAuthState("UNAUTHENTICATED");
+              handleAppSignOut(null);
             }
           } catch (sessErr: any) {
-            console.warn("[AuthContext Session Setup Error]:", sessErr.message);
+            console.error("[AuthContext Session Setup Error]:", sessErr.message);
+            // FAIL CLOSED: Immediately reject access on any network/server exception
+            toast.error("Session establishment error. Signing out for security.");
+            setDeviceAuthState("UNAUTHENTICATED");
+            handleAppSignOut(null);
+          } finally {
+            inFlightEstablishRef.current = false;
           }
         })();
 
@@ -131,11 +195,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const remoteActiveSessionId = data.activeSessionId as string | undefined;
 
             if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
-              console.warn("[Session Revoked] Remote active session changed. Triggering client logout...");
-              toast.error("Your account was signed in on another device. You have been logged out on this device.");
+              console.warn("[Session Revoked] Remote active session changed. Quietly executing security logout for old device...");
+
+              // 1. Immediately clear local session ID so no subsequent API request can use it
               if (typeof window !== "undefined") {
                 localStorage.removeItem("active_session_id");
               }
+
+              // 2. Execute quiet security logout from Firebase Auth without showing modal on Device A
               handleAppSignOut(null);
               return;
             }
@@ -212,9 +279,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPinVerified: setIsPinVerified,
         userData,
         updateUserData,
+        deviceAuthState,
       }}
     >
       {children}
+      <SessionRevokedModal
+        isOpen={isRevokedModalOpen}
+        sessionData={revokedSessionData}
+        onClose={() => setIsRevokedModalOpen(false)}
+      />
+
+      {newDeviceChallenge && (
+        <NewDeviceOtpModal
+          isOpen={isNewDeviceOtpOpen}
+          challengeId={newDeviceChallenge.challengeId}
+          initialChannel={newDeviceChallenge.channel}
+          maskedDestination={newDeviceChallenge.maskedDestination}
+          channels={newDeviceChallenge.channels}
+          onVerifiedSuccess={(newSessId, prevDev) => {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("active_session_id", newSessId);
+            }
+            setIsNewDeviceOtpOpen(false);
+            setNewDeviceChallenge(null);
+            if (prevDev) {
+              setPreviousDeviceName(prevDev);
+            }
+            setIsNewDeviceSuccessOpen(true);
+          }}
+          onCancel={() => {
+            setIsNewDeviceOtpOpen(false);
+            setNewDeviceChallenge(null);
+            setDeviceAuthState("UNAUTHENTICATED");
+            handleAppSignOut(null);
+          }}
+        />
+      )}
+
+      <NewDeviceSuccessModal
+        isOpen={isNewDeviceSuccessOpen}
+        previousDeviceName={previousDeviceName}
+        onContinue={() => {
+          setIsNewDeviceSuccessOpen(false);
+          setDeviceAuthState("AUTHENTICATED_VERIFIED");
+          toast.success("Welcome to E-Global Pay!");
+        }}
+      />
     </AuthContext.Provider>
   );
 }

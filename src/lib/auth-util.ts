@@ -7,7 +7,7 @@ const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_
  * Checks if the user's KYC status is strictly APPROVED or VERIFIED.
  */
 export async function verifyUserKycApproved(userId: string): Promise<boolean> {
-  if (userId === "mock-admin-uid" || userId === "mock-uid") {
+  if (process.env.NODE_ENV !== "production" && (userId === "mock-admin-uid" || userId === "mock-uid")) {
     return true;
   }
   try {
@@ -43,7 +43,6 @@ async function getGooglePublicCertificates(): Promise<Record<string, string>> {
     throw new Error("Failed to fetch public certificates from Google.");
   }
 
-  // Parse Cache-Control header for max-age
   let maxAgeSeconds = 3600; // Default 1 hour fallback
   const cacheControl = certsRes.headers.get("cache-control");
   if (cacheControl) {
@@ -79,7 +78,6 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
 
   const [headerB64, payloadB64, signatureB64] = parts;
 
-  // 1. Base64 URL decode header and payload safely using "base64url"
   let headerJson: any;
   let payloadJson: any;
 
@@ -90,7 +88,6 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     throw new Error("Invalid JWT: Failed to parse header or payload JSON.");
   }
 
-  // 2. Validate Header: Algorithm MUST be RS256
   if (headerJson.alg !== "RS256") {
     throw new Error(`Invalid algorithm '${headerJson.alg}'. Firebase ID tokens must use 'RS256'.`);
   }
@@ -100,12 +97,10 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     throw new Error("Missing 'kid' claim in JWT header.");
   }
 
-  // 3. Fetch Google's public certificates (cached safely according to Cache-Control max-age)
   let certs = await getGooglePublicCertificates();
   let activeCert = certs[kid];
 
   if (!activeCert) {
-    // Certificate not found in cache; invalidate cache and re-fetch once to support key rotation
     certsCache = null;
     certs = await getGooglePublicCertificates();
     activeCert = certs[kid];
@@ -114,7 +109,6 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     }
   }
 
-  // 4. Verify RS256 signature using native Node.js crypto
   const verify = crypto.createVerify("RSA-SHA256");
   verify.update(`${headerB64}.${payloadB64}`);
 
@@ -127,14 +121,12 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
     throw new Error("Signature verification failed. Token has been tampered with or corrupted.");
   }
 
-  // 5. Validate all standard JWT claims
   const now = Math.floor(Date.now() / 1000);
 
   if (!payloadJson.exp || typeof payloadJson.exp !== "number" || payloadJson.exp < now) {
     throw new Error(`Token has expired. Expired at: ${payloadJson.exp}, current time: ${now}`);
   }
 
-  // Allow up to 5 minutes of clock drift
   if (payloadJson.iat && payloadJson.iat > now + 300) {
     throw new Error("Token issued in the future (clock drift limit exceeded).");
   }
@@ -159,44 +151,95 @@ export async function verifyFirebaseIdToken(token: string, projectId: string = F
 }
 
 /**
- * Extracts, verifies Firebase ID Token, AND validates that the user's active session in Firestore match.
- * Enforces single active session rule server-side.
+ * Extracts, verifies Firebase ID Token, AND validates that the user's active session in Firestore matches.
+ * Enforces single active session rule server-side. Fail-closed.
  */
 export async function authenticateUserRequest(req: Request): Promise<DecodedTokenResult> {
-  let idToken = "";
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    idToken = authHeader.split("Bearer ")[1];
-  }
-
-  if (!idToken) {
-    const url = new URL(req.url);
-    idToken = url.searchParams.get("idToken") || "";
-  }
-
-  if (!idToken) {
-    throw new Error("Missing Firebase ID token in Authorization header.");
-  }
-
-  const decoded = await verifyFirebaseIdToken(idToken);
-
-  // Single Active Device / Session Verification
-  const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
-  if (decoded.uid && decoded.uid !== "mock-uid" && decoded.uid !== "mock-admin-uid") {
+  // STRICT RULE: Reject tokens passed via URL query parameters
+  if (req.url) {
     try {
-      const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
+      const parsedUrl = new URL(req.url, "http://localhost");
+      if (parsedUrl.searchParams.has("token") || parsedUrl.searchParams.has("bearer") || parsedUrl.searchParams.has("idToken") || parsedUrl.searchParams.has("authorization")) {
+        throw new Error("REVOKED_SESSION: Query parameter tokens are prohibited.");
+      }
+    } catch (urlErr: any) {
+      if (urlErr.message && urlErr.message.includes("REVOKED_SESSION")) {
+        throw urlErr;
+      }
+    }
+  }
+
+  let idToken = "";
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    idToken = authHeader.split("Bearer ")[1].trim();
+  }
+
+  if (!idToken) {
+    throw new Error("REVOKED_SESSION: Missing Firebase ID token in Authorization header.");
+  }
+
+  // 1. Verify Firebase ID Token first & derive UID exclusively from verified token
+  let decoded: DecodedTokenResult;
+  try {
+    decoded = await verifyFirebaseIdToken(idToken);
+  } catch (tokenErr: any) {
+    throw new Error(`REVOKED_SESSION: ${tokenErr.message || "Invalid or expired Firebase ID token."}`);
+  }
+
+  const uid = decoded.uid;
+
+  if (!uid) {
+    throw new Error("REVOKED_SESSION: Invalid token: UID claim missing.");
+  }
+
+  // Allow mock uids strictly outside production environment
+  if (process.env.NODE_ENV !== "production" && (uid === "mock-uid" || uid === "mock-admin-uid")) {
+    return decoded;
+  }
+
+  // 2. Determine if this request is session establishment, registration finalization, or PIN reset recovery
+  let isSessionExempt = false;
+  if (req.url) {
+    try {
+      const reqUrl = new URL(req.url, "http://localhost");
+      const pName = reqUrl.pathname;
+      if (pName.includes("/api/auth/")) {
+        isSessionExempt = true;
+      }
+    } catch {
+      if (req.url.includes("/api/auth/")) {
+        isSessionExempt = true;
+      }
+    }
+  }
+
+  // 3. For session, registration, and PIN recovery endpoints, pre-existing X-Session-ID is exempt.
+  // For other protected endpoints, validate X-Session-ID if present or if activeSessionId is set on user document.
+  if (!isSessionExempt) {
+    const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id");
+
+    try {
+      const userDoc = await adminDb.collection("users").doc(uid).get();
       if (userDoc.exists) {
         const activeSessionId = userDoc.data()?.activeSessionId;
-        // If an active session exists in Firestore, provided Session ID must match it
-        if (activeSessionId && providedSessionId !== activeSessionId) {
-          throw new Error("REVOKED_SESSION: Your account was signed in on another device. You have been logged out on this device.");
+
+        // If user document has an active session established, enforce X-Session-ID match
+        if (activeSessionId) {
+          if (!providedSessionId) {
+            throw new Error("REVOKED_SESSION: Missing session ID header. You have been logged out on this device.");
+          }
+          if (providedSessionId !== activeSessionId) {
+            throw new Error("REVOKED_SESSION: Provided session ID does not match active session ID.");
+          }
         }
       }
     } catch (err: any) {
       if (err.message && err.message.includes("REVOKED_SESSION")) {
         throw err;
       }
-      console.warn(`[authenticateUserRequest Warning] Session check warning for ${decoded.uid}:`, err.message);
+      console.error(`[authenticateUserRequest Error] Session validation failed for ${uid}:`, err.message);
+      throw new Error(`REVOKED_SESSION: Session validation error (${err.message}).`);
     }
   }
 

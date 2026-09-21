@@ -27,6 +27,14 @@ export const QuickActivityFeed: React.FC<QuickActivityFeedProps> = ({ isLoading:
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const hasPushedState = useRef(false);
 
+  // Safety fallback: Guarantee loading skeleton state NEVER remains stuck longer than 2.5 seconds
+  useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 2500);
+    return () => clearTimeout(safetyTimer);
+  }, []);
+
   useEffect(() => {
     const checkVisibility = () => {
       const saved = sessionStorage.getItem("balance_visible");
@@ -69,37 +77,62 @@ export const QuickActivityFeed: React.FC<QuickActivityFeedProps> = ({ isLoading:
 
     try {
       setLoading(true);
-      const q = query(
-        collection(db, "transactions"),
-        where("userId", "==", user.uid),
-        orderBy("createdAt", "desc"),
-        limit(15)
-      );
 
-      const snapshot = await getDocs(q);
+      let snapshot;
+      try {
+        const q = query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"),
+          limit(15)
+        );
+        snapshot = await getDocs(q);
+      } catch (primaryErr) {
+        console.warn("[QuickActivityFeed] Primary indexed query failed, trying unindexed fallback query:", primaryErr);
+        try {
+          const fallbackQ = query(
+            collection(db, "transactions"),
+            where("userId", "==", user.uid),
+            limit(15)
+          );
+          snapshot = await getDocs(fallbackQ);
+        } catch (fallbackErr) {
+          console.error("[QuickActivityFeed] Fallback query error:", fallbackErr);
+        }
+      }
+
       const list: Transaction[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        list.push({
-          ...data,
-          id: docSnap.id,
-          reference: data.reference || docSnap.id,
-          type: data.type || "DEPOSIT",
-          amount: Number(data.amount) || 0,
-          currency: data.currency || "NGN",
-          description: data.description || "",
-          recipientName: data.recipientName || "",
-          bankName: data.bankName || "",
-          status: data.status || "SUCCESS",
-          date: data.date || "",
-          time: data.time || "",
-          fee: Number(data.fee) || 0,
-          vat: Number(data.vat) || 0,
-          markup: Number(data.markup) || 0,
-          totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
-          totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
-        } as Transaction);
-      });
+      if (snapshot && !snapshot.empty) {
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({
+            ...data,
+            id: docSnap.id,
+            reference: data.reference || docSnap.id,
+            type: data.type || "DEPOSIT",
+            amount: Number(data.amount) || 0,
+            currency: data.currency || "NGN",
+            description: data.description || "",
+            recipientName: data.recipientName || "",
+            bankName: data.bankName || "",
+            status: data.status || "SUCCESS",
+            date: data.date || "",
+            time: data.time || "",
+            fee: Number(data.fee) || 0,
+            vat: Number(data.vat) || 0,
+            markup: Number(data.markup) || 0,
+            totalDebited: data.totalDebited !== undefined && data.totalDebited !== null ? Number(data.totalDebited) : undefined,
+            totalCredited: data.totalCredited !== undefined && data.totalCredited !== null ? Number(data.totalCredited) : undefined,
+          } as Transaction);
+        });
+
+        // Client-side sort by createdAt as fallback if index was missing
+        list.sort((a, b) => {
+          const tA = new Date(a.createdAt || 0).getTime();
+          const tB = new Date(b.createdAt || 0).getTime();
+          return tB - tA;
+        });
+      }
 
       setTransactions(list);
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
+import { getMessaging } from "firebase-admin/messaging";
 
 export async function POST(req: Request) {
   let uid = "";
@@ -12,10 +13,31 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { token, platform } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { token, platform } = body;
 
     if (!token) {
       return NextResponse.json({ error: "FCM token is required." }, { status: 400 });
+    }
+
+    // Resolve server-authoritative active session ID directly from Firestore users/{uid}
+    let authoritativeSessionId: string | null = null;
+    if (process.env.NODE_ENV !== "production" && (uid === "mock-uid" || uid === "mock-admin-uid")) {
+      authoritativeSessionId = "mock-session-id";
+    } else {
+      try {
+        const userDoc = await adminDb.collection("users").doc(uid).get();
+        if (!userDoc.exists) {
+          return NextResponse.json({ error: "Unauthorized: User document missing." }, { status: 401 });
+        }
+        authoritativeSessionId = userDoc.data()?.activeSessionId || null;
+        if (!authoritativeSessionId) {
+          return NextResponse.json({ error: "Unauthorized: Active session missing." }, { status: 401 });
+        }
+      } catch (docErr: any) {
+        console.error(`[FCM API Error] Failed to fetch active session for user ${uid}:`, docErr.message);
+        return NextResponse.json({ error: "Unauthorized: Failed to resolve active session." }, { status: 401 });
+      }
     }
 
     const cleanToken = token.trim();
@@ -28,9 +50,36 @@ export async function POST(req: Request) {
       userId: uid,
       token: cleanToken,
       platform: platform || "web",
+      sessionId: authoritativeSessionId,
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
+
+    // If this session was just authorized as a new device, deliver the security alert
+    // specifically to the newly registered token, then consume the one-time marker.
+    const userRef = adminDb.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+    const pendingSessionId = userSnap.exists ? userSnap.data()?.pendingNewDevicePushSessionId : null;
+    if (pendingSessionId && pendingSessionId === authoritativeSessionId) {
+      try {
+        await getMessaging().send({
+          token: cleanToken,
+          notification: {
+            title: "New Device Login",
+            body: "Your E-Global Pay account was successfully signed in on this device.",
+          },
+          data: {
+            type: "security",
+            event: "new_device_login",
+          },
+          android: { priority: "high" as const, notification: { sound: "default" } },
+          apns: { payload: { aps: { sound: "default" } } },
+        });
+        await userRef.update({ pendingNewDevicePushSessionId: null });
+      } catch (pushErr: any) {
+        console.error("[FCM API] New-device push dispatch failed:", pushErr.message);
+      }
+    }
 
     console.log(`[FCM API] Registered token for user ${uid}. Token ID: ${tokenDocId}`);
 
