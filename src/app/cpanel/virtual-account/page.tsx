@@ -155,7 +155,7 @@ export default function VirtualAccountPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className={cn("w-full max-w-md rounded-2xl p-6", isDark ? "bg-[#111827] border border-gray-800" : "bg-white")}>
             <h2 className="text-xl font-black">Generate New Virtual Account?</h2>
-            <p className="text-sm text-gray-500 mt-2">The current account will be deactivated and the new account will become active. The user's existing verified NIN/BVN will be reused. Wallet balance will not change.</p>
+            <p className="text-sm text-gray-500 mt-2">The current account will be deactivated and the new account will become active. The user&apos;s existing verified NIN/BVN will be reused. Wallet balance will not change.</p>
             <input value={confirm} onChange={e=>setConfirm(e.target.value.toUpperCase())} placeholder="Type GENERATE"
               className="mt-5 w-full rounded-xl border px-4 py-3 dark:bg-gray-950 dark:border-gray-700"/>
             <div className="flex gap-3 mt-4">
