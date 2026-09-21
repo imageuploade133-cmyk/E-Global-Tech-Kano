@@ -2,6 +2,7 @@ import { adminDb, adminApp } from "@/lib/firebase-admin";
 import { verifyFirebaseIdToken } from "@/lib/auth-util";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
+import { getAuth } from "firebase-admin/auth";
 
 const JWT_SECRET = process.env.CPANEL_SESSION_SECRET;
 
@@ -74,29 +75,44 @@ export async function verifyAdminAuth(req: Request): Promise<{ uid: string; isAd
 /**
  * Programmatically generates a short-lived Firebase ID Token for a user ID
  * to securely authorize server-to-server calls to the payment-gateway VM on the fly.
+ *
+ * IMPORTANT: This must return a Firebase Authentication ID token, not a
+ * Google OAuth2 access token and not a Firebase custom token.
  */
 export async function mintFirebaseIdToken(uid: string): Promise<string> {
-  const { getGoogleOAuth2AccessToken } = await import("./firebase-auth-rest");
-  const accessToken = await getGoogleOAuth2AccessToken();
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "e-tech-global-hub";
-
-  // Create Custom Token via Google Identity Toolkit v1 REST API
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:createAuthUri`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      identifier: uid,
-      continueUri: "http://localhost",
-    }),
-  });
-
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  if (!apiKey) {
-    return accessToken;
+  if (!uid) {
+    throw new Error("Cannot mint Firebase ID token without a user UID.");
   }
 
-  return accessToken;
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing Firebase API key for Firebase ID token exchange.");
+  }
+
+  // Create a Firebase custom token for the authenticated administrator.
+  const customToken = await getAuth(adminApp).createCustomToken(uid);
+
+  // Exchange the custom token for a real Firebase Authentication ID token.
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        token: customToken,
+        returnSecureToken: true,
+      }),
+    }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok || typeof data.idToken !== "string" || !data.idToken) {
+    const message = data?.error?.message || res.statusText || "Firebase custom-token exchange failed.";
+    throw new Error(`Firebase ID token exchange failed: ${message}`);
+  }
+
+  return data.idToken;
 }
