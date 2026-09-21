@@ -160,5 +160,84 @@ export class NotificationService {
     } catch (err: any) {
       console.error(`[NotificationService Exception] Failed to execute notification dispatch:`, err.message);
     }
+
+  /**
+   * Sends one idempotent push notification for a completed reversal/refund.
+   * The reversal transaction is already persisted before this method is called.
+   */
+  public static async sendReversalNotification(params: {
+    userId: string;
+    reference: string;
+    originalReference?: string;
+    amount: number;
+    currency?: string;
+    transactionLabel: string;
+    recipientName?: string;
+  }): Promise<void> {
+    if (!adminDb || !params.userId || !params.reference || params.amount <= 0) return;
+
+    const reversalRef = adminDb.collection("transactions").doc(`tx-${params.reference}`);
+    const now = Date.now();
+    let shouldDispatch = false;
+
+    try {
+      await adminDb.runTransaction(async (transaction) => {
+        const snap = await transaction.get(reversalRef);
+        if (!snap.exists) return;
+
+        const data = snap.data() || {};
+        if (data.reversalNotificationStatus === "SENT") return;
+
+        const leaseExpiresAt = Number(data.reversalNotificationLeaseExpiresAt || 0);
+        if (data.reversalNotificationStatus === "PROCESSING" && leaseExpiresAt > now) return;
+
+        transaction.set(reversalRef, {
+          reversalNotificationStatus: "PROCESSING",
+          reversalNotificationLeaseExpiresAt: now + 60_000,
+          reversalNotificationLastAttemptAt: new Date(now).toISOString(),
+        }, { merge: true });
+        shouldDispatch = true;
+      });
+
+      if (!shouldDispatch) return;
+
+      const currency = params.currency || "NGN";
+      const formattedAmount = params.amount.toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+      await this.sendPushNotification(params.userId, {
+        title: "🔄 Transaction Reversed",
+        body: `Your ${params.transactionLabel} has been reversed. ₦${formattedAmount} has been refunded to your wallet.`,
+        type: "transaction",
+        url: "/history",
+        amount: params.amount,
+        currency,
+        reference: params.reference,
+        recipientName: params.recipientName || "Wallet",
+        channel: "Reversal",
+      });
+
+      await reversalRef.set({
+        reversalNotificationStatus: "SENT",
+        reversalNotificationSentAt: new Date().toISOString(),
+        reversalNotificationLeaseExpiresAt: null,
+        reversalNotificationOriginalReference: params.originalReference || "",
+      }, { merge: true });
+    } catch (err: any) {
+      try {
+        await reversalRef.set({
+          reversalNotificationStatus: "FAILED",
+          reversalNotificationLeaseExpiresAt: null,
+          reversalNotificationLastError: String(err?.message || "Notification dispatch failed").slice(0, 500),
+        }, { merge: true });
+      } catch {
+        // Notification failure must never affect the financial transaction.
+      }
+      console.error("[NotificationService] Reversal notification dispatch failed:", err?.message || err);
+    }
+  }
+
   }
 }
