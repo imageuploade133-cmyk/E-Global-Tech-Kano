@@ -135,6 +135,7 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
 
     const userRef = adminDb.collection("users").doc(uid);
+    const adminUserRef = adminDb.collection("admin_users").doc(uid);
 
     // =========================================================================
     // ACTION 1: VERIFY NEW DEVICE OTP CHALLENGE & ACTIVATION
@@ -305,14 +306,28 @@ export async function POST(req: Request) {
         }
 
         const userSnap = await transaction.get(userRef);
+        const adminUserSnap = await transaction.get(adminUserRef);
         const userData = userSnap.exists ? userSnap.data() || {} : {};
+        const adminUserData = adminUserSnap.exists ? adminUserSnap.data() || {} : {};
 
-        // Resolve registered contact details from user document, admin_users document, or authResult token
+        // Explicit verification flags are required for normal users.
+        // Legacy CPanel admin accounts may predate these flags; for those accounts,
+        // use the server-side admin_users contact as the OTP destination. This still
+        // requires possession of the stored contact and NEVER bypasses OTP.
         const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
         const registeredEmail = (userData.email || "").trim();
+        const adminPhone = (adminUserData.phoneNumber || adminUserData.phone || "").trim();
+        const adminEmail = (adminUserData.email || "").trim();
+        const adminRole = String(adminUserData.role || userData.role || "").toLowerCase();
+        const isLegacyAdmin = adminUserSnap.exists &&
+          ["super_admin", "admin", "finance", "kyc_admin", "support", "read_only"].includes(adminRole);
 
-        const isPhoneVerified = !!registeredPhone && userData.phoneVerified === true;
-        const isEmailVerified = !!registeredEmail && userData.emailVerified === true;
+        const phoneDestination = registeredPhone || adminPhone;
+        const emailDestination = registeredEmail || adminEmail;
+        const isPhoneVerified = !!phoneDestination &&
+          (userData.phoneVerified === true || (isLegacyAdmin && !userData.phoneVerified && !!adminPhone));
+        const isEmailVerified = !!emailDestination &&
+          (userData.emailVerified === true || (isLegacyAdmin && !userData.emailVerified && !!adminEmail));
 
         let channelToUse: "whatsapp" | "email" = "whatsapp";
         let destToUse = "";
@@ -323,21 +338,21 @@ export async function POST(req: Request) {
             throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: Verified email address is not configured on this account.");
           }
           channelToUse = "email";
-          destToUse = registeredEmail;
+          destToUse = emailDestination;
         } else if (selectedChannel === "whatsapp") {
           if (!isPhoneVerified) {
             throw new Error("CHALLENGE_UNVERIFIED_CHANNEL: Verified phone number is not configured on this account.");
           }
           channelToUse = "whatsapp";
-          destToUse = registeredPhone;
+          destToUse = phoneDestination;
         } else {
           // Default based on explicit verified details
           if (isPhoneVerified) {
             channelToUse = "whatsapp";
-            destToUse = registeredPhone;
+            destToUse = phoneDestination;
           } else if (isEmailVerified) {
             channelToUse = "email";
-            destToUse = registeredEmail;
+            destToUse = emailDestination;
           } else {
             throw new Error("CHALLENGE_NO_VERIFIED_CHANNEL: No verified contact channels available on this account.");
           }
@@ -384,7 +399,9 @@ export async function POST(req: Request) {
     // =========================================================================
     const establishResult = await adminDb.runTransaction(async (transaction) => {
       const userSnap = await transaction.get(userRef);
+      const adminUserSnap = await transaction.get(adminUserRef);
       const uData = userSnap.exists ? userSnap.data() || {} : {};
+      const adminUserData = adminUserSnap.exists ? adminUserSnap.data() || {} : {};
 
       const currentActiveSession = uData.activeSessionId as string | undefined;
 
@@ -399,7 +416,7 @@ export async function POST(req: Request) {
           updatedAt: nowIso,
         }, { merge: true });
 
-        return { establishedSessionId: newSessionId, isExistingDevice: false, userData: uData };
+        return { establishedSessionId: newSessionId, isExistingDevice: false, userData: uData, adminUserData };
       }
 
       // 2. If an active session exists AND matches the device's provided session ID -> SAME DEVICE RELOAD!
@@ -411,14 +428,14 @@ export async function POST(req: Request) {
           activeSessionUserAgent: userAgent,
         }, { merge: true });
 
-        return { establishedSessionId: currentActiveSession, isExistingDevice: true, userData: uData };
+        return { establishedSessionId: currentActiveSession, isExistingDevice: true, userData: uData, adminUserData };
       }
 
       // 3. Otherwise -> ACTIVE SESSION BELONGS TO ANOTHER DEVICE (GENERATE OTP)
-      return { establishedSessionId: null, isExistingDevice: false, userData: uData };
+      return { establishedSessionId: null, isExistingDevice: false, userData: uData, adminUserData };
     });
 
-    const { establishedSessionId, isExistingDevice, userData } = establishResult;
+    const { establishedSessionId, isExistingDevice, userData, adminUserData } = establishResult;
 
     // IF NO ACTIVE SESSION EXISTED OR SAME DEVICE RELOADED WITH VALID SESSION ID -> Access Granted!
     if (establishedSessionId) {
@@ -445,13 +462,24 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
-    // Resolve registered contact details from user document, admin_users document, or authResult token
+    // Explicit verification flags are required for normal users.
+    // Legacy CPanel admin accounts may predate these flags; they are allowed to
+    // use the server-side admin_users contact as the OTP destination, but OTP
+    // verification is still mandatory before the new device becomes active.
     const registeredPhone = (userData.phoneNumber || userData.phone || "").trim();
     const registeredEmail = (userData.email || "").trim();
+    const adminPhone = (adminUserData.phoneNumber || adminUserData.phone || "").trim();
+    const adminEmail = (adminUserData.email || "").trim();
+    const adminRole = String(adminUserData.role || userData.role || "").toLowerCase();
+    const isLegacyAdmin = !!adminUserData && Object.keys(adminUserData).length > 0 &&
+      ["super_admin", "admin", "finance", "kyc_admin", "support", "read_only"].includes(adminRole);
 
-    // Only verified security contacts stored on users/{uid} are valid OTP factors.
-    const isPhoneVerified = !!registeredPhone && userData.phoneVerified === true;
-    const isEmailVerified = !!registeredEmail && userData.emailVerified === true;
+    const phoneDestination = registeredPhone || adminPhone;
+    const emailDestination = registeredEmail || adminEmail;
+    const isPhoneVerified = !!phoneDestination &&
+      (userData.phoneVerified === true || (isLegacyAdmin && !userData.phoneVerified && !!adminPhone));
+    const isEmailVerified = !!emailDestination &&
+      (userData.emailVerified === true || (isLegacyAdmin && !userData.emailVerified && !!adminEmail));
 
     if (!isPhoneVerified && !isEmailVerified) {
       return NextResponse.json({ error: "Security Error: No verified contact channels configured on your account. Please contact support." }, { status: 400 });
@@ -461,7 +489,7 @@ export async function POST(req: Request) {
     // - verified phone exists -> WhatsApp default
     // - verified email exists (and no verified phone) -> email default
     const defaultChannel: "whatsapp" | "email" = isPhoneVerified ? "whatsapp" : "email";
-    const defaultDestination = defaultChannel === "whatsapp" ? registeredPhone : registeredEmail;
+    const defaultDestination = defaultChannel === "whatsapp" ? phoneDestination : emailDestination;
 
     const challengeId = `ch_${uid}_${Date.now()}_${crypto.randomBytes(8).toString("hex")}`;
     const rawOtp = crypto.randomInt(100000, 999999).toString();
@@ -539,18 +567,18 @@ export async function POST(req: Request) {
     });
 
     const channels = [];
-    if (registeredEmail) {
+    if (emailDestination && isEmailVerified) {
       channels.push({
         type: "email",
-        label: `Email OTP (${maskEmail(registeredEmail)})`,
-        masked: maskEmail(registeredEmail),
+        label: `Email OTP (${maskEmail(emailDestination)})`,
+        masked: maskEmail(emailDestination),
       });
     }
-    if (registeredPhone) {
+    if (phoneDestination && isPhoneVerified) {
       channels.push({
         type: "whatsapp",
-        label: `Phone Number OTP (${maskPhone(registeredPhone)})`,
-        masked: maskPhone(registeredPhone),
+        label: `Phone Number OTP (${maskPhone(phoneDestination)})`,
+        masked: maskPhone(phoneDestination),
       });
     }
 
