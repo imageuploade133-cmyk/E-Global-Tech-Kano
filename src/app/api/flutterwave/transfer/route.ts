@@ -595,6 +595,21 @@ export async function POST(req: Request) {
         }
       });
 
+      // Reversal notification is best-effort and never affects the refund response.
+      try {
+        await NotificationService.sendReversalNotification({
+          userId: uid,
+          reference: `REFUND-${trfReference}`,
+          originalReference: trfReference,
+          amount: exactRefundAmount,
+          currency: trfCurrency,
+          transactionLabel: "bank transfer",
+          recipientName: trfName,
+        });
+      } catch (notificationError: any) {
+        console.warn("[Transfer Reversal Notification] Dispatch failed:", notificationError?.message || notificationError);
+      }
+
       return NextResponse.json({
         error: `Failed to complete outward bank transfer: ${err.message}. Local wallet balance has been successfully refunded.`,
         details: err.message,
