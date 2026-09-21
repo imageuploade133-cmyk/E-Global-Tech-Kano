@@ -26,7 +26,7 @@ export default function VirtualAccountPage() {
     if(q.length<2){ toast.error("Enter at least 2 characters."); return; }
     setLoading(true);
     try {
-      const r=await fetch("/api/admin/virtual-accounts/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q}),cache:"no-store"});
+      const r=await fetch(`/api/admin/virtual-accounts/search?q=${encodeURIComponent(q)}`,{cache:"no-store"});
       const d=await r.json();
       if(!r.ok) throw new Error(d.message||"Search failed.");
       setUsers(d.users||[]);
