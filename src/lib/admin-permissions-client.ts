@@ -18,6 +18,8 @@ export const CPANEL_PERMISSIONS_CATALOG: PermissionDefinition[] = [
   { key: "kyc.manage", label: "Approve / Reject KYC", category: "User Management", description: "Approve or reject customer KYC document submissions" },
   { key: "freeze.manage", label: "Account Freeze & Security", category: "User Management", description: "Freeze or unfreeze customer accounts and set notices" },
   { key: "limits.manage", label: "Account Limits Manager", category: "User Management", description: "Configure daily and transaction velocity caps" },
+  { key: "virtual_accounts.view", label: "View Virtual Accounts", category: "User Management", description: "Search users and inspect virtual account details" },
+  { key: "virtual_accounts.manage", label: "Manage Virtual Accounts", category: "User Management", description: "Securely replace and retire customer virtual accounts" },
 
   // Branding & Customization
   { key: "branding.manage", label: "Branding & App Config", category: "Branding", description: "Update platform titles, logos, and support details" },
@@ -52,6 +54,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   super_admin: ["*"],
   admin: [
     "metrics.view", "admins.view", "users.view", "users.manage",
+    "virtual_accounts.view", "virtual_accounts.manage",
     "kyc.view", "kyc.manage", "freeze.manage", "limits.manage",
     "branding.manage", "feature_toggle.manage", "communication.branding.manage", "banners.manage", "bank_logos.manage", "bill_logos.manage",
     "whatsapp.manage", "email_connect.manage", "vtu.manage", "exchange_rates.manage", "investments.manage", "deposit.manage", "wallet.deductions.manage",
