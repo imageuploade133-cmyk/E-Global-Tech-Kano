@@ -51,15 +51,28 @@ export class NotificationService {
         }
       }
 
-      // 2. Fetch all registered tokens for this user
+      // 2. Resolve the current server-authoritative active session.
+      // Only FCM tokens registered by the CURRENT active device may receive notifications.
+      // This prevents an old device from continuing to receive pushes after a new-device login.
       if (!adminDb) {
         console.warn(`[NotificationService Warning] adminDb not initialized. Skipping FCM dispatch.`);
         return false;
       }
 
-      const tokensSnapshot = await adminDb.collection("fcm_tokens").where("userId", "==", userId).get();
+      const userSnap = await adminDb.collection("users").doc(userId).get();
+      const activeSessionId = userSnap.exists ? String(userSnap.data()?.activeSessionId || "") : "";
+      if (!activeSessionId) {
+        console.log(`[NotificationService] No active session for user=${userId}; skipping FCM dispatch.`);
+        return false;
+      }
+
+      const tokensSnapshot = await adminDb.collection("fcm_tokens")
+        .where("userId", "==", userId)
+        .where("sessionId", "==", activeSessionId)
+        .get();
+
       if (tokensSnapshot.empty) {
-        console.log(`[NotificationService] No active FCM tokens registered for user=${userId}`);
+        console.log(`[NotificationService] No FCM tokens registered for current active session user=${userId}`);
         return false;
       }
 
