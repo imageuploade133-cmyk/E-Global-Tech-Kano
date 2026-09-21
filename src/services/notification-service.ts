@@ -181,16 +181,12 @@ export class NotificationService {
   }): Promise<void> {
     if (!adminDb || !params.userId || !params.reference || params.amount <= 0) return;
 
-    const reversalRef = adminDb.collection("transactions").doc(`tx-${params.reference}`);
-    const now = Date.now();
+    // General ledger is the primary source; keep the investment subledger as a safe fallback.\n    const transactionReversalRef = adminDb.collection("transactions").doc(`tx-${params.reference}`);\n    const investmentReversalRef = adminDb.collection("investmentTransactions").doc(`tx-${params.reference}`);\n    let reversalRef = transactionReversalRef;\n    const now = Date.now();
     let shouldDispatch = false;
 
     try {
       await adminDb.runTransaction(async (transaction) => {
-        const snap = await transaction.get(reversalRef);
-        if (!snap.exists) return;
-
-        const data = snap.data() || {};
+        let snap = await transaction.get(transactionReversalRef);\n        if (!snap.exists) {\n          snap = await transaction.get(investmentReversalRef);\n          if (snap.exists) reversalRef = investmentReversalRef;\n        }\n        if (!snap.exists) return;\n\n        const data = snap.data() || {};
         if (data.reversalNotificationStatus === "SENT") return;
 
         const leaseExpiresAt = Number(data.reversalNotificationLeaseExpiresAt || 0);
