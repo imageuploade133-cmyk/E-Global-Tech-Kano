@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 import CpanelActionDropdown from "@/components/cpanel/CpanelActionDropdown";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface VirtualAccountItem {
   uid: string;
