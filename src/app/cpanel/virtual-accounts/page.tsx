@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
-import CpanelActionDropdown from "@/components/cpanel/CpanelActionDropdown";
+import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import { toast } from "sonner";
 
 interface VirtualAccountItem {
@@ -425,7 +425,7 @@ export default function CpanelVirtualAccountsPage() {
                 <>
                   Are you sure you want to reactivate virtual account number{" "}
                   <strong className="text-emerald-500 font-mono">{actionTarget.virtualAccountNumber}</strong>? Incoming transfers to
-                  this virtual account will immediately resume processing into the customer's wallet.
+                  this virtual account will immediately resume processing into the customer&apos;s wallet.
                 </>
               )}
             </p>
