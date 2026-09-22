@@ -12,6 +12,10 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const searchTerm = searchParams.get("search")?.trim().toLowerCase() || "";
+    const statusFilter = searchParams.get("status")?.toUpperCase() || "ALL"; // ALL, ACTIVE, DEACTIVATED
+    const limitParam = parseInt(searchParams.get("limit") || "20", 10);
+    const pageSize = Math.min(Math.max(isNaN(limitParam) ? 20 : limitParam, 1), 100);
+    const lastDocId = searchParams.get("startAfter") || searchParams.get("lastDocId") || null;
 
     // Mock playtesting response
     if (uid === "mock-admin-uid") {
@@ -50,8 +54,16 @@ export async function GET(req: Request) {
         },
       ];
 
+      let filtered = mockVirtualAccounts;
+
+      if (statusFilter === "ACTIVE") {
+        filtered = filtered.filter((a) => a.isActive);
+      } else if (statusFilter === "DEACTIVATED") {
+        filtered = filtered.filter((a) => !a.isActive);
+      }
+
       if (searchTerm) {
-        const filtered = mockVirtualAccounts.filter(
+        filtered = filtered.filter(
           (a) =>
             a.name.toLowerCase().includes(searchTerm) ||
             a.email.toLowerCase().includes(searchTerm) ||
@@ -59,13 +71,47 @@ export async function GET(req: Request) {
             a.virtualAccountNumber.includes(searchTerm) ||
             a.virtualAccountBankName.toLowerCase().includes(searchTerm)
         );
-        return NextResponse.json({ success: true, virtualAccounts: filtered });
       }
 
-      return NextResponse.json({ success: true, virtualAccounts: mockVirtualAccounts });
+      const activeCount = mockVirtualAccounts.filter((a) => a.isActive).length;
+      const deactivatedCount = mockVirtualAccounts.filter((a) => !a.isActive).length;
+
+      return NextResponse.json({
+        success: true,
+        virtualAccounts: filtered,
+        counts: {
+          total: mockVirtualAccounts.length,
+          active: activeCount,
+          deactivated: deactivatedCount,
+        },
+        pagination: {
+          limit: pageSize,
+          hasNextPage: false,
+          lastDocId: null,
+        },
+      });
     }
 
+    // Get count aggregations to avoid fetching all documents for metrics
+    const countsPromise = (async () => {
+      try {
+        const [totalSnap, deactivatedSnap] = await Promise.all([
+          adminDb.collection("users").count().get(),
+          adminDb.collection("users").where("virtualAccountActive", "==", false).count().get(),
+        ]);
+        const total = totalSnap.data().count;
+        const deactivated = deactivatedSnap.data().count;
+        const active = Math.max(0, total - deactivated);
+        return { total, active, deactivated };
+      } catch (err) {
+        console.warn("[Admin Virtual Accounts] Count aggregation fallback:", err);
+        return { total: 0, active: 0, deactivated: 0 };
+      }
+    })();
+
     const rawUsers: any[] = [];
+    let lastFetchedDocId: string | null = null;
+    let hasNextPage = false;
 
     if (searchTerm) {
       if (searchTerm.includes("@")) {
@@ -73,17 +119,17 @@ export async function GET(req: Request) {
         const snap = await adminDb
           .collection("users")
           .where("email", "==", searchTerm)
-          .limit(30)
+          .limit(pageSize)
           .get();
         snap.forEach((doc) => rawUsers.push({ uid: doc.id, ...doc.data() }));
       } else {
         // Query across phone number, account number, BVN, or exact name match
         const queries = [
-          adminDb.collection("users").where("phoneNumber", "==", searchTerm).limit(30).get(),
-          adminDb.collection("users").where("virtualAccountNumber", "==", searchTerm).limit(30).get(),
-          adminDb.collection("users").where("accountNumber", "==", searchTerm).limit(30).get(),
-          adminDb.collection("users").where("bvn", "==", searchTerm).limit(30).get(),
-          adminDb.collection("users").where("name", "==", searchTerm.toUpperCase()).limit(30).get(),
+          adminDb.collection("users").where("phoneNumber", "==", searchTerm).limit(pageSize).get(),
+          adminDb.collection("users").where("virtualAccountNumber", "==", searchTerm).limit(pageSize).get(),
+          adminDb.collection("users").where("accountNumber", "==", searchTerm).limit(pageSize).get(),
+          adminDb.collection("users").where("bvn", "==", searchTerm).limit(pageSize).get(),
+          adminDb.collection("users").where("name", "==", searchTerm.toUpperCase()).limit(pageSize).get(),
         ];
 
         const snaps = await Promise.all(queries);
@@ -109,7 +155,7 @@ export async function GET(req: Request) {
             const fallbackSnap = await adminDb
               .collection("users")
               .where("phoneNumber", "in", digitVariations)
-              .limit(30)
+              .limit(pageSize)
               .get();
 
             fallbackSnap.forEach((doc) => {
@@ -121,19 +167,44 @@ export async function GET(req: Request) {
         }
       }
     } else {
-      // Default: Load latest 30 users with virtual accounts
-      const snap = await adminDb
-        .collection("users")
-        .orderBy("createdAt", "desc")
-        .limit(30)
-        .get();
+      // Default / Filtered paginated query using Firestore cursors
+      let query = adminDb.collection("users").orderBy("createdAt", "desc");
 
-      snap.forEach((doc) => {
-        rawUsers.push({ uid: doc.id, ...doc.data() });
-      });
+      if (statusFilter === "DEACTIVATED") {
+        query = adminDb
+          .collection("users")
+          .where("virtualAccountActive", "==", false)
+          .orderBy("createdAt", "desc");
+      }
+
+      if (lastDocId) {
+        const lastDocSnap = await adminDb.collection("users").doc(lastDocId).get();
+        if (lastDocSnap.exists) {
+          query = query.startAfter(lastDocSnap);
+        }
+      }
+
+      // Query pageSize + 1 to check if there is a next page
+      const snap = await query.limit(pageSize + 1).get();
+
+      if (!snap.empty) {
+        const docs = snap.docs;
+        hasNextPage = docs.length > pageSize;
+        const pageDocs = hasNextPage ? docs.slice(0, pageSize) : docs;
+
+        pageDocs.forEach((doc) => {
+          rawUsers.push({ uid: doc.id, ...doc.data() });
+        });
+
+        if (pageDocs.length > 0) {
+          lastFetchedDocId = pageDocs[pageDocs.length - 1].id;
+        }
+      }
     }
 
-    const mappedVirtualAccounts = rawUsers.map((u) => {
+    const counts = await countsPromise;
+
+    let mappedVirtualAccounts = rawUsers.map((u) => {
       const userUid = u.uid || u.id;
       const acctNum = u.virtualAccountNumber || u.accountNumber || "";
       const bankName = u.virtualAccountBankName || u.bankName || "Wema Bank";
@@ -158,7 +229,23 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ success: true, virtualAccounts: mappedVirtualAccounts });
+    // In-memory status filter for search results or default statusFilter if not natively indexed
+    if (statusFilter === "ACTIVE") {
+      mappedVirtualAccounts = mappedVirtualAccounts.filter((a) => a.isActive);
+    } else if (statusFilter === "DEACTIVATED" && searchTerm) {
+      mappedVirtualAccounts = mappedVirtualAccounts.filter((a) => !a.isActive);
+    }
+
+    return NextResponse.json({
+      success: true,
+      virtualAccounts: mappedVirtualAccounts,
+      counts,
+      pagination: {
+        limit: pageSize,
+        hasNextPage,
+        lastDocId: lastFetchedDocId,
+      },
+    });
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Admin Virtual Accounts GET Error]:", error.message);

@@ -29,22 +29,53 @@ export default function CpanelVirtualAccountsPage() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "DEACTIVATED">("ALL");
 
+  // Counts & Cursor Pagination States
+  const [counts, setCounts] = useState<{ total: number; active: number; deactivated: number }>({
+    total: 0,
+    active: 0,
+    deactivated: 0,
+  });
+  const [paginationInfo, setPaginationInfo] = useState<{
+    limit: number;
+    hasNextPage: boolean;
+    lastDocId: string | null;
+  }>({
+    limit: 20,
+    hasNextPage: false,
+    lastDocId: null,
+  });
+  const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
+  const [currentPageIndex, setCurrentPageIndex] = useState<number>(0);
+
   // Confirmation modal state
   const [actionTarget, setActionTarget] = useState<VirtualAccountItem | null>(null);
   const [actionType, setActionType] = useState<"deactivate" | "reactivate" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const fetchVirtualAccounts = useCallback(async (searchQuery = "") => {
+  const fetchVirtualAccounts = useCallback(async (
+    startAfterId: string | null = null,
+    searchQuery = searchTerm,
+    status = statusFilter
+  ) => {
     setLoading(true);
     try {
-      const url = searchQuery
-        ? `/api/admin/virtual-accounts?search=${encodeURIComponent(searchQuery)}`
-        : `/api/admin/virtual-accounts`;
-      const res = await fetch(url);
+      const params = new URLSearchParams();
+      params.set("limit", "20");
+      params.set("status", status);
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (startAfterId) params.set("startAfter", startAfterId);
+
+      const res = await fetch(`/api/admin/virtual-accounts?${params.toString()}`);
       const data = await res.json();
 
       if (data.success && Array.isArray(data.virtualAccounts)) {
         setVirtualAccounts(data.virtualAccounts);
+        if (data.counts) {
+          setCounts(data.counts);
+        }
+        if (data.pagination) {
+          setPaginationInfo(data.pagination);
+        }
       } else {
         toast.error(data.error || "Failed to load virtual accounts.");
         setVirtualAccounts([]);
@@ -55,15 +86,43 @@ export default function CpanelVirtualAccountsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchTerm, statusFilter]);
 
   useEffect(() => {
-    fetchVirtualAccounts();
-  }, [fetchVirtualAccounts]);
+    fetchVirtualAccounts(null, "", "ALL");
+  }, []);
+
+  const handleNextPage = () => {
+    if (paginationInfo.hasNextPage && paginationInfo.lastDocId) {
+      const nextIndex = currentPageIndex + 1;
+      const newStack = [...cursorStack];
+      newStack[nextIndex] = paginationInfo.lastDocId;
+      setCursorStack(newStack);
+      setCurrentPageIndex(nextIndex);
+      fetchVirtualAccounts(paginationInfo.lastDocId, searchTerm, statusFilter);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPageIndex > 0) {
+      const prevIndex = currentPageIndex - 1;
+      setCurrentPageIndex(prevIndex);
+      fetchVirtualAccounts(cursorStack[prevIndex], searchTerm, statusFilter);
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchVirtualAccounts(searchTerm);
+    setCursorStack([null]);
+    setCurrentPageIndex(0);
+    fetchVirtualAccounts(null, searchTerm, statusFilter);
+  };
+
+  const handleStatusFilterChange = (newStatus: "ALL" | "ACTIVE" | "DEACTIVATED") => {
+    setStatusFilter(newStatus);
+    setCursorStack([null]);
+    setCurrentPageIndex(0);
+    fetchVirtualAccounts(null, searchTerm, newStatus);
   };
 
   const handleToggleStatus = async () => {
@@ -103,16 +162,16 @@ export default function CpanelVirtualAccountsPage() {
     toast.success(`${label} copied to clipboard!`);
   };
 
-  // Filter accounts by status tab
+  // Filter accounts by status tab if client-side search is active
   const filteredAccounts = virtualAccounts.filter((item) => {
     if (statusFilter === "ACTIVE") return item.isActive;
     if (statusFilter === "DEACTIVATED") return !item.isActive;
     return true;
   });
 
-  const totalCount = virtualAccounts.length;
-  const activeCount = virtualAccounts.filter((a) => a.isActive).length;
-  const deactivatedCount = virtualAccounts.filter((a) => !a.isActive).length;
+  const totalCount = counts.total || virtualAccounts.length;
+  const activeCount = counts.active || virtualAccounts.filter((a) => a.isActive).length;
+  const deactivatedCount = counts.deactivated || virtualAccounts.filter((a) => !a.isActive).length;
   const totalBalanceSum = virtualAccounts.reduce((acc, curr) => acc + (curr.balance || 0), 0);
 
   return (
@@ -198,7 +257,7 @@ export default function CpanelVirtualAccountsPage() {
           {(["ALL", "ACTIVE", "DEACTIVATED"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setStatusFilter(tab)}
+              onClick={() => handleStatusFilterChange(tab)}
               className={`flex-1 md:flex-none px-4 py-2 text-xs font-bold rounded-lg transition-all ${
                 statusFilter === tab
                   ? "bg-[#FC7A00] text-white shadow-sm"
@@ -388,6 +447,47 @@ export default function CpanelVirtualAccountsPage() {
             </table>
           </div>
         )}
+
+        {/* Next/Previous Pagination Controls */}
+        <div className={`flex items-center justify-between p-4 border-t text-xs ${
+          isDark ? "border-gray-800 text-gray-400" : "border-gray-200 text-gray-600"
+        }`}>
+          <span className="font-semibold text-[11px] uppercase tracking-wider">
+            Page {currentPageIndex + 1} • Showing up to {paginationInfo.limit} records per page
+          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={currentPageIndex === 0 || loading}
+              onClick={handlePrevPage}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
+                currentPageIndex === 0 || loading
+                  ? "opacity-40 cursor-not-allowed"
+                  : isDark
+                  ? "bg-[#1E2638] text-white hover:bg-[#2A364F]"
+                  : "bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-200"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">chevron_left</span>
+              Previous
+            </button>
+
+            <button
+              type="button"
+              disabled={!paginationInfo.hasNextPage || loading}
+              onClick={handleNextPage}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1 ${
+                !paginationInfo.hasNextPage || loading
+                  ? "opacity-40 cursor-not-allowed"
+                  : "bg-[#FC7A00] text-white hover:bg-[#e06c00] shadow-sm"
+              }`}
+            >
+              Next
+              <span className="material-symbols-outlined text-sm">chevron_right</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Confirmation Modal */}
