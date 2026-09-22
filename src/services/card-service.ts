@@ -3,6 +3,7 @@ import { WalletService } from "@/services/wallet-service";
 import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { safeParseJson } from "@/lib/utils";
+import { randomUUID } from "crypto";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
@@ -21,12 +22,13 @@ export class CardService {
     billingAddress: BillingAddress;
     cardholder: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<CardItem> {
-    const { userId, currency, amount, billingAddress, cardholder, idToken, isMock = false } = params;
+    const { userId, currency, amount, billingAddress, cardholder, idToken, sessionId, isMock = false } = params;
     const startTime = Date.now();
-    const cardId = `card-${Date.now()}`;
-    const txRef = `vc-init-${Date.now()}`;
+    const cardId = `card-${randomUUID()}`;
+    const txRef = `vc-init-${randomUUID()}`;
 
     // Define setup costs (USD card setup cost $2.00, NGN card zero setup)
     const setupCost = currency === "USD" ? 2.00 : 0.00;
@@ -116,6 +118,7 @@ export class CardService {
         }
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+        if (sessionId) headers["X-Session-ID"] = sessionId;
         }
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards`, {
@@ -245,10 +248,11 @@ export class CardService {
     cardId: string;
     amount: number;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, amount, idToken, isMock = false } = params;
-    const txRef = `vc-fund-${Date.now()}`;
+    const { userId, cardId, amount, idToken, sessionId, isMock = false } = params;
+    const txRef = `vc-fund-${randomUUID()}`;
 
     const runMock = isMock || !hasAdminCredentials;
 
@@ -275,6 +279,7 @@ export class CardService {
     };
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
+    const operationLockRef = cardRef.collection("operation_locks").doc("active");
     if (!runMock) {
       const cardSnap = await cardRef.get();
       if (!cardSnap.exists) {
@@ -294,8 +299,13 @@ export class CardService {
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
 
     if (!runMock) {
-      // Atomically debit wallet balance
+      // Atomically reserve this card for one funding operation and debit the wallet.
       await adminDb.runTransaction(async (transaction) => {
+        const lockDoc = await transaction.get(operationLockRef);
+        const existingLock = lockDoc.exists ? lockDoc.data() || {} : {};
+        if (lockDoc.exists && Number(existingLock.expiresAt || 0) > Date.now()) {
+          throw new Error("Another card funding operation is already in progress. Please wait and try again.");
+        }
         const userDoc = await transaction.get(userRef);
         const walletDoc = await transaction.get(walletRef);
         const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
@@ -303,6 +313,13 @@ export class CardService {
         if (walletBalance < amount) {
           throw new Error(`Insufficient wallet balance to fund virtual card. Required: ${currency === "NGN" ? "₦" : "$"}${amount.toLocaleString()}, Available: ${currency === "NGN" ? "₦" : "$"}${walletBalance.toLocaleString()}`);
         }
+
+        transaction.set(operationLockRef, {
+          reference: txRef,
+          operation: "FUND",
+          expiresAt: Date.now() + 10 * 60 * 1000,
+          createdAt: new Date().toISOString(),
+        });
 
         await WalletService.debitWallet(transaction, {
           userId,
@@ -339,6 +356,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/fund`, {
           method: "POST",
@@ -360,6 +378,8 @@ export class CardService {
           const userDoc = await rollbackTx.get(userRef);
           const walletDoc = await rollbackTx.get(walletRef);
           const currentBal = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
+          rollbackTx.delete(operationLockRef);
 
           // Update the original transaction document to FAILED
           const origTxRef = adminDb.collection("transactions").doc(`tx-${txRef}`);
@@ -403,10 +423,23 @@ export class CardService {
     const nextBalance = cardData.balance + amount;
 
     if (!runMock) {
-      // Incremental update of card balance in Firestore
-      await cardRef.update({
-        balance: nextBalance,
-        updatedAt: new Date().toISOString(),
+      // Finalize balance atomically and release the card operation lease.
+      await adminDb.runTransaction(async (transaction) => {
+        const currentCardSnap = await transaction.get(cardRef);
+        const lockSnap = await transaction.get(operationLockRef);
+        const currentCard = currentCardSnap.data() as CardItem | undefined;
+        const lock = lockSnap.data() || {};
+        if (!currentCardSnap.exists || currentCard?.terminated) {
+          throw new Error("Virtual Card is no longer available.");
+        }
+        if (!lockSnap.exists || lock.reference !== txRef) {
+          throw new Error("Card funding operation lease was lost. Reconciliation is required before retrying.");
+        }
+        transaction.update(cardRef, {
+          balance: Number(currentCard?.balance || 0) + amount,
+          updatedAt: new Date().toISOString(),
+        });
+        transaction.delete(operationLockRef);
       });
 
       // Record local transaction
@@ -446,10 +479,11 @@ export class CardService {
     cardId: string;
     amount: number;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, amount, idToken, isMock = false } = params;
-    const txRef = `vc-withdraw-${Date.now()}`;
+    const { userId, cardId, amount, idToken, sessionId, isMock = false } = params;
+    const txRef = `vc-withdraw-${randomUUID()}`;
 
     const runMock = isMock || !hasAdminCredentials;
 
@@ -476,6 +510,7 @@ export class CardService {
     };
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
+    const operationLockRef = cardRef.collection("operation_locks").doc("active");
     if (!runMock) {
       const cardSnap = await cardRef.get();
       if (!cardSnap.exists) {
@@ -495,6 +530,20 @@ export class CardService {
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
 
     if (!runMock) {
+      await adminDb.runTransaction(async (transaction) => {
+        const lockDoc = await transaction.get(operationLockRef);
+        const existingLock = lockDoc.exists ? lockDoc.data() || {} : {};
+        if (lockDoc.exists && Number(existingLock.expiresAt || 0) > Date.now()) {
+          throw new Error("Another card operation is already in progress. Please wait and try again.");
+        }
+        transaction.set(operationLockRef, {
+          reference: txRef,
+          operation: "WITHDRAW",
+          expiresAt: Date.now() + 10 * 60 * 1000,
+          createdAt: new Date().toISOString(),
+        });
+      });
+
       try {
         const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
         const headers: Record<string, string> = {
@@ -506,6 +555,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/withdraw`, {
           method: "POST",
@@ -521,9 +571,24 @@ export class CardService {
         throw new Error(`Card withdrawal failed on payment gateway rails: ${err.message}`);
       }
 
-      // Perform atomic Wallet Credit & card balance decrement
+      // Perform atomic wallet credit + current card balance decrement + lease release.
       const nextBalance = cardData.balance - amount;
       await adminDb.runTransaction(async (transaction) => {
+        const currentCardSnap = await transaction.get(cardRef);
+        const lockSnap = await transaction.get(operationLockRef);
+        const currentCard = currentCardSnap.data() as CardItem | undefined;
+        const lock = lockSnap.data() || {};
+        if (!currentCardSnap.exists || currentCard?.terminated) {
+          throw new Error("Virtual Card is no longer available.");
+        }
+        if (!lockSnap.exists || lock.reference !== txRef) {
+          throw new Error("Card withdrawal operation lease was lost. Reconciliation is required before retrying.");
+        }
+        const lockedCard = currentCard!;
+        if (Number(lockedCard.balance || 0) < amount) {
+          throw new Error("Insufficient current card balance to complete withdrawal.");
+        }
+
         const userDoc = await transaction.get(userRef);
         const walletDoc = await transaction.get(walletRef);
         const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
@@ -547,11 +612,12 @@ export class CardService {
             balance: walletBalance,
           },
         });
-      });
 
-      await cardRef.update({
-        balance: nextBalance,
-        updatedAt: new Date().toISOString(),
+        transaction.update(cardRef, {
+          balance: Number(lockedCard.balance || 0) - amount,
+          updatedAt: new Date().toISOString(),
+        });
+        transaction.delete(operationLockRef);
       });
 
       // Record local transaction
@@ -589,9 +655,10 @@ export class CardService {
     cardId: string;
     isLocked: boolean; // next status
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, isLocked, idToken, isMock = false } = params;
+    const { userId, cardId, isLocked, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
@@ -616,6 +683,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/status`, {
           method: "PUT",
@@ -656,12 +724,14 @@ export class CardService {
     userId: string;
     cardId: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, idToken, isMock = false } = params;
+    const { userId, cardId, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
+    const operationLockRef = cardRef.collection("operation_locks").doc("active");
 
     if (!runMock) {
       const cardSnap = await cardRef.get();
@@ -669,6 +739,20 @@ export class CardService {
         throw new Error("Virtual Card not found.");
       }
       const cardData = cardSnap.data() as CardItem;
+
+      await adminDb.runTransaction(async (transaction) => {
+        const lockDoc = await transaction.get(operationLockRef);
+        const existingLock = lockDoc.exists ? lockDoc.data() || {} : {};
+        if (lockDoc.exists && Number(existingLock.expiresAt || 0) > Date.now()) {
+          throw new Error("Another card operation is already in progress. Please wait and try again.");
+        }
+        transaction.set(operationLockRef, {
+          reference: `vc-term-${randomUUID()}`,
+          operation: "TERMINATE",
+          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+          createdAt: new Date().toISOString(),
+        });
+      });
 
       try {
         const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
@@ -679,6 +763,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/terminate`, {
           method: "PUT",
@@ -693,25 +778,41 @@ export class CardService {
         throw new Error(`Failed to terminate card on rails: ${err.message}`);
       }
 
-      // Refund card balance to wallet atomically on termination
+      // Refund and terminate in one Firestore transaction using the operation lease.
       const refundAmount = cardData.balance;
-      if (refundAmount > 0) {
-        const currency = cardData.currency;
-        const userRef = adminDb.collection("users").doc(userId);
-        const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
+      const currency = cardData.currency;
+      const userRef = adminDb.collection("users").doc(userId);
+      const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
 
-        await adminDb.runTransaction(async (transaction) => {
+      await adminDb.runTransaction(async (transaction) => {
+        const currentCardSnap = await transaction.get(cardRef);
+        const lockSnap = await transaction.get(operationLockRef);
+        const currentCard = currentCardSnap.data() as CardItem | undefined;
+        const lock = lockSnap.data() || {};
+
+        if (!currentCardSnap.exists) {
+          throw new Error("Virtual Card not found.");
+        }
+        if (currentCard?.terminated) {
+          throw new Error("Virtual Card is already terminated.");
+        }
+        if (!lockSnap.exists || !lock.reference || lock.operation !== "TERMINATE") {
+          throw new Error("Card termination operation lease was lost. Reconciliation is required.");
+        }
+
+        const currentRefundAmount = Number(currentCard!.balance || 0);
+        if (currentRefundAmount > 0) {
           const userDoc = await transaction.get(userRef);
           const walletDoc = await transaction.get(walletRef);
           const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
 
           await WalletService.creditWallet(transaction, {
             userId,
-            amount: refundAmount,
+            amount: currentRefundAmount,
             currency,
-            reference: `vc-term-refund-${Date.now()}`,
-            description: `Virtual Card (${cardData.lastFour}) Termination Balance Refund`,
-            recipientName: `Wallet Balance`,
+            reference: `vc-term-refund-${lock.reference}`,
+            description: `Virtual Card (${currentCard!.lastFour}) Termination Balance Refund`,
+            recipientName: "Wallet Balance",
             type: "DEPOSIT",
             preLoadedUser: {
               ref: userRef,
@@ -724,13 +825,14 @@ export class CardService {
               balance: walletBalance,
             },
           });
-        });
-      }
+        }
 
-      await cardRef.update({
-        terminated: true,
-        balance: 0,
-        updatedAt: new Date().toISOString(),
+        transaction.update(cardRef, {
+          terminated: true,
+          balance: 0,
+          updatedAt: new Date().toISOString(),
+        });
+        transaction.delete(operationLockRef);
       });
 
       await adminDb.collection("notifications").add({
@@ -753,9 +855,10 @@ export class CardService {
     userId: string;
     cardId: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, idToken, isMock = false } = params;
+    const { userId, cardId, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     if (runMock) {
@@ -783,6 +886,7 @@ export class CardService {
       if (idToken || gatewayApiKey) {
         headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
       }
+      if (sessionId) headers["X-Session-ID"] = sessionId;
 
       const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}`, {
         headers,
@@ -811,9 +915,10 @@ export class CardService {
     userId: string;
     cardId: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<CardTransaction[]> {
-    const { userId, cardId, idToken, isMock = false } = params;
+    const { userId, cardId, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     if (runMock) {
@@ -890,6 +995,7 @@ export class CardService {
       if (idToken || gatewayApiKey) {
         headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
       }
+      if (sessionId) headers["X-Session-ID"] = sessionId;
 
       const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/transactions`, {
         headers,

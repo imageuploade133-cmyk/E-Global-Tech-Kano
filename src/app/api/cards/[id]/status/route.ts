@@ -8,11 +8,13 @@ export async function PUT(
 ) {
   let uid = "";
   let idToken = "";
+  let sessionId = "";
   try {
     const authResult = await authenticateUserRequest(req);
     uid = authResult.uid;
     const authHeader = req.headers.get("Authorization") || "";
     idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
   } catch (err: any) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -28,6 +30,7 @@ export async function PUT(
       cardId: id,
       isLocked: !!isLocked,
       idToken,
+      sessionId,
       isMock: uid === "mock-uid",
     });
 

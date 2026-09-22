@@ -112,6 +112,7 @@ export async function POST(req: Request) {
     if (!isMock) {
       try {
         const authHeader = req.headers.get("Authorization") || "";
+        const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
         const apiCategory = biller_type?.toUpperCase() === "DATA" ? "MOBILEDATA" : biller_type?.toUpperCase() || "AIRTIME";
 
         // Validate Biller Provider Exists
@@ -119,6 +120,7 @@ export async function POST(req: Request) {
           method: "POST",
           headers: {
             "Authorization": authHeader,
+            ...(sessionId ? { "X-Session-ID": sessionId } : {}),
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
