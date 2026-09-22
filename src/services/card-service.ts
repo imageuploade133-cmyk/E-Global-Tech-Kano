@@ -811,7 +811,7 @@ export class CardService {
             amount: currentRefundAmount,
             currency,
             reference: `vc-term-refund-${lock.reference}`,
-            description: `Virtual Card (${currentCard.lastFour}) Termination Balance Refund`,
+            description: `Virtual Card (${currentCard!.lastFour}) Termination Balance Refund`,
             recipientName: "Wallet Balance",
             type: "DEPOSIT",
             preLoadedUser: {
