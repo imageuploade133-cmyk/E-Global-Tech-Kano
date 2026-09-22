@@ -1626,6 +1626,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     try {
       let idToken = "mock-token";
+      let activeSessionId = "";
+      if (typeof window !== "undefined") {
+        activeSessionId = localStorage.getItem("active_session_id") || "";
+      }
       if (user && sessionStorage.getItem("mock") !== "true") {
         idToken = await user.getIdToken();
       }
@@ -1635,6 +1639,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {}),
         },
         body: JSON.stringify({
           amount: parseFloat(addAmount),
@@ -1680,6 +1685,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     try {
       let idToken = "mock-token";
+      let activeSessionId = "";
+      if (typeof window !== "undefined") {
+        activeSessionId = localStorage.getItem("active_session_id") || "";
+      }
       if (user && sessionStorage.getItem("mock") !== "true") {
         idToken = await user.getIdToken();
       }
@@ -1689,6 +1698,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {}),
         },
         body: JSON.stringify({
           amount: parseFloat(addAmount),
