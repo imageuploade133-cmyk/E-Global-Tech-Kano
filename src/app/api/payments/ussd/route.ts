@@ -128,6 +128,15 @@ export async function POST(req: Request) {
     const gatewayAuthHeader = req.headers.get("Authorization") || "";
     const idToken = gatewayAuthHeader.startsWith("Bearer ") ? gatewayAuthHeader.split("Bearer ")[1] : "";
 
+    // The gateway validates Firebase JWT sessions server-side. The client already
+    // supplies X-Session-ID to this Next.js route; preserve it when this route
+    // makes the server-to-server gateway call. Without forwarding it, the gateway
+    // correctly rejects a valid new-device-verified login with REVOKED_SESSION.
+    const sessionId =
+      req.headers.get("X-Session-ID") ||
+      req.headers.get("x-session-id") ||
+      "";
+
     // Step 4: Forward ALL fields exactly as received. Do not discard fields.
     const gatewayPayload = {
       tx_ref: finalTxRef,
@@ -151,6 +160,7 @@ export async function POST(req: Request) {
       headers: {
         "Authorization": `Bearer ${idToken}`,
         "Content-Type": "application/json",
+        ...(sessionId ? { "X-Session-ID": sessionId } : {}),
       },
       body: JSON.stringify(gatewayPayload),
     });
