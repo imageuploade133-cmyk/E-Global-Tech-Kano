@@ -247,6 +247,7 @@ export class CardService {
     cardId: string;
     amount: number;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
     const { userId, cardId, amount, idToken, sessionId, isMock = false } = params;
@@ -341,6 +342,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/fund`, {
           method: "POST",
@@ -448,9 +450,10 @@ export class CardService {
     cardId: string;
     amount: number;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, amount, idToken, isMock = false } = params;
+    const { userId, cardId, amount, idToken, sessionId, isMock = false } = params;
     const txRef = `vc-withdraw-${Date.now()}`;
 
     const runMock = isMock || !hasAdminCredentials;
@@ -508,6 +511,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/withdraw`, {
           method: "POST",
@@ -591,9 +595,10 @@ export class CardService {
     cardId: string;
     isLocked: boolean; // next status
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, isLocked, idToken, isMock = false } = params;
+    const { userId, cardId, isLocked, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
@@ -618,6 +623,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/status`, {
           method: "PUT",
@@ -658,6 +664,7 @@ export class CardService {
     userId: string;
     cardId: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
     const { userId, cardId, idToken, sessionId, isMock = false } = params;
@@ -681,6 +688,7 @@ export class CardService {
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
         }
+        if (sessionId) headers["X-Session-ID"] = sessionId;
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/terminate`, {
           method: "PUT",
@@ -755,9 +763,10 @@ export class CardService {
     userId: string;
     cardId: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, idToken, isMock = false } = params;
+    const { userId, cardId, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     if (runMock) {
@@ -785,6 +794,7 @@ export class CardService {
       if (idToken || gatewayApiKey) {
         headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
       }
+      if (sessionId) headers["X-Session-ID"] = sessionId;
 
       const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}`, {
         headers,
@@ -813,9 +823,10 @@ export class CardService {
     userId: string;
     cardId: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<CardTransaction[]> {
-    const { userId, cardId, idToken, isMock = false } = params;
+    const { userId, cardId, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     if (runMock) {
@@ -892,6 +903,7 @@ export class CardService {
       if (idToken || gatewayApiKey) {
         headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
       }
+      if (sessionId) headers["X-Session-ID"] = sessionId;
 
       const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards/${cardData.cardId}/transactions`, {
         headers,
