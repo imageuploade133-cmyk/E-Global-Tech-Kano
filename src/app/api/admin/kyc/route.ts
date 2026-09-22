@@ -157,6 +157,38 @@ export async function POST(req: Request) {
       });
     }
 
+    if (action === "move_to_pending") {
+      const nowIso = new Date().toISOString();
+      const userRef = adminDb.collection("users").doc(targetUid);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        return NextResponse.json({ error: "Target user profile not found." }, { status: 404 });
+      }
+
+      const userData = userDoc.data() || {};
+      await userRef.update({
+        kycStatus: "PENDING",
+        kycSubmittedAt: nowIso,
+      });
+
+      const submissionRef = adminDb.collection("kyc_submissions").doc(targetUid);
+      await submissionRef.set(
+        {
+          userId: targetUid,
+          documentType: userData.kycType || "bvn",
+          documentNumber: userData.bvn || userData.nin || userData.kycNumber || "22222222222",
+          status: "PENDING",
+          submittedAt: nowIso,
+        },
+        { merge: true }
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: `User ${userData.name || "profile"} moved to Pending verification queue successfully.`
+      });
+    }
+
     const authHeader = req.headers.get("Authorization") || "";
     let idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
 

@@ -118,7 +118,7 @@ function CpanelKycPageContent() {
     fetchPendingKyc(false, kycTab);
   }, [kycTab]);
 
-  const handleProcessKyc = async (targetUid: string, action: "verify" | "approve" | "reject" | "retry") => {
+  const handleProcessKyc = async (targetUid: string, action: "verify" | "approve" | "reject" | "retry" | "move_to_pending") => {
     setIsProcessingKyc(targetUid);
     const reason = rejectionReason[targetUid] || "";
     const provider = selectedProvider[targetUid];
@@ -158,6 +158,8 @@ function CpanelKycPageContent() {
           setPendingKycUser((prev) => prev.filter((u) => u.uid !== targetUid));
         } else if (action === "verify") {
           setPendingKycUser((prev) => prev.map((u) => (u.uid === targetUid ? { ...u, kycStatus: "IDENTITY_VERIFIED" as any } : u)));
+        } else if (action === "move_to_pending") {
+          setPendingKycUser((prev) => prev.map((u) => (u.uid === targetUid ? { ...u, kycStatus: "PENDING" as any } : u)));
         } else if (action === "reject") {
           setPendingKycUser((prev) => prev.map((u) => (u.uid === targetUid ? { ...u, kycStatus: "REJECTED" as any } : u)));
         }
@@ -379,7 +381,7 @@ function CpanelKycPageContent() {
                     </div>
 
                     {/* Provider Selector for Approval */}
-                    {(u.kycStatus === "IDENTITY_VERIFIED" || u.kycStatus === "PROVISIONING_FAILED" || u.kycStatus === "PENDING") && (
+                    {(u.kycStatus === "IDENTITY_VERIFIED" || u.kycStatus === "PROVISIONING_FAILED" || u.kycStatus === "PENDING" || u.kycStatus === "UNVERIFIED") && (
                       <div className="space-y-1">
                         <label className="text-[9px] font-black uppercase text-gray-400">Select Virtual Account Gateway Provider *</label>
                         <select
@@ -400,16 +402,23 @@ function CpanelKycPageContent() {
                         isDark={isDark}
                         actions={[
                           {
+                            label: "Move to Pending Queue",
+                            icon: "pending_actions",
+                            variant: "warning",
+                            disabled: u.kycStatus !== "UNVERIFIED" && u.kycStatus !== "REJECTED",
+                            onClick: () => handleProcessKyc(u.uid, "move_to_pending"),
+                          },
+                          {
                             label: "Check Identity",
                             icon: "badge",
-                            disabled: !(u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW" || u.kycStatus === "VERIFICATION_FAILED"),
+                            disabled: !(u.kycStatus === "PENDING" || u.kycStatus === "PENDING_REVIEW" || u.kycStatus === "VERIFICATION_FAILED" || u.kycStatus === "UNVERIFIED"),
                             onClick: () => handleProcessKyc(u.uid, "verify"),
                           },
                           {
                             label: "Approve & Provision",
                             icon: "verified",
                             variant: "emerald",
-                            disabled: u.kycStatus !== "IDENTITY_VERIFIED",
+                            disabled: !(u.kycStatus === "IDENTITY_VERIFIED" || u.kycStatus === "PENDING" || u.kycStatus === "UNVERIFIED"),
                             onClick: () => handleProcessKyc(u.uid, "approve"),
                           },
                           {
@@ -423,7 +432,7 @@ function CpanelKycPageContent() {
                             label: "Reject KYC",
                             icon: "cancel",
                             variant: "danger",
-                            disabled: u.kycStatus === "REJECTED" || u.kycStatus === "VERIFIED" || u.kycStatus === "UNVERIFIED",
+                            disabled: u.kycStatus === "REJECTED" || u.kycStatus === "VERIFIED",
                             onClick: () => handleProcessKyc(u.uid, "reject"),
                           },
                           {
