@@ -36,5 +36,13 @@
     "postcss": "^8.5.2",
     "tailwindcss": "^4.0.0",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "jwks-rsa": {
+      "jose": "4.15.9"
+    }
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
