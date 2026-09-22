@@ -740,6 +740,7 @@ export class CardService {
     const runMock = isMock || !hasAdminCredentials;
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
+    const operationLockRef = cardRef.collection("operation_locks").doc("active");
 
     if (!runMock) {
       const cardSnap = await cardRef.get();
@@ -747,6 +748,20 @@ export class CardService {
         throw new Error("Virtual Card not found.");
       }
       const cardData = cardSnap.data() as CardItem;
+
+      await adminDb.runTransaction(async (transaction) => {
+        const lockDoc = await transaction.get(operationLockRef);
+        const existingLock = lockDoc.exists ? lockDoc.data() || {} : {};
+        if (lockDoc.exists && Number(existingLock.expiresAt || 0) > Date.now()) {
+          throw new Error("Another card operation is already in progress. Please wait and try again.");
+        }
+        transaction.set(operationLockRef, {
+          reference: `vc-term-${Date.now()}`,
+          operation: "TERMINATE",
+          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+          createdAt: new Date().toISOString(),
+        });
+      });
 
       try {
         const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
@@ -772,25 +787,41 @@ export class CardService {
         throw new Error(`Failed to terminate card on rails: ${err.message}`);
       }
 
-      // Refund card balance to wallet atomically on termination
+      // Refund and terminate in one Firestore transaction using the operation lease.
       const refundAmount = cardData.balance;
-      if (refundAmount > 0) {
-        const currency = cardData.currency;
-        const userRef = adminDb.collection("users").doc(userId);
-        const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
+      const currency = cardData.currency;
+      const userRef = adminDb.collection("users").doc(userId);
+      const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
 
-        await adminDb.runTransaction(async (transaction) => {
+      await adminDb.runTransaction(async (transaction) => {
+        const currentCardSnap = await transaction.get(cardRef);
+        const lockSnap = await transaction.get(operationLockRef);
+        const currentCard = currentCardSnap.data() as CardItem | undefined;
+        const lock = lockSnap.data() || {};
+
+        if (!currentCardSnap.exists) {
+          throw new Error("Virtual Card not found.");
+        }
+        if (currentCard?.terminated) {
+          throw new Error("Virtual Card is already terminated.");
+        }
+        if (!lockSnap.exists || !lock.reference || lock.operation !== "TERMINATE") {
+          throw new Error("Card termination operation lease was lost. Reconciliation is required.");
+        }
+
+        const currentRefundAmount = Number(currentCard.balance || 0);
+        if (currentRefundAmount > 0) {
           const userDoc = await transaction.get(userRef);
           const walletDoc = await transaction.get(walletRef);
           const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
 
           await WalletService.creditWallet(transaction, {
             userId,
-            amount: refundAmount,
+            amount: currentRefundAmount,
             currency,
-            reference: `vc-term-refund-${Date.now()}`,
-            description: `Virtual Card (${cardData.lastFour}) Termination Balance Refund`,
-            recipientName: `Wallet Balance`,
+            reference: `vc-term-refund-${lock.reference}`,
+            description: `Virtual Card (${currentCard.lastFour}) Termination Balance Refund`,
+            recipientName: "Wallet Balance",
             type: "DEPOSIT",
             preLoadedUser: {
               ref: userRef,
@@ -803,13 +834,14 @@ export class CardService {
               balance: walletBalance,
             },
           });
-        });
-      }
+        }
 
-      await cardRef.update({
-        terminated: true,
-        balance: 0,
-        updatedAt: new Date().toISOString(),
+        transaction.update(cardRef, {
+          terminated: true,
+          balance: 0,
+          updatedAt: new Date().toISOString(),
+        });
+        transaction.delete(operationLockRef);
       });
 
       await adminDb.collection("notifications").add({
