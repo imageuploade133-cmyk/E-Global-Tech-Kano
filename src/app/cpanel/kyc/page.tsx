@@ -21,6 +21,7 @@ interface PendingKycUser {
   submittedAt: string;
   capturedSelfie?: string;
   livenessChallenge?: string;
+  photoURL?: string;
   virtualAccountNumber?: string;
   virtualAccountBankName?: string;
   balance?: number;
@@ -423,10 +424,21 @@ function CpanelKycPageContent() {
                 return (
                   <div key={u.uid} className={cn("p-4 border rounded-2xl transition-all space-y-3", isDark ? "border-gray-800 bg-gray-900/40 hover:bg-gray-850/30" : "border-gray-150 bg-gray-50/50 hover:bg-gray-100/30")}>
                     <div className="flex justify-between items-start flex-wrap gap-2">
-                      <div>
-                        <h4 className={cn("font-extrabold text-sm leading-none", isDark ? "text-white" : "text-gray-900")}>{u.name}</h4>
-                        <p className="text-xs font-semibold mt-1 select-all text-gray-400">{u.email}</p>
-                        <p className="text-[10px] font-mono text-gray-400 mt-0.5">{u.phoneNumber}</p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full border border-[#FC7A00]/30 bg-orange-500/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {u.photoURL ? (
+                            <img src={u.photoURL} alt={u.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="font-extrabold text-[#FC7A00] text-sm font-hanken">
+                              {u.name ? u.name.slice(0, 2).toUpperCase() : "US"}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className={cn("font-extrabold text-sm leading-none", isDark ? "text-white" : "text-gray-900")}>{u.name}</h4>
+                          <p className="text-xs font-semibold mt-1 select-all text-gray-400">{u.email}</p>
+                          <p className="text-[10px] font-mono text-gray-400 mt-0.5">{u.phoneNumber}</p>
+                        </div>
                       </div>
 
                       <div className="text-right">
@@ -595,8 +607,14 @@ function CpanelKycPageContent() {
           <div className={cn("w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto no-scrollbar", panelClass)}>
             <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-[#FC7A00] flex items-center justify-center font-black">
-                  <span className="material-symbols-outlined text-xl">badge</span>
+                <div className="w-12 h-12 rounded-full border border-[#FC7A00]/30 bg-orange-500/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {inspectingUser.photoURL ? (
+                    <img src={inspectingUser.photoURL} alt={inspectingUser.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-extrabold text-[#FC7A00] text-sm font-hanken">
+                      {inspectingUser.name ? inspectingUser.name.slice(0, 2).toUpperCase() : "US"}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base font-bold uppercase">{inspectingUser.name}</h3>
@@ -698,8 +716,14 @@ function CpanelKycPageContent() {
           <div className={cn("w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5", panelClass)}>
             <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black">
-                  <span className="material-symbols-outlined text-xl">edit_note</span>
+                <div className="w-10 h-10 rounded-full border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {editingUser.photoURL ? (
+                    <img src={editingUser.photoURL} alt={editingUser.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-extrabold text-emerald-500 text-xs font-hanken">
+                      {editingUser.name ? editingUser.name.slice(0, 2).toUpperCase() : "US"}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base font-bold uppercase">Edit Customer KYC Details</h3>

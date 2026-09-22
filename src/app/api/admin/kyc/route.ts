@@ -109,6 +109,7 @@ export async function GET(req: Request) {
         capturedSelfie: data.capturedSelfie || data.kycCapturedSelfie || null,
         livenessChallenge: data.livenessChallenge || null,
         kycVerifiedAt: data.kycVerifiedAt || null,
+        photoURL: data.photoURL || data.avatarUrl || data.profileImage || data.photoUrl || null,
         virtualAccountNumber: data.virtualAccountNumber || data.accountNumber || "",
         virtualAccountBankName: data.virtualAccountBankName || data.bankName || "",
         balance: Number(data.balance) || 0
