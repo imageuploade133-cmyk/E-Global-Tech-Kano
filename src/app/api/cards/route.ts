@@ -106,6 +106,7 @@ export async function POST(req: Request) {
     uid = authResult.uid;
     const authHeader = req.headers.get("Authorization") || "";
     idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
   } catch (err: any) {
     return NextResponse.json({ error: "Unauthorized: Invalid or missing token." }, { status: 401 });
   }
@@ -138,6 +139,7 @@ export async function POST(req: Request) {
       billingAddress,
       cardholder,
       idToken,
+      sessionId,
       isMock,
     });
 
