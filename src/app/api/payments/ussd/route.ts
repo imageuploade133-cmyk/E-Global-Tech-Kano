@@ -125,6 +125,14 @@ export async function POST(req: Request) {
     const gatewayAuthHeader = req.headers.get("Authorization") || "";
     const idToken = gatewayAuthHeader.startsWith("Bearer ") ? gatewayAuthHeader.split("Bearer ")[1] : "";
 
+    // Preserve the server-authoritative active session when proxying the request
+    // to the payment gateway. The gateway independently validates this value
+    // against users/{uid}.activeSessionId.
+    const activeSessionId =
+      req.headers.get("x-session-id") ||
+      req.headers.get("X-Session-ID") ||
+      "";
+
     // Step 4: Forward ALL fields exactly as received. Do not discard fields.
     const gatewayPayload = {
       tx_ref: finalTxRef,
@@ -148,6 +156,7 @@ export async function POST(req: Request) {
       headers: {
         "Authorization": `Bearer ${idToken}`,
         "Content-Type": "application/json",
+        ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {}),
       },
       body: JSON.stringify(gatewayPayload),
     });
