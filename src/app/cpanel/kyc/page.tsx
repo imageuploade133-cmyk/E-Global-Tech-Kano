@@ -1,8 +1,6 @@
 "use client";
 import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 
-
-
 import React, { useState, useEffect } from "react";
 import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import Link from "next/link";
@@ -23,6 +21,9 @@ interface PendingKycUser {
   submittedAt: string;
   capturedSelfie?: string;
   livenessChallenge?: string;
+  virtualAccountNumber?: string;
+  virtualAccountBankName?: string;
+  balance?: number;
 }
 
 const ButtonSpinner = () => (
@@ -48,6 +49,18 @@ function CpanelKycPageContent() {
   const [kycLastDocId, setKycLastDocId] = useState("");
   const [kycHasMore, setKycHasMore] = useState(false);
   const [kycTotalCount, setKycTotalCount] = useState(0);
+
+  // Inspector and Editor Drawer States
+  const [inspectingUser, setInspectingUser] = useState<PendingKycUser | null>(null);
+  const [editingUser, setEditingUser] = useState<PendingKycUser | null>(null);
+
+  // Edit form state
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editKycType, setEditKycType] = useState<"bvn" | "nin">("bvn");
+  const [editKycNumber, setEditKycNumber] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const [adminActionModal, setAdminActionModal] = useState<{
     isOpen: boolean;
@@ -75,9 +88,81 @@ function CpanelKycPageContent() {
     setAdminActionModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
   };
 
+  const openEditingModal = (u: PendingKycUser) => {
+    setEditingUser(u);
+    setEditName(u.name || "");
+    setEditEmail(u.email || "");
+    setEditPhone(u.phoneNumber || "");
+    setEditKycType(u.kycType || "bvn");
+    setEditKycNumber(u.kycNumber || "");
+  };
 
+  const handleSaveUserKycInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
 
+    setIsSavingEdit(true);
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
 
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "update_user_kyc_info",
+          targetUid: editingUser.uid,
+          name: editName,
+          email: editEmail,
+          phoneNumber: editPhone,
+          kycType: editKycType,
+          kycNumber: editKycNumber,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Customer KYC information saved!");
+        setPendingKycUser((prev) =>
+          prev.map((item) =>
+            item.uid === editingUser.uid
+              ? {
+                  ...item,
+                  name: editName,
+                  email: editEmail,
+                  phoneNumber: editPhone,
+                  kycType: editKycType,
+                  kycNumber: editKycNumber,
+                }
+              : item
+          )
+        );
+        if (inspectingUser && inspectingUser.uid === editingUser.uid) {
+          setInspectingUser({
+            ...inspectingUser,
+            name: editName,
+            email: editEmail,
+            phoneNumber: editPhone,
+            kycType: editKycType,
+            kycNumber: editKycNumber,
+          });
+        }
+        setEditingUser(null);
+      } else {
+        toast.error(data.error || "Failed to update customer KYC info.");
+      }
+    } catch {
+      toast.error("Network communication error saving user details.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   const fetchPendingKyc = async (isLoadMore: boolean = false, customTab?: "pending" | "verified_today" | "unverified") => {
     setIsLoadingKyc(true);
@@ -202,6 +287,9 @@ function CpanelKycPageContent() {
           if (res.ok && data.success) {
             toast.success(data.message || "User profile permanently deleted.");
             setPendingKycUser((prev) => prev.filter((u) => u.uid !== targetUid));
+            if (inspectingUser && inspectingUser.uid === targetUid) {
+              setInspectingUser(null);
+            }
           } else {
             toast.error(data.error || "Failed to delete user profile.");
           }
@@ -375,7 +463,7 @@ function CpanelKycPageContent() {
                     {/* KYC Type & Number */}
                     <div className={cn("p-3 rounded-xl border space-y-1.5", isDark ? "bg-gray-800/60 border-gray-700" : "bg-white border-gray-200")}>
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="font-black uppercase text-gray-400">{u.kycType.toUpperCase()} Number:</span>
+                        <span className="font-black uppercase text-gray-400">{u.kycType ? u.kycType.toUpperCase() : "BVN"} Number:</span>
                         <span className="font-mono font-bold select-all text-emerald-500">{u.kycNumber || "NOT PROVIDED"}</span>
                       </div>
                     </div>
@@ -401,6 +489,17 @@ function CpanelKycPageContent() {
                       <CpanelActionDropdown
                         isDark={isDark}
                         actions={[
+                          {
+                            label: "View Account Info",
+                            icon: "info",
+                            onClick: () => setInspectingUser(u),
+                          },
+                          {
+                            label: "Edit KYC Details",
+                            icon: "edit_note",
+                            variant: "emerald",
+                            onClick: () => openEditingModal(u),
+                          },
                           {
                             label: "Move to Pending Queue",
                             icon: "pending_actions",
@@ -489,6 +588,219 @@ function CpanelKycPageContent() {
         </div>
 
       </div>
+
+      {/* Account Details Inspector Modal Drawer */}
+      {inspectingUser && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className={cn("w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto no-scrollbar", panelClass)}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-[#FC7A00] flex items-center justify-center font-black">
+                  <span className="material-symbols-outlined text-xl">badge</span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold uppercase">{inspectingUser.name}</h3>
+                  <p className="text-[10px] text-gray-400 font-mono">UID: {inspectingUser.uid}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectingUser(null)}
+                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Selfie preview if available */}
+              {inspectingUser.capturedSelfie && (
+                <div className="flex items-center gap-4 p-3 rounded-2xl border bg-orange-500/5 border-orange-500/20">
+                  <img src={inspectingUser.capturedSelfie} alt="Biometric Selfie" className="w-20 h-20 rounded-xl object-cover border border-orange-500/30" />
+                  <div>
+                    <span className="font-extrabold text-[#FC7A00] uppercase text-[10px]">Captured Biometric Selfie</span>
+                    <p className="text-gray-400 text-[11px] mt-1 font-semibold">Liveness Verification Code: <span className="font-mono text-white">{inspectingUser.livenessChallenge || "Passed"}</span></p>
+                  </div>
+                </div>
+              )}
+
+              {/* Profile Details Grid */}
+              <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl border border-gray-200/50 dark:border-gray-800">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400 block">Full Name</span>
+                  <p className="font-bold text-sm mt-0.5">{inspectingUser.name}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400 block">KYC Status</span>
+                  <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    {inspectingUser.kycStatus}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400 block">Email Address</span>
+                  <p className="font-semibold text-xs mt-0.5 select-all truncate">{inspectingUser.email || "N/A"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400 block">Phone Number</span>
+                  <p className="font-semibold text-xs mt-0.5 select-all font-mono">{inspectingUser.phoneNumber || "N/A"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400 block">KYC Document Type</span>
+                  <p className="font-bold uppercase text-xs mt-0.5 text-[#FC7A00]">{inspectingUser.kycType || "BVN"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400 block">Document Number</span>
+                  <p className="font-mono font-bold text-xs mt-0.5 text-emerald-500 select-all">{inspectingUser.kycNumber || "NOT PROVIDED"}</p>
+                </div>
+              </div>
+
+              {/* Virtual Account & Wallet Info */}
+              <div className="p-4 rounded-2xl border border-gray-200/50 dark:border-gray-800 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400">Virtual Account Number</span>
+                  <span className="font-mono font-black text-sm text-[#FC7A00] select-all">{inspectingUser.virtualAccountNumber || "Not Assigned Yet"}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400">Virtual Account Bank</span>
+                  <span className="font-bold text-xs">{inspectingUser.virtualAccountBankName || "N/A"}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-extrabold uppercase text-gray-400">Wallet Available Balance</span>
+                  <span className="font-bold text-xs text-emerald-500">₦{(inspectingUser.balance || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => {
+                  openEditingModal(inspectingUser);
+                }}
+                className="px-4 py-2 bg-[#FC7A00] text-white text-xs font-bold uppercase rounded-xl hover:bg-[#e06c00] transition-all"
+              >
+                Edit KYC Information
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectingUser(null)}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Customer KYC Details Drawer Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className={cn("w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5", panelClass)}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black">
+                  <span className="material-symbols-outlined text-xl">edit_note</span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold uppercase">Edit Customer KYC Details</h3>
+                  <p className="text-[10px] text-gray-400">Update missing or incorrect verification details.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUserKycInfo} className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Customer Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="e.g. Jules Verne"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="customer@example.com"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Phone Number</label>
+                <input
+                  type="text"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+2348012345678"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold uppercase text-gray-400">KYC Type</label>
+                  <select
+                    value={editKycType}
+                    onChange={(e) => setEditKycType(e.target.value as "bvn" | "nin")}
+                    className={cn(inputClass, "cursor-pointer font-bold")}
+                  >
+                    <option value="bvn">BVN (Bank Verification Number)</option>
+                    <option value="nin">NIN (National Identity Number)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold uppercase text-gray-400">KYC Document Number</label>
+                  <input
+                    type="text"
+                    required
+                    value={editKycNumber}
+                    onChange={(e) => setEditKycNumber(e.target.value)}
+                    placeholder="11-digit BVN or NIN"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200/50 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  disabled={isSavingEdit}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded-xl transition-all shadow-md flex items-center gap-1.5"
+                >
+                  {isSavingEdit && (
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  <span>Save KYC Details</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       {adminActionModal.isOpen && (
