@@ -1618,7 +1618,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // USSD Bank Selection Action
-  const handleBankSelect = async (bank: { id: string; name: string }) => {
+  const handleBankSelect = async (bank: { id: string; name: string; code?: string }) => {
     setSelectedBank(bank);
     setUssdErrorMessage("");
     setIsInitializing(true);
@@ -1640,6 +1640,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           amount: parseFloat(addAmount),
           currency: "NGN",
           bankId: bank.id,
+          bank_code: bank.code || bank.id,
+          bankName: bank.name,
           email: user?.email || "captain@example.com",
           name: userData?.name || user?.displayName || "Captain Wallet",
           phone: userData?.phoneNumber || "08012345678",

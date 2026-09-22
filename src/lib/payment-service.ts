@@ -1,11 +1,10 @@
 import { safeParseJson } from "@/lib/utils";
+import { resolveUssdCode } from "@/lib/ussd-resolver";
 
 const FLW_BASE_URL = "https://etechglobalhub.duckdns.org/api/flutterwave";
 
-export interface USSDPaymentPayload { tx_ref: string; amount: number; email: string; phone_number: string; fullname: string; bank_code: string; }
+export interface USSDPaymentPayload { tx_ref: string; amount: number; email: string; phone_number: string; fullname: string; bank_code: string; bank_name?: string; }
 export interface BankTransferPayload { tx_ref: string; amount: number; email: string; phone_number: string; fullname: string; firstname?: string; lastname?: string; narration?: string; }
-
-const TEST_USSD_TEMPLATES: Record<string, string> = { "058": "*737*1*2*", "044": "*901*1*2*", "033": "*919*3*2*", "057": "*966*2*", "011": "*894*1*1*", "999992": "*955*2*", "50515": "*5573*1*" };
 
 export class PaymentService {
   static async createUSSDPayment(payload: USSDPaymentPayload, idToken: string) {
@@ -16,9 +15,9 @@ export class PaymentService {
     if (!response.ok || resData.status !== "success") throw new Error(resData.message || `HTTP Error ${response.status}`);
     const flwData = resData.data || resData || {};
     const auth = resData.meta?.authorization || resData.data?.meta?.authorization || resData.data?.authorization || {};
-    let authNote = auth.note || auth.validate_instructions || auth.instruction || flwData.payment_code || flwData.payment_instruction || resData.payment_code || resData.payment_instruction;
-    if (!authNote) authNote = `${TEST_USSD_TEMPLATES[payload.bank_code] || "*955*2*"}${payload.amount}#`;
-    return { status: "pending", flwId: flwData.id || "flw-test-id", txRef: payload.tx_ref, ussdCode: authNote, bankName: flwData.account_bank || "Selected Bank" };
+    const rawNote = auth.note || auth.validate_instructions || auth.instruction || flwData.payment_code || flwData.payment_instruction || resData.payment_code || resData.payment_instruction;
+    const authNote = resolveUssdCode(payload.bank_code, payload.bank_name || flwData.account_bank, payload.amount, rawNote);
+    return { status: "pending", flwId: flwData.id || "flw-test-id", txRef: payload.tx_ref, ussdCode: authNote, bankName: flwData.account_bank || payload.bank_name || "Selected Bank" };
   }
 
   static async createBankTransferPayment(payload: BankTransferPayload, idToken: string) {
