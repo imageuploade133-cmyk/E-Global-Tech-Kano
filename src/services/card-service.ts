@@ -626,8 +626,6 @@ export class CardService {
         });
         transaction.delete(operationLockRef);
       });
-        updatedAt: new Date().toISOString(),
-      });
 
       // Record local transaction
       await cardRef.collection("card_transactions").add({
