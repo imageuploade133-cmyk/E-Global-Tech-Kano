@@ -21,9 +21,10 @@ export class CardService {
     billingAddress: BillingAddress;
     cardholder: string;
     idToken: string;
+    sessionId: string;
     isMock?: boolean;
   }): Promise<CardItem> {
-    const { userId, currency, amount, billingAddress, cardholder, idToken, isMock = false } = params;
+    const { userId, currency, amount, billingAddress, cardholder, idToken, sessionId, isMock = false } = params;
     const startTime = Date.now();
     const cardId = `card-${Date.now()}`;
     const txRef = `vc-init-${Date.now()}`;
@@ -116,6 +117,7 @@ export class CardService {
         }
         if (idToken || gatewayApiKey) {
           headers["Authorization"] = `Bearer ${idToken || gatewayApiKey}`;
+        if (sessionId) headers["X-Session-ID"] = sessionId;
         }
 
         const res = await fetch(`${GATEWAY_URL}/api/flutterwave/cards`, {
@@ -247,7 +249,7 @@ export class CardService {
     idToken: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, amount, idToken, isMock = false } = params;
+    const { userId, cardId, amount, idToken, sessionId, isMock = false } = params;
     const txRef = `vc-fund-${Date.now()}`;
 
     const runMock = isMock || !hasAdminCredentials;
@@ -658,7 +660,7 @@ export class CardService {
     idToken: string;
     isMock?: boolean;
   }): Promise<any> {
-    const { userId, cardId, idToken, isMock = false } = params;
+    const { userId, cardId, idToken, sessionId, isMock = false } = params;
     const runMock = isMock || !hasAdminCredentials;
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
