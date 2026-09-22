@@ -101,14 +101,17 @@ export async function GET(req: Request) {
         uid: doc.id,
         name: data.name || `${data.firstName || ""} ${data.lastName || ""}`.trim() || "System User",
         email: data.email || "",
-        phoneNumber: data.phoneNumber || "",
-        kycType: data.kycType || "bvn",
-        kycNumber: data.kycNumber || "",
+        phoneNumber: data.phoneNumber || data.phone || "",
+        kycType: data.kycType || (data.bvn ? "bvn" : "nin"),
+        kycNumber: data.kycNumber || data.bvn || data.nin || "",
         kycStatus: data.kycStatus || "UNVERIFIED",
         submittedAt: data.kycSubmittedAt || data.createdAt || new Date().toISOString(),
         capturedSelfie: data.capturedSelfie || data.kycCapturedSelfie || null,
         livenessChallenge: data.livenessChallenge || null,
-        kycVerifiedAt: data.kycVerifiedAt || null
+        kycVerifiedAt: data.kycVerifiedAt || null,
+        virtualAccountNumber: data.virtualAccountNumber || data.accountNumber || "",
+        virtualAccountBankName: data.virtualAccountBankName || data.bankName || "",
+        balance: Number(data.balance) || 0
       };
     });
 
@@ -134,7 +137,8 @@ export async function POST(req: Request) {
     }
     const { uid } = perm.auth;
 
-    const { action, targetUid, reason, provider } = await req.json();
+    const requestBody = await req.json();
+    const { action, targetUid, reason, provider } = requestBody;
 
     if (!targetUid) {
       return NextResponse.json({ error: "Missing target user identifier." }, { status: 400 });
@@ -151,9 +155,60 @@ export async function POST(req: Request) {
     // "Check Identity" is a visual check done by human admins which transitions state locally in the UI to let them click approve.
     // The payment-gateway does not have a separate verify endpoint, so we return success immediately.
     if (action === "verify") {
+      try {
+        const { NotificationService } = await import("@/services/notification-service");
+        await NotificationService.sendPushNotification(targetUid, {
+          title: "Identity Checked! 🔍",
+          body: "Your identity details have been verified by system administration.",
+          type: "security"
+        });
+      } catch (notifErr: any) {
+        console.warn(`[Admin KYC Verify Push Warning]:`, notifErr.message);
+      }
+
       return NextResponse.json({
         success: true,
         message: "User identity verification completed successfully."
+      });
+    }
+
+    if (action === "update_user_kyc_info") {
+      const { name, email, phoneNumber, kycType, kycNumber } = requestBody;
+      const userRef = adminDb.collection("users").doc(targetUid);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        return NextResponse.json({ error: "Target user profile not found." }, { status: 404 });
+      }
+
+      const updateData: Record<string, any> = {
+        updatedAt: new Date().toISOString(),
+      };
+      if (name) updateData.name = name;
+      if (email) updateData.email = email;
+      if (phoneNumber) updateData.phoneNumber = phoneNumber;
+      if (kycType) updateData.kycType = kycType;
+      if (kycNumber) {
+        updateData.kycNumber = kycNumber;
+        if (kycType === "bvn") updateData.bvn = kycNumber;
+        if (kycType === "nin") updateData.nin = kycNumber;
+      }
+
+      await userRef.update(updateData);
+
+      // Upsert in kyc_submissions if exists or needed
+      const subRef = adminDb.collection("kyc_submissions").doc(targetUid);
+      const subDoc = await subRef.get();
+      if (subDoc.exists) {
+        await subRef.update({
+          ...(kycType && { documentType: kycType }),
+          ...(kycNumber && { documentNumber: kycNumber }),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Customer KYC information updated successfully."
       });
     }
 
@@ -217,6 +272,17 @@ export async function POST(req: Request) {
       const result = await parseResponseJson(response, "Failed to approve KYC in gateway.");
       if (!response.ok) {
         return NextResponse.json({ error: result.message || "Failed to approve KYC in gateway." }, { status: response.status });
+      }
+
+      try {
+        const { NotificationService } = await import("@/services/notification-service");
+        await NotificationService.sendPushNotification(targetUid, {
+          title: "KYC Verified! 🎉",
+          body: "Congratulations! Your identity verification has been approved. Your virtual account is ready for full platform access.",
+          type: "security"
+        });
+      } catch (notifErr: any) {
+        console.warn(`[Admin KYC Push Notification Warning]:`, notifErr.message);
       }
 
       return NextResponse.json({
