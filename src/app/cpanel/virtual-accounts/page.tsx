@@ -354,7 +354,7 @@ export default function CpanelVirtualAccountsPage() {
                     {/* Actions */}
                     <td className="p-4 text-right">
                       <CpanelActionDropdown
-                        items={[
+                        actions={[
                           item.isActive
                             ? {
                                 label: "Deactivate Virtual Account",
