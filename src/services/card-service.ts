@@ -584,7 +584,7 @@ export class CardService {
         if (!lockSnap.exists || lock.reference !== txRef) {
           throw new Error("Card withdrawal operation lease was lost. Reconciliation is required before retrying.");
         }
-        const lockedCard = currentCard;
+        const lockedCard = currentCard!;
         if (Number(lockedCard.balance || 0) < amount) {
           throw new Error("Insufficient current card balance to complete withdrawal.");
         }
