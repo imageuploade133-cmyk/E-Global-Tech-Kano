@@ -56,6 +56,13 @@ export class CardService {
         }
 
         // Execute Wallet Debit
+        transaction.set(operationLockRef, {
+          reference: txRef,
+          operation: "FUND",
+          expiresAt: Date.now() + 10 * 60 * 1000,
+          createdAt: new Date().toISOString(),
+        });
+
         await WalletService.debitWallet(transaction, {
           userId,
           amount,
@@ -144,6 +151,8 @@ export class CardService {
           const userDoc = await rollbackTx.get(userRef);
           const walletDoc = await rollbackTx.get(walletRef);
           const currentBal = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
+          rollbackTx.delete(operationLockRef);
 
           // Update the original transaction document to FAILED
           const origTxRef = adminDb.collection("transactions").doc(`tx-${txRef}`);
@@ -278,6 +287,7 @@ export class CardService {
     };
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
+    const operationLockRef = cardRef.collection("operation_locks").doc("active");
     if (!runMock) {
       const cardSnap = await cardRef.get();
       if (!cardSnap.exists) {
@@ -297,8 +307,13 @@ export class CardService {
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
 
     if (!runMock) {
-      // Atomically debit wallet balance
+      // Atomically reserve this card for one funding operation and debit the wallet.
       await adminDb.runTransaction(async (transaction) => {
+        const lockDoc = await transaction.get(operationLockRef);
+        const existingLock = lockDoc.exists ? lockDoc.data() || {} : {};
+        if (lockDoc.exists && Number(existingLock.expiresAt || 0) > Date.now()) {
+          throw new Error("Another card funding operation is already in progress. Please wait and try again.");
+        }
         const userDoc = await transaction.get(userRef);
         const walletDoc = await transaction.get(walletRef);
         const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
@@ -407,10 +422,23 @@ export class CardService {
     const nextBalance = cardData.balance + amount;
 
     if (!runMock) {
-      // Incremental update of card balance in Firestore
-      await cardRef.update({
-        balance: nextBalance,
-        updatedAt: new Date().toISOString(),
+      // Finalize balance atomically and release the card operation lease.
+      await adminDb.runTransaction(async (transaction) => {
+        const currentCardSnap = await transaction.get(cardRef);
+        const lockSnap = await transaction.get(operationLockRef);
+        const currentCard = currentCardSnap.data() as CardItem | undefined;
+        const lock = lockSnap.data() || {};
+        if (!currentCardSnap.exists || currentCard?.terminated) {
+          throw new Error("Virtual Card is no longer available.");
+        }
+        if (!lockSnap.exists || lock.reference !== txRef) {
+          throw new Error("Card funding operation lease was lost. Reconciliation is required before retrying.");
+        }
+        transaction.update(cardRef, {
+          balance: Number(currentCard?.balance || 0) + amount,
+          updatedAt: new Date().toISOString(),
+        });
+        transaction.delete(operationLockRef);
       });
 
       // Record local transaction
