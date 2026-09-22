@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { safeParseJson } from "@/lib/utils";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { resolveUssdCode } from "@/lib/ussd-resolver";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -51,6 +52,8 @@ export async function POST(req: Request) {
       bankCode,
       bank_code,
       bankId,
+      bankName,
+      bank_name,
       email,
       name,
       fullname,
@@ -125,12 +128,13 @@ export async function POST(req: Request) {
     const gatewayAuthHeader = req.headers.get("Authorization") || "";
     const idToken = gatewayAuthHeader.startsWith("Bearer ") ? gatewayAuthHeader.split("Bearer ")[1] : "";
 
-    // Preserve the server-authoritative active session when proxying the request
-    // to the payment gateway. The gateway independently validates this value
-    // against users/{uid}.activeSessionId.
-    const activeSessionId =
-      req.headers.get("x-session-id") ||
+    // The gateway validates Firebase JWT sessions server-side. The client already
+    // supplies X-Session-ID to this Next.js route; preserve it when this route
+    // makes the server-to-server gateway call. Without forwarding it, the gateway
+    // correctly rejects a valid new-device-verified login with REVOKED_SESSION.
+    const sessionId =
       req.headers.get("X-Session-ID") ||
+      req.headers.get("x-session-id") ||
       "";
 
     // Step 4: Forward ALL fields exactly as received. Do not discard fields.
@@ -156,7 +160,7 @@ export async function POST(req: Request) {
       headers: {
         "Authorization": `Bearer ${idToken}`,
         "Content-Type": "application/json",
-        ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {}),
+        ...(sessionId ? { "X-Session-ID": sessionId } : {}),
       },
       body: JSON.stringify(gatewayPayload),
     });
@@ -181,28 +185,16 @@ export async function POST(req: Request) {
                  resData.data?.authorization ||
                  {};
 
-    let authNote = auth.note ||
-                   auth.validate_instructions ||
-                   auth.instruction ||
-                   flwData.payment_code ||
-                   flwData.payment_instruction ||
-                   resData.payment_code ||
-                   resData.payment_instruction;
+    const rawNote = auth.note ||
+                    auth.validate_instructions ||
+                    auth.instruction ||
+                    flwData.payment_code ||
+                    flwData.payment_instruction ||
+                    resData.payment_code ||
+                    resData.payment_instruction;
 
-    if (!authNote) {
-      // In-app high-fidelity fallback template
-      const TEST_USSD_TEMPLATES: Record<string, string> = {
-        "058": "*737*1*2*",
-        "044": "*901*1*2*",
-        "033": "*919*3*2*",
-        "057": "*966*2*",
-        "011": "*894*1*1*",
-        "999992": "*955*2*",
-        "50515": "*5573*1*",
-      };
-      const bankPrefix = TEST_USSD_TEMPLATES[finalBankCode] || "*955*2*";
-      authNote = `${bankPrefix}${payAmount}#`;
-    }
+    const targetBankName = bankName || bank_name || flwData.account_bank;
+    const authNote = resolveUssdCode(finalBankCode, targetBankName, payAmount, rawNote);
 
     logPaymentEvent({
       category: "Payment Initialized",

@@ -1618,7 +1618,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // USSD Bank Selection Action
-  const handleBankSelect = async (bank: { id: string; name: string }) => {
+  const handleBankSelect = async (bank: { id: string; name: string; code?: string }) => {
     setSelectedBank(bank);
     setUssdErrorMessage("");
     setIsInitializing(true);
@@ -1626,6 +1626,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     try {
       let idToken = "mock-token";
+      let activeSessionId = "";
+      if (typeof window !== "undefined") {
+        activeSessionId = localStorage.getItem("active_session_id") || "";
+      }
       if (user && sessionStorage.getItem("mock") !== "true") {
         idToken = await user.getIdToken();
       }
@@ -1635,11 +1639,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {}),
         },
         body: JSON.stringify({
           amount: parseFloat(addAmount),
           currency: "NGN",
           bankId: bank.id,
+          bank_code: bank.code || bank.id,
+          bankName: bank.name,
           email: user?.email || "captain@example.com",
           name: userData?.name || user?.displayName || "Captain Wallet",
           phone: userData?.phoneNumber || "08012345678",
@@ -1678,6 +1685,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     try {
       let idToken = "mock-token";
+      let activeSessionId = "";
+      if (typeof window !== "undefined") {
+        activeSessionId = localStorage.getItem("active_session_id") || "";
+      }
       if (user && sessionStorage.getItem("mock") !== "true") {
         idToken = await user.getIdToken();
       }
@@ -1687,6 +1698,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {}),
         },
         body: JSON.stringify({
           amount: parseFloat(addAmount),
@@ -2648,6 +2660,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </div>
                     </div>
                   ) : null}
+
+                  {userData?.virtualAccountActive === false && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 text-red-500 text-left mb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-red-500 text-[18px]">block</span>
+                        <p className="font-hanken font-bold text-xs">Virtual Account Deactivated</p>
+                      </div>
+                      <p className="font-hanken text-[10.5px] leading-relaxed text-red-400">
+                        Your virtual account number has been deactivated by administration. Incoming bank transfers will be held. Contact support to reactivate.
+                      </p>
+                    </div>
+                  )}
 
                   {showSuccessCard ? (
                     <div className="bg-gradient-to-r from-[#1E293B] to-[#0F172A] border border-white/5 rounded-2xl p-4 text-white relative overflow-hidden select-none">
