@@ -397,6 +397,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
       title: "User Management",
       items: [
         { id: "users", label: "Users & Permissions", icon: "group", href: "/cpanel/users", permission: "users.view" },
+        { id: "virtual_accounts", label: "Virtual Accounts", icon: "account_balance_wallet", href: "/cpanel/virtual-accounts", permission: "users.view" },
         { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc", permission: "kyc.view" },
         { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze", permission: "freeze.manage" },
         { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },

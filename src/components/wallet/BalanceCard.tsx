@@ -2649,6 +2649,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </div>
                   ) : null}
 
+                  {userData?.virtualAccountActive === false && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3 text-red-500 text-left mb-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="material-symbols-outlined text-red-500 text-[18px]">block</span>
+                        <p className="font-hanken font-bold text-xs">Virtual Account Deactivated</p>
+                      </div>
+                      <p className="font-hanken text-[10.5px] leading-relaxed text-red-400">
+                        Your virtual account number has been deactivated by administration. Incoming bank transfers will be held. Contact support to reactivate.
+                      </p>
+                    </div>
+                  )}
+
                   {showSuccessCard ? (
                     <div className="bg-gradient-to-r from-[#1E293B] to-[#0F172A] border border-white/5 rounded-2xl p-4 text-white relative overflow-hidden select-none">
                       <div className="absolute right-0 bottom-0 opacity-15 text-[100px] select-none pointer-events-none translate-x-1/4 translate-y-1/4">
