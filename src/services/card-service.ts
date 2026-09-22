@@ -322,6 +322,13 @@ export class CardService {
           throw new Error(`Insufficient wallet balance to fund virtual card. Required: ${currency === "NGN" ? "₦" : "$"}${amount.toLocaleString()}, Available: ${currency === "NGN" ? "₦" : "$"}${walletBalance.toLocaleString()}`);
         }
 
+        transaction.set(operationLockRef, {
+          reference: txRef,
+          operation: "FUND",
+          expiresAt: Date.now() + 10 * 60 * 1000,
+          createdAt: new Date().toISOString(),
+        });
+
         await WalletService.debitWallet(transaction, {
           userId,
           amount,
@@ -379,6 +386,8 @@ export class CardService {
           const userDoc = await rollbackTx.get(userRef);
           const walletDoc = await rollbackTx.get(walletRef);
           const currentBal = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
+
+          rollbackTx.delete(operationLockRef);
 
           // Update the original transaction document to FAILED
           const origTxRef = adminDb.collection("transactions").doc(`tx-${txRef}`);
