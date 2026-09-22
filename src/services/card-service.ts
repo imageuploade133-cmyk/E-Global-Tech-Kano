@@ -3,6 +3,7 @@ import { WalletService } from "@/services/wallet-service";
 import { CardItem, CardTransaction, BillingAddress } from "@/types/cards";
 import { logPaymentEvent } from "@/lib/payment-logger";
 import { safeParseJson } from "@/lib/utils";
+import { randomUUID } from "crypto";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
 
@@ -26,8 +27,8 @@ export class CardService {
   }): Promise<CardItem> {
     const { userId, currency, amount, billingAddress, cardholder, idToken, sessionId, isMock = false } = params;
     const startTime = Date.now();
-    const cardId = `card-${Date.now()}`;
-    const txRef = `vc-init-${Date.now()}`;
+    const cardId = `card-${randomUUID()}`;
+    const txRef = `vc-init-${randomUUID()}`;
 
     // Define setup costs (USD card setup cost $2.00, NGN card zero setup)
     const setupCost = currency === "USD" ? 2.00 : 0.00;
@@ -251,7 +252,7 @@ export class CardService {
     isMock?: boolean;
   }): Promise<any> {
     const { userId, cardId, amount, idToken, sessionId, isMock = false } = params;
-    const txRef = `vc-fund-${Date.now()}`;
+    const txRef = `vc-fund-${randomUUID()}`;
 
     const runMock = isMock || !hasAdminCredentials;
 
@@ -482,7 +483,7 @@ export class CardService {
     isMock?: boolean;
   }): Promise<any> {
     const { userId, cardId, amount, idToken, sessionId, isMock = false } = params;
-    const txRef = `vc-withdraw-${Date.now()}`;
+    const txRef = `vc-withdraw-${randomUUID()}`;
 
     const runMock = isMock || !hasAdminCredentials;
 
@@ -745,7 +746,7 @@ export class CardService {
           throw new Error("Another card operation is already in progress. Please wait and try again.");
         }
         transaction.set(operationLockRef, {
-          reference: `vc-term-${Date.now()}`,
+          reference: `vc-term-${randomUUID()}`,
           operation: "TERMINATE",
           expiresAt: Date.now() + 24 * 60 * 60 * 1000,
           createdAt: new Date().toISOString(),
