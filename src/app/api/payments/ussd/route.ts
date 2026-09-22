@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { safeParseJson } from "@/lib/utils";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { resolveUssdCode } from "@/lib/ussd-resolver";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -51,6 +52,8 @@ export async function POST(req: Request) {
       bankCode,
       bank_code,
       bankId,
+      bankName,
+      bank_name,
       email,
       name,
       fullname,
@@ -172,28 +175,16 @@ export async function POST(req: Request) {
                  resData.data?.authorization ||
                  {};
 
-    let authNote = auth.note ||
-                   auth.validate_instructions ||
-                   auth.instruction ||
-                   flwData.payment_code ||
-                   flwData.payment_instruction ||
-                   resData.payment_code ||
-                   resData.payment_instruction;
+    const rawNote = auth.note ||
+                    auth.validate_instructions ||
+                    auth.instruction ||
+                    flwData.payment_code ||
+                    flwData.payment_instruction ||
+                    resData.payment_code ||
+                    resData.payment_instruction;
 
-    if (!authNote) {
-      // In-app high-fidelity fallback template
-      const TEST_USSD_TEMPLATES: Record<string, string> = {
-        "058": "*737*1*2*",
-        "044": "*901*1*2*",
-        "033": "*919*3*2*",
-        "057": "*966*2*",
-        "011": "*894*1*1*",
-        "999992": "*955*2*",
-        "50515": "*5573*1*",
-      };
-      const bankPrefix = TEST_USSD_TEMPLATES[finalBankCode] || "*955*2*";
-      authNote = `${bankPrefix}${payAmount}#`;
-    }
+    const targetBankName = bankName || bank_name || flwData.account_bank;
+    const authNote = resolveUssdCode(finalBankCode, targetBankName, payAmount, rawNote);
 
     logPaymentEvent({
       category: "Payment Initialized",
