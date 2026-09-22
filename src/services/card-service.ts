@@ -518,6 +518,7 @@ export class CardService {
     };
 
     const cardRef = adminDb.collection("users").doc(userId).collection("cards").doc(cardId);
+    const operationLockRef = cardRef.collection("operation_locks").doc("active");
     if (!runMock) {
       const cardSnap = await cardRef.get();
       if (!cardSnap.exists) {
@@ -537,6 +538,20 @@ export class CardService {
     const walletRef = adminDb.collection("wallets").doc(`${userId}_${currency}`);
 
     if (!runMock) {
+      await adminDb.runTransaction(async (transaction) => {
+        const lockDoc = await transaction.get(operationLockRef);
+        const existingLock = lockDoc.exists ? lockDoc.data() || {} : {};
+        if (lockDoc.exists && Number(existingLock.expiresAt || 0) > Date.now()) {
+          throw new Error("Another card operation is already in progress. Please wait and try again.");
+        }
+        transaction.set(operationLockRef, {
+          reference: txRef,
+          operation: "WITHDRAW",
+          expiresAt: Date.now() + 10 * 60 * 1000,
+          createdAt: new Date().toISOString(),
+        });
+      });
+
       try {
         const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "";
         const headers: Record<string, string> = {
@@ -564,9 +579,23 @@ export class CardService {
         throw new Error(`Card withdrawal failed on payment gateway rails: ${err.message}`);
       }
 
-      // Perform atomic Wallet Credit & card balance decrement
+      // Perform atomic wallet credit + current card balance decrement + lease release.
       const nextBalance = cardData.balance - amount;
       await adminDb.runTransaction(async (transaction) => {
+        const currentCardSnap = await transaction.get(cardRef);
+        const lockSnap = await transaction.get(operationLockRef);
+        const currentCard = currentCardSnap.data() as CardItem | undefined;
+        const lock = lockSnap.data() || {};
+        if (!currentCardSnap.exists || currentCard?.terminated) {
+          throw new Error("Virtual Card is no longer available.");
+        }
+        if (!lockSnap.exists || lock.reference !== txRef) {
+          throw new Error("Card withdrawal operation lease was lost. Reconciliation is required before retrying.");
+        }
+        if (Number(currentCard.balance || 0) < amount) {
+          throw new Error("Insufficient current card balance to complete withdrawal.");
+        }
+
         const userDoc = await transaction.get(userRef);
         const walletDoc = await transaction.get(walletRef);
         const walletBalance = walletDoc.exists ? (Number(walletDoc.data()?.balance) || 0) : 0;
@@ -590,10 +619,13 @@ export class CardService {
             balance: walletBalance,
           },
         });
-      });
 
-      await cardRef.update({
-        balance: nextBalance,
+        transaction.update(cardRef, {
+          balance: Number(currentCard.balance || 0) - amount,
+          updatedAt: new Date().toISOString(),
+        });
+        transaction.delete(operationLockRef);
+      });
         updatedAt: new Date().toISOString(),
       });
 
