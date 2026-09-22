@@ -800,7 +800,7 @@ export class CardService {
           throw new Error("Card termination operation lease was lost. Reconciliation is required.");
         }
 
-        const currentRefundAmount = Number(currentCard.balance || 0);
+        const currentRefundAmount = Number(currentCard!.balance || 0);
         if (currentRefundAmount > 0) {
           const userDoc = await transaction.get(userRef);
           const walletDoc = await transaction.get(walletRef);
