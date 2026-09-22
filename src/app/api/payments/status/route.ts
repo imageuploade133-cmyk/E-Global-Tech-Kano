@@ -30,9 +30,10 @@ export async function GET(req: Request) {
 
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
 
     // Call service layer to verify reference status on VM Payment Gateway
-    const statusResult = await PaymentService.checkPaymentStatus(txRef, idToken);
+    const statusResult = await PaymentService.checkPaymentStatus(txRef, idToken, sessionId);
 
     return NextResponse.json({
       success: true,

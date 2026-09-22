@@ -80,6 +80,7 @@ export async function POST(req: Request) {
 
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
 
     const isMock = uid === "mock-uid";
 
@@ -345,6 +346,7 @@ export async function POST(req: Request) {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
+          ...(sessionId ? { "X-Session-ID": sessionId } : {}),
         },
         body: JSON.stringify({
           title: title || "Bulk Settlement",

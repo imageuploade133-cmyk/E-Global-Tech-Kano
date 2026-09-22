@@ -41,7 +41,8 @@ export async function POST(req: Request) {
       });
     }
 
-    const idToken = req.headers.get("Authorization")?.split("Bearer ")[1] || "mock-token";
+    const idToken = req.headers.get("Authorization")?.split("Bearer ")[1] || "";
+    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
 
     const body = await req.json();
 
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${idToken}`,
         "x-api-key": apiKey,
+        ...(sessionId ? { "X-Session-ID": sessionId } : {}),
       },
       body: JSON.stringify(body),
     });

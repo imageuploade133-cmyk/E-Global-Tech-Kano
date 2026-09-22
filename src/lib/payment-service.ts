@@ -7,8 +7,8 @@ export interface USSDPaymentPayload { tx_ref: string; amount: number; email: str
 export interface BankTransferPayload { tx_ref: string; amount: number; email: string; phone_number: string; fullname: string; firstname?: string; lastname?: string; narration?: string; }
 
 export class PaymentService {
-  static async createUSSDPayment(payload: USSDPaymentPayload, idToken: string) {
-    const response = await fetch(`${FLW_BASE_URL}/charges?type=ussd`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, type: "ussd", country: "NG", account_bank: payload.bank_code }) });
+  static async createUSSDPayment(payload: USSDPaymentPayload, idToken: string, sessionId: string) {
+    const response = await fetch(`${FLW_BASE_URL}/charges?type=ussd`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json", ...(sessionId ? { "X-Session-ID": sessionId } : {}), ...(sessionId ? { "X-Session-ID": sessionId } : {}), ...(sessionId ? { "X-Session-ID": sessionId } : {}) }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, type: "ussd", country: "NG", account_bank: payload.bank_code }) });
     const resData = await safeParseJson(response);
     console.log(`[VM Payment Gateway USSD Charge API] HTTP Status: ${response.status}`);
     console.log(`[VM Payment Gateway USSD Charge API] Raw Response: ${JSON.stringify(resData)}`);
@@ -20,7 +20,7 @@ export class PaymentService {
     return { status: "pending", flwId: flwData.id || "flw-test-id", txRef: payload.tx_ref, ussdCode: authNote, bankName: flwData.account_bank || payload.bank_name || "Selected Bank" };
   }
 
-  static async createBankTransferPayment(payload: BankTransferPayload, idToken: string) {
+  static async createBankTransferPayment(payload: BankTransferPayload, idToken: string, sessionId: string) {
     const nameParts = (payload.fullname || "").trim().split(/\s+/);
     const calculatedFirstname = payload.firstname || nameParts[0] || "Customer";
     const calculatedLastname = payload.lastname || nameParts.slice(1).join(" ") || "Wallet";
@@ -40,7 +40,7 @@ export class PaymentService {
     return { status: "pending", flwId: flwData.id || "flw-test-id", txRef: payload.tx_ref, accountNumber: transferAccount, bankName: transferBank, accountName: "E-Tech Global Hub", amount: transferAmount, expiresAt: new Date(Date.now() + 11 * 60 * 1000).toISOString(), reference: transferReference, transferAccount, transferBank, transferAmount, transferReference, transferNote };
   }
 
-  static async checkPaymentStatus(txRef: string, idToken: string) {
+  static async checkPaymentStatus(txRef: string, idToken: string, sessionId: string) {
     const response = await fetch("/api/flutterwave/verify", { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ txRef }) });
     const resData = await safeParseJson(response);
     if (!response.ok) {

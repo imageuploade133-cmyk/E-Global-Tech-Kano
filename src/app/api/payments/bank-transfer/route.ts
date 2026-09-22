@@ -76,6 +76,7 @@ export async function POST(req: Request) {
 
     const authHeader = req.headers.get("Authorization") || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.split("Bearer ")[1] : "";
+    const sessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || "";
 
     // Request the Virtual Account from VM Payment Gateway
     const transferDetails = await PaymentService.createBankTransferPayment({
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
       firstname,
       lastname,
       narration,
-    }, idToken);
+    }, idToken, sessionId);
 
     logPaymentEvent({
       category: "Payment Initialized",
