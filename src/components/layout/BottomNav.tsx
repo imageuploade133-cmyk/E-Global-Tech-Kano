@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { isFeatureEnabled, getFeatureDisabledMessage, FeatureToggleKey } from "@/lib/feature-toggle";
 import { toast } from "sonner";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface NavItem {
   label: string;
@@ -77,6 +78,7 @@ export const BottomNav: React.FC = () => {
   const { config } = useAppConfig();
 
   const handleNavClick = (e: React.MouseEvent, item: NavItem) => {
+    triggerHaptic();
     let featureKey: FeatureToggleKey | null = null;
     if (item.href === "/cards") featureKey = "virtual_cards";
     else if (item.href === "/store") featureKey = "store";
