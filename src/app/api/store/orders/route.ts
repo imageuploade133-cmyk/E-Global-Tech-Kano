@@ -450,19 +450,23 @@ export async function POST(req: Request) {
         }
 
         const freshBal = Number(freshWalletSnap.data()?.balance) || 0;
+
+        // IMPORTANT: Firestore requires every transaction read to complete before any transaction write.
+        // Read the user document here, before updating wallet/store/order/ledger documents.
+        const userSnap = await transaction.get(userRef);
+
         if (freshBal < calculatedTotalAmount) {
           throw new Error(`Insufficient wallet balance. Order total is ₦${calculatedTotalAmount.toLocaleString()}, but your balance is ₦${freshBal.toLocaleString()}. Please switch to 'Checkout with Card Payment'.`);
         }
 
         newBalance = freshBal - calculatedTotalAmount;
 
-        // 3. Update Wallet & User Balances
+        // 3. All transaction writes happen only after all reads are complete.
         transaction.update(walletRef, {
           balance: newBalance,
           updatedAt: now,
         });
 
-        const userSnap = await transaction.get(userRef);
         if (userSnap.exists) {
           transaction.update(userRef, {
             balance: newBalance,
