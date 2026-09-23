@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
+import { SupportChatModal } from "@/components/support/SupportChatModal";
 import { toast } from "sonner";
 
 export interface SupportChatMessage {
@@ -32,6 +33,7 @@ export function SupportChatSection() {
   const [sending, setSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isFullScreenModalOpen, setIsFullScreenModalOpen] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -237,10 +239,23 @@ export function SupportChatSection() {
             <p className="text-[10px] text-white/80 font-medium">Real-time Encrypted Support Channel</p>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded-full bg-emerald-500 text-white font-mono font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-          Online
-        </span>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsFullScreenModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white font-hanken font-extrabold text-[10px] uppercase tracking-wider flex items-center gap-1 transition-all active:scale-95 cursor-pointer border border-white/20 shadow-xs"
+            title="Open Live Chat in Full Screen"
+          >
+            <span className="material-symbols-outlined text-sm font-bold">open_in_full</span>
+            <span className="hidden sm:inline">Full Screen</span>
+          </button>
+
+          <span className="px-2.5 py-1 rounded-full bg-emerald-500 text-white font-mono font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            Online
+          </span>
+        </div>
       </div>
 
       {/* Messages Scroll Area */}
@@ -330,6 +345,12 @@ export function SupportChatSection() {
           </>
         )}
       </form>
+
+      {/* Full Screen Live Chat Modal */}
+      <SupportChatModal
+        isOpen={isFullScreenModalOpen}
+        onClose={() => setIsFullScreenModalOpen(false)}
+      />
     </div>
   );
 }
