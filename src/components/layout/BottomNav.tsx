@@ -58,7 +58,7 @@ const navItems: NavItem[] = [
     href: "/history",
     renderIcon: (isActive) => (
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={isActive ? "#FC7A00" : "currentColor"} className="w-[18px] h-[18px] min-[360px]:w-[21px] min-[360px]:h-[21px] min-[400px]:w-[24px] min-[400px]:h-[24px] transition-all">
-        <path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 7.07 7.07 0 0 0-6-3.43l-1.42 1.42A8.9 8.9 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.25 2.52.77-1.28-3.52-2.09V8z" />
+        <path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 7.07 7.07 0 0 1-6-3.43l-1.42 1.42A8.9 8.9 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.25 2.52.77-1.28-3.52-2.09V8z" />
       </svg>
     ),
   },
