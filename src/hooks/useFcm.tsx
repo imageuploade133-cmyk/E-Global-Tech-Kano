@@ -10,33 +10,82 @@ import { useRouter } from "next/navigation";
 const VAPID_KEY = process.env.NEXT_PUBLIC_FCM_VAPID_KEY || "";
 
 export function useFcm() {
-  const { user, userData } = useAuth();
+  const { user, userData, deviceAuthState } = useAuth();
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const router = useRouter();
 
   const syncTokenWithBackend = useCallback(async (token: string, action: "register" | "unregister") => {
     if (!user) return;
-    try {
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/fcm/register", {
-        method: action === "register" ? "POST" : "DELETE",
-        headers: {
+
+    // FCM registration is bound to the server-authoritative active device
+    // session. During a new-device OTP flow there is intentionally no active
+    // session yet, so wait until AuthContext reports verification complete.
+    if (deviceAuthState !== "AUTHENTICATED_VERIFIED") {
+      console.log("[FCM Sync] Waiting for verified device session before registering token.");
+      return;
+    }
+
+    const maxAttempts = action === "register" ? 7 : 1;
+    const retryDelays = [500, 1000, 2000, 3000, 5000, 7000];
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        const idToken = await user.getIdToken();
+        const sessionId =
+          typeof window !== "undefined"
+            ? localStorage.getItem("active_session_id")
+            : null;
+
+        const headers: Record<string, string> = {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ token }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        console.log(`[FCM Sync] Token ${action}ed successfully in database.`);
-      } else {
-        console.warn(`[FCM Sync Warning] Token ${action} failed:`, data.message || data.error);
+        };
+
+        if (sessionId) {
+          headers["X-Session-ID"] = sessionId;
+        }
+
+        const res = await fetch("/api/fcm/register", {
+          method: action === "register" ? "POST" : "DELETE",
+          headers,
+          body: JSON.stringify({ token }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          console.log(`[FCM Sync] Token ${action}ed successfully in database.`);
+          return;
+        }
+
+        // Only retry the transient session-establishment race. Never retry a
+        // revoked/mismatched session, which must remain fail-closed.
+        const errorText = String(data?.error || data?.message || "").toLowerCase();
+        const retryableSessionRace =
+          res.status === 401 &&
+          (
+            errorText.includes("missing session id") ||
+            errorText.includes("active session missing") ||
+            errorText.includes("failed to resolve active session") ||
+            errorText.includes("session validation error")
+          );
+
+        if (!retryableSessionRace || attempt >= maxAttempts - 1) {
+          console.warn("[FCM Sync Warning] Token registration failed:", data?.message || data?.error);
+          return;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt] ?? 5000));
+      } catch (err: any) {
+        if (attempt >= maxAttempts - 1) {
+          console.error("[FCM Sync Exception] Failed to sync token with backend:", err.message);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt] ?? 5000));
       }
-    } catch (err: any) {
-      console.error(`[FCM Sync Exception] Failed to sync token with backend:`, err.message);
     }
-  }, [user]);
+  }, [user, deviceAuthState]);
 
   const requestPermissionAndGetToken = useCallback(async () => {
     if (typeof window === "undefined") return null;
@@ -181,7 +230,7 @@ export function useFcm() {
         unsubscribeForeground();
       }
     };
-  }, [user, requestPermissionAndGetToken]);
+  }, [user, deviceAuthState, requestPermissionAndGetToken]);
 
   return {
     fcmToken,
