@@ -1,5 +1,7 @@
 "use client";
 
+import { triggerHaptic } from "@/lib/haptics";
+
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
@@ -263,7 +265,7 @@ export default function ProfilePage() {
           {/* Section: Destructive Actions (Logout) */}
           <section className="pt-2">
             <button
-              onClick={() => setIsLogoutOpen(true)}
+              onClick={() => { triggerHaptic(); setIsLogoutOpen(true); }}
               className="w-full py-4 bg-[#dc3545]/10 hover:bg-[#dc3545]/15 border border-[#dc3545]/20 text-[#dc3545] rounded-2xl flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-xs active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px]">logout</span>
