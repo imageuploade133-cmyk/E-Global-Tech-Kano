@@ -1,5 +1,7 @@
 "use client";
 
+import { triggerHaptic } from "@/lib/haptics";
+
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -387,7 +389,7 @@ export default function CardsPage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => window.history.back()}
+                onClick={() => { triggerHaptic(); window.history.back(); }}
                 className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
                 title="Go Back"
               >

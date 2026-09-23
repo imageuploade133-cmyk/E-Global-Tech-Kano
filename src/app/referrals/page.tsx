@@ -1,5 +1,7 @@
 "use client";
 
+import { triggerHaptic } from "@/lib/haptics";
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
@@ -137,7 +139,7 @@ export default function ReferralsPage() {
         <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
           <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
             <button
-              onClick={() => router.push("/")}
+              onClick={() => { triggerHaptic(); router.push("/"); }}
               className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px] font-bold">arrow_back</span>
