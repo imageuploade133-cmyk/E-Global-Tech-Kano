@@ -14,6 +14,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { useAuth } from "@/lib/AuthContext";
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, limit } from "firebase/firestore";
 import { useEffect } from "react";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface HeaderProps {
   userName: string;
@@ -78,22 +79,6 @@ function formatNotificationTime(createdAtStr?: string): string {
     return "Just now";
   }
 }
-
-/**
- * Gives supported mobile devices a short, native-like tap haptic for
- * top-bar navigation and action controls without affecting their behavior.
- */
-const triggerHeaderHaptic = (): void => {
-  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
-    return;
-  }
-
-  try {
-    navigator.vibrate(10);
-  } catch {
-    // Haptic feedback is optional and must never affect the existing action.
-  }
-};
 
 export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoading }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -272,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
             <button
               type="button"
               onClick={() => {
-                triggerHeaderHaptic();
+                triggerHaptic();
                 handleOpenProfile();
               }}
               className="focus:outline-none flex-shrink-0 cursor-pointer"
