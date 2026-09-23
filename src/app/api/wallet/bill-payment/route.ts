@@ -4,6 +4,7 @@ import { WalletService } from "@/lib/wallet-service";
 import { adminDb } from "@/lib/firebase-admin";
 import { isRateLimited } from "@/lib/rate-limiter";
 import { logPaymentEvent } from "@/lib/payment-logger";
+import { NotificationService } from "@/services/notification-service";
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -93,6 +94,21 @@ export async function POST(req: Request) {
       currency: payCurrency,
       message: `Successfully processed secure utility ${type} purchase for ${recipient}. New Balance: ₦${result.newBalance}`,
       processingTimeMs: Date.now() - startTime,
+    });
+
+    // Best-effort push notification. Never block or fail the financial response.
+    NotificationService.sendPushNotification(targetUserId, {
+      title: `✅ ${String(type).replace(/_/g, " ")} Payment Successful`,
+      body: `Your ${String(type).toLowerCase()} payment of ₦${payAmount.toLocaleString()} to ${recipient} was completed successfully.`,
+      type: "transaction",
+      url: "/history",
+      amount: payAmount,
+      currency: payCurrency,
+      reference: ref_id,
+      recipientName: recipient,
+      channel: "Bill Payment",
+    }).catch((notificationError) => {
+      console.warn("[Bill API Notification] Push dispatch failed:", notificationError?.message || notificationError);
     });
 
     return NextResponse.json({
