@@ -1,5 +1,7 @@
 "use client";
 
+import { triggerHaptic } from "@/lib/haptics";
+
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/layout/Header";
@@ -310,7 +312,7 @@ export default function BillsHistoryPage() {
           <div className="flex items-center justify-between gap-2.5 w-full">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <button
-                onClick={() => window.history.back()}
+                onClick={() => { triggerHaptic(); window.history.back(); }}
                 className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none flex-shrink-0"
                 title="Go Back"
               >

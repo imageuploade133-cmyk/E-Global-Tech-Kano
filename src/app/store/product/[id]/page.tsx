@@ -1,5 +1,7 @@
 "use client";
 
+import { triggerHaptic } from "@/lib/haptics";
+
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { RouteGuard } from "@/components/RouteGuard";
@@ -484,7 +486,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </p>
           <button
             type="button"
-            onClick={() => router.push("/store")}
+            onClick={() => { triggerHaptic(); router.push("/store"); }}
             className="px-6 py-3 bg-[#FC7A00] text-white rounded-2xl text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm cursor-pointer border-0"
           >
             Return to Store
@@ -534,7 +536,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <div className="max-w-md mx-auto flex items-center justify-between gap-2">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={() => { triggerHaptic(); router.back(); }}
               className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-800 flex items-center justify-center active:scale-90 transition-all cursor-pointer border-0"
               title="Go Back"
             >

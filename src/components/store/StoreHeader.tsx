@@ -2,6 +2,7 @@
 
 import React from "react";
 import { StoreSettings } from "./types";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface StoreHeaderProps {
   settings: StoreSettings;
@@ -62,7 +63,7 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
           {!settings.hideClearCacheButton && (
             <button
               type="button"
-              onClick={onClearCache}
+              onClick={() => { triggerHaptic(); onClearCache(); }}
               className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
               title="Clear Cache & Refresh Store Data"
             >
@@ -78,7 +79,7 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
           {/* Wishlist Button */}
           <button
             type="button"
-            onClick={onOpenWishlist}
+            onClick={() => { triggerHaptic(); onOpenWishlist(); }}
             className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             title="Wishlist / Favorites"
           >
@@ -98,7 +99,7 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
           {/* Order History Icon Button */}
           <button
             type="button"
-            onClick={onOpenMyOrders}
+            onClick={() => { triggerHaptic(); onOpenMyOrders(); }}
             className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             title="Order History"
           >
@@ -118,7 +119,7 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
           {/* Shopping Cart Icon Button */}
           <button
             type="button"
-            onClick={onOpenCart}
+            onClick={() => { triggerHaptic(); onOpenCart(); }}
             className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             title="Shopping Cart"
           >
