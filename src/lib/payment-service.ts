@@ -24,7 +24,12 @@ export class PaymentService {
     const nameParts = (payload.fullname || "").trim().split(/\s+/);
     const calculatedFirstname = payload.firstname || nameParts[0] || "Customer";
     const calculatedLastname = payload.lastname || nameParts.slice(1).join(" ") || "Wallet";
-    const response = await fetch(`${FLW_BASE_URL}/charges?type=bank_transfer`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, firstname: calculatedFirstname, lastname: calculatedLastname, narration: payload.narration || "E-Tech Wallet Funding", type: "bank_transfer", is_permanent: false }) });
+    const normalizedSessionId = (sessionId || "").trim();
+    if (!normalizedSessionId) {
+      throw new Error("Missing session ID. Please refresh your session and try again.");
+    }
+
+    const response = await fetch(`${FLW_BASE_URL}/charges?type=bank_transfer`, { method: "POST", headers: { "Authorization": `Bearer ${idToken}`, "Content-Type": "application/json", "X-Session-ID": normalizedSessionId }, body: JSON.stringify({ tx_ref: payload.tx_ref, amount: payload.amount.toString(), currency: "NGN", email: payload.email, phone_number: payload.phone_number, fullname: payload.fullname, firstname: calculatedFirstname, lastname: calculatedLastname, narration: payload.narration || "E-Tech Wallet Funding", type: "bank_transfer", is_permanent: false }) });
     const resData = await safeParseJson(response);
     console.log(`[VM Payment Gateway Bank Transfer Charge API] HTTP Status: ${response.status}`);
     console.log(`[VM Payment Gateway Bank Transfer Charge API] Raw Response: ${JSON.stringify(resData)}`);
