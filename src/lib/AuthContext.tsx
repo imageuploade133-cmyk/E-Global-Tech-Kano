@@ -207,11 +207,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
 
-            // Sync activeSessionId to localStorage if missing locally
-            if (remoteActiveSessionId && typeof window !== "undefined" && !localSessionId) {
-              localStorage.setItem("active_session_id", remoteActiveSessionId);
-            }
-
             setUserData({
               isPinRequired: true,
               isFaceIdEnabled: false,
