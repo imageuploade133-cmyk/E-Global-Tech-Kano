@@ -79,6 +79,22 @@ function formatNotificationTime(createdAtStr?: string): string {
   }
 }
 
+/**
+ * Gives supported mobile devices a short, native-like tap haptic for
+ * top-bar navigation and action controls without affecting their behavior.
+ */
+const triggerHeaderHaptic = (): void => {
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
+    return;
+  }
+
+  try {
+    navigator.vibrate(10);
+  } catch {
+    // Haptic feedback is optional and must never affect the existing action.
+  }
+};
+
 export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoading }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
@@ -255,7 +271,10 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
           ) : (
             <button
               type="button"
-              onClick={handleOpenProfile}
+              onClick={() => {
+                triggerHeaderHaptic();
+                handleOpenProfile();
+              }}
               className="focus:outline-none flex-shrink-0 cursor-pointer"
               title="View Profile Settings"
             >
@@ -297,6 +316,7 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
         <div className="flex items-center gap-2 flex-shrink-0">
           <Link
             href="/support"
+            onClick={triggerHeaderHaptic}
             className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             title="Customer Support"
           >
@@ -305,7 +325,10 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
             </span>
           </Link>
           <button
-            onClick={() => setIsLogoutOpen(true)}
+            onClick={() => {
+              triggerHeaderHaptic();
+              setIsLogoutOpen(true);
+            }}
             className="w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             title="Sign Out"
           >
@@ -314,7 +337,10 @@ export const Header: React.FC<HeaderProps> = ({ userName, profileImage, isLoadin
             </span>
           </button>
           <button
-            onClick={() => setIsNotificationsOpen(true)}
+            onClick={() => {
+              triggerHeaderHaptic();
+              setIsNotificationsOpen(true);
+            }}
             className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full border border-gray-100 bg-gray-50 flex items-center justify-center text-gray-700 hover:bg-gray-100 active:scale-90 transition-all cursor-pointer"
             title="Notifications"
           >
