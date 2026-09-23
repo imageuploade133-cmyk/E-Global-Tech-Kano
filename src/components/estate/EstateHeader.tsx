@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface EstateHeaderProps {
   title?: string;
@@ -50,6 +51,7 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
           {showBackButton ? (
             <Link
               href="/estate"
+              onClick={() => triggerHaptic()}
               className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-700 hover:text-black active:scale-90 transition-all cursor-pointer flex-shrink-0 border-0"
               title="Back to Marketplace"
             >
@@ -88,7 +90,7 @@ export const EstateHeader: React.FC<EstateHeaderProps> = ({
           {onOpenFavorites && (
             <button
               type="button"
-              onClick={onOpenFavorites}
+              onClick={() => { triggerHaptic(); onOpenFavorites(); }}
               className="relative w-8 h-8 min-[375px]:w-9 min-[375px]:h-9 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 active:scale-90 transition-all cursor-pointer border-0"
               title="Saved Properties"
             >
