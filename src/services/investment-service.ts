@@ -447,7 +447,14 @@ export class InvestmentService {
         updatedAt: startDate.toISOString(),
       };
 
-      transaction.set(investRef, investRecord);
+      // Firestore rejects undefined field values. Optional investment fields
+      // must be omitted rather than written as undefined (especially when MAIN
+      // wallet investments do not have bonus-wallet balance snapshots).
+      const firestoreInvestRecord = Object.fromEntries(
+        Object.entries(investRecord).filter(([, value]) => value !== undefined)
+      ) as InvestmentRecord;
+
+      transaction.set(investRef, firestoreInvestRecord);
 
       // Write specialized Investment transaction log
       const logRef = adminDb.collection("investmentTransactions").doc(`tx-invest-${refId}`);
