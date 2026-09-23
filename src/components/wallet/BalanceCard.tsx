@@ -15,6 +15,7 @@ import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
 import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface BalanceCardProps {
   balance: number;
@@ -93,6 +94,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   }, []);
 
   const toggleVisibility = () => {
+    // Give the eye/balance visibility control the same immediate native-style
+    // haptic feedback as the bottom navigation.
+    triggerHaptic();
     const nextState = !isVisible;
     setIsVisible(nextState);
     sessionStorage.setItem("balance_visible", String(nextState));
