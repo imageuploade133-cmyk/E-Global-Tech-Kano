@@ -1,5 +1,7 @@
 "use client";
 
+import { triggerHaptic } from "@/lib/haptics";
+
 import React, { useState, useEffect } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { RouteGuard } from "@/components/RouteGuard";
@@ -841,7 +843,7 @@ export default function GenericBillPage() {
           {/* Title Row with Back History Button */}
           <div className="flex items-center gap-4 mb-5">
             <button
-              onClick={() => window.history.back()}
+              onClick={() => { triggerHaptic(); window.history.back(); }}
               className="w-10 h-10 rounded-full border border-gray-150 bg-white flex items-center justify-center text-gray-700 hover:text-black hover:border-gray-200 active:scale-95 transition-all duration-300 cursor-pointer shadow-none"
               title="Go Back"
             >
