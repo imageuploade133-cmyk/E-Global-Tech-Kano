@@ -122,6 +122,52 @@ export const RequestCardModal: React.FC<RequestCardModalProps> = ({
             className="fixed inset-0 bg-black/70 backdrop-blur-md z-[99998]"
           />
 
+          {/* High Z-Index Loading Progress Overlay during Card Minting */}
+          <AnimatePresence>
+            {isMinting && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100005] flex flex-col items-center justify-center p-6 text-white text-center select-none"
+              >
+                <div className="w-full max-w-xs bg-[#111827] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-5 flex flex-col items-center">
+                  <div className="relative w-16 h-16 flex items-center justify-center">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+                      className="absolute inset-0 rounded-full border-3 border-gray-800 border-t-[#FC7A00] border-r-[#FF9022]"
+                    />
+                    <span className="material-symbols-outlined text-[#FC7A00] text-[28px] animate-pulse">
+                      credit_card
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 w-full">
+                    <h4 className="font-hanken font-extrabold text-base text-white uppercase tracking-wider">
+                      Minting Virtual Card
+                    </h4>
+                    <p className="font-mono text-2xl font-black text-[#FC7A00]">
+                      {Math.min(100, Math.max(0, mintProgress))}%
+                    </p>
+                  </div>
+
+                  {/* Progress Bar Container */}
+                  <div className="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden p-0.5 border border-gray-700">
+                    <motion.div
+                      className="bg-gradient-to-r from-[#FC7A00] to-[#FF9022] h-full rounded-full transition-all duration-200"
+                      style={{ width: `${Math.min(100, Math.max(0, mintProgress))}%` }}
+                    />
+                  </div>
+
+                  <p className="font-hanken text-[11px] font-bold text-gray-300 uppercase tracking-widest leading-relaxed h-8 flex items-center justify-center">
+                    {mintStatusText || "PROCESSING VIRTUAL CARD ISSUANCE..."}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Full-Screen Hardware-Accelerated Container */}
           <motion.div
             initial={{ opacity: 0, y: "100%" }}
@@ -138,8 +184,9 @@ export const RequestCardModal: React.FC<RequestCardModalProps> = ({
               </h3>
               <button
                 type="button"
+                disabled={isMinting}
                 onClick={onClose}
-                className="w-9 h-9 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black hover:bg-gray-100 transition-all cursor-pointer"
+                className="w-9 h-9 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black hover:bg-gray-100 transition-all cursor-pointer disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[18px] font-bold">close</span>
               </button>
