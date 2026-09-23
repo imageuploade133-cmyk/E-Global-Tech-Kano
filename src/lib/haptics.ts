@@ -1,16 +1,23 @@
 /**
- * Triggers a short optional haptic feedback pulse for supported devices.
+ * Triggers the wallet's native-style haptic feedback.
  *
- * Safe for server-rendered modules because browser APIs are accessed only
- * when the function is called in a user interaction handler.
+ * In the Flutter WebView we prefer the native InAppWebView bridge because
+ * navigator.vibrate() is not consistently exposed/strong enough on Android.
+ * The browser API remains a safe fallback for normal web/PWA use.
  */
-export const triggerHaptic = (duration = 10): void => {
-  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
-    return;
-  }
-
+export const triggerHaptic = (duration = 45): void => {
   try {
-    navigator.vibrate(duration);
+    if (typeof window !== "undefined") {
+      const flutterWebView = (window as any).flutter_inappwebview;
+      if (flutterWebView && typeof flutterWebView.callHandler === "function") {
+        void flutterWebView.callHandler("triggerHaptic", duration);
+        return;
+      }
+    }
+
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(duration);
+    }
   } catch {
     // Haptic feedback is optional and must never affect existing behavior.
   }
