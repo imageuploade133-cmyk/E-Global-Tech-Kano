@@ -14,6 +14,26 @@ interface NavItem {
   renderIcon: (isActive: boolean) => React.ReactNode;
 }
 
+/**
+ * Gives supported mobile devices a short, native-like tap haptic when a
+ * bottom-navigation item is pressed.
+ *
+ * Feature detection keeps this completely safe on browsers/devices that do
+ * not expose the Vibration API. The call is made directly from the click
+ * handler so it retains the browser's user-activation context.
+ */
+const triggerNavHaptic = (): void => {
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
+    return;
+  }
+
+  try {
+    navigator.vibrate(10);
+  } catch {
+    // Haptic feedback is optional and must never affect navigation.
+  }
+};
+
 const navItems: NavItem[] = [
   {
     label: "Wealth",
@@ -77,6 +97,8 @@ export const BottomNav: React.FC = () => {
   const { config } = useAppConfig();
 
   const handleNavClick = (e: React.MouseEvent, item: NavItem) => {
+    triggerNavHaptic();
+
     let featureKey: FeatureToggleKey | null = null;
     if (item.href === "/cards") featureKey = "virtual_cards";
     else if (item.href === "/store") featureKey = "store";
