@@ -39,6 +39,7 @@
   ],
   "exclude": [
     "node_modules",
-    "payment-gateway"
+    "payment-gateway",
+    "scripts"
   ]
 }

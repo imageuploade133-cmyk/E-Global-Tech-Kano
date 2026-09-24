@@ -57,3 +57,4 @@ verification/screenshots/error.png
 
 # Standalone payment gateway repository
 /payment-gateway/
+keys/\n*.pem
