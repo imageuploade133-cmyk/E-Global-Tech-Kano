@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCuolap_m6yXWEo2csYMyGhEshsHnd1aEQ",
@@ -12,10 +17,22 @@ const firebaseConfig = {
   measurementId: "G-QL3VDSLC9J"
 };
 
-// Initialize Firebase
+// Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Initialize Firestore with persistent local cache support for offline rendering
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (e) {
+  // If Firestore is already initialized or persistence isn't supported in current environment, fall back to getFirestore
+  db = getFirestore(app);
+}
 
 // Dynamic, safe messaging initialization for SSR environments
 export const getClientMessaging = async () => {

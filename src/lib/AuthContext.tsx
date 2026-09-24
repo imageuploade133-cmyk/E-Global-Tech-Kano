@@ -1,31 +1,36 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, updateProfile } from "firebase/auth";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import { User, onAuthStateChanged, updateProfile } from "firebase/auth";
+import { doc, onSnapshot, updateDoc, getDocFromCache } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import "@/lib/init-fetch-interceptor";
-import { handleAppSignOut } from "@/lib/logout-util";
 import { toast } from "sonner";
-import { SessionRevokedModal, SessionRevokedData } from "@/components/layout/SessionRevokedModal";
-import { NewDeviceOtpModal } from "@/components/layout/NewDeviceOtpModal";
-import { NewDeviceSuccessModal } from "@/components/layout/NewDeviceSuccessModal";
-import { getDetailedDeviceName } from "@/lib/device-util";
+import { handleAppSignOut } from "@/lib/logout-util";
+import { SessionRevokedModal } from "@/components/SessionRevokedModal";
+import { NewDeviceOtpModal } from "@/components/NewDeviceOtpModal";
+import { NewDeviceSuccessModal } from "@/components/NewDeviceSuccessModal";
 
+export type DeviceAuthState =
+  | "CHECKING_DEVICE_SESSION"
+  | "AUTHENTICATED_VERIFIED"
+  | "AUTHENTICATED_PENDING_DEVICE_VERIFICATION"
+  | "OFFLINE_STARTUP"
+  | "UNAUTHENTICATED";
 
-interface UserData {
+export interface UserData {
+  uid?: string;
   name?: string;
+  displayName?: string;
   email?: string;
   pin?: string;
-  balance?: number;
+  pinHash?: string;
   isPinRequired?: boolean;
   isFaceIdEnabled?: boolean;
   dailyLimit?: number;
-  photoURL?: string;
-  [key: string]: unknown;
+  balance?: number;
+  activeSessionId?: string;
+  [key: string]: any;
 }
-
-export type DeviceAuthState = "AUTHENTICATED_VERIFIED" | "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" | "CHECKING_DEVICE_SESSION" | "UNAUTHENTICATED";
 
 interface AuthContextType {
   user: User | null;
@@ -35,24 +40,39 @@ interface AuthContextType {
   userData: UserData | null;
   updateUserData: (updates: Partial<UserData>) => Promise<void>;
   deviceAuthState: DeviceAuthState;
+  isOfflineStartup: boolean;
+  retryOnlineConnection: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getDetailedDeviceName = (): string => {
+  if (typeof window === "undefined") return "Web App";
+  const ua = navigator.userAgent;
+  if (/android/i.test(ua)) return "Android Device";
+  if (/iPhone|iPad|iPod/i.test(ua)) return "iOS Device";
+  if (/Mac/i.test(ua)) return "Mac Computer";
+  if (/Windows/i.test(ua)) return "Windows PC";
+  if (/Linux/i.test(ua)) return "Linux Workstation";
+  return "Mobile Device";
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const inFlightEstablishRef = React.useRef<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [isPinVerified, setIsPinVerified] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
-  const [revokedSessionData, setRevokedSessionData] = useState<SessionRevokedData | null>(null);
+  const [isPinVerified, setIsPinVerified] = useState(false);
+  const [deviceAuthState, setDeviceAuthState] = useState<DeviceAuthState>("CHECKING_DEVICE_SESSION");
+  const [isOfflineStartup, setIsOfflineStartup] = useState(false);
 
-  // New Device OTP Challenge & Activation Success State
-  const [deviceAuthState, setDeviceAuthState] = useState<DeviceAuthState>("UNAUTHENTICATED");
+  const [isRevokedModalOpen, setIsRevokedModalOpen] = useState(false);
+  const [revokedSessionData, setRevokedSessionData] = useState<any>(null);
+
   const [isNewDeviceOtpOpen, setIsNewDeviceOtpOpen] = useState(false);
   const [isNewDeviceSuccessOpen, setIsNewDeviceSuccessOpen] = useState(false);
-  const [previousDeviceName, setPreviousDeviceName] = useState<string>("");
+  const [previousDeviceName, setPreviousDeviceName] = useState("");
+  const inFlightEstablishRef = useRef(false);
+
   const [newDeviceChallenge, setNewDeviceChallenge] = useState<{
     challengeId: string;
     channel: "whatsapp" | "email";
@@ -75,13 +95,125 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveStoredMockData = (data: UserData) => {
-    if (typeof window !== "undefined") {
+    if (typeof window === "undefined") {
       sessionStorage.setItem("mock_user_data", JSON.stringify(data));
     }
   };
 
+  const establishSessionWithTimeout = async (currentUser: User): Promise<boolean> => {
+    if (inFlightEstablishRef.current) return false;
+    inFlightEstablishRef.current = true;
+
+    const existingSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s bounded timeout for network session check
+
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+          ...(existingSessionId ? { "X-Session-ID": existingSessionId } : {}),
+        },
+        body: JSON.stringify({
+          action: "establish",
+          existingSessionId: existingSessionId || undefined,
+          deviceName: getDetailedDeviceName(),
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const sessData = await res.json().catch(() => ({}));
+
+      if (res.ok && sessData.requiresOtp && sessData.challengeId) {
+        setDeviceAuthState("AUTHENTICATED_PENDING_DEVICE_VERIFICATION");
+        setIsPinVerified(false);
+        setIsOfflineStartup(false);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("active_session_id");
+        }
+        setNewDeviceChallenge({
+          challengeId: sessData.challengeId,
+          channel: sessData.channel || "whatsapp",
+          maskedDestination: sessData.maskedDestination || "",
+          channels: sessData.channels || [],
+        });
+        setIsNewDeviceOtpOpen(true);
+        if (sessData.dispatchWarning) toast.warning(sessData.dispatchWarning);
+        return true;
+      } else if (res.ok && sessData.sessionId) {
+        setDeviceAuthState("AUTHENTICATED_VERIFIED");
+        setIsOfflineStartup(false);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("active_session_id", sessData.sessionId);
+        }
+        return true;
+      } else {
+        toast.error(sessData.error || "Session verification failed.");
+        setDeviceAuthState("UNAUTHENTICATED");
+        handleAppSignOut(null);
+        return false;
+      }
+    } catch (err: any) {
+      if (err.name === "AbortError" || !navigator.onLine) {
+        console.warn("[AuthContext] Session fetch timed out or device is offline. Transitioning to OFFLINE_STARTUP mode.");
+        setDeviceAuthState("OFFLINE_STARTUP");
+        setIsOfflineStartup(true);
+        return false;
+      } else {
+        console.error("[AuthContext Session Setup Error]:", err.message);
+        toast.error("Session establishment error. Signing out for security.");
+        setDeviceAuthState("UNAUTHENTICATED");
+        handleAppSignOut(null);
+        return false;
+      }
+    } finally {
+      inFlightEstablishRef.current = false;
+    }
+  };
+
+  const retryOnlineConnection = async () => {
+    if (!user) return;
+    setLoading(true);
+    setDeviceAuthState("CHECKING_DEVICE_SESSION");
+    const success = await establishSessionWithTimeout(user);
+    if (!success && !navigator.onLine) {
+      toast.info("Still offline. Displaying read-only wallet view.");
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    // Mock mode is strictly restricted to development/testing environments to prevent production authentication bypass
+    // Listen to browser online/offline events
+    const handleOnline = () => {
+      if (isOfflineStartup && user) {
+        toast.success("Back online. Syncing session...");
+        retryOnlineConnection();
+      }
+    };
+    const handleOffline = () => {
+      setIsOfflineStartup(true);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      }
+    };
+  }, [isOfflineStartup, user]);
+
+  useEffect(() => {
+    // Mock mode restriction
     const isDevEnv = process.env.NODE_ENV !== "production";
     const hasMockQuery = isDevEnv && typeof window !== "undefined" && window.location.search.includes("mock=true");
     const hasMockSession = isDevEnv && typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
@@ -121,88 +253,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currentUser) {
         setDeviceAuthState("CHECKING_DEVICE_SESSION");
 
-        // Read existing local active_session_id to present on reloads/reopens
-        const existingSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
+        // Execute session establishment with a bounded 3.5s timeout
+        establishSessionWithTimeout(currentUser);
 
-        // 1. Establish or re-verify active session with backend API
-        (async () => {
-          if (inFlightEstablishRef.current) return;
-          inFlightEstablishRef.current = true;
-          try {
-            const idToken = await currentUser.getIdToken();
-            const res = await fetch("/api/auth/session", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${idToken}`,
-                ...(existingSessionId ? { "X-Session-ID": existingSessionId } : {}),
-              },
-              body: JSON.stringify({
-                action: "establish",
-                existingSessionId: existingSessionId || undefined,
-                deviceName: getDetailedDeviceName(),
-              }),
-            });
-            const sessData = await res.json().catch(() => ({}));
-
-            if (res.ok && sessData.requiresOtp && sessData.challengeId) {
-              // Server detected an existing active session on another device -> Transition into AUTHENTICATED_PENDING_DEVICE_VERIFICATION
-              setDeviceAuthState("AUTHENTICATED_PENDING_DEVICE_VERIFICATION");
-              setIsPinVerified(false);
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("active_session_id");
+        // Safety timer to resolve userData loading if offline and Firestore listener hangs
+        const offlineSnapshotTimer = setTimeout(async () => {
+          if (!userData) {
+            console.warn("[AuthContext] Firestore snapshot pending. Attempting cache lookup for offline startup...");
+            try {
+              const cacheSnap = await getDocFromCache(doc(db, "users", currentUser.uid));
+              if (cacheSnap.exists()) {
+                const cData = cacheSnap.data() as UserData;
+                setUserData({
+                  isPinRequired: true,
+                  isFaceIdEnabled: false,
+                  dailyLimit: 500000,
+                  balance: cData.balance !== undefined ? cData.balance : 0.00,
+                  name: (cData.displayName as string | undefined) || cData.name || "",
+                  ...cData,
+                });
+              } else {
+                setUserData({
+                  isPinRequired: true,
+                  isFaceIdEnabled: false,
+                  dailyLimit: 500000,
+                  balance: 0.00,
+                  name: currentUser.displayName || "",
+                  email: currentUser.email || "",
+                });
               }
-              setNewDeviceChallenge({
-                challengeId: sessData.challengeId,
-                channel: sessData.channel || "whatsapp",
-                maskedDestination: sessData.maskedDestination || "",
-                channels: sessData.channels || [],
+            } catch (_) {
+              setUserData({
+                isPinRequired: true,
+                isFaceIdEnabled: false,
+                dailyLimit: 500000,
+                balance: 0.00,
+                name: currentUser.displayName || "",
+                email: currentUser.email || "",
               });
-              setIsNewDeviceOtpOpen(true);
-
-              if (sessData.dispatchWarning) {
-                toast.warning(sessData.dispatchWarning);
-              }
-            } else if (res.ok && sessData.sessionId) {
-              setDeviceAuthState("AUTHENTICATED_VERIFIED");
-              if (typeof window !== "undefined") {
-                localStorage.setItem("active_session_id", sessData.sessionId);
-              }
-            } else {
-              // Fail closed: if session establishment returns error or unexpected payload, sign out immediately
-              toast.error(sessData.error || "Session verification failed.");
-              setDeviceAuthState("UNAUTHENTICATED");
-              handleAppSignOut(null);
+            } finally {
+              setLoading(false);
             }
-          } catch (sessErr: any) {
-            console.error("[AuthContext Session Setup Error]:", sessErr.message);
-            // FAIL CLOSED: Immediately reject access on any network/server exception
-            toast.error("Session establishment error. Signing out for security.");
-            setDeviceAuthState("UNAUTHENTICATED");
-            handleAppSignOut(null);
-          } finally {
-            inFlightEstablishRef.current = false;
           }
-        })();
+        }, 3000); // 3s fallback
 
-        // 2. Set up real-time listener for user data & active session revocation
+        // Set up real-time listener for user data & active session revocation
         unsubscribeSnapshot = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
+          clearTimeout(offlineSnapshotTimer);
           if (docSnap.exists()) {
             const data = docSnap.data() as UserData;
 
-            // Single Active Device / Session Revocation Check
+            // Single Active Device / Session Revocation Check (only evaluated when online with valid active_session_id)
             const localSessionId = typeof window !== "undefined" ? localStorage.getItem("active_session_id") : null;
             const remoteActiveSessionId = data.activeSessionId as string | undefined;
 
-            if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
+            if (navigator.onLine && localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
               console.warn("[Session Revoked] Remote active session changed. Quietly executing security logout for old device...");
-
-              // 1. Immediately clear local session ID so no subsequent API request can use it
               if (typeof window !== "undefined") {
                 localStorage.removeItem("active_session_id");
               }
-
-              // 2. Execute quiet security logout from Firebase Auth without showing modal on Device A
               handleAppSignOut(null);
               return;
             }
@@ -225,13 +334,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           setLoading(false);
         }, (error) => {
-          console.error("Firestore Listener Error:", error);
+          clearTimeout(offlineSnapshotTimer);
+          console.warn("[AuthContext] Firestore Listener Error (likely offline):", error.message);
+          if (!userData) {
+            setUserData({
+              isPinRequired: true,
+              isFaceIdEnabled: false,
+              dailyLimit: 500000,
+              balance: 0.00,
+              name: currentUser.displayName || "",
+              email: currentUser.email || "",
+            });
+          }
           setLoading(false);
         });
       } else {
         if (unsubscribeSnapshot) unsubscribeSnapshot();
         setUserData(null);
         setIsPinVerified(false);
+        setDeviceAuthState("UNAUTHENTICATED");
+        setIsOfflineStartup(false);
         setLoading(false);
       }
     });
@@ -243,6 +365,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateUserData = async (updates: Partial<UserData>) => {
+    if (isOfflineStartup || !navigator.onLine) {
+      toast.error("You are currently offline. Please reconnect to update settings.");
+      return;
+    }
+
     const isMock = sessionStorage.getItem("mock") === "true";
 
     if (isMock) {
@@ -257,15 +384,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (user) {
-      // 1. Update Firebase Auth Profile if name or profile image changes
       if (updates.name || updates.photoURL) {
         await updateProfile(user, {
           displayName: updates.name || user.displayName,
           photoURL: (updates.photoURL as string) || user.photoURL
         });
       }
-
-      // 2. Update Firestore
       await updateDoc(doc(db, "users", user.uid), updates);
     }
   };
@@ -280,6 +404,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userData,
         updateUserData,
         deviceAuthState,
+        isOfflineStartup,
+        retryOnlineConnection,
       }}
     >
       {children}
