@@ -19,6 +19,6 @@ export const triggerHaptic = (duration = 60): void => {
       navigator.vibrate(duration);
     }
   } catch {
-    // Haptic feedback is optional and must never affect existing behavior.
+    // Haptic feedback is optional and must never affect existing functionality.
   }
 };
