@@ -1,0 +1,11 @@
+{
+  "bundleVersion": "1.0.1",
+  "bundleUrl": "https://e-global-197077.vercel.app/mobile-bundles/1.0.1/bundle.zip",
+  "sha256": "b836b3db74e61d782faf7e9c151d8b03ea14ad5f0beea68204374c8429935598",
+  "size": 4188863,
+  "signature": "TAvCVN/yuRW5We3fxMcvJvgU8jYTY7YZALfm3ndrgx6Dr22QdkoqVCS4uwm7UfC3HVsAWwIO0PHY6rsK0Z0KOEtNyaLBdlmt6VNXZloZU45qjTJMPs8LoPHr6edzB6x/yQxvqm/GPkO+P5yLoC0D78vMxwY+ZStmTSdNH07nS4Exa5uWFW0y2JOqf5eusP9MMiRLj00xV5abSPTX63L96JUGFcTpIi+ZyAr1A6hbAmC+tS6KvtbJPE8ncCMXrs2uhoTfzs6XE5mopQIcfEJobMmAjxzzsDOXGGUJdsBQBrRMBvdeaOI2ALJMtKGLzu1fituwgfGV7dFf4Wii+1bD+w==",
+  "createdAt": "2026-09-24T06:27:34.805Z",
+  "requiredFiles": [
+    "index.html"
+  ]
+}
