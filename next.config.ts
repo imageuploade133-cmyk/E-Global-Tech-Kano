@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...(process.env.NEXT_EXPORT === "true" ? { output: "export" } : {}),
   serverExternalPackages: ["firebase-admin"],
   async rewrites() {
     return [
@@ -10,6 +11,7 @@ const nextConfig = {
     ];
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
