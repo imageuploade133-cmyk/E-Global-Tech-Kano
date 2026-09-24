@@ -6,9 +6,9 @@ import { doc, onSnapshot, updateDoc, getDocFromCache } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { handleAppSignOut } from "@/lib/logout-util";
-import { SessionRevokedModal } from "@/components/SessionRevokedModal";
-import { NewDeviceOtpModal } from "@/components/NewDeviceOtpModal";
-import { NewDeviceSuccessModal } from "@/components/NewDeviceSuccessModal";
+import { SessionRevokedModal } from "@/components/layout/SessionRevokedModal";
+import { NewDeviceOtpModal } from "@/components/layout/NewDeviceOtpModal";
+import { NewDeviceSuccessModal } from "@/components/layout/NewDeviceSuccessModal";
 
 export type DeviceAuthState =
   | "CHECKING_DEVICE_SESSION"
