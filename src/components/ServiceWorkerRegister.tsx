@@ -8,9 +8,9 @@ export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // 1. Version Update Check (Clears caches, local storage, and forces reload on new build deploy)
+    // 1. Version Update Check (Only run when device is online to avoid infinite reload loops when offline)
     const savedVersion = sessionStorage.getItem("APP_VERSION");
-    if (savedVersion !== CURRENT_VERSION) {
+    if (navigator.onLine && savedVersion !== CURRENT_VERSION) {
       console.log(`[Version Control] New deployment detected (${CURRENT_VERSION}). Initializing fresh cache and storage update...`);
 
       // Preserve non-sensitive visual toggles if desired, or clear everything
@@ -48,6 +48,11 @@ export function ServiceWorkerRegister() {
       // Force instant window reload to fetch latest client bundles from hosting server
       window.location.reload();
       return;
+    }
+
+    // Record version if not present during offline startup
+    if (!savedVersion) {
+      sessionStorage.setItem("APP_VERSION", CURRENT_VERSION);
     }
 
     // 2. Register modern Service Worker for offline load support

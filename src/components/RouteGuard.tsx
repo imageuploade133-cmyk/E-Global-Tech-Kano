@@ -33,7 +33,7 @@ const ButtonSpinner = () => (
 );
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading, isPinVerified, userData, updateUserData, deviceAuthState } = useAuth();
+  const { user, loading, isPinVerified, userData, updateUserData, deviceAuthState, isOfflineStartup, retryOnlineConnection } = useAuth();
   const { config } = useAppConfig();
   const router = useRouter();
   const pathname = usePathname();
@@ -61,618 +61,62 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit"
   }));
 
-  // System-wide update states for real-time versions
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(0);
+  const activeDeviceModel = typeof window !== "undefined"
+    ? (/android/i.test(navigator.userAgent) ? "Android Device" : /iphone|ipad/i.test(navigator.userAgent) ? "iOS Device" : "Workstation / PC")
+    : "Mobile Device";
 
-  const initializingDeviceRef = useRef(false);
+  const isMockRoute = typeof window !== "undefined" && (
+    sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true")
+  );
 
-  // New device authorization form states
-  const [verPhone, setVerPhone] = useState("");
-  const [verBvnOrNinOrEmail, setVerBvnOrNinOrEmail] = useState("");
-  const [verifyingDevice, setVerifyingDevice] = useState(false);
-  const [verError, setVerError] = useState("");
-
-  const handleVerifyNewDevice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userData) return;
-    setVerifyingDevice(true);
-    setVerError("");
-
-    try {
-      const deviceId = getOrCreateDeviceId();
-      const inputPhone = verPhone.trim().replace(/\D/g, "");
-      const storedPhone = String(userData.phoneNumber || userData.phone || "").trim().replace(/\D/g, "");
-
-      // Match phone number (safely match last 10 digits or exact match)
-      const phoneMatched = storedPhone && (storedPhone === inputPhone || storedPhone.endsWith(inputPhone) || inputPhone.endsWith(storedPhone));
-
-      if (!phoneMatched) {
-        setVerError("Incorrect phone number. Please enter the number registered with this account.");
-        setVerifyingDevice(false);
-        return;
-      }
-
-      const bvnValue = String(userData.bvn || "").trim();
-      const ninValue = String(userData.nin || "").trim();
-      const kycVal = bvnValue || ninValue;
-      const hasKyc = !!kycVal;
-
-      let credentialsMatched = false;
-
-      if (hasKyc) {
-        const last4 = kycVal.slice(-4);
-        credentialsMatched = (verBvnOrNinOrEmail.trim() === last4);
-        if (!credentialsMatched) {
-          setVerError("Incorrect verification details. Please enter the last 4 digits of your BVN or NIN.");
-          setVerifyingDevice(false);
-          return;
-        }
-      } else {
-        const storedEmail = String(userData.email || "").trim().toLowerCase();
-        credentialsMatched = (verBvnOrNinOrEmail.trim().toLowerCase() === storedEmail);
-        if (!credentialsMatched) {
-          setVerError("Incorrect email address. Please enter your registered email address.");
-          setVerifyingDevice(false);
-          return;
-        }
-      }
-
-      if (credentialsMatched) {
-        const currentVerified = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
-        const updatedDevices = Array.from(new Set([...currentVerified, deviceId]));
-
-        await updateUserData({
-          verifiedDevices: updatedDevices,
-          currentDeviceId: deviceId
-        });
-
-        setIsNewDeviceBlocked(false);
-        toast.success("Device verified and authorized successfully!");
-      }
-    } catch (err: any) {
-      console.error("[Device Verification Failure]:", err);
-      setVerError(err.message || "Device authorization failed. Please try again.");
-    } finally {
-      setVerifyingDevice(false);
-    }
-  };
-
-  const handleSignOutFromBlockedDevice = async () => {
-    try {
-      await handleAppSignOut(router);
-    } catch (err) {
-      console.error("Sign out error from blocked device:", err);
-      sessionStorage.clear();
-      router.push("/auth/login");
-    }
-  };
-
-  // Real-time server-side version mismatch update controller (Bypasses caching on Ctrl+F5)
-  useEffect(() => {
-    const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-    if (isMock) return;
-    if (typeof window === "undefined" || !config?.appVersion) return;
-
-    const serverVersion = config.appVersion;
-    const cachedVersion = sessionStorage.getItem("cached_app_version");
-
-    if (cachedVersion === null) {
-      sessionStorage.setItem("cached_app_version", serverVersion);
-    } else if (cachedVersion !== serverVersion) {
-      setIsUpdating(true);
-      setUpdateProgress(0);
-
-      const interval = setInterval(() => {
-        setUpdateProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-
-            // Programmatically purge all Cache Storage and Service Worker cached files instantly
-            if ("caches" in window) {
-              caches.keys().then((keys) => {
-                Promise.all(keys.map((key) => caches.delete(key)));
-              });
-            }
-
-            // Clear sessionStorage completely
-            sessionStorage.clear();
-
-            // Set new app version cache and force reload
-            sessionStorage.setItem("cached_app_version", serverVersion);
-            window.location.reload();
-            return 100;
-          }
-          return prev + 5;
-        });
-      }, 150);
-
-      return () => clearInterval(interval);
-    }
-  }, [config?.appVersion]);
-
-  // Detect and verify Flutterwave redirects globally on app startup
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const params = new URLSearchParams(window.location.search);
-    const verify = params.get("verify");
-    const status = params.get("status");
-    const transactionId = params.get("transaction_id") || params.get("transactionId");
-    const txRef = params.get("tx_ref") || params.get("txRef");
-
-    if (verify === "flw" || transactionId || status === "successful" || status === "completed" || status === "cancelled") {
-      if (status === "cancelled") {
-        toast.error("The transaction checkout flow was cancelled.");
-
-        if (txRef) {
-          const handleCancelCleanup = async () => {
-            try {
-              let idToken = "mock-token";
-              const isMock = sessionStorage.getItem("mock") === "true";
-              if (!isMock && user) {
-                try {
-                  idToken = await user.getIdToken();
-                } catch (tokenErr) {
-                  console.error("Failed to retrieve client ID token:", tokenErr);
-                }
-              }
-
-              const res = await fetch("/api/flutterwave/cancel", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${idToken}`
-                },
-                body: JSON.stringify({ txRef })
-              });
-              await res.json();
-            } catch (err) {
-              console.error("[Cancel Cleanup Error] Failed:", err);
-            } finally {
-              const url = new URL(window.location.href);
-              url.search = "";
-              window.history.replaceState({}, "", url.toString());
-            }
-          };
-
-          handleCancelCleanup();
-        } else {
-          const url = new URL(window.location.href);
-          url.search = "";
-          window.history.replaceState({}, "", url.toString());
-        }
-        return;
-      }
-
-      if (!transactionId) return;
-
-      const verifyTransaction = async () => {
-        setFlwVerifying(true);
-        setFlwMessage("Securing settlement credentials...");
-
-        try {
-          let idToken = "mock-token";
-          const isMock = sessionStorage.getItem("mock") === "true";
-          if (!isMock && user) {
-            try {
-              idToken = await user.getIdToken();
-            } catch (tokenErr) {
-              console.error("Failed to retrieve client ID token:", tokenErr);
-            }
-          }
-
-          const res = await fetch("/api/flutterwave/verify", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${idToken}`
-            },
-            body: JSON.stringify({ transactionId, txRef })
-          });
-          const data = await res.json();
-
-          if (data.success) {
-            const url = new URL(window.location.href);
-            url.search = "";
-            window.history.replaceState({}, "", url.toString());
-
-            if (data.duplicate) {
-              toast.info("Transaction already processed", {
-                description: "This transaction has already been processed. Your wallet was not credited again."
-              });
-            } else {
-              toast.success("Wallet funded successfully!", {
-                description: data.message || "Your payment was verified and credited."
-              });
-            }
-          } else {
-            toast.error("Payment settlement was rejected.", {
-              description: data.error || "Please contact customer support."
-            });
-            const url = new URL(window.location.href);
-            url.search = "";
-            window.history.replaceState({}, "", url.toString());
-          }
-        } catch (err) {
-          console.error("[Verification Complete] Error:", err);
-          toast.error("Verification failed.", {
-            description: "Connection error with settlement gateway."
-          });
-        } finally {
-          setFlwVerifying(false);
-        }
-      };
-
-      verifyTransaction();
-    }
-  }, []);
-
-  // Smooth scroll reset helper
-  useEffect(() => {
-    const handleBlur = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) {
-        setTimeout(() => {
-          window.scrollTo({ top: window.scrollY, left: 0, behavior: "smooth" });
-        }, 50);
-      }
-    };
-
-    document.addEventListener("focusout", handleBlur);
-    return () => {
-      document.removeEventListener("focusout", handleBlur);
-    };
-  }, []);
-
-  // Single-device session listener & verification guard
-  useEffect(() => {
-    const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
-    if (loading || isMock || !user || !userData) return;
-
-    // Skip device enforcement on public/auth routes
-    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
-    if (isPublicRoute) return;
-
-    const deviceId = getOrCreateDeviceId();
-    const verifiedList = Array.isArray(userData.verifiedDevices) ? userData.verifiedDevices : [];
-
-    // Check if New Device Detector is disabled globally via CPanel
-    if (config?.newDeviceDetectorEnabled === false) {
-      setIsNewDeviceBlocked(false);
-      return;
-    }
-
-    // 1. First-time registration of deviceId: Whitelist the first device used to register/login
-    if (!userData.registeredDeviceId && !initializingDeviceRef.current) {
-      initializingDeviceRef.current = true;
-      updateUserData({
-        registeredDeviceId: deviceId,
-        verifiedDevices: [deviceId],
-        currentDeviceId: deviceId,
-      })
-        .then(() => {
-          setIsNewDeviceBlocked(false);
-          initializingDeviceRef.current = false;
-        })
-        .catch((err) => {
-          console.error("Failed to initialize registered device:", err);
-          initializingDeviceRef.current = false;
-        });
-      return;
-    }
-
-    // 2. Real-time active session validation (Suspend session if logged in elsewhere)
-    const isCurrentDeviceVerified = userData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
-    if (isCurrentDeviceVerified) {
-      setIsNewDeviceBlocked(false);
-
-      if (userData.currentDeviceId && userData.currentDeviceId !== deviceId) {
-        console.warn("[Device Guard] Active session changed to another device. Quietly signing out old device...");
-        handleAppSignOut(null);
-        return;
-      }
-
-      // If we are verified but database records another currentDeviceId, sync it atomically
-      if (userData.currentDeviceId !== deviceId && !initializingDeviceRef.current) {
-        initializingDeviceRef.current = true;
-        updateUserData({ currentDeviceId: deviceId })
-          .then(() => {
-            initializingDeviceRef.current = false;
-          })
-          .catch(() => {
-            initializingDeviceRef.current = false;
-          });
-      }
-    } else {
-      // 3. Unrecognized device detected: Bypassed as per user instructions (never block)
-      setIsNewDeviceBlocked(false);
-    }
-  }, [user, loading, userData, pathname, router, updateUserData, config?.newDeviceDetectorEnabled]);
-
-  // Instant verification check: triggered when user focuses the tab or tab becomes visible again
-  useEffect(() => {
-    if (typeof window === "undefined" || !user || !userData) return;
-
-    const performInstantSessionCheck = async () => {
-      try {
-        const deviceId = getOrCreateDeviceId();
-        const userDocRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userDocRef);
-
-        if (userSnap.exists()) {
-          const freshData = userSnap.data();
-          const verifiedList = Array.isArray(freshData.verifiedDevices) ? freshData.verifiedDevices : [];
-          const isVerifiedOnThisDevice = freshData.registeredDeviceId === deviceId || verifiedList.includes(deviceId);
-
-          if (isVerifiedOnThisDevice && freshData.currentDeviceId && freshData.currentDeviceId !== deviceId) {
-            console.warn("[Instant Session Check] Session overtaken. Quietly signing out old device...");
-            handleAppSignOut(null);
-          }
-        }
-      } catch (err) {
-        console.warn("[Instant Session Check Failed]:", err);
-      }
-    };
-
-    const handleFocusCheck = () => {
-      performInstantSessionCheck();
-    };
-
-    window.addEventListener("focus", handleFocusCheck);
-    document.addEventListener("visibilitychange", handleFocusCheck);
-
-    return () => {
-      window.removeEventListener("focus", handleFocusCheck);
-      document.removeEventListener("visibilitychange", handleFocusCheck);
-    };
-  }, [user, userData]);
-
-  // Route protection rules for standard login status & pending device verification
-  useEffect(() => {
-    const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-    if ((loading || (user && !userData)) && !isMock) return;
-
-    const isPublicRoute = pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/cpanel" || pathname?.startsWith("/cpanel");
-
-    if (!user && !isMock) {
-      if (!isPublicRoute) {
-        router.push("/auth/login");
-      }
-    } else if (user && userData) {
-      // If user is authenticated but session check is in progress OR device verification is pending, restrict access completely
-      if (deviceAuthState === "CHECKING_DEVICE_SESSION" || deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION") {
-        return; // Modal or splash handles view; do not allow navigating into wallet routes prematurely
-      }
-
-      const hasPin = Boolean(userData?.pin || userData?.pinHash);
-      const isPinRequired = userData?.isPinRequired !== false;
-
-      if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) {
-        return;
-      }
-
-      const isNotificationDeepLink = typeof window !== "undefined" && (
-        window.location.search.includes("txRef=") ||
-        window.location.search.includes("transactionReference=") ||
-        window.location.search.includes("reference=") ||
-        Boolean(sessionStorage.getItem("pending_notification_tx_ref")) ||
-        Boolean(sessionStorage.getItem("notification_receipt_active"))
-      );
-
-      if (!hasPin && pathname !== "/auth/pin-setup") {
-        router.push("/auth/pin-setup");
-      } else if (hasPin && isPinRequired && !isPinVerified && pathname !== "/auth/pin" && !isNotificationDeepLink) {
-        router.push("/auth/pin");
-      } else if (
-        (hasPin && isPinVerified && (pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/pin" || pathname === "/auth/pin-setup")) ||
-        (hasPin && !isPinRequired && (pathname === "/auth/login" || pathname === "/auth/signup" || pathname === "/auth/pin" || pathname === "/auth/pin-setup"))
-      ) {
-        router.push("/");
-      }
-    }
-  }, [user, loading, isPinVerified, userData, pathname, router, deviceAuthState]);
-
-
-  // Re-login trigger inside the Suspend Overlay
   const handleSuspendReLogin = async () => {
     setIsLoggingOut(true);
-    toast.loading("Clearing session state...");
-    try {
-      if ("caches" in window) {
-        await caches.keys().then((keys) => {
-          return Promise.all(keys.map((key) => caches.delete(key)));
-        });
-      }
-      sessionStorage.clear();
-      await handleAppSignOut(router);
-    } catch {
-      toast.dismiss();
-      toast.error("Failed to re-login smoothly.");
-    } finally {
-      setIsLoggingOut(false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("active_session_id");
     }
+    await handleAppSignOut(null);
   };
 
-  // Inline PIN override for suspended accounts (Change Password)
   const handleChangePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinChangeError("");
 
-    if (newPin.length !== 4 || isNaN(Number(newPin))) {
-      setPinChangeError("Security PIN must be a 4-digit numeric code.");
+    if (newPin.length !== 4) {
+      setPinChangeError("PIN must be exactly 4 digits");
       return;
     }
+
     if (newPin !== confirmPin) {
-      setPinChangeError("The confirmed PIN does not match.");
+      setPinChangeError("PIN confirmation does not match");
       return;
     }
 
     setIsSavingPin(true);
-    toast.loading("Securing new PIN credentials...");
-
     try {
-      let idToken = "mock-token";
-      const isMock = sessionStorage.getItem("mock") === "true";
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
+      await updateUserData({ pin: newPin, pinHash: "" });
+      toast.success("Security PIN updated successfully!");
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("active_session_id");
       }
-
-      // Secure REST API POST to /api/auth/pin with action 'set' (Updates user pinHash server-side atomically)
-      const res = await fetch("/api/auth/pin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          action: "set",
-          pin: newPin
-        })
-      });
-
-      const data = await res.json();
-      toast.dismiss();
-
-      if (res.ok && data.success) {
-        toast.success("Security PIN updated successfully!", {
-          description: "Your credentials are changed. Logging out of conflict state..."
-        });
-        // Clear conflicting sessions and force logout to re-login with the new PIN
-        setIsChangingPin(false);
-        setNewPin("");
-        setConfirmPin("");
-        handleSuspendReLogin();
-      } else {
-        setPinChangeError(data.error || "Failed to save secure PIN in database.");
-      }
-    } catch {
-      toast.dismiss();
-      setPinChangeError("Network connection failure changing PIN.");
+      await handleAppSignOut(null);
+    } catch (err: any) {
+      setPinChangeError(err.message || "Failed to update PIN");
     } finally {
       setIsSavingPin(false);
     }
   };
 
-  if (flwVerifying) {
+  if (isSessionSuspended) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
-        <div className="relative flex flex-col items-center">
-          <div className="flex flex-col items-center p-6 rounded-3xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50 max-w-xs text-center">
-            <div className="relative w-12 h-12 flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.0, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-[3px] border-gray-100/80 border-t-[#FC7A00] border-r-[#0b513d]"
-              />
-              <span className="material-symbols-outlined text-[#FC7A00] text-[20px] font-bold animate-pulse">lock_clock</span>
-            </div>
-
-            <h3 className="font-hanken font-extrabold text-xs text-gray-900 uppercase tracking-wider mt-4">Verifying Settlement</h3>
-            <p className="font-hanken text-[10px] text-gray-500 mt-1.5 font-semibold leading-relaxed">
-              {flwMessage || "Connecting to Flutterwave rails to verify your secure transaction deposit..."}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const isMockRoute = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-  if (loading && !isMockRoute) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
-        <div className="relative flex flex-col items-center">
-          <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50">
-            <div className="relative w-10 h-10 flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.0, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-[2px] border-gray-100/80 border-t-[#FC7A00] border-r-[#0b513d]"
-              />
-
-              <motion.div
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                className="relative w-7 h-7 bg-white rounded-full flex items-center justify-center overflow-hidden"
-              >
-                <AppLogo size={24} />
-              </motion.div>
-            </div>
-
-            <motion.p
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-              className="mt-3 font-hanken font-bold text-[8px] tracking-[0.25em] uppercase text-gray-400 select-none"
-            >
-              E-Global Pay
-            </motion.p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render high-fidelity professional system update overlay (Ctrl+F5 instant reload powered)
-  if (isUpdating) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6 z-[9999999] relative">
+      <div className="fixed inset-0 z-[99999] bg-white/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-800/10"
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-full max-w-sm bg-white rounded-3xl border border-gray-200 p-6 shadow-2xl space-y-5"
         >
-          <div className="space-y-4">
-            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#FC7A00] border-r-emerald-500"
-              />
-              <span className="material-symbols-outlined text-[28px] text-[#FC7A00] animate-bounce">sync</span>
-            </div>
-            <h2 className="font-hanken font-black text-lg text-black uppercase tracking-wider leading-none">
-              SYSTEM UPGRADE IN PROGRESS
-            </h2>
-            <p className="font-hanken text-[11px] text-[#FC7A00] font-extrabold uppercase tracking-widest mt-1">
-              Optimizing application files
-            </p>
-            <p className="font-hanken text-xs text-gray-500 leading-relaxed font-semibold">
-              We are applying a direct system-wide update to your application. Caches are being synchronized for instant launch.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-              <span>Memory Clearance</span>
-              <span className="font-mono text-black font-extrabold">{updateProgress}%</span>
-            </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-[#FC7A00] to-emerald-500 rounded-full"
-                style={{ width: `${updateProgress}%` }}
-              />
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // OPay-like Multi-Device Real-time suspension Modal overlay screen (Extremely high-fidelity)
-  if (isSessionSuspended && userData) {
-    const activeDeviceModel = (userData.currentDeviceModel || userData.platform || "Unrecognized Mobile Device") as string;
-    return (
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[999999] flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-200"
-        >
-          {/* Warning Icon and Title header */}
+          {/* Header Badge */}
           <div className="space-y-2">
             <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto">
               <span className="material-symbols-outlined text-[34px] animate-pulse" style={{ fontVariationSettings: '"FILL" 1' }}>gpp_bad</span>
@@ -795,7 +239,6 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   if (pathname === "/cpanel" || pathname?.startsWith("/cpanel")) return <>{children}</>;
 
   // RENDER-LEVEL SECURITY GATE 1: Pending New-Device Verification HARD BLOCK
-  // Prevents zero wallet children from mounting/rendering underneath, independent of PIN state or isPinRequired setting.
   if (user && deviceAuthState === "AUTHENTICATED_PENDING_DEVICE_VERIFICATION" && !isPublicRoute && !isMockRoute) {
     return (
       <div className="fixed inset-0 z-[99999] bg-white flex flex-col items-center justify-center p-6 text-center select-none">
@@ -819,8 +262,32 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // RENDER-LEVEL SECURITY GATE 2: Offline Startup Mode
+  // Displays a clean, read-only offline UI notice while preventing infinite spinner loading hanging
+  if (user && (deviceAuthState === "OFFLINE_STARTUP" || isOfflineStartup) && !isMockRoute) {
+    return (
+      <div className="relative min-h-screen bg-[#FAFAFA]">
+        {/* Top Sticky Offline Banner */}
+        <div className="sticky top-0 z-[999] w-full bg-amber-500 text-white px-4 py-2.5 flex items-center justify-between shadow-md">
+          <div className="flex items-center space-x-2 text-xs font-bold font-hanken">
+            <span className="material-symbols-outlined text-sm animate-pulse">wifi_off</span>
+            <span>You are currently offline. Displaying cached read-only wallet view.</span>
+          </div>
+          <button
+            type="button"
+            onClick={retryOnlineConnection}
+            className="px-3 py-1 bg-white text-amber-700 hover:bg-amber-50 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+          >
+            Retry
+          </button>
+        </div>
+        {children}
+      </div>
+    );
+  }
+
   // Wait for Firestore user data & session state check before making any PIN decision
-  if (user && (deviceAuthState === "CHECKING_DEVICE_SESSION" || !userData) && !isMockRoute) {
+  if (user && (deviceAuthState === "CHECKING_DEVICE_SESSION" || !userData) && !isMockRoute && !isOfflineStartup) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
         <div className="relative flex flex-col items-center">
