@@ -54,8 +54,8 @@ async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
  * Uses 5-minute in-memory cache to prevent repetitive Firestore reads on every message/OTP dispatch.
  */
 export async function getWhatsappServerConfig(options?: { useCpanelConfig?: boolean }): Promise<WhatsappConfig> {
-  let apiUrl = (process.env.WHATSAPP_API_URL || "https://whatsapp-5fda.onrender.com").replace(/\/+$/, "");
-  let apiKey = process.env.WHATSAPP_API_KEY || "";
+  let apiUrl = (process.env.WHATSAPP_API_URL || process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055").replace(/\/+$/, "");
+  let apiKey = process.env.WHATSAPP_API_KEY || process.env.PAYMENT_GATEWAY_API_KEY || "";
   let instanceId = process.env.WHATSAPP_INSTANCE_ID || "default";
   let adminUsername = process.env.WHATSAPP_ADMIN_USERNAME || "admin";
   let adminPassword = process.env.WHATSAPP_ADMIN_PASSWORD || "";
