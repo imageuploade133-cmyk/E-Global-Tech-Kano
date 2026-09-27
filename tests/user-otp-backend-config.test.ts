@@ -13,29 +13,63 @@ export interface TestWhatsappConfig {
   instanceId: string;
 }
 
-export async function resolveTestEmailConfig(params: TestSendEmailParams, mockFirestoreConfig?: any) {
-  let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
-  let apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
-  let instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
+export function sanitizeEmailApiUrl(url?: string | null): string {
+  if (!url || typeof url !== "string") return "";
+  const clean = url.trim();
+  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  return clean;
+}
 
-  if (params.useCpanelConfig === true && mockFirestoreConfig) {
-    if (mockFirestoreConfig.emailApiUrl) emailApiUrl = mockFirestoreConfig.emailApiUrl;
-    if (mockFirestoreConfig.emailApiKey) apiKey = mockFirestoreConfig.emailApiKey;
-    if (mockFirestoreConfig.emailInstanceId) instanceId = mockFirestoreConfig.emailInstanceId;
+export function sanitizeWhatsappApiUrl(url?: string | null): string {
+  if (!url || typeof url !== "string") return "";
+  const clean = url.trim().replace(/\/+$/, "");
+  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  return clean;
+}
+
+export async function resolveEmailConfig(params: TestSendEmailParams, firestoreConfig?: any) {
+  const envEmailUrl = sanitizeEmailApiUrl(process.env.EMAIL_API_URL);
+  let apiKey = (process.env.EMAIL_API_KEY && !process.env.EMAIL_API_KEY.includes("***"))
+    ? process.env.EMAIL_API_KEY
+    : (process.env.WHATSAPP_API_KEY && !process.env.WHATSAPP_API_KEY.includes("***"))
+      ? process.env.WHATSAPP_API_KEY
+      : process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+  let instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
+  let emailApiUrl = envEmailUrl;
+
+  if (params.useCpanelConfig === true && firestoreConfig) {
+    const firestoreUrl = sanitizeEmailApiUrl(firestoreConfig.emailApiUrl || firestoreConfig.whatsappApiUrl);
+    if (firestoreUrl) {
+      emailApiUrl = firestoreUrl.includes("/api/email")
+        ? firestoreUrl
+        : `${firestoreUrl.replace(/\/$/, "")}/api/email/send`;
+    }
+    if (firestoreConfig.emailApiKey && !firestoreConfig.emailApiKey.includes("***")) apiKey = firestoreConfig.emailApiKey;
+    if (firestoreConfig.emailInstanceId) instanceId = firestoreConfig.emailInstanceId;
+  }
+
+  if (!emailApiUrl) {
+    const gwUrl = process.env.PAYMENT_GATEWAY_URL ? process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "") : "http://127.0.0.1:3055";
+    emailApiUrl = `${gwUrl}/api/email/send`;
   }
 
   return { emailApiUrl, apiKey, instanceId };
 }
 
-export async function resolveTestWhatsappConfig(options?: { useCpanelConfig?: boolean }, mockFirestoreConfig?: any): Promise<TestWhatsappConfig> {
-  let apiUrl = (process.env.WHATSAPP_API_URL || "https://whatsapp-5fda.onrender.com").replace(/\/+$/, "");
-  let apiKey = process.env.WHATSAPP_API_KEY || "";
+export async function resolveWhatsappConfig(options?: { useCpanelConfig?: boolean }, firestoreConfig?: any): Promise<TestWhatsappConfig> {
+  let apiUrl = sanitizeWhatsappApiUrl(process.env.WHATSAPP_API_URL);
+  let apiKey = process.env.WHATSAPP_API_KEY || process.env.PAYMENT_GATEWAY_API_KEY || "";
   let instanceId = process.env.WHATSAPP_INSTANCE_ID || "default";
 
-  if (options?.useCpanelConfig === true && mockFirestoreConfig) {
-    if (mockFirestoreConfig.whatsappApiUrl) apiUrl = mockFirestoreConfig.whatsappApiUrl.replace(/\/+$/, "");
-    if (mockFirestoreConfig.whatsappApiKey) apiKey = mockFirestoreConfig.whatsappApiKey;
-    if (mockFirestoreConfig.whatsappInstanceId) instanceId = mockFirestoreConfig.whatsappInstanceId;
+  if (options?.useCpanelConfig === true && firestoreConfig) {
+    const firestoreUrl = sanitizeWhatsappApiUrl(firestoreConfig.whatsappApiUrl);
+    if (firestoreUrl) apiUrl = firestoreUrl;
+    if (firestoreConfig.whatsappApiKey && !firestoreConfig.whatsappApiKey.includes("***")) apiKey = firestoreConfig.whatsappApiKey;
+    if (firestoreConfig.whatsappInstanceId) instanceId = firestoreConfig.whatsappInstanceId;
+  }
+
+  if (!apiUrl) {
+    apiUrl = sanitizeWhatsappApiUrl(process.env.PAYMENT_GATEWAY_URL) || "http://127.0.0.1:3055";
   }
 
   return { apiUrl, apiKey, instanceId };
@@ -64,8 +98,7 @@ describe("User OTP & Verification Backend Configuration Isolation", () => {
       emailInstanceId: "cpanel_override_instance",
     };
 
-    // Default user OTP call (useCpanelConfig is not set)
-    const resolvedUserConfig = await resolveTestEmailConfig({
+    const resolvedUserConfig = await resolveEmailConfig({
       to: "user@example.com",
       subject: "OTP Verification",
       html: "<p>123456</p>",
@@ -75,8 +108,7 @@ describe("User OTP & Verification Backend Configuration Isolation", () => {
     expect(resolvedUserConfig.apiKey).toBe("real_backend_email_key_123");
     expect(resolvedUserConfig.instanceId).toBe("real_backend_instance_email");
 
-    // Explicit CPanel Admin Diagnostic call (useCpanelConfig: true)
-    const resolvedCpanelConfig = await resolveTestEmailConfig({
+    const resolvedCpanelConfig = await resolveEmailConfig({
       to: "admin@example.com",
       subject: "CPanel Test",
       html: "<p>Ping</p>",
@@ -88,6 +120,19 @@ describe("User OTP & Verification Backend Configuration Isolation", () => {
     expect(resolvedCpanelConfig.instanceId).toBe("cpanel_override_instance");
   });
 
+  it("Sanitizes legacy whatsapp-5fda.onrender.com domain and falls back to PAYMENT_GATEWAY_URL", async () => {
+    process.env.EMAIL_API_URL = "https://whatsapp-5fda.onrender.com/api/email/send";
+    process.env.PAYMENT_GATEWAY_URL = "https://etechglobalhub.duckdns.org";
+
+    const resolved = await resolveEmailConfig({
+      to: "user@example.com",
+      subject: "OTP",
+      html: "<p>123</p>",
+    });
+
+    expect(resolved.emailApiUrl).toBe("https://etechglobalhub.duckdns.org/api/email/send");
+  });
+
   it("User OTP WhatsApp uses process environment variables by default (ignoring CPanel Firestore config)", async () => {
     const mockCpanelFirestoreDoc = {
       whatsappApiUrl: "http://cpanel-override-wa.test",
@@ -95,15 +140,13 @@ describe("User OTP & Verification Backend Configuration Isolation", () => {
       whatsappInstanceId: "cpanel_override_wa_instance",
     };
 
-    // Default user WhatsApp OTP call
-    const resolvedUserWaConfig = await resolveTestWhatsappConfig(undefined, mockCpanelFirestoreDoc);
+    const resolvedUserWaConfig = await resolveWhatsappConfig(undefined, mockCpanelFirestoreDoc);
 
     expect(resolvedUserWaConfig.apiUrl).toBe("http://real-backend.test");
     expect(resolvedUserWaConfig.apiKey).toBe("real_backend_wa_key_456");
     expect(resolvedUserWaConfig.instanceId).toBe("real_backend_instance_wa");
 
-    // CPanel Admin Diagnostic call
-    const resolvedCpanelWaConfig = await resolveTestWhatsappConfig({ useCpanelConfig: true }, mockCpanelFirestoreDoc);
+    const resolvedCpanelWaConfig = await resolveWhatsappConfig({ useCpanelConfig: true }, mockCpanelFirestoreDoc);
 
     expect(resolvedCpanelWaConfig.apiUrl).toBe("http://cpanel-override-wa.test");
     expect(resolvedCpanelWaConfig.apiKey).toBe("cpanel_override_wa_key_888");
