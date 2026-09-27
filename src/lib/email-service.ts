@@ -108,7 +108,7 @@ export async function ensureEmailApiKeyOnGateway(params: {
       });
     };
 
-    let res = await sendCreateReq();
+    const res = await sendCreateReq();
 
     if (res.ok) {
       console.log(`[ensureEmailApiKeyOnGateway] Successfully registered API key ${emailApiKey} on gateway.`);
