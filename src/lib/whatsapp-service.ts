@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebase-admin";
+import { ensureEmailApiKeyOnGateway } from "@/lib/email-service";
 
 export interface WhatsappConfig {
   apiUrl: string;
@@ -263,6 +264,67 @@ export async function callWhatsappBackend(
         }
       } catch {
         // Ignore fallback fetch error
+      }
+    }
+
+    // If HTTP 401/403 or Invalid API Key error occurs, attempt auto-provisioning key on gateway and retry with fresh admin session
+    if (
+      response.status === 401 ||
+      response.status === 403 ||
+      (typeof text === "string" && (text.includes("Unauthorized") || text.includes("Invalid API Key") || text.includes("Invalid session")))
+    ) {
+      console.log("[callWhatsappBackend] Auth failure detected. Attempting to ensure/provision API key on WhatsAPI gateway...");
+      vmSessionCookie = ""; // Clear stale cookie
+
+      const createdOnGateway = await ensureEmailApiKeyOnGateway({
+        emailApiUrl: `${config.apiUrl}/api/email/send`,
+        emailApiKey: config.apiKey,
+        emailInstanceId: config.instanceId,
+        adminUsername: config.adminUsername,
+        adminPassword: config.adminPassword,
+        senderName: "E-Global WhatsApp Key",
+      });
+
+      if (createdOnGateway) {
+        console.log("[callWhatsappBackend] Key auto-provisioned on gateway. Retrying call...");
+        const retryRes = await fetch(targetUrl, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+          cache: "no-store",
+        });
+        if (retryRes.ok) {
+          const retryText = await retryRes.text();
+          let retryData: any = null;
+          if (retryText) {
+            try { retryData = JSON.parse(retryText); } catch { retryData = { textResponse: retryText }; }
+          }
+          return { ok: true, status: retryRes.status, data: retryData };
+        }
+      }
+
+      // Retry with fresh admin session token if login credentials exist
+      const sessionAuth = await ensureVmSessionCookie(config);
+      if (sessionAuth.cookie || sessionAuth.token) {
+        const sessionHeaders = { ...headers };
+        if (sessionAuth.cookie) sessionHeaders["Cookie"] = sessionAuth.cookie;
+        if (sessionAuth.token) sessionHeaders["Authorization"] = `Bearer ${sessionAuth.token}`;
+
+        const sessionRetryRes = await fetch(targetUrl, {
+          method,
+          headers: sessionHeaders,
+          body: body ? JSON.stringify(body) : undefined,
+          cache: "no-store",
+        });
+
+        if (sessionRetryRes.ok) {
+          const sText = await sessionRetryRes.text();
+          let sData: any = null;
+          if (sText) {
+            try { sData = JSON.parse(sText); } catch { sData = { textResponse: sText }; }
+          }
+          return { ok: true, status: sessionRetryRes.status, data: sData };
+        }
       }
     }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { formatQrCodePayload, callWhatsappBackend, clearWhatsappCache } from "@/lib/whatsapp-service";
+import { ensureEmailApiKeyOnGateway } from "@/lib/email-service";
 
 export async function GET(req: Request) {
   try {
@@ -230,6 +231,17 @@ export async function POST(req: Request) {
       try {
         await adminDb.collection("config").doc("whatsapp_api").set(updateData, { merge: true });
         clearWhatsappCache();
+
+        if (updateData.whatsappApiKey && updateData.whatsappApiUrl) {
+          ensureEmailApiKeyOnGateway({
+            emailApiUrl: `${updateData.whatsappApiUrl}/api/email/send`,
+            emailApiKey: updateData.whatsappApiKey,
+            emailInstanceId: updateData.whatsappInstanceId || "inst_33647102",
+            adminUsername: updateData.whatsappAdminUsername,
+            adminPassword: updateData.whatsappAdminPassword,
+            senderName: "E-Global WhatsApp Key",
+          }).catch((err) => console.warn("[save_api_config] Key auto-provisioning warning:", err.message));
+        }
 
         return NextResponse.json({
           success: true,
