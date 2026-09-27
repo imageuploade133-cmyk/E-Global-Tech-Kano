@@ -170,8 +170,11 @@ export async function ensureEmailApiKeyOnGateway(params: {
  * Server-side Email Service calling the WhatsAPI Email API Gateway.
  */
 export async function sendEmail(params: SendEmailParams): Promise<boolean> {
-  let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
-  let apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
+  const defaultGatewayUrl = process.env.PAYMENT_GATEWAY_URL
+    ? `${process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "")}/api/email/send`
+    : "http://127.0.0.1:3055/api/email/send";
+  let emailApiUrl = process.env.EMAIL_API_URL || defaultGatewayUrl;
+  let apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
   let instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
   let adminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
   let adminPassword = process.env.EMAIL_ADMIN_PASSWORD || process.env.WHATSAPP_ADMIN_PASSWORD || "";

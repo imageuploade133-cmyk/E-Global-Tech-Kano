@@ -20,7 +20,7 @@ function CpanelEmailConnectContent() {
   const { isDark, toggleTheme } = useCpanelTheme();
 
   // Configuration States
-  const [emailApiUrlInput, setEmailApiUrlInput] = useState("https://whatsapp-5fda.onrender.com/api/email/send");
+  const [emailApiUrlInput, setEmailApiUrlInput] = useState("https://etechglobalhub.duckdns.org/api/email/send");
   const [emailApiKeyInput, setEmailApiKeyInput] = useState("");
   const [emailApiKeyMasked, setEmailApiKeyMasked] = useState("email_live_4a7t...*******");
   const [emailInstanceIdInput, setEmailInstanceIdInput] = useState("inst_33647102");
@@ -45,7 +45,7 @@ function CpanelEmailConnectContent() {
 
   // New Key Form States
   const [newKeyName, setNewKeyName] = useState("");
-  const [newKeyUrl, setNewKeyUrl] = useState("https://whatsapp-5fda.onrender.com/api/email/send");
+  const [newKeyUrl, setNewKeyUrl] = useState("https://etechglobalhub.duckdns.org/api/email/send");
   const [newKeySecret, setNewKeySecret] = useState("");
   const [newKeyInstanceId, setNewKeyInstanceId] = useState("inst_33647102");
   const [newKeyAdminUsername, setNewKeyAdminUsername] = useState("");
@@ -683,7 +683,7 @@ function CpanelEmailConnectContent() {
                   required
                   value={emailApiUrlInput}
                   onChange={(e) => setEmailApiUrlInput(e.target.value)}
-                  placeholder="e.g. https://whatsapp-5fda.onrender.com/api/email/send"
+                  placeholder="e.g. https://etechglobalhub.duckdns.org/api/email/send"
                   className={inputClass}
                 />
               </div>

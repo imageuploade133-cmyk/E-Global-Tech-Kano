@@ -17,7 +17,10 @@ export async function GET(req: Request) {
     }
     const { uid } = perm.auth;
 
-    let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
+    const defaultGatewayEmailUrl = process.env.PAYMENT_GATEWAY_URL
+      ? `${process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "")}/api/email/send`
+      : "http://127.0.0.1:3055/api/email/send";
+    let emailApiUrl = process.env.EMAIL_API_URL || defaultGatewayEmailUrl;
     let emailApiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
     let emailInstanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
     let emailAdminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
@@ -141,7 +144,7 @@ export async function POST(req: Request) {
 
       const newKeyId = `key-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const cleanKey = String(emailApiKey).trim();
-      const cleanUrl = String(emailApiUrl || process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send").trim();
+      const cleanUrl = String(emailApiUrl || process.env.EMAIL_API_URL || defaultGatewayEmailUrl).trim();
       const cleanInst = String(emailInstanceId || process.env.EMAIL_INSTANCE_ID || "inst_33647102").trim();
 
       const newKeyRecord = {
@@ -381,7 +384,7 @@ export async function POST(req: Request) {
       const messageBody = customMessage?.trim() || "This is a live test email sent from your E-Global Control Panel Email Gateway configuration tool.";
 
       // Read active configuration
-      let targetApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
+      let targetApiUrl = process.env.EMAIL_API_URL || defaultGatewayEmailUrl;
       let targetApiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
       let targetInstanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
       let targetAdminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
