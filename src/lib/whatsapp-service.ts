@@ -69,6 +69,11 @@ export async function getWhatsappServerConfig(options?: { useCpanelConfig?: bool
 
   // Only read CPanel override configuration if explicitly requested (e.g. for CPanel admin tests/monitoring).
   if (options?.useCpanelConfig === true) {
+    const now = Date.now();
+    if (cachedWhatsappConfig && cachedWhatsappConfig.expiresAt > now) {
+      return cachedWhatsappConfig.data;
+    }
+
     try {
       const docSnap = await adminDb.collection("config").doc("whatsapp_api").get();
       if (docSnap.exists) {
@@ -83,6 +88,10 @@ export async function getWhatsappServerConfig(options?: { useCpanelConfig?: bool
     } catch (err: any) {
       console.warn("[getWhatsappServerConfig] Firestore config lookup warning:", err.message);
     }
+
+    const cpanelConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
+    cachedWhatsappConfig = { data: cpanelConfig, expiresAt: now + CACHE_TTL_MS };
+    return cpanelConfig;
   }
 
   if (!apiUrl) {
