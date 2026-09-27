@@ -22,8 +22,10 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 Minutes
  */
 function sanitizeWhatsappApiUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "";
-  const clean = url.trim().replace(/\/+$/, "");
-  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  let clean = url.trim().replace(/\/+$/, "");
+  if (clean.includes("whatsapp-5fda.onrender.com")) {
+    clean = clean.replace("whatsapp-5fda.onrender.com", "whatsapp-b5os.onrender.com");
+  }
   return clean;
 }
 
@@ -95,7 +97,7 @@ export async function getWhatsappServerConfig(options?: { useCpanelConfig?: bool
   }
 
   if (!apiUrl) {
-    apiUrl = sanitizeWhatsappApiUrl(process.env.PAYMENT_GATEWAY_URL) || "http://127.0.0.1:3055";
+    apiUrl = sanitizeWhatsappApiUrl(process.env.PAYMENT_GATEWAY_URL) || "https://whatsapp-b5os.onrender.com";
   }
 
   const resolvedConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };

@@ -168,8 +168,10 @@ export async function ensureEmailApiKeyOnGateway(params: {
 
 function sanitizeEmailApiUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "";
-  const clean = url.trim();
-  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  let clean = url.trim();
+  if (clean.includes("whatsapp-5fda.onrender.com")) {
+    clean = clean.replace("whatsapp-5fda.onrender.com", "whatsapp-b5os.onrender.com");
+  }
   return clean;
 }
 
@@ -219,10 +221,10 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
     }
   }
 
-  // Fallback endpoint on PAYMENT_GATEWAY_URL
+  // Fallback endpoint on WhatsAPI gateway URL
   if (!emailApiUrl) {
-    const gwUrl = process.env.PAYMENT_GATEWAY_URL ? process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "") : "http://127.0.0.1:3055";
-    emailApiUrl = `${gwUrl}/api/email/send`;
+    const gwUrl = process.env.PAYMENT_GATEWAY_URL ? process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "") : "";
+    emailApiUrl = gwUrl ? `${gwUrl}/api/email/send` : "https://whatsapp-b5os.onrender.com/api/email/send";
   }
 
   const buildHeaders = (keyToUse: string, cookieToUse?: string) => {

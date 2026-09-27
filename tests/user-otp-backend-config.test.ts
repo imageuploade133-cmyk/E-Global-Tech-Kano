@@ -15,15 +15,19 @@ export interface TestWhatsappConfig {
 
 export function sanitizeEmailApiUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "";
-  const clean = url.trim();
-  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  let clean = url.trim();
+  if (clean.includes("whatsapp-5fda.onrender.com")) {
+    clean = clean.replace("whatsapp-5fda.onrender.com", "whatsapp-b5os.onrender.com");
+  }
   return clean;
 }
 
 export function sanitizeWhatsappApiUrl(url?: string | null): string {
   if (!url || typeof url !== "string") return "";
-  const clean = url.trim().replace(/\/+$/, "");
-  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  let clean = url.trim().replace(/\/+$/, "");
+  if (clean.includes("whatsapp-5fda.onrender.com")) {
+    clean = clean.replace("whatsapp-5fda.onrender.com", "whatsapp-b5os.onrender.com");
+  }
   return clean;
 }
 
@@ -49,8 +53,8 @@ export async function resolveEmailConfig(params: TestSendEmailParams, firestoreC
   }
 
   if (!emailApiUrl) {
-    const gwUrl = process.env.PAYMENT_GATEWAY_URL ? process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "") : "http://127.0.0.1:3055";
-    emailApiUrl = `${gwUrl}/api/email/send`;
+    const gwUrl = process.env.PAYMENT_GATEWAY_URL ? process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "") : "";
+    emailApiUrl = gwUrl ? `${gwUrl}/api/email/send` : "https://whatsapp-b5os.onrender.com/api/email/send";
   }
 
   return { emailApiUrl, apiKey, instanceId };
@@ -69,7 +73,7 @@ export async function resolveWhatsappConfig(options?: { useCpanelConfig?: boolea
   }
 
   if (!apiUrl) {
-    apiUrl = sanitizeWhatsappApiUrl(process.env.PAYMENT_GATEWAY_URL) || "http://127.0.0.1:3055";
+    apiUrl = sanitizeWhatsappApiUrl(process.env.PAYMENT_GATEWAY_URL) || "https://whatsapp-b5os.onrender.com";
   }
 
   return { apiUrl, apiKey, instanceId };
@@ -120,9 +124,8 @@ describe("User OTP & Verification Backend Configuration Isolation", () => {
     expect(resolvedCpanelConfig.instanceId).toBe("cpanel_override_instance");
   });
 
-  it("Sanitizes legacy whatsapp-5fda.onrender.com domain and falls back to PAYMENT_GATEWAY_URL", async () => {
+  it("Migrates legacy whatsapp-5fda.onrender.com domain to whatsapp-b5os.onrender.com", async () => {
     process.env.EMAIL_API_URL = "https://whatsapp-5fda.onrender.com/api/email/send";
-    process.env.PAYMENT_GATEWAY_URL = "https://etechglobalhub.duckdns.org";
 
     const resolved = await resolveEmailConfig({
       to: "user@example.com",
@@ -130,7 +133,7 @@ describe("User OTP & Verification Backend Configuration Isolation", () => {
       html: "<p>123</p>",
     });
 
-    expect(resolved.emailApiUrl).toBe("https://etechglobalhub.duckdns.org/api/email/send");
+    expect(resolved.emailApiUrl).toBe("https://whatsapp-b5os.onrender.com/api/email/send");
   });
 
   it("User OTP WhatsApp uses process environment variables by default (ignoring CPanel Firestore config)", async () => {
