@@ -166,20 +166,29 @@ export async function ensureEmailApiKeyOnGateway(params: {
   }
 }
 
+function sanitizeEmailApiUrl(url?: string | null): string {
+  if (!url || typeof url !== "string") return "";
+  const clean = url.trim();
+  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  return clean;
+}
+
 /**
  * Server-side Email Service calling the WhatsAPI Email API Gateway.
  */
 export async function sendEmail(params: SendEmailParams): Promise<boolean> {
-  const defaultGatewayUrl = process.env.PAYMENT_GATEWAY_URL
-    ? `${process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "")}/api/email/send`
-    : "http://127.0.0.1:3055/api/email/send";
-  let emailApiUrl = process.env.EMAIL_API_URL || defaultGatewayUrl;
-  let apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+  const envEmailUrl = sanitizeEmailApiUrl(process.env.EMAIL_API_URL);
+  let apiKey = (process.env.EMAIL_API_KEY && !process.env.EMAIL_API_KEY.includes("***"))
+    ? process.env.EMAIL_API_KEY
+    : (process.env.WHATSAPP_API_KEY && !process.env.WHATSAPP_API_KEY.includes("***"))
+      ? process.env.WHATSAPP_API_KEY
+      : process.env.PAYMENT_GATEWAY_API_KEY || "default_gateway_secure_key_12345";
   let instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
   let adminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
   let adminPassword = process.env.EMAIL_ADMIN_PASSWORD || process.env.WHATSAPP_ADMIN_PASSWORD || "";
   let senderName = "E-Global Pay";
   let senderEmail = "no-reply@eglobalpay.com";
+  let emailApiUrl = envEmailUrl;
 
   // Only read CPanel override configuration if explicitly requested (e.g. for CPanel admin tests/diagnostics).
   // Standard user operations (signup OTP, new device session OTP, PIN reset OTP, security contact changes)
@@ -187,11 +196,11 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   if (params.useCpanelConfig === true) {
     const data = await getCachedEmailGatewayConfig();
     if (data) {
-      if (data.emailApiUrl) emailApiUrl = data.emailApiUrl;
-      if (data.whatsappApiUrl && !data.emailApiUrl) {
-        emailApiUrl = data.whatsappApiUrl.includes("/api/email")
-          ? data.whatsappApiUrl
-          : `${data.whatsappApiUrl.replace(/\/$/, "")}/api/email/send`;
+      const firestoreUrl = sanitizeEmailApiUrl(data.emailApiUrl || data.whatsappApiUrl);
+      if (firestoreUrl) {
+        emailApiUrl = firestoreUrl.includes("/api/email")
+          ? firestoreUrl
+          : `${firestoreUrl.replace(/\/$/, "")}/api/email/send`;
       }
       if (data.emailApiKey && !data.emailApiKey.includes("***")) apiKey = data.emailApiKey;
       else if (data.whatsappApiKey && !data.whatsappApiKey.includes("***")) apiKey = data.whatsappApiKey;
@@ -208,6 +217,12 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
       if (data.senderName) senderName = data.senderName;
       if (data.senderEmail) senderEmail = data.senderEmail;
     }
+  }
+
+  // Fallback endpoint on PAYMENT_GATEWAY_URL
+  if (!emailApiUrl) {
+    const gwUrl = process.env.PAYMENT_GATEWAY_URL ? process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "") : "http://127.0.0.1:3055";
+    emailApiUrl = `${gwUrl}/api/email/send`;
   }
 
   const buildHeaders = (keyToUse: string, cookieToUse?: string) => {

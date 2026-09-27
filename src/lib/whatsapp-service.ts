@@ -20,6 +20,13 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 Minutes
 /**
  * Ensures an active session cookie with the WhatsApp API VM.
  */
+function sanitizeWhatsappApiUrl(url?: string | null): string {
+  if (!url || typeof url !== "string") return "";
+  const clean = url.trim().replace(/\/+$/, "");
+  if (clean.includes("whatsapp-5fda.onrender.com")) return "";
+  return clean;
+}
+
 async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
   if (vmSessionCookie) return vmSessionCookie;
   if (!config.adminUsername || !config.adminPassword) return "";
@@ -54,7 +61,7 @@ async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
  * Uses 5-minute in-memory cache to prevent repetitive Firestore reads on every message/OTP dispatch.
  */
 export async function getWhatsappServerConfig(options?: { useCpanelConfig?: boolean }): Promise<WhatsappConfig> {
-  let apiUrl = (process.env.WHATSAPP_API_URL || process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055").replace(/\/+$/, "");
+  let apiUrl = sanitizeWhatsappApiUrl(process.env.WHATSAPP_API_URL);
   let apiKey = process.env.WHATSAPP_API_KEY || process.env.PAYMENT_GATEWAY_API_KEY || "";
   let instanceId = process.env.WHATSAPP_INSTANCE_ID || "default";
   let adminUsername = process.env.WHATSAPP_ADMIN_USERNAME || "admin";
@@ -71,8 +78,9 @@ export async function getWhatsappServerConfig(options?: { useCpanelConfig?: bool
       const docSnap = await adminDb.collection("config").doc("whatsapp_api").get();
       if (docSnap.exists) {
         const data = docSnap.data() || {};
-        if (data.whatsappApiUrl) apiUrl = data.whatsappApiUrl.replace(/\/+$/, "");
-        if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
+        const firestoreUrl = sanitizeWhatsappApiUrl(data.whatsappApiUrl);
+        if (firestoreUrl) apiUrl = firestoreUrl;
+        if (data.whatsappApiKey && !data.whatsappApiKey.includes("***")) apiKey = data.whatsappApiKey;
         if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
         if (data.whatsappAdminUsername) adminUsername = data.whatsappAdminUsername;
         if (data.whatsappAdminPassword) adminPassword = data.whatsappAdminPassword;
@@ -81,12 +89,17 @@ export async function getWhatsappServerConfig(options?: { useCpanelConfig?: bool
       console.warn("[getWhatsappServerConfig] Firestore config lookup warning:", err.message);
     }
 
-    const resolvedConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
-    cachedWhatsappConfig = { data: resolvedConfig, expiresAt: now + CACHE_TTL_MS };
-    return resolvedConfig;
+    const cpanelConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
+    cachedWhatsappConfig = { data: cpanelConfig, expiresAt: now + CACHE_TTL_MS };
+    return cpanelConfig;
   }
 
-  return { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
+  if (!apiUrl) {
+    apiUrl = sanitizeWhatsappApiUrl(process.env.PAYMENT_GATEWAY_URL) || "http://127.0.0.1:3055";
+  }
+
+  const resolvedConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
+  return resolvedConfig;
 }
 
 /**
