@@ -116,6 +116,10 @@ export async function POST(req: Request) {
     }
     const { uid, email: adminEmail } = perm.auth;
 
+    const defaultGatewayEmailUrl = process.env.PAYMENT_GATEWAY_URL
+      ? `${process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "")}/api/email/send`
+      : "http://127.0.0.1:3055/api/email/send";
+
     const body = await req.json();
     const { action } = body;
 
