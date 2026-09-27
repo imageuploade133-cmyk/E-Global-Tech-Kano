@@ -10,26 +10,26 @@ export async function GET(req: Request) {
     }
     const admin = perm.auth;
 
-    const config = await getWhatsappServerConfig();
+    const config = await getWhatsappServerConfig({ useCpanelConfig: true });
 
     if (!config.apiUrl) {
       return NextResponse.json({ error: "WhatsApp API is not configured on server." }, { status: 500 });
     }
 
     // Call WhatsApp API to retrieve QR code or connect payload
-    const backendRes = await callWhatsappBackend(`/instances/${config.instanceId}`, "GET", undefined, 6000);
+    const backendRes = await callWhatsappBackend(`/instances/${config.instanceId}`, "GET", undefined, 6000, { useCpanelConfig: true });
 
     // Check if status endpoint returned a QR code
     let qrData = backendRes.data?.instance?.qr || backendRes.data?.instance?.base64 || backendRes.data?.qr || backendRes.data?.base64;
 
     // If QR code is not present in GET /instances/:id, trigger POST /instances/:id/start or GET /instance/connect/:id
     if (!qrData) {
-      const connectRes = await callWhatsappBackend(`/instance/connect/${config.instanceId}`, "GET", undefined, 8000);
+      const connectRes = await callWhatsappBackend(`/instance/connect/${config.instanceId}`, "GET", undefined, 8000, { useCpanelConfig: true });
       qrData = connectRes.data?.base64 || connectRes.data?.code || connectRes.data?.qr || connectRes.data?.qrcode;
     }
 
     if (!qrData) {
-      const startRes = await callWhatsappBackend(`/instances/${config.instanceId}/start`, "POST", undefined, 8000);
+      const startRes = await callWhatsappBackend(`/instances/${config.instanceId}/start`, "POST", undefined, 8000, { useCpanelConfig: true });
       qrData = startRes.data?.qr || startRes.data?.base64 || startRes.data?.code;
     }
 

@@ -25,17 +25,17 @@ export async function POST(req: Request) {
     }
 
     try {
-      const config = await getWhatsappServerConfig();
+      const config = await getWhatsappServerConfig({ useCpanelConfig: true });
 
       if (!config.apiUrl) {
         return NextResponse.json({ error: "WhatsApp API is not configured on server." }, { status: 500 });
       }
 
       // Call POST /instances/:id/start (or GET /instance/connect/:id)
-      let backendRes = await callWhatsappBackend(`/instances/${config.instanceId}/start`, "POST", undefined, 10000);
+      let backendRes = await callWhatsappBackend(`/instances/${config.instanceId}`, "POST", undefined, 10000, { useCpanelConfig: true });
 
       if (!backendRes.ok && backendRes.status === 404) {
-        backendRes = await callWhatsappBackend(`/instance/connect/${config.instanceId}`, "GET", undefined, 10000);
+        backendRes = await callWhatsappBackend(`/instance/connect/${config.instanceId}`, "GET", undefined, 10000, { useCpanelConfig: true });
       }
 
       await logWhatsappAdminAudit(admin.uid, admin.email || "", "CONNECT_WHATSAPP_DEVICE", {
