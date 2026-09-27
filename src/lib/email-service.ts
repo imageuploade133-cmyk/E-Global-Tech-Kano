@@ -172,6 +172,9 @@ function sanitizeEmailApiUrl(url?: string | null): string {
   if (clean.includes("whatsapp-5fda.onrender.com")) {
     clean = clean.replace("whatsapp-5fda.onrender.com", "whatsapp-b5os.onrender.com");
   }
+  if (clean.includes("etechglobalhub.duckdns.org")) {
+    return "";
+  }
   return clean;
 }
 
@@ -221,10 +224,14 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
     }
   }
 
-  // Fallback endpoint on WhatsAPI gateway URL
+  // Fallback endpoint on WhatsAPI gateway URL (Render)
   if (!emailApiUrl) {
-    const gwUrl = process.env.PAYMENT_GATEWAY_URL ? process.env.PAYMENT_GATEWAY_URL.replace(/\/$/, "") : "";
-    emailApiUrl = gwUrl ? `${gwUrl}/api/email/send` : "https://whatsapp-b5os.onrender.com/api/email/send";
+    const waUrl = process.env.WHATSAPP_API_URL ? process.env.WHATSAPP_API_URL.replace(/\/$/, "") : "";
+    if (waUrl && !waUrl.includes("etechglobalhub.duckdns.org")) {
+      emailApiUrl = waUrl.includes("/api/email") ? waUrl : `${waUrl}/api/email/send`;
+    } else {
+      emailApiUrl = "https://whatsapp-b5os.onrender.com/api/email/send";
+    }
   }
 
   const buildHeaders = (keyToUse: string, cookieToUse?: string) => {
