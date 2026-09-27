@@ -79,7 +79,7 @@ export async function ensureEmailApiKeyOnGateway(params: {
 }): Promise<boolean> {
   const { emailApiUrl, emailApiKey, emailInstanceId, adminUsername, adminPassword, senderName } = params;
 
-  if (!emailApiKey || !emailApiUrl) return false;
+  if (!emailApiKey || !emailApiUrl || emailApiKey.includes("***")) return false;
 
   try {
     const urlObj = new URL(emailApiUrl);
@@ -108,50 +108,54 @@ export async function ensureEmailApiKeyOnGateway(params: {
       });
     };
 
-    const res = await sendCreateReq();
+    let res = await sendCreateReq();
 
     if (res.ok) {
       console.log(`[ensureEmailApiKeyOnGateway] Successfully registered API key ${emailApiKey} on gateway.`);
       return true;
     }
 
-    // If 401 Unauthorized, attempt gateway admin session login first
-    if ((res.status === 401 || res.status === 403) && adminUsername && adminPassword) {
-      console.log("[ensureEmailApiKeyOnGateway] Auth required. Attempting gateway admin session login...");
-      const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+    // Strictly resolve configured admin username and password without trial-and-error password guessing
+    const userToUse = (adminUsername || process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "").trim();
+    const passToUse = (adminPassword || process.env.EMAIL_ADMIN_PASSWORD || process.env.WHATSAPP_ADMIN_PASSWORD || "").trim();
 
-      let sessionCookie = "";
-      let acquiredToken = "";
+    if (!userToUse || !passToUse) {
+      return false;
+    }
 
-      for (const ep of loginEndpoints) {
-        try {
-          const loginRes = await fetch(ep, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              username: adminUsername,
-              email: adminUsername,
-              password: adminPassword,
-            }),
-          });
+    const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
 
-          if (loginRes.ok) {
-            const setCookieHeader = loginRes.headers.get("set-cookie");
-            if (setCookieHeader) sessionCookie = setCookieHeader;
+    let sessionCookie = "";
+    let acquiredToken = "";
 
-            const loginData = await loginRes.json().catch(() => ({}));
-            acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
-            break;
-          }
-        } catch {}
-      }
+    for (const ep of loginEndpoints) {
+      try {
+        const loginRes = await fetch(ep, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: userToUse,
+            email: userToUse,
+            password: passToUse,
+          }),
+        });
 
-      if (acquiredToken || sessionCookie) {
-        const retryRes = await sendCreateReq(sessionCookie, acquiredToken);
-        if (retryRes.ok) {
-          console.log(`[ensureEmailApiKeyOnGateway] Registered API key ${emailApiKey} via admin session.`);
-          return true;
+        if (loginRes.ok) {
+          const setCookieHeader = loginRes.headers.get("set-cookie");
+          if (setCookieHeader) sessionCookie = setCookieHeader;
+
+          const loginData = await loginRes.json().catch(() => ({}));
+          acquiredToken = loginData.token || loginData.apiKey || loginData.key || loginData.accessToken || "";
+          break;
         }
+      } catch {}
+    }
+
+    if (acquiredToken || sessionCookie) {
+      const retryRes = await sendCreateReq(sessionCookie, acquiredToken);
+      if (retryRes.ok) {
+        console.log(`[ensureEmailApiKeyOnGateway] Registered API key ${emailApiKey} via admin session.`);
+        return true;
       }
     }
 
@@ -186,8 +190,8 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
           ? data.whatsappApiUrl
           : `${data.whatsappApiUrl.replace(/\/$/, "")}/api/email/send`;
       }
-      if (data.emailApiKey) apiKey = data.emailApiKey;
-      else if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
+      if (data.emailApiKey && !data.emailApiKey.includes("***")) apiKey = data.emailApiKey;
+      else if (data.whatsappApiKey && !data.whatsappApiKey.includes("***")) apiKey = data.whatsappApiKey;
 
       if (data.emailInstanceId) instanceId = data.emailInstanceId;
       else if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;

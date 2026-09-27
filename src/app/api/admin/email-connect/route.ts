@@ -394,7 +394,7 @@ export async function POST(req: Request) {
         if (docSnap.exists) {
           const data = docSnap.data();
           if (data?.emailApiUrl) targetApiUrl = data.emailApiUrl;
-          if (data?.emailApiKey) targetApiKey = data.emailApiKey;
+          if (data?.emailApiKey && !data.emailApiKey.includes("***")) targetApiKey = data.emailApiKey;
           if (data?.emailInstanceId) targetInstanceId = data.emailInstanceId;
           if (data?.emailAdminUsername) targetAdminUsername = data.emailAdminUsername;
           if (data?.emailAdminPassword) targetAdminPassword = data.emailAdminPassword;
