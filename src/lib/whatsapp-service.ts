@@ -29,33 +29,45 @@ function sanitizeWhatsappApiUrl(url?: string | null): string {
   return clean;
 }
 
-async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
-  if (vmSessionCookie) return vmSessionCookie;
-  if (!config.adminUsername || !config.adminPassword) return "";
+export function clearWhatsappCache() {
+  cachedWhatsappConfig = null;
+  vmSessionCookie = "";
+}
 
-  try {
-    const loginUrl = `${config.apiUrl}/api/login`;
-    const res = await fetch(loginUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: config.adminUsername,
-        password: config.adminPassword,
-      }),
-      cache: "no-store",
-    });
+async function ensureVmSessionCookie(config: WhatsappConfig): Promise<{ cookie: string; token: string }> {
+  if (vmSessionCookie) return { cookie: vmSessionCookie, token: "" };
+  if (!config.adminUsername || !config.adminPassword) return { cookie: "", token: "" };
 
-    if (res.ok) {
-      const setCookie = res.headers.get("set-cookie");
-      if (setCookie) {
-        vmSessionCookie = setCookie.split(";")[0];
-        return vmSessionCookie;
+  const baseUrl = config.apiUrl.replace(/\/+$/, "");
+  const loginEndpoints = [`${baseUrl}/api/auth/login`, `${baseUrl}/auth/login`, `${baseUrl}/api/login`, `${baseUrl}/login`];
+
+  for (const ep of loginEndpoints) {
+    try {
+      const res = await fetch(ep, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: config.adminUsername,
+          email: config.adminUsername,
+          password: config.adminPassword,
+        }),
+        cache: "no-store",
+      });
+
+      if (res.ok) {
+        const setCookie = res.headers.get("set-cookie");
+        if (setCookie) {
+          vmSessionCookie = setCookie.split(";")[0];
+        }
+        const data = await res.json().catch(() => ({}));
+        const token = data.token || data.apiKey || data.key || data.accessToken || "";
+        return { cookie: vmSessionCookie, token };
       }
+    } catch (err: any) {
+      console.warn(`[ensureVmSessionCookie] VM Login endpoint ${ep} failed:`, err.message);
     }
-  } catch (err: any) {
-    console.warn("[ensureVmSessionCookie] VM Login failed:", err.message);
   }
-  return "";
+  return { cookie: "", token: "" };
 }
 
 /**
@@ -151,15 +163,23 @@ export async function callWhatsappBackend(
 
   if (config.apiKey) {
     headers["X-API-Key"] = config.apiKey;
+    headers["x-api-key"] = config.apiKey;
+    headers["apikey"] = config.apiKey;
+    headers["Authorization"] = `Bearer ${config.apiKey}`;
   }
 
   if (config.instanceId) {
     headers["X-Instance-ID"] = config.instanceId;
+    headers["X-Email-ID"] = config.instanceId;
+    headers["X-Project-ID"] = config.instanceId;
   }
 
-  const sessionCookie = await ensureVmSessionCookie(config);
+  const { cookie: sessionCookie, token: sessionToken } = await ensureVmSessionCookie(config);
   if (sessionCookie) {
     headers["Cookie"] = sessionCookie;
+  }
+  if (sessionToken && !config.apiKey) {
+    headers["Authorization"] = `Bearer ${sessionToken}`;
   }
 
   try {

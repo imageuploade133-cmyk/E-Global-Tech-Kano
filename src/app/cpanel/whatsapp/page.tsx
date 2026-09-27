@@ -112,11 +112,11 @@ function CpanelWhatsappPageContent() {
         }
 
         if (data.apiConfig) {
-          setWhatsappApiUrlInput(data.apiConfig.whatsappApiUrl || "");
-          setWhatsappInstanceIdInput(data.apiConfig.whatsappInstanceId || "");
-          setWhatsappApiKeyInput("");
-          setWhatsappAdminUsernameInput("");
-          setWhatsappAdminPasswordInput("");
+          setWhatsappApiUrlInput((prev) => prev || data.apiConfig.whatsappApiUrl || "");
+          setWhatsappInstanceIdInput((prev) => prev || data.apiConfig.whatsappInstanceId || "");
+          if (data.apiConfig.whatsappAdminUsername) {
+            setWhatsappAdminUsernameInput((prev) => prev || data.apiConfig.whatsappAdminUsername || "");
+          }
         }
 
         if (newStatus === "LINKED") {

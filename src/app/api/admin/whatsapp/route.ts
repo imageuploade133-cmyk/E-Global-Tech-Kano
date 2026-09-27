@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-import { formatQrCodePayload, callWhatsappBackend } from "@/lib/whatsapp-service";
+import { formatQrCodePayload, callWhatsappBackend, clearWhatsappCache } from "@/lib/whatsapp-service";
 
 export async function GET(req: Request) {
   try {
@@ -64,6 +64,7 @@ export async function GET(req: Request) {
         apiConfig: {
           whatsappApiUrl,
           whatsappInstanceId,
+          whatsappAdminUsername,
           hasApiKeyConfigured: Boolean(whatsappApiKey),
         }
       });
@@ -76,10 +77,10 @@ export async function GET(req: Request) {
     let liveQrCode: string | null = null;
 
     try {
-      let backendRes = await callWhatsappBackend(`/instances/${whatsappInstanceId}`, "GET");
+      let backendRes = await callWhatsappBackend(`/instances/${whatsappInstanceId}`, "GET", undefined, 7000, { useCpanelConfig: true });
 
       if (!backendRes.ok) {
-        backendRes = await callWhatsappBackend("/instances", "GET");
+        backendRes = await callWhatsappBackend("/instances", "GET", undefined, 7000, { useCpanelConfig: true });
       }
 
       if (backendRes.ok && backendRes.data) {
@@ -138,6 +139,7 @@ export async function GET(req: Request) {
           apiConfig: {
             whatsappApiUrl,
             whatsappInstanceId,
+            whatsappAdminUsername,
             hasApiKeyConfigured: Boolean(whatsappApiKey),
           }
         });
@@ -149,7 +151,7 @@ export async function GET(req: Request) {
     // 3. FETCH LIVE QR CODE AUTOMATICALLY IF DISCONNECTED
     if (!liveQrCode) {
       try {
-        const qrRes = await callWhatsappBackend(`/instances/${whatsappInstanceId}/qr`, "GET");
+        const qrRes = await callWhatsappBackend(`/instances/${whatsappInstanceId}/qr`, "GET", undefined, 7000, { useCpanelConfig: true });
         if (qrRes.ok && qrRes.data) {
           const qrData = qrRes.data;
           const base64Code = qrData?.qr || qrData?.base64 || qrData?.code || qrData?.qrcode;
@@ -173,6 +175,7 @@ export async function GET(req: Request) {
       apiConfig: {
         whatsappApiUrl,
         whatsappInstanceId,
+        whatsappAdminUsername,
         hasApiKeyConfigured: Boolean(whatsappApiKey),
       }
     });
@@ -226,6 +229,7 @@ export async function POST(req: Request) {
 
       try {
         await adminDb.collection("config").doc("whatsapp_api").set(updateData, { merge: true });
+        clearWhatsappCache();
 
         return NextResponse.json({
           success: true,
