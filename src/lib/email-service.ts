@@ -7,6 +7,7 @@ export interface SendEmailParams {
   html: string;
   text?: string;
   replyTo?: string;
+  useCpanelConfig?: boolean;
   attachments?: Array<{
     filename: string;
     content: string; // base64 string
@@ -173,29 +174,33 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   let senderName = "E-Global Pay";
   let senderEmail = "no-reply@eglobalpay.com";
 
-  // Fetch dynamic Email Gateway credentials using 5-minute in-memory cache
-  const data = await getCachedEmailGatewayConfig();
-  if (data) {
-    if (data.emailApiUrl) emailApiUrl = data.emailApiUrl;
-    if (data.whatsappApiUrl && !data.emailApiUrl) {
-      emailApiUrl = data.whatsappApiUrl.includes("/api/email")
-        ? data.whatsappApiUrl
-        : `${data.whatsappApiUrl.replace(/\/$/, "")}/api/email/send`;
+  // Only read CPanel override configuration if explicitly requested (e.g. for CPanel admin tests/diagnostics).
+  // Standard user operations (signup OTP, new device session OTP, PIN reset OTP, security contact changes)
+  // use process environment variables directly to ensure stability with the real backend API.
+  if (params.useCpanelConfig === true) {
+    const data = await getCachedEmailGatewayConfig();
+    if (data) {
+      if (data.emailApiUrl) emailApiUrl = data.emailApiUrl;
+      if (data.whatsappApiUrl && !data.emailApiUrl) {
+        emailApiUrl = data.whatsappApiUrl.includes("/api/email")
+          ? data.whatsappApiUrl
+          : `${data.whatsappApiUrl.replace(/\/$/, "")}/api/email/send`;
+      }
+      if (data.emailApiKey) apiKey = data.emailApiKey;
+      else if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
+
+      if (data.emailInstanceId) instanceId = data.emailInstanceId;
+      else if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
+
+      if (data.emailAdminUsername) adminUsername = data.emailAdminUsername;
+      else if (data.whatsappAdminUsername) adminUsername = data.whatsappAdminUsername;
+
+      if (data.emailAdminPassword) adminPassword = data.emailAdminPassword;
+      else if (data.whatsappAdminPassword) adminPassword = data.whatsappAdminPassword;
+
+      if (data.senderName) senderName = data.senderName;
+      if (data.senderEmail) senderEmail = data.senderEmail;
     }
-    if (data.emailApiKey) apiKey = data.emailApiKey;
-    else if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
-
-    if (data.emailInstanceId) instanceId = data.emailInstanceId;
-    else if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
-
-    if (data.emailAdminUsername) adminUsername = data.emailAdminUsername;
-    else if (data.whatsappAdminUsername) adminUsername = data.whatsappAdminUsername;
-
-    if (data.emailAdminPassword) adminPassword = data.emailAdminPassword;
-    else if (data.whatsappAdminPassword) adminPassword = data.whatsappAdminPassword;
-
-    if (data.senderName) senderName = data.senderName;
-    if (data.senderEmail) senderEmail = data.senderEmail;
   }
 
   const buildHeaders = (keyToUse: string, cookieToUse?: string) => {

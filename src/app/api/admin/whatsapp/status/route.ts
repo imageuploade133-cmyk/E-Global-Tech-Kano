@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     }
     const admin = perm.auth;
 
-    const config = await getWhatsappServerConfig();
+    const config = await getWhatsappServerConfig({ useCpanelConfig: true });
 
     if (!config.apiUrl) {
       return NextResponse.json({
@@ -23,11 +23,11 @@ export async function GET(req: Request) {
     }
 
     // Call WhatsApp API GET /instances/:id
-    let backendRes = await callWhatsappBackend(`/instances/${config.instanceId}`, "GET", undefined, 7000);
+    let backendRes = await callWhatsappBackend(`/instances/${config.instanceId}`, "GET", undefined, 7000, { useCpanelConfig: true });
 
     // If /instances/:id is not found, attempt /instance/connectionStatus/:id
     if (!backendRes.ok && backendRes.status === 404) {
-      backendRes = await callWhatsappBackend(`/instance/connectionStatus/${config.instanceId}`, "GET", undefined, 7000);
+      backendRes = await callWhatsappBackend(`/instance/connectionStatus/${config.instanceId}`, "GET", undefined, 7000, { useCpanelConfig: true });
     }
 
     const lastChecked = new Date().toISOString();

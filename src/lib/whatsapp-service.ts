@@ -53,35 +53,40 @@ async function ensureVmSessionCookie(config: WhatsappConfig): Promise<string> {
  * Resolves server-side WhatsApp environment configuration.
  * Uses 5-minute in-memory cache to prevent repetitive Firestore reads on every message/OTP dispatch.
  */
-export async function getWhatsappServerConfig(): Promise<WhatsappConfig> {
-  const now = Date.now();
-  if (cachedWhatsappConfig && cachedWhatsappConfig.expiresAt > now) {
-    return cachedWhatsappConfig.data;
-  }
-
+export async function getWhatsappServerConfig(options?: { useCpanelConfig?: boolean }): Promise<WhatsappConfig> {
   let apiUrl = (process.env.WHATSAPP_API_URL || "https://whatsapp-5fda.onrender.com").replace(/\/+$/, "");
   let apiKey = process.env.WHATSAPP_API_KEY || "";
   let instanceId = process.env.WHATSAPP_INSTANCE_ID || "default";
   let adminUsername = process.env.WHATSAPP_ADMIN_USERNAME || "admin";
   let adminPassword = process.env.WHATSAPP_ADMIN_PASSWORD || "";
 
-  try {
-    const docSnap = await adminDb.collection("config").doc("whatsapp_api").get();
-    if (docSnap.exists) {
-      const data = docSnap.data() || {};
-      if (data.whatsappApiUrl) apiUrl = data.whatsappApiUrl.replace(/\/+$/, "");
-      if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
-      if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
-      if (data.whatsappAdminUsername) adminUsername = data.whatsappAdminUsername;
-      if (data.whatsappAdminPassword) adminPassword = data.whatsappAdminPassword;
+  // Only read CPanel override configuration if explicitly requested (e.g. for CPanel admin tests/monitoring).
+  if (options?.useCpanelConfig === true) {
+    const now = Date.now();
+    if (cachedWhatsappConfig && cachedWhatsappConfig.expiresAt > now) {
+      return cachedWhatsappConfig.data;
     }
-  } catch (err: any) {
-    console.warn("[getWhatsappServerConfig] Firestore config lookup warning:", err.message);
+
+    try {
+      const docSnap = await adminDb.collection("config").doc("whatsapp_api").get();
+      if (docSnap.exists) {
+        const data = docSnap.data() || {};
+        if (data.whatsappApiUrl) apiUrl = data.whatsappApiUrl.replace(/\/+$/, "");
+        if (data.whatsappApiKey) apiKey = data.whatsappApiKey;
+        if (data.whatsappInstanceId) instanceId = data.whatsappInstanceId;
+        if (data.whatsappAdminUsername) adminUsername = data.whatsappAdminUsername;
+        if (data.whatsappAdminPassword) adminPassword = data.whatsappAdminPassword;
+      }
+    } catch (err: any) {
+      console.warn("[getWhatsappServerConfig] Firestore config lookup warning:", err.message);
+    }
+
+    const resolvedConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
+    cachedWhatsappConfig = { data: resolvedConfig, expiresAt: now + CACHE_TTL_MS };
+    return resolvedConfig;
   }
 
-  const resolvedConfig: WhatsappConfig = { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
-  cachedWhatsappConfig = { data: resolvedConfig, expiresAt: now + CACHE_TTL_MS };
-  return resolvedConfig;
+  return { apiUrl, apiKey, instanceId, adminUsername, adminPassword };
 }
 
 /**
@@ -110,9 +115,10 @@ export async function callWhatsappBackend(
   endpointPath: string,
   method: "GET" | "POST" | "DELETE" = "GET",
   body?: any,
-  timeoutMs: number = 10000
+  timeoutMs: number = 10000,
+  options?: { useCpanelConfig?: boolean }
 ): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
-  const config = await getWhatsappServerConfig();
+  const config = await getWhatsappServerConfig(options);
 
   if (!config.apiUrl) {
     return { ok: false, status: 500, error: "WHATSAPP_API_URL is not configured on server." };

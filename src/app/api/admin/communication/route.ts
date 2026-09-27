@@ -138,20 +138,20 @@ export async function POST(req: Request) {
             url: bannerUrl,
             caption: waText,
             message: waText,
-          });
+          }, 10000, { useCpanelConfig: true });
 
           if (!waRes.ok) {
             // Fallback to text message with banner link
             waRes = await callWhatsappBackend("/send/text", "POST", {
               number: fullNum,
               message: `${waText}\n\n${bannerUrl}`,
-            });
+            }, 10000, { useCpanelConfig: true });
           }
         } else {
           waRes = await callWhatsappBackend("/send/text", "POST", {
             number: fullNum,
             message: waText,
-          });
+          }, 10000, { useCpanelConfig: true });
         }
 
         if (!waRes.ok) {
@@ -248,6 +248,7 @@ export async function POST(req: Request) {
           subject,
           html: htmlBody,
           replyTo,
+          useCpanelConfig: true,
         });
       } catch (e: any) {
         emailErrDetails = e.message || "Email gateway connection error";

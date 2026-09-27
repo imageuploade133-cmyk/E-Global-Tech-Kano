@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       textToSend = message.trim();
     }
 
-    const config = await getWhatsappServerConfig();
+    const config = await getWhatsappServerConfig({ useCpanelConfig: true });
 
     if (!config.apiUrl || !config.apiKey || !config.instanceId) {
       return NextResponse.json({
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     };
 
     // Strictly send to POST /send/text using WhatsAPI contract (callWhatsappBackend automatically prepends /api)
-    const backendRes = await callWhatsappBackend("/send/text", "POST", payload, 10000);
+    const backendRes = await callWhatsappBackend("/send/text", "POST", payload, 10000, { useCpanelConfig: true });
 
     await logWhatsappAdminAudit(admin.uid, admin.email || "", "TEST_WHATSAPP_DISPATCH", {
       phoneNumber: fullNum,
