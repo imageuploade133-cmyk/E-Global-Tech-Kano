@@ -71,11 +71,31 @@ export async function POST(req: Request) {
             body: "Your E-Global Pay account was successfully signed in on this device.",
           },
           data: {
+            title: "New Device Login",
+            body: "Your E-Global Pay account was successfully signed in on this device.",
             type: "security",
             event: "new_device_login",
           },
-          android: { priority: "high" as const, notification: { sound: "default" } },
-          apns: { payload: { aps: { sound: "default" } } },
+          android: {
+            priority: "high" as const,
+            notification: {
+              sound: "default",
+              channelId: "eglobal_wallet_high_channel",
+              clickAction: "FLUTTER_NOTIFICATION_CLICK",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                alert: {
+                  title: "New Device Login",
+                  body: "Your E-Global Pay account was successfully signed in on this device.",
+                },
+                sound: "default",
+                badge: 1,
+              },
+            },
+          },
         });
         await userRef.update({ pendingNewDevicePushSessionId: null });
         console.log(`[FCM API] Successfully dispatched New Device Login push to user ${uid}`);
