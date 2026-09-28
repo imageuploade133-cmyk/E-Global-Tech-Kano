@@ -29,7 +29,11 @@ export class NotificationService {
       // 1. Save to Firestore under user's notification subcollection
       if (adminDb) {
         try {
-          const notificationRef = adminDb.collection("users").doc(userId).collection("notifications").doc();
+          const histDocId = payload.reference ? `tx-notif-${payload.reference}` : undefined;
+          const notificationRef = histDocId
+            ? adminDb.collection("users").doc(userId).collection("notifications").doc(histDocId)
+            : adminDb.collection("users").doc(userId).collection("notifications").doc();
+
           await notificationRef.set({
             title: payload.title,
             body: payload.body,
@@ -44,35 +48,41 @@ export class NotificationService {
             recipientName: payload.recipientName || "",
             bankName: payload.bankName || "",
             channel: payload.channel || "",
-          });
+          }, { merge: true });
           console.log(`[NotificationService] Saved notification history for user=${userId} | docId=${notificationRef.id}`);
         } catch (fsErr: any) {
           console.error(`[NotificationService Error] Failed to save history for user=${userId}:`, fsErr.message);
         }
       }
 
-      // 2. Resolve the current server-authoritative active session.
-      // Only FCM tokens registered by the CURRENT active device may receive notifications.
-      // This prevents an old device from continuing to receive pushes after a new-device login.
       if (!adminDb) {
         console.warn(`[NotificationService Warning] adminDb not initialized. Skipping FCM dispatch.`);
         return false;
       }
 
+      // 2. Resolve current active session and fetch target FCM tokens
       const userSnap = await adminDb.collection("users").doc(userId).get();
       const activeSessionId = userSnap.exists ? String(userSnap.data()?.activeSessionId || "") : "";
-      if (!activeSessionId) {
-        console.log(`[NotificationService] No active session for user=${userId}; skipping FCM dispatch.`);
-        return false;
+
+      let tokensSnapshot = activeSessionId
+        ? await adminDb.collection("fcm_tokens")
+            .where("userId", "==", userId)
+            .where("sessionId", "==", activeSessionId)
+            .get()
+        : await adminDb.collection("fcm_tokens")
+            .where("userId", "==", userId)
+            .get();
+
+      // Fallback: If no tokens matched activeSessionId, query all tokens for userId
+      if (tokensSnapshot.empty) {
+        console.log(`[NotificationService] No tokens matched sessionId=${activeSessionId} for user=${userId}. Falling back to all tokens for user.`);
+        tokensSnapshot = await adminDb.collection("fcm_tokens")
+          .where("userId", "==", userId)
+          .get();
       }
 
-      const tokensSnapshot = await adminDb.collection("fcm_tokens")
-        .where("userId", "==", userId)
-        .where("sessionId", "==", activeSessionId)
-        .get();
-
       if (tokensSnapshot.empty) {
-        console.log(`[NotificationService] No FCM tokens registered for current active session user=${userId}`);
+        console.log(`[NotificationService] No FCM tokens registered for user=${userId}`);
         return false;
       }
 
@@ -85,6 +95,11 @@ export class NotificationService {
             token: data.token,
             platform: data.platform || "web",
           });
+
+          // Auto-fix missing sessionId on document if activeSessionId is known
+          if (activeSessionId && !data.sessionId) {
+            docSnap.ref.update({ sessionId: activeSessionId }).catch(() => {});
+          }
         }
       });
 
@@ -168,8 +183,8 @@ export class NotificationService {
         tokensToDelete.forEach((tokenId) => {
           batch.delete(db.collection("fcm_tokens").doc(tokenId));
         });
-        await batch.commit();
-          console.log(`[NotificationService] Automatically deleted ${tokensToDelete.length} invalid/expired FCM token(s).`);
+        await batch.commit().catch((bErr) => console.error("[NotificationService] Token cleanup error:", bErr.message));
+        console.log(`[NotificationService] Automatically deleted ${tokensToDelete.length} invalid/expired FCM token(s).`);
       }
 
       return sentCount > 0;
