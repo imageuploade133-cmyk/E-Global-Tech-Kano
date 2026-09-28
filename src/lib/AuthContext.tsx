@@ -117,6 +117,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (typeof window !== "undefined") {
+        (window as any).__getFirebaseAuthToken = currentUser ? () => currentUser.getIdToken() : null;
+      }
 
       if (currentUser) {
         setDeviceAuthState("CHECKING_DEVICE_SESSION");
