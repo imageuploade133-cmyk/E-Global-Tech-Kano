@@ -443,6 +443,7 @@ export async function POST(req: Request) {
         const newSessionId = `sess_${uid}_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
         transaction.set(userRef, {
           activeSessionId: newSessionId,
+          pendingNewDevicePushSessionId: newSessionId,
           activeSessionCreatedAt: nowIso,
           activeSessionDevice: deviceName,
           activeSessionUserAgent: userAgent,
