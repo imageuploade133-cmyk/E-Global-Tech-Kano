@@ -217,7 +217,7 @@ export function NewDeviceOtpModal({
               VERIFY IT&apos;S YOU
             </span>
             <h2 className="text-lg sm:text-xl font-black text-black tracking-tight leading-tight">
-              New Device Verification
+              2FA Verification
             </h2>
             <p className="text-[11px] sm:text-xs text-gray-500 font-medium leading-tight mt-1 max-w-sm mx-auto">
               A new device was detected. Choose a method to receive your 6-digit OTP:
