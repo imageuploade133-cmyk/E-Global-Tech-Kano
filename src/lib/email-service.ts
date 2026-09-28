@@ -165,7 +165,7 @@ export async function ensureEmailApiKeyOnGateway(params: {
  * Server-side Email Service calling the WhatsAPI Email API Gateway.
  */
 export async function sendEmail(params: SendEmailParams): Promise<boolean> {
-  let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-5fda.onrender.com/api/email/send";
+  let emailApiUrl = process.env.EMAIL_API_URL || "https://whatsapp-b5os.onrender.com/api/email/send";
   let apiKey = process.env.EMAIL_API_KEY || process.env.WHATSAPP_API_KEY || "inst_33647102";
   let instanceId = process.env.EMAIL_INSTANCE_ID || process.env.WHATSAPP_INSTANCE_ID || "inst_33647102";
   let adminUsername = process.env.EMAIL_ADMIN_USERNAME || process.env.WHATSAPP_ADMIN_USERNAME || "";
