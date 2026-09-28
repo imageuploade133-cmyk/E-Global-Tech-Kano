@@ -41,6 +41,8 @@ function CpanelEmailConnectContent() {
   const [isCreatingKey, setIsCreatingKey] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [showRawKey, setShowRawKey] = useState<Record<string, boolean>>({});
+  const [editingKeySender, setEditingKeySender] = useState<Record<string, { senderName: string; senderEmail: string }>>({});
+  const [isUpdatingKey, setIsUpdatingKey] = useState<Record<string, boolean>>({});
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // New Key Form States
@@ -96,7 +98,18 @@ function CpanelEmailConnectContent() {
         if (c.dailyLimit) setDailyLimit(c.dailyLimit);
         if (typeof c.dailyUsed === "number") setDailyUsed(c.dailyUsed);
         if (c.lastActivity) setLastActivity(new Date(c.lastActivity).toLocaleString());
-        if (Array.isArray(c.apiKeys)) setApiKeysList(c.apiKeys);
+        if (Array.isArray(c.apiKeys)) {
+          setApiKeysList(c.apiKeys);
+          const initialSenderState: Record<string, { senderName: string; senderEmail: string }> = {};
+          c.apiKeys.forEach((k: any, idx: number) => {
+            const kId = k.id || `key-${idx + 1}`;
+            initialSenderState[kId] = {
+              senderName: k.senderName || c.senderName || "E-Global Pay",
+              senderEmail: k.senderEmail || c.senderEmail || "no-reply@eglobalpay.com",
+            };
+          });
+          setEditingKeySender(initialSenderState);
+        }
 
         addLog(`Status refreshed: ${c.status || "CONNECTED"}. Gateway active.`);
       }
@@ -309,6 +322,51 @@ function CpanelEmailConnectContent() {
       addLog(`[ERROR] Create key exception: ${err.message}`);
     } finally {
       setIsCreatingKey(false);
+    }
+  };
+
+  const handleUpdateKeySender = async (keyId: string) => {
+    const senderData = editingKeySender[keyId];
+    if (!senderData) return;
+
+    setIsUpdatingKey((prev) => ({ ...prev, [keyId]: true }));
+    addLog(`Updating sender details for Email API Key [${keyId}]...`);
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/email-connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "update_key",
+          keyId,
+          senderName: senderData.senderName.trim(),
+          senderEmail: senderData.senderEmail.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success("Sender details updated for this Email API Key!");
+        addLog(`[SUCCESS] Updated sender info for key [${keyId}]: Name="${senderData.senderName.trim()}", Email="${senderData.senderEmail.trim()}"`);
+        fetchConfig();
+      } else {
+        toast.error(data.error || "Failed to update sender details.");
+        addLog(`[ERROR] Update failed for key [${keyId}]: ${data.error}`);
+      }
+    } catch (err: any) {
+      toast.error("Error updating sender details.");
+      addLog(`[ERROR] Update exception for key [${keyId}]: ${err.message}`);
+    } finally {
+      setIsUpdatingKey((prev) => ({ ...prev, [keyId]: false }));
     }
   };
 
@@ -574,6 +632,64 @@ function CpanelEmailConnectContent() {
                       <strong className="font-extrabold text-xs text-gray-700 dark:text-gray-300 block mt-0.5 font-mono">
                         {keyItem.lastActivity ? new Date(keyItem.lastActivity).toLocaleString() : lastActivity}
                       </strong>
+                    </div>
+                  </div>
+
+                  {/* Key Sender Name & Sender Email Form */}
+                  <div className="bg-white dark:bg-gray-950 p-4 rounded-xl border border-gray-200/60 dark:border-gray-800/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider block">Configured Sender Information</span>
+                      <button
+                        type="button"
+                        disabled={isUpdatingKey[keyId]}
+                        onClick={() => handleUpdateKeySender(keyId)}
+                        className="px-3 py-1 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        {isUpdatingKey[keyId] ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[14px]">save</span>}
+                        <span>Save Sender Info</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400 block">Sender Name</label>
+                        <input
+                          type="text"
+                          value={editingKeySender[keyId]?.senderName ?? (keyItem.senderName || senderNameInput || "E-Global Pay")}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditingKeySender((prev) => ({
+                              ...prev,
+                              [keyId]: {
+                                senderName: val,
+                                senderEmail: prev[keyId]?.senderEmail ?? (keyItem.senderEmail || senderEmailInput || "no-reply@eglobalpay.com"),
+                              },
+                            }));
+                          }}
+                          placeholder="e.g. E-Global Pay"
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-gray-400 block">Sender Email</label>
+                        <input
+                          type="email"
+                          value={editingKeySender[keyId]?.senderEmail ?? (keyItem.senderEmail || senderEmailInput || "no-reply@eglobalpay.com")}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditingKeySender((prev) => ({
+                              ...prev,
+                              [keyId]: {
+                                senderName: prev[keyId]?.senderName ?? (keyItem.senderName || senderNameInput || "E-Global Pay"),
+                                senderEmail: val,
+                              },
+                            }));
+                          }}
+                          placeholder="e.g. no-reply@eglobalpay.com"
+                          className={inputClass}
+                        />
+                      </div>
                     </div>
                   </div>
 

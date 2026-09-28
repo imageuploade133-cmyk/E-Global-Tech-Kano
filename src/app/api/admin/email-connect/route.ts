@@ -219,6 +219,42 @@ export async function POST(req: Request) {
       }
     }
 
+    // UPDATE INDIVIDUAL EMAIL API KEY SENDER INFO
+    if (action === "update_key") {
+      const { keyId, senderName, senderEmail, name } = body;
+      if (!keyId) {
+        return NextResponse.json({ error: "Key ID is required for update." }, { status: 400 });
+      }
+
+      try {
+        const docRef = adminDb.collection("config").doc("email_connect");
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+          const existingKeys = Array.isArray(docSnap.data()?.apiKeys) ? docSnap.data()!.apiKeys : [];
+          const updatedKeys = existingKeys.map((k: any) => {
+            if (k.id === keyId) {
+              return {
+                ...k,
+                senderName: senderName !== undefined ? String(senderName).trim() : k.senderName,
+                senderEmail: senderEmail !== undefined ? String(senderEmail).trim() : k.senderEmail,
+                name: name !== undefined ? String(name).trim() : (senderName ? String(senderName).trim() : k.name),
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return k;
+          });
+          await docRef.set({ apiKeys: updatedKeys, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: "Email API Key sender details updated successfully.",
+        });
+      } catch (dbErr: any) {
+        return NextResponse.json({ error: "Failed to update API key: " + dbErr.message }, { status: 500 });
+      }
+    }
+
     // DELETE EMAIL API KEY
     if (action === "delete_key") {
       const { keyId } = body;
