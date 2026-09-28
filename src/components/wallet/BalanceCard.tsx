@@ -207,6 +207,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   useEffect(() => {
+    if (balance !== undefined && !isNaN(balance)) {
+      setWalletBalances((prev) => ({ ...prev, NGN: balance }));
+    }
+  }, [balance]);
+
+  useEffect(() => {
     fetchWalletBalances();
     // Fetch occasionally
     const intv = setInterval(fetchWalletBalances, 10000);
