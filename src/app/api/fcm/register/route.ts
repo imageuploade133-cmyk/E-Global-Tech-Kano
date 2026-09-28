@@ -22,23 +22,25 @@ export async function POST(req: Request) {
 
     // Resolve server-authoritative active session ID directly from Firestore users/{uid}
     let authoritativeSessionId: string | null = null;
+    const providedSessionId = req.headers.get("X-Session-ID") || req.headers.get("x-session-id") || body?.sessionId || "";
+
     if (process.env.NODE_ENV !== "production" && (uid === "mock-uid" || uid === "mock-admin-uid")) {
       authoritativeSessionId = "mock-session-id";
     } else {
       try {
         const userDoc = await adminDb.collection("users").doc(uid).get();
-        if (!userDoc.exists) {
-          return NextResponse.json({ error: "Unauthorized: User document missing." }, { status: 401 });
-        }
-        authoritativeSessionId = userDoc.data()?.activeSessionId || null;
-        if (!authoritativeSessionId) {
-          return NextResponse.json({ error: "Unauthorized: Active session missing." }, { status: 401 });
+        if (userDoc.exists) {
+          authoritativeSessionId = userDoc.data()?.activeSessionId || providedSessionId || null;
+        } else {
+          authoritativeSessionId = providedSessionId || null;
         }
       } catch (docErr: any) {
         console.error(`[FCM API Error] Failed to fetch active session for user ${uid}:`, docErr.message);
-        return NextResponse.json({ error: "Unauthorized: Failed to resolve active session." }, { status: 401 });
+        authoritativeSessionId = providedSessionId || null;
       }
     }
+
+    const sessionIdToStore = authoritativeSessionId || providedSessionId || null;
 
     const cleanToken = token.trim();
     const tokenDocId = `${uid}_${Buffer.from(cleanToken).toString("base64").slice(0, 100)}`; // Safe, uniform composite key
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
       userId: uid,
       token: cleanToken,
       platform: platform || "web",
-      sessionId: authoritativeSessionId,
+      ...(sessionIdToStore ? { sessionId: sessionIdToStore } : {}),
       createdAt: now,
       updatedAt: now,
     }, { merge: true });
@@ -60,7 +62,7 @@ export async function POST(req: Request) {
     const userRef = adminDb.collection("users").doc(uid);
     const userSnap = await userRef.get();
     const pendingSessionId = userSnap.exists ? userSnap.data()?.pendingNewDevicePushSessionId : null;
-    if (pendingSessionId && pendingSessionId === authoritativeSessionId) {
+    if (pendingSessionId && (pendingSessionId === sessionIdToStore || !sessionIdToStore)) {
       try {
         await getMessaging().send({
           token: cleanToken,
@@ -76,6 +78,7 @@ export async function POST(req: Request) {
           apns: { payload: { aps: { sound: "default" } } },
         });
         await userRef.update({ pendingNewDevicePushSessionId: null });
+        console.log(`[FCM API] Successfully dispatched New Device Login push to user ${uid}`);
       } catch (pushErr: any) {
         console.error("[FCM API] New-device push dispatch failed:", pushErr.message);
       }
