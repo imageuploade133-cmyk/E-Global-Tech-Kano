@@ -18,9 +18,10 @@ export interface NotificationPayload {
 
 export class NotificationService {
   /**
-   * Sends a push notification to all registered tokens for a user and saves the notification in history.
+   * Sends a push notification strictly to active tokens matching the user's authoritative active session ID,
+   * and saves the notification in history.
    * @param userId The ID of the recipient user.
-   * @param payload The notification content (title, body, type, url).
+   * @param payload The notification content.
    */
   public static async sendPushNotification(userId: string, payload: NotificationPayload): Promise<boolean> {
     try {
@@ -60,30 +61,40 @@ export class NotificationService {
         return false;
       }
 
-      // 2. Resolve current active session and fetch target FCM tokens
+      // 2. Resolve current active session and fetch target FCM tokens matching active session ID ONLY
       const userSnap = await adminDb.collection("users").doc(userId).get();
       const activeSessionId = userSnap.exists ? String(userSnap.data()?.activeSessionId || "") : "";
 
-      let tokensSnapshot = activeSessionId
-        ? await adminDb.collection("fcm_tokens")
-            .where("userId", "==", userId)
-            .where("sessionId", "==", activeSessionId)
-            .get()
-        : await adminDb.collection("fcm_tokens")
-            .where("userId", "==", userId)
-            .get();
-
-      // Fallback: If no tokens matched activeSessionId, query all tokens for userId
-      if (tokensSnapshot.empty) {
-        console.log(`[NotificationService] No tokens matched sessionId=${activeSessionId} for user=${userId}. Falling back to all tokens for user.`);
-        tokensSnapshot = await adminDb.collection("fcm_tokens")
-          .where("userId", "==", userId)
-          .get();
+      if (!activeSessionId) {
+        console.log(`[NotificationService] No active session for user=${userId}; skipping FCM dispatch.`);
+        return false;
       }
 
+      let tokensSnapshot = await adminDb.collection("fcm_tokens")
+        .where("userId", "==", userId)
+        .where("sessionId", "==", activeSessionId)
+        .get();
+
+      // Fallback: If no tokens carry sessionId yet, check tokens for user where sessionId is missing/empty
       if (tokensSnapshot.empty) {
-        console.log(`[NotificationService] No FCM tokens registered for user=${userId}`);
-        return false;
+        const fallbackSnap = await adminDb.collection("fcm_tokens")
+          .where("userId", "==", userId)
+          .get();
+
+        const validFallbackDocs = fallbackSnap.docs.filter(docSnap => {
+          const d = docSnap.data();
+          return !d.sessionId || d.sessionId === activeSessionId;
+        });
+
+        if (validFallbackDocs.length === 0) {
+          console.log(`[NotificationService] No active FCM tokens registered for user=${userId} with activeSessionId=${activeSessionId}`);
+          return false;
+        }
+
+        tokensSnapshot = {
+          empty: false,
+          forEach: (callback: (doc: any) => void) => validFallbackDocs.forEach(callback),
+        } as any;
       }
 
       const tokensList: { id: string; token: string; platform: string }[] = [];
@@ -97,7 +108,7 @@ export class NotificationService {
           });
 
           // Auto-fix missing sessionId on document if activeSessionId is known
-          if (activeSessionId && !data.sessionId) {
+          if (activeSessionId && !data.sessionId && docSnap.ref && typeof docSnap.ref.update === "function") {
             docSnap.ref.update({ sessionId: activeSessionId }).catch(() => {});
           }
         }
@@ -105,7 +116,7 @@ export class NotificationService {
 
       console.log(`[NotificationService] Found ${tokensList.length} FCM token(s) for user=${userId}`);
 
-      // 3. Send notifications via FCM
+      // 3. Send notifications via FCM with channelId and APNs alert payload
       const messaging = getMessaging();
       const tokensToDelete: string[] = [];
       let sentCount = 0;
@@ -132,12 +143,17 @@ export class NotificationService {
               priority: "high" as const,
               notification: {
                 sound: "default",
+                channelId: "eglobal_wallet_high_channel",
                 clickAction: "FLUTTER_NOTIFICATION_CLICK",
               },
             },
             apns: {
               payload: {
                 aps: {
+                  alert: {
+                    title: payload.title,
+                    body: payload.body,
+                  },
                   sound: "default",
                   badge: 1,
                 },
@@ -161,7 +177,6 @@ export class NotificationService {
           const errMsg = fcmErr.message || "";
           console.warn(`[NotificationService Warning] Failed to send push to token=${t.id}:`, errMsg);
 
-          // Automatic Invalid/Expired Token Cleanup
           const isInvalidToken =
             fcmErr.code === "messaging/invalid-registration-token" ||
             fcmErr.code === "messaging/registration-token-not-registered" ||
@@ -176,7 +191,7 @@ export class NotificationService {
         }
       }
 
-      // Perform cleanups asynchronously to avoid blocking
+      // Clean up invalid tokens
       if (tokensToDelete.length > 0 && adminDb) {
         const db = adminDb;
         const batch = db.batch();
@@ -209,7 +224,6 @@ export class NotificationService {
   }): Promise<void> {
     if (!adminDb || !params.userId || !params.reference || params.amount <= 0) return;
 
-    // General ledger is the primary source; keep the investment subledger as a safe fallback.
     const transactionReversalRef = adminDb.collection("transactions").doc(`tx-${params.reference}`);
     const investmentReversalRef = adminDb.collection("investmentTransactions").doc(`tx-${params.reference}`);
     let reversalRef = transactionReversalRef;

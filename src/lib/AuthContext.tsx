@@ -200,9 +200,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (localSessionId && remoteActiveSessionId && localSessionId !== remoteActiveSessionId) {
               console.warn("[Session Revoked] Remote active session changed. Quietly executing security logout for old device...");
 
-              // 1. Immediately clear local session ID so no subsequent API request can use it
+              // 1. Immediately clear local session ID and FCM token so no subsequent API request can use it
               if (typeof window !== "undefined") {
                 localStorage.removeItem("active_session_id");
+                localStorage.removeItem("active_fcm_token");
+                sessionStorage.removeItem("active_fcm_token");
               }
 
               // 2. Execute quiet security logout from Firebase Auth without showing modal on Device A

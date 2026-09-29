@@ -57,6 +57,32 @@ export async function POST(req: Request) {
       updatedAt: now,
     }, { merge: true });
 
+    // Purge any tokens belonging to old superseded sessions so old devices NEVER receive pushes
+    if (sessionIdToStore) {
+      try {
+        const oldTokensSnap = await adminDb.collection("fcm_tokens")
+          .where("userId", "==", uid)
+          .get();
+        if (!oldTokensSnap.empty) {
+          const batch = adminDb.batch();
+          let deletedCount = 0;
+          oldTokensSnap.docs.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (docSnap.id !== tokenDocId && data.sessionId && data.sessionId !== sessionIdToStore) {
+              batch.delete(docSnap.ref);
+              deletedCount++;
+            }
+          });
+          if (deletedCount > 0) {
+            await batch.commit();
+            console.log(`[FCM API] Purged ${deletedCount} superseded token(s) for user ${uid}`);
+          }
+        }
+      } catch (purgeErr: any) {
+        console.warn("[FCM API] Superseded token purge warning:", purgeErr.message);
+      }
+    }
+
     // If this session was just authorized as a new device, deliver the security alert
     // specifically to the newly registered token, then consume the one-time marker.
     const userRef = adminDb.collection("users").doc(uid);
