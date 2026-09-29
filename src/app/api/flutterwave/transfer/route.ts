@@ -248,7 +248,7 @@ export async function POST(req: Request) {
 
       // Perform local debit atomically
       console.log("STEP 8 - Calling WalletService.debitWallet() with preloaded parameters");
-      await WalletService.debitWallet(transaction, {
+      const debitResult = await WalletService.debitWallet(transaction, {
         userId: uid,
         amount: trfAmount,
         currency: trfCurrency,
@@ -283,6 +283,7 @@ export async function POST(req: Request) {
 
       return {
         success: true,
+        walletBalance: debitResult.newBalance,
       };
     });
 

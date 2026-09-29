@@ -1852,8 +1852,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         });
         handleSaveRecent();
         setTrfStep("completion");
+
+        // The API has already atomically debited the wallet. Apply the
+        // server-confirmed post-debit balance immediately, then re-fetch
+        // to reconcile all wallet fields without a second debit.
+        if (typeof data.walletBalance === "number") {
+          setWalletBalances((prev) => ({ ...prev, NGN: data.walletBalance }));
+        }
+        await fetchWalletBalances();
+
         toast.success("Transfer initiated successfully!");
-        fetchWalletBalances(); // Re-fetch immediately to update balance state in UI
       } else {
         setTrfPin("");
         // Specific improved error reporting from backend (TASK 4)
