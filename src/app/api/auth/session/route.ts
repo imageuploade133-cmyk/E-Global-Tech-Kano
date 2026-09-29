@@ -1,3 +1,27 @@
+
+async function purgeSupersededFcmTokens(uid: string, activeSessionId: string): Promise<void> {
+  try {
+    const tokensQuery = await adminDb.collection("fcm_tokens").where("userId", "==", uid).get();
+    if (!tokensQuery.empty) {
+      const batch = adminDb.batch();
+      let deleteCount = 0;
+      tokensQuery.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.sessionId && data.sessionId !== activeSessionId) {
+          batch.delete(docSnap.ref);
+          deleteCount++;
+        }
+      });
+      if (deleteCount > 0) {
+        await batch.commit();
+        console.log(`[Session API] Purged ${deleteCount} superseded FCM token(s) for user ${uid}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[Session API] Failed purging superseded FCM tokens for user ${uid}:`, err.message);
+  }
+}
+
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
@@ -255,6 +279,7 @@ export async function POST(req: Request) {
         return { previousSessionId: prevSessId, prevDeviceName: prevDevName };
       });
 
+      await purgeSupersededFcmTokens(uid, newSessionId);
       console.log(`[Session API] Successfully verified OTP and activated new session for user ${uid}.`);
 
       return NextResponse.json({
