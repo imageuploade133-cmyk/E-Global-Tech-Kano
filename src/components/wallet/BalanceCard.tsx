@@ -1777,6 +1777,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         toast.dismiss();
 
         if (res.ok && data.success) {
+          setIsTransferring(false);
           setTransferResult({
             success: true,
             message: `Your bulk transfer of ${bulkRecipients.length} recipients has been successfully queued in the background!`,
@@ -1788,7 +1789,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           if (typeof data.walletBalance === "number") {
             setWalletBalances((prev) => ({ ...prev, NGN: data.walletBalance }));
           }
-          await fetchWalletBalances();
+          fetchWalletBalances();
           window.dispatchEvent(new Event("app-refresh"));
         } else {
           setTrfPin("");
@@ -1849,6 +1850,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       toast.dismiss();
 
       if (res.ok && data.success) {
+        setIsTransferring(false);
         setTransferResult({
           success: true,
           message: `Your outward bank transfer has been initiated successfully! ₦${parseFloat(trfAmount).toLocaleString()} is being settled to ${trfAccountName}.`,
@@ -1863,7 +1865,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         if (typeof data.walletBalance === "number") {
           setWalletBalances((prev) => ({ ...prev, NGN: data.walletBalance }));
         }
-        await fetchWalletBalances();
+        fetchWalletBalances();
         window.dispatchEvent(new Event("app-refresh"));
 
         toast.success("Transfer initiated successfully!");
