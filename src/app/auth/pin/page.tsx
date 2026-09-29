@@ -50,6 +50,8 @@ export default function PinPage() {
   // Face ID Coming Soon Modal State
   const [showFaceIdModal, setShowFaceIdModal] = useState(false);
 
+  useModalBackHandler(showFaceIdModal, () => setShowFaceIdModal(false), "face-id-drawer");
+
   // Loading Delay State
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyingText, setVerifyingText] = useState("Securing connection...");
@@ -571,7 +573,7 @@ export default function PinPage() {
         onConfirm={handleLogOutFromPin}
       />
 
-      {/* Face ID / Biometrics Coming Soon Modal */}
+      {/* Face ID / Biometrics Bottom Sheet Drawer */}
       <AnimatePresence>
         {showFaceIdModal && (
           <>
@@ -583,26 +585,55 @@ export default function PinPage() {
               className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100000]"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 350 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-xs bg-white rounded-3xl p-6 shadow-2xl z-[100001] text-center font-hanken border border-gray-100 flex flex-col items-center"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
+              drag="y"
+              dragDirectionLock
+              dragConstraints={{ top: 0, bottom: 400 }}
+              dragElastic={{ top: 0, bottom: 0.2 }}
+              onDragEnd={(_event, info) => {
+                if (info.offset.y > 100 || info.velocity.y > 500) {
+                  setShowFaceIdModal(false);
+                }
+              }}
+              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[28px] border-t border-gray-200 p-6 pb-8 z-[100001] flex flex-col items-center select-none cursor-default shadow-none font-hanken"
             >
-              <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mb-3.5 shadow-inner">
-                <span className="material-symbols-outlined text-[32px] font-bold">face_6</span>
+              {/* Draggable handle bar */}
+              <div className="w-10 h-1 bg-gray-300 rounded-full mb-4 cursor-grab active:cursor-grabbing" />
+
+              {/* Drawer Header */}
+              <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
+                <div className="w-8" />
+                <h2 className="font-hanken font-bold text-base text-black text-center">
+                  Face ID Authentication
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowFaceIdModal(false)}
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                </button>
               </div>
-              <h3 className="font-extrabold text-base text-black mb-1">Face ID Authentication</h3>
-              <span className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-[#FC7A00]/10 text-[#FC7A00] rounded-full mb-3 border border-[#FC7A00]/20">
+
+              {/* Icon & Badge */}
+              <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mb-3 shadow-inner">
+                <span className="material-symbols-outlined text-[36px] font-bold">face_6</span>
+              </div>
+              <span className="px-3 py-1 text-[9.5px] font-black uppercase tracking-wider bg-[#FC7A00]/10 text-[#FC7A00] rounded-full mb-3 border border-[#FC7A00]/20">
                 Coming Soon 🚀
               </span>
-              <p className="text-xs text-gray-500 font-medium leading-relaxed mb-5">
-                Biometric login and Face ID verification are currently under development and will be available in the upcoming release.
+
+              <p className="font-hanken text-xs text-gray-500 text-center max-w-[290px] mb-6 leading-relaxed font-medium">
+                Biometric login and Face ID verification are currently under active development and will be available in our upcoming app update.
               </p>
+
               <button
                 type="button"
                 onClick={() => setShowFaceIdModal(false)}
-                className="w-full py-3 bg-black hover:bg-gray-900 active:scale-98 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer border-0 shadow-sm"
+                className="w-full py-4 bg-black hover:bg-gray-900 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl transition-all shadow-none cursor-pointer border-0"
               >
                 Got It
               </button>
