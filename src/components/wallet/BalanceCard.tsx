@@ -1785,7 +1785,11 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           handleSaveBulkRecents();
           setTrfStep("completion");
           toast.success("Bulk batch queued successfully!");
-          fetchWalletBalances(); // Re-fetch immediately to update balance state in UI
+          if (typeof data.walletBalance === "number") {
+            setWalletBalances((prev) => ({ ...prev, NGN: data.walletBalance }));
+          }
+          await fetchWalletBalances();
+          window.dispatchEvent(new Event("app-refresh"));
         } else {
           setTrfPin("");
           const backendErr = data.error || data.message || data.data?.message || "Bulk transfer queuing failed.";
@@ -1860,6 +1864,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
           setWalletBalances((prev) => ({ ...prev, NGN: data.walletBalance }));
         }
         await fetchWalletBalances();
+        window.dispatchEvent(new Event("app-refresh"));
 
         toast.success("Transfer initiated successfully!");
       } else {
