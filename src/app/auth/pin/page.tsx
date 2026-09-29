@@ -47,6 +47,9 @@ export default function PinPage() {
   // Logout confirmation state
   const [isLogoutDrawerOpen, setIsLogoutDrawerOpen] = useState(false);
 
+  // Face ID Coming Soon Modal State
+  const [showFaceIdModal, setShowFaceIdModal] = useState(false);
+
   // Loading Delay State
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyingText, setVerifyingText] = useState("Securing connection...");
@@ -516,7 +519,15 @@ export default function PinPage() {
             {num}
           </motion.button>
         ))}
-        <div className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20" />
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          whileHover={{ scale: 1.05 }}
+          onClick={() => setShowFaceIdModal(true)}
+          className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-[#FC7A00] border border-gray-200 bg-orange-50/50 cursor-pointer transition-colors"
+          title="Face ID / Biometrics"
+        >
+          <span className="material-symbols-outlined text-[26px] min-[360px]:text-[30px] min-[410px]:text-3xl">face_6</span>
+        </motion.button>
         {keypadNumbers[9] !== undefined && (
           <motion.button
             whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
@@ -559,6 +570,46 @@ export default function PinPage() {
         onClose={() => setIsLogoutDrawerOpen(false)}
         onConfirm={handleLogOutFromPin}
       />
+
+      {/* Face ID / Biometrics Coming Soon Modal */}
+      <AnimatePresence>
+        {showFaceIdModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFaceIdModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[100000]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-xs bg-white rounded-3xl p-6 shadow-2xl z-[100001] text-center font-hanken border border-gray-100 flex flex-col items-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mb-3.5 shadow-inner">
+                <span className="material-symbols-outlined text-[32px] font-bold">face_6</span>
+              </div>
+              <h3 className="font-extrabold text-base text-black mb-1">Face ID Authentication</h3>
+              <span className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-[#FC7A00]/10 text-[#FC7A00] rounded-full mb-3 border border-[#FC7A00]/20">
+                Coming Soon 🚀
+              </span>
+              <p className="text-xs text-gray-500 font-medium leading-relaxed mb-5">
+                Biometric login and Face ID verification are currently under development and will be available in the upcoming release.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowFaceIdModal(false)}
+                className="w-full py-3 bg-black hover:bg-gray-900 active:scale-98 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer border-0 shadow-sm"
+              >
+                Got It
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Full-Screen Hardware-Accelerated Overlay for Forgot PIN recovery */}
       <AnimatePresence>
