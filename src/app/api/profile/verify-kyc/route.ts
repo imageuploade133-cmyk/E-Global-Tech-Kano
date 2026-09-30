@@ -138,14 +138,16 @@ export async function POST(req: Request) {
 
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": idToken ? `Bearer ${idToken}` : "",
+    };
+    if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
     // Forward the KYC request to the payment-gateway
     const response = await fetch(`${GATEWAY_URL}/api/profile/verify-kyc`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": gatewayApiKey,
-        "Authorization": idToken ? `Bearer ${idToken}` : "",
-      },
+      headers,
       body: JSON.stringify({
         firstName: nameFallback.split(" ")[0] || "User",
         lastName: nameFallback.split(" ").slice(1).join(" ") || "User",
