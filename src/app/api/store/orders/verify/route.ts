@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     }
 
     const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
     const txRef = url.searchParams.get("tx_ref") || orderData?.txRef || `TX-STORE-${orderId}`;
 
     let isVerified = false;

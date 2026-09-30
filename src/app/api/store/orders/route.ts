@@ -223,7 +223,7 @@ export async function POST(req: Request) {
 
       // Generate card payment checkout link
       const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
-      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
       const txRef = `TX-STORE-${orderId}`;
       const requestHost = req.headers.get("host") || "";

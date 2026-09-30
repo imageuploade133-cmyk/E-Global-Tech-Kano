@@ -252,7 +252,7 @@ export async function POST(req: Request) {
       ownerUid: authUser.uid,
     };
 
-    // REQUIREMENT 3: For purpose=kyc_selfie, create a server-verifiable upload receipt bound to authenticated UID
+    // REQUIREMENT 1: For kyc_selfie or kyc_document, server-verifiable upload receipt creation MUST succeed before returning success.
     if (purpose === "kyc_selfie" || purpose === "kyc_document") {
       try {
         const nowMs = Date.now();
@@ -266,7 +266,10 @@ export async function POST(req: Request) {
           expiresAt: new Date(nowMs + 60 * 60 * 1000).toISOString(), // 60-minute validity window
         });
       } catch (receiptErr: any) {
-        console.warn("[Upload API] Failed to write KYC upload receipt:", receiptErr.message);
+        console.error("[Upload API] Mandatory KYC upload receipt creation failed:", receiptErr.message);
+        return NextResponse.json({
+          error: "Failed to generate server upload receipt for KYC image. Upload aborted for compliance security."
+        }, { status: 500 });
       }
     }
 

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       idToken = await mintFirebaseIdToken(uid);
     }
 
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     const response = await fetch(`${GATEWAY_URL}/api/admin/reconciliation`, {
       method: "POST",

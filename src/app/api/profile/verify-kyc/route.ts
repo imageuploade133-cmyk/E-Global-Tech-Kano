@@ -77,33 +77,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
     }
 
-    // REQUIREMENT: Server-side KYC upload receipt/provenance verification
-    // Verify that capturedSelfie URL was uploaded via /api/upload-image by this authenticated UID
+    // REQUIREMENT 2 & 3: Strict KYC Selfie Receipt & Expiry Validation
+    // Verify that capturedSelfie URL was uploaded via /api/upload-image by this authenticated UID specifically for purpose === "kyc_selfie"
     const trimmedSelfieUrl = capturedSelfie.trim();
     const receiptDocId = Buffer.from(`${uid}_${trimmedSelfieUrl}`).toString("hex").slice(0, 64);
     const receiptSnap = await adminDb.collection("kyc_upload_receipts").doc(receiptDocId).get();
 
     let validReceiptFound = false;
+    const nowIso = new Date().toISOString();
 
     if (receiptSnap.exists) {
       const receiptData = receiptSnap.data() || {};
-      const nowIso = new Date().toISOString();
 
+      // STRICT CHECKS: ownerUid, url, purpose === "kyc_selfie" (kyc_document cannot satisfy selfie verification), and non-expired
       if (
         receiptData.ownerUid === uid &&
         receiptData.url === trimmedSelfieUrl &&
-        (receiptData.purpose === "kyc_selfie" || receiptData.purpose === "kyc_document") &&
-        (!receiptData.expiresAt || receiptData.expiresAt > nowIso)
+        receiptData.purpose === "kyc_selfie" &&
+        receiptData.expiresAt &&
+        receiptData.expiresAt > nowIso
       ) {
         validReceiptFound = true;
       } else {
-        console.warn(`[KYC Provenance Violation] Invalid/expired receipt or owner mismatch for ${uid}`);
+        console.warn(`[KYC Provenance Violation] Invalid/expired receipt or owner/purpose mismatch for ${uid}`);
         return NextResponse.json({
-          error: "Access Denied: The submitted selfie upload receipt is invalid, expired, or belongs to another user account."
+          error: "Access Denied: The submitted selfie upload receipt is invalid, expired, wrong purpose, or belongs to another user account."
         }, { status: 403 });
       }
     } else {
-      // Fallback query by URL in kyc_upload_receipts
+      // Fallback query by URL in kyc_upload_receipts enforcing the EXACT SAME strict security checks
       const receiptQuery = await adminDb.collection("kyc_upload_receipts")
         .where("url", "==", trimmedSelfieUrl)
         .limit(1)
@@ -111,25 +113,30 @@ export async function POST(req: Request) {
 
       if (!receiptQuery.empty) {
         const foundData = receiptQuery.docs[0].data();
-        if (foundData.ownerUid !== uid) {
-          console.warn(`[KYC Provenance Violation] User ${uid} attempted to submit selfie URL uploaded by ${foundData.ownerUid}`);
-          return NextResponse.json({
-            error: "Access Denied: The submitted selfie URL was uploaded by another user account."
-          }, { status: 403 });
-        }
-        if (foundData.ownerUid === uid && (foundData.purpose === "kyc_selfie" || foundData.purpose === "kyc_document")) {
+        if (
+          foundData.ownerUid === uid &&
+          foundData.url === trimmedSelfieUrl &&
+          foundData.purpose === "kyc_selfie" &&
+          foundData.expiresAt &&
+          foundData.expiresAt > nowIso
+        ) {
           validReceiptFound = true;
+        } else {
+          console.warn(`[KYC Provenance Violation] Fallback check failed for ${uid}`);
+          return NextResponse.json({
+            error: "Access Denied: The submitted selfie upload receipt is invalid, expired, wrong purpose, or belongs to another user account."
+          }, { status: 403 });
         }
       }
     }
 
     if (!validReceiptFound) {
       return NextResponse.json({
-        error: "Access Denied: Mandatory KYC upload receipt missing. You must record and upload your selfie using the in-app camera."
+        error: "Access Denied: Mandatory KYC selfie upload receipt missing or expired. You must record and upload your selfie using the in-app camera."
       }, { status: 403 });
     }
 
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     // Forward the KYC request to the payment-gateway
     const response = await fetch(`${GATEWAY_URL}/api/profile/verify-kyc`, {

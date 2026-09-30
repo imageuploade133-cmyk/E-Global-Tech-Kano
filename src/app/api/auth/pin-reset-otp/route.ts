@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     const authHeader = req.headers.get("Authorization") || "";
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     const body = await req.json().catch(() => ({}));
     const { channel = "whatsapp" } = body;

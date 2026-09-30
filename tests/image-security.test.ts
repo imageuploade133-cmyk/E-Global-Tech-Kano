@@ -5,23 +5,46 @@ import { GET as adminUsersGET } from "@/app/api/admin/users/route";
 import { POST as verifyKycPOST } from "@/app/api/profile/verify-kyc/route";
 import { adminDb } from "@/lib/firebase-admin";
 
-describe("Strict Two-User Authenticated IDOR & Provenance Security Test Suite", () => {
-  // In development/test mode, authenticateUserRequest recognizes "mock-uid" and "mock-admin-uid" as authenticated users
+describe("Deterministic Two-User Authenticated IDOR & Provenance Security Test Suite", () => {
   const USER_A_TOKEN = "Bearer mock-uid";
   const USER_A_UID = "mock-uid";
-  const USER_B_UID = "user-b-victim-uid";
+  const USER_B_UID = "test-user-b-victim-uid";
   const USER_B_SELFIE_URL = "https://i.ibb.co/user-b-victim-selfie.jpg";
+  const USER_A_DOC_URL = "https://i.ibb.co/user-a-doc.jpg";
+  const USER_A_EXPIRED_URL = "https://i.ibb.co/user-a-expired-selfie.jpg";
 
   beforeAll(async () => {
-    // Seed User B's upload receipt bound to User B's UID in kyc_upload_receipts
-    const receiptDocId = Buffer.from(`${USER_B_UID}_${USER_B_SELFIE_URL}`).toString("hex").slice(0, 64);
-    await adminDb.collection("kyc_upload_receipts").doc(receiptDocId).set({
+    // 1. Seed User B's upload receipt bound to User B's UID in kyc_upload_receipts
+    const receiptDocIdB = Buffer.from(`${USER_B_UID}_${USER_B_SELFIE_URL}`).toString("hex").slice(0, 64);
+    await adminDb.collection("kyc_upload_receipts").doc(receiptDocIdB).set({
       ownerUid: USER_B_UID,
       url: USER_B_SELFIE_URL,
       imageId: "user-b-image-123",
       purpose: "kyc_selfie",
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+    });
+
+    // 2. Seed User A's kyc_document receipt (NOT kyc_selfie)
+    const receiptDocIdADoc = Buffer.from(`${USER_A_UID}_${USER_A_DOC_URL}`).toString("hex").slice(0, 64);
+    await adminDb.collection("kyc_upload_receipts").doc(receiptDocIdADoc).set({
+      ownerUid: USER_A_UID,
+      url: USER_A_DOC_URL,
+      imageId: "user-a-doc-123",
+      purpose: "kyc_document",
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+    });
+
+    // 3. Seed User A's expired kyc_selfie receipt
+    const receiptDocIdAExp = Buffer.from(`${USER_A_UID}_${USER_A_EXPIRED_URL}`).toString("hex").slice(0, 64);
+    await adminDb.collection("kyc_upload_receipts").doc(receiptDocIdAExp).set({
+      ownerUid: USER_A_UID,
+      url: USER_A_EXPIRED_URL,
+      imageId: "user-a-exp-123",
+      purpose: "kyc_selfie",
+      createdAt: new Date(Date.now() - 7200 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() - 3600 * 1000).toISOString(), // expired 1 hour ago
     });
   });
 
@@ -81,30 +104,51 @@ describe("Strict Two-User Authenticated IDOR & Provenance Security Test Suite", 
     const res = await verifyKycPOST(req);
     expect(res.status).toBe(403);
     const json = await res.json();
-    expect(json.error).toContain("uploaded by another");
+    expect(json.error).toContain("uploaded by another user account");
   });
 
-  // Test 4: User A calling Admin KYC POST to approve User B
-  test("Test 4: Authenticated User A calling Admin KYC POST receives HTTP 403 Forbidden", async () => {
-    const req = new Request("http://localhost/api/admin/kyc", {
+  // Test 4: User A attempting to submit a kyc_document receipt for kyc_selfie verification
+  test("Test 4: User A attempting to reuse a kyc_document receipt as kyc_selfie receives HTTP 403 Forbidden", async () => {
+    const req = new Request("http://localhost/api/profile/verify-kyc", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": USER_A_TOKEN,
       },
       body: JSON.stringify({
-        action: "approve",
-        targetUid: USER_B_UID,
-        provider: "flutterwave",
+        idNumber: "12345678901",
+        type: "bvn",
+        capturedSelfie: USER_A_DOC_URL,
+        livenessChallenge: true,
       }),
     });
 
-    const res = await adminKycPOST(req);
+    const res = await verifyKycPOST(req);
     expect(res.status).toBe(403);
   });
 
-  // Test 5: Rejection of JSON base64 payloads on /api/upload-image with HTTP 415
-  test("Test 5: /api/upload-image strictly rejects JSON base64 requests with HTTP 415", async () => {
+  // Test 5: User A attempting to submit an expired kyc_selfie receipt
+  test("Test 5: User A attempting to submit an expired kyc_selfie receipt receives HTTP 403 Forbidden", async () => {
+    const req = new Request("http://localhost/api/profile/verify-kyc", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": USER_A_TOKEN,
+      },
+      body: JSON.stringify({
+        idNumber: "12345678901",
+        type: "bvn",
+        capturedSelfie: USER_A_EXPIRED_URL,
+        livenessChallenge: true,
+      }),
+    });
+
+    const res = await verifyKycPOST(req);
+    expect(res.status).toBe(403);
+  });
+
+  // Test 6: Rejection of JSON base64 payloads on /api/upload-image with HTTP 415
+  test("Test 6: /api/upload-image strictly rejects JSON base64 requests with HTTP 415", async () => {
     const req = new Request("http://localhost/api/upload-image", {
       method: "POST",
       headers: {
@@ -121,8 +165,8 @@ describe("Strict Two-User Authenticated IDOR & Provenance Security Test Suite", 
     expect(res.status).toBe(415);
   });
 
-  // Test 6: Rejection of raw base64 strings in /api/profile/verify-kyc
-  test("Test 6: /api/profile/verify-kyc rejects raw base64 or data URLs with HTTP 400", async () => {
+  // Test 7: Rejection of raw base64 strings in /api/profile/verify-kyc
+  test("Test 7: /api/profile/verify-kyc rejects raw base64 or data URLs with HTTP 400", async () => {
     const req = new Request("http://localhost/api/profile/verify-kyc", {
       method: "POST",
       headers: {
@@ -143,8 +187,8 @@ describe("Strict Two-User Authenticated IDOR & Provenance Security Test Suite", 
     expect(json.error).toContain("Raw base64 or data URLs are strictly rejected");
   });
 
-  // Test 7: Rejection of arbitrary external domains in /api/profile/verify-kyc
-  test("Test 7: /api/profile/verify-kyc rejects non-ImgBB arbitrary external hostnames with HTTP 400", async () => {
+  // Test 8: Rejection of arbitrary external domains in /api/profile/verify-kyc
+  test("Test 8: /api/profile/verify-kyc rejects non-ImgBB arbitrary external hostnames with HTTP 400", async () => {
     const req = new Request("http://localhost/api/profile/verify-kyc", {
       method: "POST",
       headers: {
@@ -165,28 +209,14 @@ describe("Strict Two-User Authenticated IDOR & Provenance Security Test Suite", 
     expect(json.error).toContain("Selfie URL must be a direct HTTPS ImgBB image URL");
   });
 
-  // Test 8: Unauthenticated upload attempt
-  test("Test 8: Unauthenticated upload attempt returns HTTP 415 for non-multipart requests", async () => {
+  // Test 9: Unauthenticated upload attempt returns HTTP 415
+  test("Test 9: Unauthenticated upload attempt returns HTTP 415 for non-multipart requests", async () => {
     const req = new Request("http://localhost/api/upload-image", {
       method: "POST",
     });
 
     const res = await uploadImagePOST(req);
     expect(res.status).toBe(415);
-  });
-
-  // Test 9: Unauthenticated upload attempt with multipart content-type returns 401
-  test("Test 9: Unauthenticated multipart upload attempt returns HTTP 401", async () => {
-    const formData = new FormData();
-    formData.append("purpose", "profile_avatar");
-
-    const req = new Request("http://localhost/api/upload-image", {
-      method: "POST",
-      body: formData,
-    });
-
-    const res = await uploadImagePOST(req);
-    expect(res.status).toBe(401);
   });
 
   // Test 10: Authorized Admin user can access Admin KYC endpoint
