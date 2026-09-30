@@ -86,13 +86,15 @@ export async function POST(req: Request) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 50000);
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": authHeader,
+    };
+    if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-verify-otp`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": authHeader,
-        "x-api-key": gatewayApiKey,
-      },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeoutId));
