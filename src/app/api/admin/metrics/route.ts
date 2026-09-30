@@ -22,13 +22,15 @@ export async function POST(req: Request) {
 
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}`,
+    };
+    if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
     const response = await fetch(`${GATEWAY_URL}/api/admin/metrics`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`,
-        "x-api-key": gatewayApiKey,
-      },
+      headers,
     });
 
     const result = await response.json();
