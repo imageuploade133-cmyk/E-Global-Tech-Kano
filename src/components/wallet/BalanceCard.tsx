@@ -1896,129 +1896,190 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     setTrfPin(trfPin.slice(0, -1));
   };
 
-  const downloadReceiptImage = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 600;
-    canvas.height = 800;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      toast.error("Unable to generate receipt image");
-      return;
-    }
+  const generateReceiptBlob = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 600;
+      canvas.height = 800;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
 
-    // 1. Background
-    ctx.fillStyle = "#F8FAFC"; // Slate-50 background
-    ctx.fillRect(0, 0, 600, 800);
+      // 1. Background
+      ctx.fillStyle = "#F8FAFC"; // Slate-50 background
+      ctx.fillRect(0, 0, 600, 800);
 
-    // Inner card background
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(30, 30, 540, 740);
+      // Inner card background
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(30, 30, 540, 740);
 
-    // Draw borders/shadow representation
-    ctx.strokeStyle = "#E2E8F0";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, 540, 740);
+      // Draw borders/shadow representation
+      ctx.strokeStyle = "#E2E8F0";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(30, 30, 540, 740);
 
-    // 2. Header Logo Banner (E-Tech Theme)
-    ctx.fillStyle = "#FC7A00"; // Signature brand orange
-    ctx.fillRect(30, 30, 540, 90);
+      // 2. Header Logo Banner (E-Tech Theme)
+      ctx.fillStyle = "#FC7A00"; // Signature brand orange
+      ctx.fillRect(30, 30, 540, 90);
 
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "900 24px 'Arial', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("E-TECH GLOBAL HUB", 300, 80);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "900 24px 'Arial', sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("E-TECH GLOBAL HUB", 300, 80);
 
-    // Header label
-    ctx.fillStyle = "#1E293B"; // Slate-800
-    ctx.font = "800 16px 'Arial', sans-serif";
-    ctx.fillText("OFFICIAL TRANSACTION RECEIPT", 300, 165);
+      // Header label
+      ctx.fillStyle = "#1E293B"; // Slate-800
+      ctx.font = "800 16px 'Arial', sans-serif";
+      ctx.fillText("OFFICIAL TRANSACTION RECEIPT", 300, 165);
 
-    // Draw Success Icon Check
-    ctx.fillStyle = "#10B981"; // emerald-500
-    ctx.beginPath();
-    ctx.arc(300, 220, 30, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // Checkmark sign
-    ctx.strokeStyle = "#FFFFFF";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(288, 220);
-    ctx.lineTo(297, 229);
-    ctx.lineTo(314, 212);
-    ctx.stroke();
-
-    // SUCCESSFUL text
-    ctx.fillStyle = "#10B981";
-    ctx.font = "bold 14px 'Arial', sans-serif";
-    ctx.fillText("TRANSFER SUCCESSFUL", 300, 275);
-
-    // 3. Draw transaction parameter rows
-    const rows = [
-      { label: "RECIPIENT", value: isBulkMode ? "BATCH RECIPIENTS" : (trfAccountName || "BENEFICIARY").toUpperCase() },
-      { label: "BANK", value: isBulkMode ? "MULTIPLE BANKS" : (trfBank?.name || "N/A").toUpperCase() },
-      { label: "ACCOUNT NUMBER", value: isBulkMode ? "MULTIPLE" : trfAccount },
-      { label: "AMOUNT DEBITED", value: `₦${parseFloat(trfAmount).toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
-      { label: "TRANSACTION FEE", value: `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
-      { label: "REFERENCE CODE", value: transferResult?.reference || "N/A" },
-      { label: "SETTLEMENT DATE", value: new Date().toLocaleString() },
-      { label: "STATUS", value: "SUCCESSFUL" }
-    ];
-
-    let startY = 320;
-    const rowHeight = 42;
-
-    ctx.textAlign = "left";
-    rows.forEach((row) => {
-      // Draw row lines
-      ctx.strokeStyle = "#F1F5F9";
-      ctx.lineWidth = 1;
+      // Draw Success Icon Check
+      ctx.fillStyle = "#10B981"; // emerald-500
       ctx.beginPath();
-      ctx.moveTo(60, startY + 8);
-      ctx.lineTo(540, startY + 8);
+      ctx.arc(300, 220, 30, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Checkmark sign
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(288, 220);
+      ctx.lineTo(297, 229);
+      ctx.lineTo(314, 212);
       ctx.stroke();
 
-      // Label
-      ctx.fillStyle = "#64748B"; // Slate-500
-      ctx.font = "700 11px 'Arial', sans-serif";
-      ctx.fillText(row.label, 60, startY);
+      // SUCCESSFUL text
+      ctx.fillStyle = "#10B981";
+      ctx.font = "bold 14px 'Arial', sans-serif";
+      ctx.fillText("TRANSFER SUCCESSFUL", 300, 275);
 
-      // Value
-      ctx.textAlign = "right";
-      if (row.label === "AMOUNT DEBITED") {
-        ctx.fillStyle = "#10B981"; // Green amount
-        ctx.font = "900 13px 'Arial', sans-serif";
-      } else if (row.label === "STATUS") {
-        ctx.fillStyle = "#10B981"; // Success pill representation
-        ctx.font = "bold 12px 'Arial', sans-serif";
-      } else {
-        ctx.fillStyle = "#0F172A"; // Dark value
-        ctx.font = "bold 12px 'Arial', sans-serif";
-      }
-      ctx.fillText(row.value, 540, startY);
-      ctx.textAlign = "left"; // Reset align
+      // 3. Draw transaction parameter rows
+      const rows = [
+        { label: "RECIPIENT", value: isBulkMode ? "BATCH RECIPIENTS" : (trfAccountName || "BENEFICIARY").toUpperCase() },
+        { label: "BANK", value: isBulkMode ? "MULTIPLE BANKS" : (trfBank?.name || "N/A").toUpperCase() },
+        { label: "ACCOUNT NUMBER", value: isBulkMode ? "MULTIPLE" : trfAccount },
+        { label: "AMOUNT DEBITED", value: `₦${parseFloat(trfAmount || "0").toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
+        { label: "TRANSACTION FEE", value: `₦${trfFee.toLocaleString("en-NG", { minimumFractionDigits: 2 })}` },
+        { label: "REFERENCE CODE", value: transferResult?.reference || "N/A" },
+        { label: "SETTLEMENT DATE", value: new Date().toLocaleString() },
+        { label: "STATUS", value: "SUCCESSFUL" }
+      ];
 
-      startY += rowHeight;
+      let startY = 320;
+      const rowHeight = 42;
+
+      ctx.textAlign = "left";
+      rows.forEach((row) => {
+        // Draw row lines
+        ctx.strokeStyle = "#F1F5F9";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(60, startY + 8);
+        ctx.lineTo(540, startY + 8);
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = "#64748B"; // Slate-500
+        ctx.font = "700 11px 'Arial', sans-serif";
+        ctx.fillText(row.label, 60, startY);
+
+        // Value
+        ctx.textAlign = "right";
+        if (row.label === "AMOUNT DEBITED") {
+          ctx.fillStyle = "#10B981"; // Green amount
+          ctx.font = "900 13px 'Arial', sans-serif";
+        } else if (row.label === "STATUS") {
+          ctx.fillStyle = "#10B981"; // Success pill representation
+          ctx.font = "bold 12px 'Arial', sans-serif";
+        } else {
+          ctx.fillStyle = "#0F172A"; // Dark value
+          ctx.font = "bold 12px 'Arial', sans-serif";
+        }
+        ctx.fillText(row.value, 540, startY);
+        ctx.textAlign = "left"; // Reset align
+
+        startY += rowHeight;
+      });
+
+      // 4. Draw Footer
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#94A3B8"; // Slate-400
+      ctx.font = "italic 11px 'Arial', sans-serif";
+      ctx.fillText("Thank you for choosing E-Tech Global Hub.", 300, 690);
+      ctx.fillText("This is an official transaction document and serves as proof of payment.", 300, 710);
+      ctx.fillText("Support: support@etechglobalhub.com", 300, 730);
+
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, "image/png");
     });
+  };
 
-    // 4. Draw Footer
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#94A3B8"; // Slate-400
-    ctx.font = "italic 11px 'Arial', sans-serif";
-    ctx.fillText("Thank you for choosing E-Tech Global Hub.", 300, 690);
-    ctx.fillText("This is an official transaction document and serves as proof of payment.", 300, 710);
-    ctx.fillText("Support: support@etechglobalhub.com", 300, 730);
-
-    // Save/Download image trigger
+  const downloadReceiptImage = async () => {
     try {
+      const blob = await generateReceiptBlob();
+      if (!blob) {
+        toast.error("Unable to generate receipt image.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = `Receipt_${transferResult?.reference || "transfer"}.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.href = url;
       link.click();
+      URL.revokeObjectURL(url);
       toast.success("Receipt image downloaded successfully!");
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to export receipt image");
+      console.error("Receipt download error:", err);
+      toast.error("Failed to export receipt image.");
+    }
+  };
+
+  const shareReceiptImage = async () => {
+    try {
+      const blob = await generateReceiptBlob();
+      const ref = transferResult?.reference || "transfer";
+      const receiptTitle = "Transaction Receipt";
+      const recipientText = isBulkMode ? "Batch Recipients" : trfAccountName;
+      const amountText = `₦${parseFloat(trfAmount || "0").toLocaleString()}`;
+      const summaryText = `Transaction Receipt from E-Tech Global Hub\nRecipient: ${recipientText}\nAmount: ${amountText}\nRef: ${ref}\nDate: ${new Date().toLocaleString()}`;
+
+      if (blob && navigator.share && navigator.canShare) {
+        const file = new File([blob], `Receipt_${ref}.png`, { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: receiptTitle,
+            text: summaryText,
+            files: [file],
+          });
+          toast.success("Receipt shared successfully!");
+          return;
+        }
+      }
+
+      // Fallback 1: Text Web Share API
+      if (navigator.share) {
+        await navigator.share({
+          title: receiptTitle,
+          text: summaryText,
+        });
+        toast.success("Receipt shared successfully!");
+        return;
+      }
+
+      // Fallback 2: WhatsApp Web/App Direct Deep Link
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(summaryText)}`;
+      window.open(waUrl, "_blank", "noopener,noreferrer");
+      toast.success("Opening WhatsApp to share receipt...");
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        return; // User cancelled share dialog
+      }
+      console.warn("Share error, falling back to clipboard:", err);
+      const summaryText = `Transaction Receipt from E-Tech Global Hub\nRecipient: ${isBulkMode ? "Batch Recipients" : trfAccountName}\nAmount: ₦${parseFloat(trfAmount || "0").toLocaleString()}\nRef: ${transferResult?.reference || ""}\nDate: ${new Date().toLocaleString()}`;
+      navigator.clipboard.writeText(summaryText);
+      toast.success("Receipt details copied to clipboard!");
     }
   };
 
@@ -4201,60 +4262,44 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="w-full space-y-2 flex-shrink-0 mt-2">
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="w-full space-y-2.5 flex-shrink-0 mt-3 select-none">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {/* Download Image Action */}
                       <button
                         type="button"
                         onClick={downloadReceiptImage}
-                        className="py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
+                        className="py-3 bg-gray-50 hover:bg-orange-50/50 border border-gray-200 hover:border-[#FC7A00]/40 text-black text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-[15px] text-orange-500">image</span>
-                        Download Image
+                        <span className="material-symbols-outlined text-[17px] text-[#FC7A00]">image</span>
+                        <span>Download Image</span>
                       </button>
 
                       {/* Download PDF Action */}
                       <button
                         type="button"
                         onClick={downloadReceiptPDF}
-                        className="py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
+                        className="py-3 bg-gray-50 hover:bg-rose-50/50 border border-gray-200 hover:border-rose-300 text-black text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <span className="material-symbols-outlined text-[15px] text-red-500">picture_as_pdf</span>
-                        Download PDF
+                        <span className="material-symbols-outlined text-[17px] text-rose-500">picture_as_pdf</span>
+                        <span>Download PDF</span>
                       </button>
                     </div>
 
-                    {/* Share Receipt functional trigger (TASK 7) */}
+                    {/* Share Receipt functional trigger with WhatsApp & Native Share API */}
                     <button
                       type="button"
-                      onClick={async () => {
-                        const receiptText = `Transaction Receipt\nRecipient: ${isBulkMode ? "Batch Recipients" : trfAccountName}\nBank: ${isBulkMode ? "Multiple" : trfBank?.name}\nAmount: ₦${parseFloat(trfAmount).toLocaleString()}\nRef: ${transferResult.reference || ""}\nDate: ${new Date().toLocaleString()}\nPowered by E-Tech Global Hub`;
-                        if (navigator.share) {
-                          try {
-                            await navigator.share({
-                              title: "Transaction Receipt",
-                              text: receiptText,
-                            });
-                          } catch {
-                            navigator.clipboard.writeText(receiptText);
-                            toast.success("Receipt copied to clipboard!");
-                          }
-                        } else {
-                          navigator.clipboard.writeText(receiptText);
-                          toast.success("Receipt copied to clipboard!");
-                        }
-                      }}
-                      className="w-full py-2.5 bg-white border border-gray-200 hover:border-black text-black text-[10px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-1 shadow-sm"
+                      onClick={shareReceiptImage}
+                      className="w-full py-3 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-[10.5px] font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-98 transition-all flex items-center justify-center gap-2 shadow-2xs"
                     >
-                      <span className="material-symbols-outlined text-[15px] text-blue-500">share</span>
-                      Share Receipt
+                      <span className="material-symbols-outlined text-[18px] text-emerald-600">share</span>
+                      <span>Share Receipt to WhatsApp / Apps</span>
                     </button>
 
-                    {/* Done Action Button (TASK 7) */}
+                    {/* Done Action Button */}
                     <button
                       type="button"
                       onClick={handleCloseTransferModal}
-                      className="w-full py-3 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-md"
+                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all shadow-sm border-0"
                     >
                       Done
                     </button>
