@@ -26,6 +26,7 @@ interface EstateSlide {
   description?: string;
   targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate";
   link?: string;
+  position?: number;
   customWidth?: number | null;
   customHeight?: number | null;
   mobileHeight?: number | null;
@@ -55,6 +56,7 @@ function AdminEstateSlidesPageContent() {
   const [description, setDescription] = useState("");
   const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate">("estate");
   const [link, setLink] = useState("");
+  const [position, setPosition] = useState<number>(1);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -248,6 +250,7 @@ function AdminEstateSlidesPageContent() {
           description: description.trim(),
           targetPage,
           link: link.trim(),
+          position: Number(position) || 1,
         }),
       });
 
@@ -295,6 +298,7 @@ function AdminEstateSlidesPageContent() {
           description: editingSlide.description,
           targetPage: editingSlide.targetPage,
           link: editingSlide.link,
+          position: Number(editingSlide.position) || 1,
           customWidth: editingSlide.customWidth,
           customHeight: editingSlide.customHeight,
           mobileHeight: editingSlide.mobileHeight,
@@ -348,6 +352,54 @@ function AdminEstateSlidesPageContent() {
       }
     } catch {
       toast.error("API connection error while deleting slide.");
+    }
+  };
+
+  const handleQuickMovePosition = async (slide: EstateSlide, delta: number) => {
+    const currentPos = slide.position || 1;
+    const newPos = Math.max(1, currentPos + delta);
+    if (newPos === currentPos) return;
+
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          id: slide.id,
+          imageUrl: slide.imageUrl,
+          title: slide.title,
+          description: slide.description,
+          targetPage: slide.targetPage,
+          link: slide.link,
+          position: newPos,
+          customWidth: slide.customWidth,
+          customHeight: slide.customHeight,
+          mobileHeight: slide.mobileHeight,
+          desktopHeight: slide.desktopHeight,
+          marginBottom: slide.marginBottom,
+          isCrop: slide.isCrop,
+          isHidden: slide.isHidden,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Slide moved to position #${newPos}`);
+        fetchSlides();
+      } else {
+        toast.error(data.error || "Failed to update position.");
+      }
+    } catch {
+      toast.error("Network error updating slide position.");
     }
   };
 
@@ -411,6 +463,22 @@ function AdminEstateSlidesPageContent() {
                     value={bannerSlideInterval}
                     onChange={(e) => setBannerSlideInterval(Math.max(1, parseInt(e.target.value) || 1))}
                     className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">format_list_numbered</span>
+                    Slide Position / Order Number (#)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    placeholder="e.g. 1"
+                    value={position}
+                    onChange={(e) => setPosition(Math.max(1, parseInt(e.target.value) || 1))}
+                    className={cn(inputClass, "font-mono font-bold")}
                   />
                 </div>
 
@@ -742,7 +810,29 @@ function AdminEstateSlidesPageContent() {
                         <div className="min-w-0 flex-1">
                           <h4 className="font-extrabold text-xs uppercase tracking-tight text-orange-500 leading-tight select-all truncate">{b.title || "Untitled Estate Slide"}</h4>
                           <p className={cn("text-[10px] font-medium leading-relaxed truncate mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>{b.description || "No description provided."}</p>
-                          <div className="flex flex-wrap gap-2 mt-2">
+                          <div className="flex flex-wrap gap-2 mt-2 items-center">
+                            <div className="flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                                Position #{b.position || 1}
+                              </span>
+                              <button
+                                type="button"
+                                title="Move Up"
+                                onClick={() => handleQuickMovePosition(b, -1)}
+                                disabled={(b.position || 1) <= 1}
+                                className="w-5 h-5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-orange-500/10 hover:text-orange-500 text-gray-500 disabled:opacity-30 cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[12px] font-bold">arrow_upward</span>
+                              </button>
+                              <button
+                                type="button"
+                                title="Move Down"
+                                onClick={() => handleQuickMovePosition(b, 1)}
+                                className="w-5 h-5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-orange-500/10 hover:text-orange-500 text-gray-500 cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[12px] font-bold">arrow_downward</span>
+                              </button>
+                            </div>
                             <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border bg-amber-500/10 border-amber-500/20 text-amber-500">
                               Target: {b.targetPage}
                             </span>
@@ -898,14 +988,30 @@ function AdminEstateSlidesPageContent() {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
-                    <input
-                      type="text"
-                      value={editingSlide.link || ""}
-                      onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
-                      className={inputClass}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
+                      <input
+                        type="text"
+                        value={editingSlide.link || ""}
+                        onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px]">format_list_numbered</span>
+                        Position Order (#)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={editingSlide.position || 1}
+                        onChange={(e) => setEditingSlide({ ...editingSlide, position: Math.max(1, parseInt(e.target.value) || 1) })}
+                        className={cn(inputClass, "font-mono font-bold")}
+                      />
+                    </div>
                   </div>
 
                   <div className="p-3.5 bg-orange-500/5 border border-orange-500/20 rounded-2xl space-y-3">

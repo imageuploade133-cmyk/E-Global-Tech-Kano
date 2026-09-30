@@ -9,11 +9,21 @@ export async function GET(req: Request) {
       return perm.response!;
     }
 
-    const bannersSnap = await adminDb.collection("banners").orderBy("createdAt", "desc").get();
+    const bannersSnap = await adminDb.collection("banners").get();
     const banners = bannersSnap.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    }));
+    })) as any[];
+
+    // Sort by position ascending (1, 2, 3...), falling back to createdAt descending
+    banners.sort((a, b) => {
+      const posA = typeof a.position === "number" ? a.position : 9999;
+      const posB = typeof b.position === "number" ? b.position : 9999;
+      if (posA !== posB) return posA - posB;
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
 
     return NextResponse.json({ success: true, banners });
   } catch (err: any) {
@@ -30,7 +40,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { id, imageUrl, title, description, targetPage, link, customWidth, customHeight, mobileHeight, desktopHeight, marginBottom, isCrop, isHidden } = body;
+    const { id, imageUrl, title, description, targetPage, link, position, customWidth, customHeight, mobileHeight, desktopHeight, marginBottom, isCrop, isHidden } = body;
 
     if (!imageUrl || !imageUrl.trim()) {
       return NextResponse.json({ error: "Image URL is required for the banner slide." }, { status: 400 });
@@ -40,12 +50,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Valid targetPage parameter is required ('all', 'bills', 'investment', 'referral', 'transfer', 'store', 'estate')." }, { status: 400 });
     }
 
+    const parsedPosition = typeof position === "number" ? Math.max(1, position) : (typeof position === "string" && !isNaN(parseInt(position)) ? Math.max(1, parseInt(position)) : 1);
+
     const bannerDoc = {
       imageUrl: imageUrl.trim(),
       title: (title || "").trim(),
       description: (description || "").trim(),
       targetPage,
       link: (link || "").trim(),
+      position: parsedPosition,
       customWidth: typeof customWidth === "number" ? customWidth : null,
       customHeight: typeof customHeight === "number" ? customHeight : null,
       mobileHeight: typeof mobileHeight === "number" ? mobileHeight : null,
