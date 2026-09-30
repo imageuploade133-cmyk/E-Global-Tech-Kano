@@ -174,6 +174,9 @@ export async function GET(req: Request) {
       totalDataProfit,
     };
 
+    // REQUIREMENT 3 & 4: Ensure imgbbApiKey is NEVER returned to browser clients
+    delete (mergedConfig as any).imgbbApiKey;
+
     return NextResponse.json({ success: true, config: mergedConfig });
   } catch (err: any) {
     console.error("[Admin Config GET API] Exception:", err.message);
@@ -189,6 +192,11 @@ export async function POST(req: Request) {
     }
 
     const updates = await req.json();
+
+    // REQUIREMENT 4: Prevent client/admin requests from setting or storing imgbbApiKey in config/app
+    if (updates && typeof updates === "object") {
+      delete updates.imgbbApiKey;
+    }
 
     // Secure Firestore write with await - wait for Firestore to confirm success before returning success
     await adminDb.collection("config").doc("app").set(updates, { merge: true });

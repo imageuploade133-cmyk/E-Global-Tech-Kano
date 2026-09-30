@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { extractImgBbDirectUrls, validateImageUrl, ImageMetadata } from "@/lib/image-upload";
@@ -161,7 +162,6 @@ export async function POST(req: Request) {
 
     // Resolve dynamic max upload size limit from CPanel config/app or environment
     let maxUploadSizeMb = 10;
-    let serverConfigApiKey: string | undefined;
 
     try {
       const appConfigSnap = await adminDb.collection("config").doc("app").get();
@@ -169,9 +169,6 @@ export async function POST(req: Request) {
         const appConfigData = appConfigSnap.data();
         if (appConfigData?.maxKycUploadSizeMb && typeof appConfigData.maxKycUploadSizeMb === "number") {
           maxUploadSizeMb = appConfigData.maxKycUploadSizeMb;
-        }
-        if (appConfigData?.imgbbApiKey) {
-          serverConfigApiKey = appConfigData.imgbbApiKey;
         }
       }
     } catch (configErr: any) {
@@ -211,12 +208,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Resolve ImgBB API key safely from server process environment variables or server CPanel config document
-    const apiKey = process.env.IMGBB_API_KEY || serverConfigApiKey;
+    // REQUIREMENT 3: Resolve ImgBB API key strictly from server process environment variables ONLY
+    const apiKey = process.env.IMGBB_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "ImgBB API Key is not configured in server environment or CPanel admin settings." },
+        { error: "ImgBB API Key is not configured in server environment." },
         { status: 500 }
       );
     }
@@ -247,9 +244,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "ImgBB upload succeeded but failed to extract direct image URL" }, { status: 502 });
     }
 
-    // STRICT DIRECT URL CHECK: Ensure returned URL is hosted on i.ibb.co
-    if (!url.includes("i.ibb.co/")) {
-      return NextResponse.json({ error: "Extracted image URL is not a direct ImgBB i.ibb.co image URL." }, { status: 502 });
+    // STRICT DIRECT URL CHECK: Use URL parser to verify hostname is strictly i.ibb.co or ibb.co and protocol is https
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol !== "https:" || (parsedUrl.hostname !== "i.ibb.co" && parsedUrl.hostname !== "ibb.co")) {
+        return NextResponse.json({ error: "Extracted image URL is not a direct ImgBB i.ibb.co image URL." }, { status: 502 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Extracted image URL is malformed." }, { status: 502 });
     }
 
     // Perform verification on the generated direct image URL before confirming success
@@ -277,7 +279,7 @@ export async function POST(req: Request) {
     if (purpose === "kyc_selfie" || purpose === "kyc_document") {
       try {
         const nowMs = Date.now();
-        const receiptDocId = Buffer.from(`${authUser.uid}_${url}`).toString("hex").slice(0, 64);
+        const receiptDocId = crypto.createHash("sha256").update(`${authUser.uid}:${url}`).digest("hex");
         await adminDb.collection("kyc_upload_receipts").doc(receiptDocId).set({
           ownerUid: authUser.uid,
           url,

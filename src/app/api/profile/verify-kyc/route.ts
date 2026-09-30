@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
 
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
     // REQUIREMENT 2 & 3: Strict KYC Selfie Receipt & Expiry Validation
     // Verify that capturedSelfie URL was uploaded via /api/upload-image by this authenticated UID specifically for purpose === "kyc_selfie"
     const trimmedSelfieUrl = capturedSelfie.trim();
-    const receiptDocId = Buffer.from(`${uid}_${trimmedSelfieUrl}`).toString("hex").slice(0, 64);
+    const receiptDocId = crypto.createHash("sha256").update(`${uid}:${trimmedSelfieUrl}`).digest("hex");
     const receiptSnap = await adminDb.collection("kyc_upload_receipts").doc(receiptDocId).get();
 
     let validReceiptFound = false;

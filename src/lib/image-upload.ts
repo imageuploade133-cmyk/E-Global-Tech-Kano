@@ -1,6 +1,7 @@
 /**
  * Centralized Image Upload and URL Validation Utilities
  */
+import { auth } from "@/lib/firebase";
 
 export interface ImageMetadata {
   imageProvider: string;
@@ -151,14 +152,28 @@ export async function uploadImageSecurely(
   purpose = "general",
   onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     try {
+      // Get authenticated Firebase ID token if user is signed in
+      let idToken = "";
+      try {
+        if (auth && auth.currentUser) {
+          idToken = await auth.currentUser.getIdToken();
+        }
+      } catch (authErr: any) {
+        console.warn("[uploadImageSecurely] Could not retrieve Firebase ID token:", authErr.message);
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("purpose", purpose);
 
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/upload-image");
+
+      if (idToken) {
+        xhr.setRequestHeader("Authorization", `Bearer ${idToken}`);
+      }
 
       if (xhr.upload && onProgress) {
         onProgress(5);

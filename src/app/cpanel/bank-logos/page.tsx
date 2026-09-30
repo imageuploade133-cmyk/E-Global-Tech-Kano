@@ -34,7 +34,6 @@ function CpanelBankLogosPageContent() {
   const [banks, setBanks] = useState<BankItem[]>([]);
   const [isLoadingBanks, setIsLoadingBanks] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [imgbbApiKey, setImgbbApiKey] = useState("");
 
   // Track editing inputs & uploading/toggling states per bankId
   const [editingLogos, setEditingLogos] = useState<Record<string, string>>({});
@@ -80,22 +79,6 @@ function CpanelBankLogosPageContent() {
     }
     checkSession();
   }, [router]);
-
-  // Fetch Admin App Config for ImgBB Key
-  useEffect(() => {
-    async function fetchConfig() {
-      try {
-        const res = await fetch("/api/admin/config");
-        const data = await res.json();
-        if (data.config?.imgbbApiKey) {
-          setImgbbApiKey(data.config.imgbbApiKey);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch admin config:", err);
-      }
-    }
-    fetchConfig();
-  }, []);
 
   const [hasSearched, setHasSearched] = useState(false);
 
