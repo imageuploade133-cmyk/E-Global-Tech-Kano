@@ -114,6 +114,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatusText, setExportStatusText] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const { getBillerLogo, getBankLogo, getStoreLogo, banks } = useLogos();
   const { config } = useAppConfig();
 
@@ -446,12 +449,19 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Generating HD PDF receipt...");
+      setIsExporting(true);
+      setExportProgress(10);
+      setExportStatusText("Preloading images & assets...");
 
       await waitForReceiptImages(receiptRef.current, 5000);
+      setExportProgress(35);
+      setExportStatusText("Sanitizing styles & compiling DOM...");
 
       const html2canvas = (await import("html2canvas")).default;
       const { jsPDF } = await import("jspdf");
+
+      setExportProgress(55);
+      setExportStatusText("Rendering HD graphics...");
 
       const canvas = await html2canvas(receiptRef.current, {
         scale: 3,
@@ -461,6 +471,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         logging: false,
         onclone: onCloneReceiptForHtml2Canvas,
       });
+
+      setExportProgress(80);
+      setExportStatusText("Building PDF document...");
 
       const imgData = canvas.toDataURL("image/png", 1.0);
       const pdf = new jsPDF("p", "mm", "a4");
@@ -480,6 +493,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
           ? (window as any).flutter_inappwebview
           : null;
 
+      setExportProgress(95);
+      setExportStatusText("Finalizing PDF file...");
+
       if (bridge && typeof bridge.callHandler === "function") {
         const saved = await bridge.callHandler("downloadBase64File", {
           data: pdfDataUri,
@@ -493,14 +509,16 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         pdf.save(pdfFileName);
       }
 
-      toast.dismiss();
+      setExportProgress(100);
       toast.success("HD PDF Receipt downloaded!");
     } catch (err) {
       console.error("PDF generation failed:", err);
-      toast.dismiss();
       toast.error("Failed to generate PDF.");
     } finally {
-      setGenerating(false);
+      setTimeout(() => {
+        setIsExporting(false);
+        setGenerating(false);
+      }, 500);
     }
   };
 
@@ -546,11 +564,19 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Generating PNG image...");
+      setIsExporting(true);
+      setExportProgress(10);
+      setExportStatusText("Preloading images & logos...");
 
       await waitForReceiptImages(receiptRef.current, 5000);
+      setExportProgress(40);
+      setExportStatusText("Sanitizing CSS & compiling canvas...");
 
       const html2canvas = (await import("html2canvas")).default;
+
+      setExportProgress(65);
+      setExportStatusText("Rendering HD PNG image...");
+
       const canvas = await html2canvas(receiptRef.current, {
         scale: 3,
         useCORS: true,
@@ -559,16 +585,22 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         onclone: onCloneReceiptForHtml2Canvas,
       });
 
+      setExportProgress(85);
+      setExportStatusText("Converting image blob...");
+
       canvas.toBlob(async (blob) => {
         if (!blob) {
           console.error("Image generation failed: canvas.toBlob returned null.");
-          toast.dismiss();
           toast.error("Failed to generate PNG image.");
+          setIsExporting(false);
           setGenerating(false);
           return;
         }
 
         try {
+          setExportProgress(95);
+          setExportStatusText("Saving PNG image...");
+
           const imageFileName = `Receipt_${transaction.reference}.png`;
           const imageDataUri = canvas.toDataURL("image/png");
           const bridge =
@@ -596,20 +628,22 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
             setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
           }
 
-          toast.dismiss();
+          setExportProgress(100);
           toast.success("Image downloaded!");
-          setGenerating(false);
         } catch (err) {
           console.error("Image download failed:", err);
-          toast.dismiss();
           toast.error("Failed to download image.");
-          setGenerating(false);
+        } finally {
+          setTimeout(() => {
+            setIsExporting(false);
+            setGenerating(false);
+          }, 500);
         }
       }, "image/png");
     } catch (err) {
       console.error("Image generation failed:", err);
-      toast.dismiss();
       toast.error("Failed to generate image.");
+      setIsExporting(false);
       setGenerating(false);
     }
   };
@@ -618,11 +652,19 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     if (!receiptRef.current) return;
     try {
       setGenerating(true);
-      toast.loading("Preparing HD receipt for sharing...");
+      setIsExporting(true);
+      setExportProgress(10);
+      setExportStatusText("Preloading images...");
 
       await waitForReceiptImages(receiptRef.current, 5000);
+      setExportProgress(40);
+      setExportStatusText("Rendering HD graphic canvas...");
 
       const html2canvas = (await import("html2canvas")).default;
+
+      setExportProgress(65);
+      setExportStatusText("Processing image...");
+
       const canvas = await html2canvas(receiptRef.current, {
         scale: 3,
         useCORS: true,
@@ -632,26 +674,30 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         onclone: onCloneReceiptForHtml2Canvas,
       });
 
+      setExportProgress(85);
+      setExportStatusText("Preparing share payload...");
+
       canvas.toBlob(async (blob) => {
         if (!blob) {
           console.error("Image generation failed: canvas.toBlob returned null.");
-          toast.dismiss();
           toast.error("Failed to compile receipt.");
+          setIsExporting(false);
           setGenerating(false);
           return;
         }
 
         const file = new File([blob], `Receipt_${transaction.reference}.png`, { type: "image/png" });
 
+        setExportProgress(95);
+        setExportStatusText("Opening share tray...");
+
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          toast.dismiss();
           await navigator.share({
             files: [file],
             title: `${receiptHeaderName} Transaction Receipt`,
             text: `Transaction Receipt - ${transaction.reference}`,
           });
         } else {
-          toast.dismiss();
           const imageFileName = `Receipt_${transaction.reference}.png`;
           const imageDataUri = canvas.toDataURL("image/png");
           const bridge =
@@ -681,12 +727,17 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
 
           toast.success("Downloaded HD receipt to device.");
         }
-        setGenerating(false);
+
+        setExportProgress(100);
+        setTimeout(() => {
+          setIsExporting(false);
+          setGenerating(false);
+        }, 500);
       }, "image/png", 1.0);
     } catch (err) {
       console.error("Image generation failed:", err);
-      toast.dismiss();
       toast.error("Failed to share receipt.");
+      setIsExporting(false);
       setGenerating(false);
     }
   };
@@ -1747,6 +1798,32 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Export Progress Bar Overlay */}
+        <AnimatePresence>
+          {isExporting && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="absolute bottom-20 left-4 right-4 z-20 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-orange-200/80 shadow-xl space-y-2.5 max-w-sm mx-auto"
+            >
+              <div className="flex items-center justify-between text-xs font-black text-[#FC7A00]">
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                  <span>{exportStatusText || "Exporting Receipt..."}</span>
+                </span>
+                <span className="font-mono font-black text-xs text-gray-800">{exportProgress}%</span>
+              </div>
+              <div className="w-full bg-orange-100 h-2.5 rounded-full overflow-hidden p-0.5">
+                <div
+                  className="bg-gradient-to-r from-[#FC7A00] via-amber-400 to-[#E06600] h-full rounded-full transition-all duration-300 shadow-2xs"
+                  style={{ width: `${Math.max(5, Math.min(exportProgress, 100))}%` }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Action Buttons Panel */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex gap-2 shadow-lg z-10">
