@@ -183,10 +183,10 @@ export default function Home() {
     const distance = currentY - startY;
 
     if (distance > 0 && window.scrollY <= 0) {
-      // Apply a logarithmic damping curve for mobile physical resistance
-      const dampedDistance = Math.min(120, distance * 0.45);
+      // Apply smooth mobile physical resistance curve; allowing pushing back up to cancel
+      const dampedDistance = Math.max(0, Math.min(100, distance * 0.5));
       setPullDistance(dampedDistance);
-    } else if (distance < 0) {
+    } else {
       setPullDistance(0);
     }
   };

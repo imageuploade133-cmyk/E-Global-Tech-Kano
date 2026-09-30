@@ -115,7 +115,7 @@ export default function EstateMarketplacePage() {
     const currentY = e.touches[0].clientY;
     const diff = currentY - touchStartYRef.current;
     if (diff > 0 && window.scrollY === 0) {
-      setPullDistance(Math.min(diff * 0.45, 90));
+      setPullDistance(Math.max(0, Math.min(diff * 0.5, 100)));
     } else {
       setPullDistance(0);
     }
@@ -124,8 +124,9 @@ export default function EstateMarketplacePage() {
   const handleTouchEnd = () => {
     if (!isPullingRef.current) return;
     isPullingRef.current = false;
-    if (pullDistance > 50 && !isRefreshing) {
+    if (pullDistance >= 50 && !isRefreshing) {
       setIsRefreshing(true);
+      setPullDistance(50);
       fetchProperties();
     } else {
       setPullDistance(0);
