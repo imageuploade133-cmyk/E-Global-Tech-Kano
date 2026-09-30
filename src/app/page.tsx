@@ -195,9 +195,9 @@ export default function Home() {
     if (startY === 0 || isRefreshing) return;
     setStartY(0);
 
-    if (pullDistance > 60) {
+    if (pullDistance >= 50) {
       setIsRefreshing(true);
-      setPullDistance(60);
+      setPullDistance(50);
 
       try {
         let idToken = "mock-token";
