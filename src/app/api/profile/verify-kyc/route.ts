@@ -77,14 +77,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
     }
 
-    // REQUIREMENT 3: Server-side KYC upload receipt/provenance verification
+    // REQUIREMENT: Server-side KYC upload receipt/provenance verification
     // Verify that capturedSelfie URL was uploaded via /api/upload-image by this authenticated UID
     const trimmedSelfieUrl = capturedSelfie.trim();
     const receiptDocId = Buffer.from(`${uid}_${trimmedSelfieUrl}`).toString("hex").slice(0, 64);
     const receiptSnap = await adminDb.collection("kyc_upload_receipts").doc(receiptDocId).get();
 
-    if (!receiptSnap.exists) {
-      // Direct receipt not found. Check if another user uploaded this image URL
+    let validReceiptFound = false;
+
+    if (receiptSnap.exists) {
+      const receiptData = receiptSnap.data() || {};
+      const nowIso = new Date().toISOString();
+
+      if (
+        receiptData.ownerUid === uid &&
+        receiptData.url === trimmedSelfieUrl &&
+        (receiptData.purpose === "kyc_selfie" || receiptData.purpose === "kyc_document") &&
+        (!receiptData.expiresAt || receiptData.expiresAt > nowIso)
+      ) {
+        validReceiptFound = true;
+      } else {
+        console.warn(`[KYC Provenance Violation] Invalid/expired receipt or owner mismatch for ${uid}`);
+        return NextResponse.json({
+          error: "Access Denied: The submitted selfie upload receipt is invalid, expired, or belongs to another user account."
+        }, { status: 403 });
+      }
+    } else {
+      // Fallback query by URL in kyc_upload_receipts
       const receiptQuery = await adminDb.collection("kyc_upload_receipts")
         .where("url", "==", trimmedSelfieUrl)
         .limit(1)
@@ -95,24 +114,19 @@ export async function POST(req: Request) {
         if (foundData.ownerUid !== uid) {
           console.warn(`[KYC Provenance Violation] User ${uid} attempted to submit selfie URL uploaded by ${foundData.ownerUid}`);
           return NextResponse.json({
-            error: "Access Denied: The submitted selfie URL was uploaded by another account. You must upload your own selfie."
+            error: "Access Denied: The submitted selfie URL was uploaded by another user account."
           }, { status: 403 });
         }
+        if (foundData.ownerUid === uid && (foundData.purpose === "kyc_selfie" || foundData.purpose === "kyc_document")) {
+          validReceiptFound = true;
+        }
       }
+    }
 
-      // Allow mock uids or existing verified users in non-production, otherwise reject missing receipt
-      if (process.env.NODE_ENV === "production" && uid !== "mock-uid" && uid !== "mock-admin-uid") {
-        return NextResponse.json({
-          error: "Access Denied: No valid upload receipt found for this selfie image. You must upload your selfie through the app camera."
-        }, { status: 403 });
-      }
-    } else {
-      const receiptData = receiptSnap.data() || {};
-      if (receiptData.ownerUid !== uid) {
-        return NextResponse.json({
-          error: "Access Denied: The submitted selfie URL was uploaded by another account. You must upload your own selfie."
-        }, { status: 403 });
-      }
+    if (!validReceiptFound) {
+      return NextResponse.json({
+        error: "Access Denied: Mandatory KYC upload receipt missing. You must record and upload your selfie using the in-app camera."
+      }, { status: 403 });
     }
 
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
