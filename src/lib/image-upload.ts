@@ -11,6 +11,7 @@ export interface ImageMetadata {
   uploadedAt: string;
   verifiedAt?: string;
   status: "VERIFIED_ACTIVE" | "UNVERIFIED" | "FAILED";
+  ownerUid?: string;
 }
 
 export interface UploadResult {

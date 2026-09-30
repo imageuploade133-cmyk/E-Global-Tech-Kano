@@ -173,25 +173,34 @@ export function KycVerificationDrawer({
     let uploadedUrl = "";
     const activeImageSource = selfiePreview || filePreview || "";
 
-    // 1. Upload to Imgbb securely via upload-image API
-    if (activeImageSource.startsWith("data:image")) {
+    // Convert active image source (data URL from camera or selected file) into a real File for multipart upload
+    let fileToUpload: File | null = selectedFile;
+    if (!fileToUpload && selfiePreview && selfiePreview.startsWith("data:")) {
       try {
-        const res = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: activeImageSource, purpose: "kyc_document" }),
-        });
-        const json = await res.json();
-        if (res.ok && json.success && json.url) {
-          uploadedUrl = json.url;
-        } else {
-          uploadedUrl = activeImageSource;
+        const arr = selfiePreview.split(",");
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
         }
-      } catch (err) {
-        uploadedUrl = activeImageSource;
+        fileToUpload = new File([u8arr], "kyc_selfie.jpg", { type: mime });
+      } catch (e) {
+        console.error("Failed to convert selfie preview to file object:", e);
+      }
+    }
+
+    if (fileToUpload) {
+      const uploadResult = await uploadImageSecurely(fileToUpload, "kyc_selfie");
+      if (uploadResult.success && uploadResult.url) {
+        uploadedUrl = uploadResult.url;
+      } else {
+        throw new Error(uploadResult.error || "Failed to upload selfie image to ImgBB.");
       }
     } else {
-      uploadedUrl = activeImageSource || "https://i.ibb.co/WWjZrtC7/E-Tech.png";
+      throw new Error("No valid image file available for upload.");
     }
 
     setSubmitStep("submitting");

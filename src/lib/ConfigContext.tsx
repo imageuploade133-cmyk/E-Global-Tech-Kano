@@ -22,7 +22,7 @@ export interface AppConfig {
   totalUsers: number;
   globalNgnBalance: number;
   globalUsdBalance: number;
-  imgbbApiKey: string;
+  imgbbApiKey?: string;
   appVersion?: string;
   totalFixedDeposit?: number;
   todayDeposit?: number;
@@ -63,7 +63,7 @@ const DEFAULT_CONFIG: AppConfig = {
   totalUsers: 0,
   globalNgnBalance: 0,
   globalUsdBalance: 0,
-  imgbbApiKey: "0d1a390cb385b632d952db08a3479005",
+  imgbbApiKey: "",
   appVersion: "1.0.0",
   totalFixedDeposit: 0,
   todayDeposit: 0,

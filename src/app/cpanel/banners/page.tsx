@@ -269,34 +269,20 @@ function AdminBannersPageContent() {
     if (!file || !editingSlide) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("image", file);
-
-    const apiKey = config.imgbbApiKey || "";
-    if (!apiKey) {
-      toast.error("Imgbb API Key is missing. Please save an API key in visual branding settings.");
-      setIsUploading(false);
-      return;
-    }
-
-    toast.loading("Uploading slide image to ImgBB...");
+    toast.loading("Uploading slide image securely...");
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-        method: "POST",
-        body: formData
-      });
-      const json = await res.json();
+      const result = await uploadImageSecurely(file, "banner");
       toast.dismiss();
 
-      if (json.success) {
-        setEditingSlide({ ...editingSlide, imageUrl: json.data.display_url });
+      if (result.success && result.url) {
+        setEditingSlide({ ...editingSlide, imageUrl: result.url });
         toast.success("Slide image changed successfully!");
       } else {
-        toast.error(json.error?.message || "Failed to upload image to ImgBB.");
+        toast.error(result.error || "Failed to upload slide image.");
       }
-    } catch {
+    } catch (err: any) {
       toast.dismiss();
-      toast.error("ImgBB API connection error.");
+      toast.error(err.message || "Slide image upload failed.");
     } finally {
       setIsUploading(false);
     }

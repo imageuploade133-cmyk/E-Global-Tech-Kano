@@ -49,8 +49,15 @@ export async function POST(req: Request) {
       errors.push("Identity type must be either 'bvn' or 'nin'.");
     }
 
-    if (!capturedSelfie) {
+    if (!capturedSelfie || typeof capturedSelfie !== "string") {
       errors.push("Live camera facial capture selfie is required.");
+    } else {
+      const trimmedSelfie = capturedSelfie.trim();
+      if (trimmedSelfie.startsWith("data:") || trimmedSelfie.includes("base64")) {
+        errors.push("Raw base64 or data URLs are strictly rejected for KYC selfies. Image must be uploaded to ImgBB via /api/upload-image first.");
+      } else if (!trimmedSelfie.startsWith("https://i.ibb.co/")) {
+        errors.push("Selfie URL must be a verified ImgBB direct image URL (https://i.ibb.co/...). Arbitrary external URLs are rejected.");
+      }
     }
 
     if (!livenessChallenge) {
