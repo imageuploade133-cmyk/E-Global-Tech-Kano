@@ -159,9 +159,30 @@ export async function POST(req: Request) {
       );
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    // Resolve dynamic max upload size limit from CPanel config/app or environment
+    let maxUploadSizeMb = 10;
+    let serverConfigApiKey: string | undefined;
+
+    try {
+      const appConfigSnap = await adminDb.collection("config").doc("app").get();
+      if (appConfigSnap.exists) {
+        const appConfigData = appConfigSnap.data();
+        if (appConfigData?.maxKycUploadSizeMb && typeof appConfigData.maxKycUploadSizeMb === "number") {
+          maxUploadSizeMb = appConfigData.maxKycUploadSizeMb;
+        }
+        if (appConfigData?.imgbbApiKey) {
+          serverConfigApiKey = appConfigData.imgbbApiKey;
+        }
+      }
+    } catch (configErr: any) {
+      console.warn("[Upload API] Failed to fetch CPanel config app settings:", configErr.message);
+    }
+
+    const maxSizeBytes = maxUploadSizeMb * 1024 * 1024;
+
+    if (file.size > maxSizeBytes) {
       return NextResponse.json(
-        { error: `File size exceeds the 8MB limit (file is ${(file.size / (1024 * 1024)).toFixed(2)}MB)` },
+        { error: `File size exceeds the configured CPanel upload limit of ${maxUploadSizeMb}MB (uploaded file is ${(file.size / (1024 * 1024)).toFixed(2)}MB)` },
         { status: 400 }
       );
     }
@@ -190,12 +211,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Resolve ImgBB API key safely from server process environment variables
-    const apiKey = process.env.IMGBB_API_KEY;
+    // Resolve ImgBB API key safely from server process environment variables or server CPanel config document
+    const apiKey = process.env.IMGBB_API_KEY || serverConfigApiKey;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "ImgBB API Key is not configured in server environment." },
+        { error: "ImgBB API Key is not configured in server environment or CPanel admin settings." },
         { status: 500 }
       );
     }
