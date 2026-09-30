@@ -396,6 +396,52 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
   const dataPlanValidity = (transaction.metadata as any)?.validity || (transaction.metadata as any)?.duration || parsedPlanData.duration || "30 Days";
 
   // PDF Export (HD Quality)
+  const onCloneReceiptForHtml2Canvas = (clonedDoc: Document) => {
+    // 1. Remove or clean stylesheets that contain unsupported oklch() color functions
+    const styles = clonedDoc.querySelectorAll("style, link[rel='stylesheet']");
+    styles.forEach((style) => {
+      try {
+        if (style.textContent && style.textContent.includes("oklch")) {
+          // Replace oklch(...) occurrences in stylesheets with safe fallback hex/rgb or transparent
+          style.textContent = style.textContent.replace(/oklch\([^)]+\)/gi, "rgba(0,0,0,0.1)");
+        }
+      } catch (e) {
+        // Ignore CSS parsing issues in cloned document
+      }
+    });
+
+    // 2. Iterate all elements in the cloned DOM tree and convert computed styles to inline RGB/RGBA
+    const clonedElements = clonedDoc.querySelectorAll("*");
+    clonedElements.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      if (!htmlEl.style) return;
+
+      try {
+        const computed = window.getComputedStyle(htmlEl);
+
+        // Sanitize background-color if it uses oklch
+        const bg = computed.backgroundColor;
+        if (bg && bg.includes("oklch")) {
+          htmlEl.style.backgroundColor = "#FFFFFF";
+        }
+
+        // Sanitize color if it uses oklch
+        const color = computed.color;
+        if (color && color.includes("oklch")) {
+          htmlEl.style.color = "#000000";
+        }
+
+        // Sanitize border-color if it uses oklch
+        const border = computed.borderColor;
+        if (border && border.includes("oklch")) {
+          htmlEl.style.borderColor = "#E2E8F0";
+        }
+      } catch (e) {
+        // Ignore style inspection failures
+      }
+    });
+  };
+
   const handleDownloadPDF = async () => {
     if (!receiptRef.current) return;
     try {
@@ -413,6 +459,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         allowTaint: true,
         backgroundColor: "#FFFFFF",
         logging: false,
+        onclone: onCloneReceiptForHtml2Canvas,
       });
 
       const imgData = canvas.toDataURL("image/png", 1.0);
@@ -509,6 +556,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         useCORS: true,
         backgroundColor: "#FFFFFF",
         logging: false,
+        onclone: onCloneReceiptForHtml2Canvas,
       });
 
       canvas.toBlob(async (blob) => {
@@ -581,6 +629,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
         allowTaint: true,
         backgroundColor: "#FFFFFF",
         logging: false,
+        onclone: onCloneReceiptForHtml2Canvas,
       });
 
       canvas.toBlob(async (blob) => {
