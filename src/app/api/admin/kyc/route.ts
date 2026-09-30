@@ -259,13 +259,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected." }, { status: 400 });
       }
 
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/approve`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ provider })
       });
 
@@ -291,13 +293,15 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "reject") {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/reject`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ reason })
       });
 
@@ -316,13 +320,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected for retry." }, { status: 400 });
       }
 
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/retry-provisioning`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ provider })
       });
 
