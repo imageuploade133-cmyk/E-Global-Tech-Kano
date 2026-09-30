@@ -38,14 +38,16 @@ export async function POST(req: Request) {
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
     const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}`,
+    };
+    if (apiKey) headers["x-api-key"] = apiKey;
+    if (sessionId) headers["X-Session-ID"] = sessionId;
+
     const gatewayRes = await fetch(`${gatewayUrl}/api/vtu/electricity`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`,
-        "x-api-key": apiKey,
-        ...(sessionId ? { "X-Session-ID": sessionId } : {}),
-      },
+      headers,
       body: JSON.stringify(body),
     });
 

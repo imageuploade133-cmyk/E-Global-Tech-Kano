@@ -15,12 +15,14 @@ export async function GET(req: Request) {
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
     const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
+    const headers: Record<string, string> = {
+      "Authorization": `Bearer ${idToken}`,
+    };
+    if (apiKey) headers["x-api-key"] = apiKey;
+
     const gatewayRes = await fetch(`${gatewayUrl}/api/vtu/electricity/validate?provider=${provider}&meterNo=${meterNo}&meterType=${meterType}`, {
       method: "GET",
-      headers: {
-        "Authorization": `Bearer ${idToken}`,
-        "x-api-key": apiKey,
-      },
+      headers,
     });
 
     if (!gatewayRes.ok) {

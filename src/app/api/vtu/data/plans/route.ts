@@ -36,12 +36,14 @@ export async function GET(req: Request) {
       }
     }
 
+    const headers: Record<string, string> = {
+      "Authorization": `Bearer ${idToken}`,
+    };
+    if (apiKey) headers["x-api-key"] = apiKey;
+
     const gatewayRes = await fetch(`${gatewayUrl}/api/vtu/data/plans?network=${network}`, {
       method: "GET",
-      headers: {
-        "Authorization": `Bearer ${idToken}`,
-        "x-api-key": apiKey,
-      },
+      headers,
     });
 
     if (!gatewayRes.ok) {
