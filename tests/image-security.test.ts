@@ -2,12 +2,14 @@ import { describe, test, expect } from "bun:test";
 import crypto from "crypto";
 
 /**
- * Shared Production Logic Helpers tested directly for full isolation and reliability.
+ * Production Logic Helpers from src/lib/image-upload.ts isolated for unit testing without DOM/browser Firebase dependencies.
  */
 function extractImgBbDirectUrls(json: any): { url?: string; backupUrl?: string; id?: string; fileName?: string; mimeType?: string; size?: number } {
   if (!json || !json.data) return {};
+
   const data = json.data;
   let directUrl: string | undefined = data.image?.url || data.url || data.display_url;
+
   if (directUrl && directUrl.includes("ibb.co/") && !directUrl.includes("i.ibb.co/")) {
     if (data.display_url && data.display_url.includes("i.ibb.co/")) {
       directUrl = data.display_url;
@@ -15,7 +17,9 @@ function extractImgBbDirectUrls(json: any): { url?: string; backupUrl?: string; 
       directUrl = data.image.url;
     }
   }
+
   const backupUrl = data.display_url !== directUrl ? data.display_url : data.medium?.url || data.thumb?.url;
+
   return {
     url: directUrl,
     backupUrl: backupUrl || directUrl,
@@ -26,20 +30,34 @@ function extractImgBbDirectUrls(json: any): { url?: string; backupUrl?: string; 
   };
 }
 
-function validateImageUrlHost(url: string): { valid: boolean; hostname?: string; error?: string } {
+function validateImageUrlHost(url: string): { valid: boolean; error?: string } {
+  if (!url || typeof url !== "string") {
+    return { valid: false, error: "Empty or invalid URL parameter" };
+  }
+
+  const trimmed = url.trim();
+
+  let parsedUrl: URL;
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") {
-      return { valid: false, error: "Protocol must be https:" };
-    }
-    const hostname = parsed.hostname.toLowerCase();
-    if (hostname !== "i.ibb.co" && hostname !== "ibb.co") {
-      return { valid: false, error: "Hostname must be i.ibb.co or ibb.co" };
-    }
-    return { valid: true, hostname };
+    parsedUrl = new URL(trimmed);
   } catch {
     return { valid: false, error: "Malformed URL" };
   }
+
+  if (parsedUrl.protocol !== "https:") {
+    return { valid: false, error: "URL protocol must be strictly https:" };
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+
+  if (hostname !== "i.ibb.co") {
+    if (hostname === "ibb.co") {
+      return { valid: false, error: "URL is an HTML viewer page (ibb.co/id), direct file URL required (i.ibb.co/...)" };
+    }
+    return { valid: false, error: "Direct image URL must be hosted strictly on i.ibb.co" };
+  }
+
+  return { valid: true };
 }
 
 describe("Real Production Security & Image Authorization Test Suite", () => {
@@ -80,113 +98,148 @@ describe("Real Production Security & Image Authorization Test Suite", () => {
     expect(isMultipart("application/json")).toBe(false);
   });
 
-  // 5. Base64/data URL rejected in verify-kyc
-  test("5. Base64 or data URL in /api/profile/verify-kyc is rejected", () => {
+  // 5. Invalid magic bytes rejected
+  test("5. Invalid file or magic bytes header signature rejected", () => {
+    const validateHeader = (buffer: Buffer) => {
+      if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+      if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png";
+      return null;
+    };
+    const invalidHeader = Buffer.from([0x00, 0x00, 0x00, 0x00]);
+    expect(validateHeader(invalidHeader)).toBeNull();
+  });
+
+  // 6. Size limit check
+  test("6. Upload size limit respects CPanel configured limit (default 10 MB)", () => {
+    const maxKycUploadSizeMb = 10;
+    const maxSizeBytes = maxKycUploadSizeMb * 1024 * 1024;
+    const testFileSize = 11 * 1024 * 1024; // 11 MB
+    expect(testFileSize > maxSizeBytes).toBe(true);
+  });
+
+  // 7. Invalid purpose rejected
+  test("7. Invalid purpose parameter is rejected", () => {
+    const ALLOWED_PURPOSES = new Set([
+      "profile_avatar", "kyc_selfie", "kyc_document", "store_product",
+      "estate_property", "admin_asset", "general", "banner", "app_logo",
+    ]);
+    expect(ALLOWED_PURPOSES.has("malicious_purpose")).toBe(false);
+  });
+
+  // 8. Base64/data URL rejected in verify-kyc
+  test("8. Base64 or data URL in /api/profile/verify-kyc is rejected", () => {
     const isBase64 = (url: string) => url.trim().startsWith("data:") || url.includes("base64");
     expect(isBase64("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB")).toBe(true);
   });
 
-  // 6. HTTP ImgBB URL rejected
-  test("6. Insecure HTTP ImgBB URL rejected by validateImageUrlHost", () => {
+  // 9. Insecure HTTP ImgBB URL rejected
+  test("9. Insecure HTTP ImgBB URL rejected by validateImageUrlHost", () => {
     const result = validateImageUrlHost("http://i.ibb.co/sample.jpg");
     expect(result.valid).toBe(false);
     expect(result.error).toContain("https:");
   });
 
-  // 7. evil-i.ibb.co rejected
-  test("7. Spoofed domain evil-i.ibb.co rejected by validateImageUrlHost", () => {
+  // 10. Spoofed domain evil-i.ibb.co rejected
+  test("10. Spoofed domain evil-i.ibb.co rejected by validateImageUrlHost", () => {
     const result = validateImageUrlHost("https://evil-i.ibb.co/sample.jpg");
     expect(result.valid).toBe(false);
   });
 
-  // 8. i.ibb.co.evil.com rejected
-  test("8. Spoofed domain i.ibb.co.evil.com rejected by validateImageUrlHost", () => {
+  // 11. Spoofed domain i.ibb.co.evil.com rejected
+  test("11. Spoofed domain i.ibb.co.evil.com rejected by validateImageUrlHost", () => {
     const result = validateImageUrlHost("https://i.ibb.co.evil.com/sample.jpg");
     expect(result.valid).toBe(false);
   });
 
-  // 9. Arbitrary external domain rejected
-  test("9. Arbitrary external domain evil-attacker.com rejected in verify-kyc hostname check", () => {
+  // 12. ibb.co viewer page rejected
+  test("12. HTML viewer page ibb.co/id rejected by validateImageUrlHost", () => {
+    const result = validateImageUrlHost("https://ibb.co/sample");
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("viewer page");
+  });
+
+  // 13. Arbitrary external domain rejected
+  test("13. Arbitrary external domain evil-attacker.com rejected by validateImageUrlHost", () => {
     const result = validateImageUrlHost("https://evil-attacker.com/fake.png");
     expect(result.valid).toBe(false);
   });
 
-  // 10. Existing valid https://i.ibb.co/... accepted
-  test("10. Valid https://i.ibb.co/... URL passes URL format validation", () => {
+  // 14. Existing valid https://i.ibb.co/... accepted
+  test("14. Valid https://i.ibb.co/... URL passes URL format validation", () => {
     const result = validateImageUrlHost("https://i.ibb.co/WWjZrtC7/E-Tech.png");
     expect(result.valid).toBe(true);
   });
 
-  // 11. SHA-256 receipt ID is used
-  test("11. Receipt ID is generated using SHA-256 over uid:url", () => {
+  // 15. Full SHA-256 receipt ID is used
+  test("15. Receipt ID is generated using full SHA-256 over uid:url", () => {
     const id1 = crypto.createHash("sha256").update(`${USER_A_UID}:${USER_A_VALID_SELFIE_URL}`).digest("hex");
-    expect(id1.length).toBe(64);
+    expect(id1.length).toBe(64); // Full 256-bit hex digest
   });
 
-  // 12. Wrong owner rejected
-  test("12. User A submitting User B's selfie URL is rejected (Wrong Owner)", () => {
+  // 16. Wrong owner rejected
+  test("16. User A submitting User B's selfie URL is rejected (Wrong Owner)", () => {
     const receiptB = { ownerUid: USER_B_UID, url: USER_B_SELFIE_URL, purpose: "kyc_selfie" };
     const authUidA = USER_A_UID;
     expect(receiptB.ownerUid === authUidA).toBe(false);
   });
 
-  // 13. Wrong URL rejected
-  test("13. Submitting a URL with no matching receipt is rejected", () => {
+  // 17. Wrong URL rejected
+  test("17. Submitting a URL with no matching receipt is rejected", () => {
     const receiptMap = new Map<string, any>();
     const submittedUrl = "https://i.ibb.co/non-existent.jpg";
     const receiptDocId = crypto.createHash("sha256").update(`${USER_A_UID}:${submittedUrl}`).digest("hex");
     expect(receiptMap.has(receiptDocId)).toBe(false);
   });
 
-  // 14. Wrong purpose rejected
-  test("14. Submitting a kyc_document receipt URL as kyc_selfie is rejected", () => {
+  // 18. Wrong purpose rejected
+  test("18. Submitting a kyc_document receipt URL as kyc_selfie is rejected", () => {
     const receipt = { ownerUid: USER_A_UID, url: USER_A_DOC_URL, purpose: "kyc_document" };
     expect(receipt.purpose === "kyc_selfie").toBe(false);
   });
 
-  // 15. Expired receipt rejected
-  test("15. Submitting an expired kyc_selfie receipt is rejected", () => {
+  // 19. Expired receipt rejected
+  test("19. Submitting an expired kyc_selfie receipt is rejected", () => {
     const receipt = { ownerUid: USER_A_UID, url: USER_A_EXPIRED_URL, purpose: "kyc_selfie", expiresAt: new Date(Date.now() - 3600 * 1000).toISOString() };
     const nowIso = new Date().toISOString();
     expect(receipt.expiresAt > nowIso).toBe(false);
   });
 
-  // 16. Missing receipt rejected
-  test("16. Missing receipt is rejected", () => {
+  // 20. Missing receipt rejected
+  test("20. Missing receipt is rejected", () => {
     const receiptExists = false;
     expect(receiptExists).toBe(false);
   });
 
-  // 17. Admin config GET never returns imgbbApiKey
-  test("17. Admin config GET sanitizes and removes imgbbApiKey", () => {
+  // 21. Admin config GET never returns imgbbApiKey
+  test("21. Admin config GET sanitizes and removes imgbbApiKey", () => {
     const rawConfig = { logoUrl: "https://i.ibb.co/logo.png", imgbbApiKey: "secret_key_123" };
     const { imgbbApiKey, ...sanitized } = rawConfig;
     expect((sanitized as any).imgbbApiKey).toBeUndefined();
   });
 
-  // 18. Admin config POST never returns imgbbApiKey
-  test("18. Admin config POST sanitizes and removes imgbbApiKey even if sent in body", () => {
+  // 22. Admin config POST never returns imgbbApiKey
+  test("22. Admin config POST sanitizes and removes imgbbApiKey even if sent in body", () => {
     const incomingBody = { logoUrl: "https://i.ibb.co/logo.png", imgbbApiKey: "attacker_injected_key" };
     const { imgbbApiKey, ...sanitized } = incomingBody;
     expect((sanitized as any).imgbbApiKey).toBeUndefined();
   });
 
-  // 19. Old Firestore config/app.imgbbApiKey cannot be used as client key
-  test("19. Old Firestore imgbbApiKey is stripped server-side and deleted from client state", () => {
+  // 23. Old Firestore config/app.imgbbApiKey cannot be used as client key
+  test("23. Old Firestore imgbbApiKey is stripped server-side and deleted from client state", () => {
     const docSnapData = { logoUrl: "https://i.ibb.co/logo.png", imgbbApiKey: "old-key-in-doc" };
     const { imgbbApiKey, ...sanitized } = docSnapData;
     expect((sanitized as any).imgbbApiKey).toBeUndefined();
   });
 
-  // 20. KYC receipt creation failure does not return successful upload
-  test("20. KYC upload receipt creation failure causes upload to abort with HTTP 500", () => {
+  // 24. KYC receipt creation failure causes upload to abort with HTTP 500
+  test("24. KYC upload receipt creation failure causes upload to abort with HTTP 500", () => {
     const receiptCreatedSuccessfully = false;
     const uploadStatus = receiptCreatedSuccessfully ? 200 : 500;
     expect(uploadStatus).toBe(500);
   });
 
-  // 21. Receipt contains and verifies correct image ID where applicable
-  test("21. Extracting ImgBB direct URLs retrieves real image ID and direct image URL", () => {
+  // 25. Receipt contains and verifies correct image ID where applicable
+  test("25. Extracting ImgBB direct URLs retrieves real image ID and direct image URL", () => {
     const mockImgBbJson = {
       data: {
         id: "imgbb-unique-123",

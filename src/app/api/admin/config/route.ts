@@ -9,11 +9,8 @@ import { requireAdminPermission } from "@/lib/admin-permissions";
  */
 function sanitizeConfigDoc<T extends Record<string, any>>(config: T): T {
   if (!config || typeof config !== "object") return config;
-  const sanitized = { ...config };
-  delete sanitized.imgbbApiKey;
-  delete sanitized.secretKey;
-  delete sanitized.apiKey;
-  return sanitized;
+  const { imgbbApiKey, secretKey, apiKey, ...sanitized } = config;
+  return sanitized as T;
 }
 
 export async function GET(req: Request) {
@@ -208,12 +205,12 @@ export async function POST(req: Request) {
     const updates = await req.json();
 
     // REQUIREMENT 4: Prevent client/admin requests from setting or storing imgbbApiKey in config/app
-    if (updates && typeof updates === "object") {
-      delete updates.imgbbApiKey;
-    }
+    const sanitizedUpdates = (updates && typeof updates === "object")
+      ? sanitizeConfigDoc(updates)
+      : updates;
 
     // Secure Firestore write with await - wait for Firestore to confirm success before returning success
-    await adminDb.collection("config").doc("app").set(updates, { merge: true });
+    await adminDb.collection("config").doc("app").set(sanitizedUpdates, { merge: true });
 
     // Fetch the updated document to return authoritative server data
     const updatedDoc = await adminDb.collection("config").doc("app").get();
