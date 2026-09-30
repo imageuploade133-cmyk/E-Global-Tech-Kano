@@ -20,6 +20,7 @@ interface StoreSlide {
   subtitle: string;
   description?: string;
   link: string;
+  position?: number;
   customWidth?: number | null;
   customHeight?: number | null;
   mobileHeight?: number | null;
@@ -49,6 +50,7 @@ function CpanelStoreSlidesPageContent() {
   const [slideTitle, setSlideTitle] = useState("");
   const [slideSubtitle, setSlideSubtitle] = useState("");
   const [slideLink, setSlideLink] = useState("");
+  const [slidePosition, setSlidePosition] = useState<number>(1);
   const [isUploadingSlideImage, setIsUploadingSlideImage] = useState(false);
   const [isSavingSlide, setIsSavingSlide] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -161,6 +163,7 @@ function CpanelStoreSlidesPageContent() {
     setSlideTitle("");
     setSlideSubtitle("");
     setSlideLink("");
+    setSlidePosition(1);
   };
 
   const handleAddSlide = async (e: React.FormEvent) => {
@@ -188,6 +191,7 @@ function CpanelStoreSlidesPageContent() {
             subtitle: slideSubtitle.trim(),
             description: slideSubtitle.trim(),
             link: slideLink.trim(),
+            position: Number(slidePosition) || 1,
             isCrop: true,
             isHidden: false,
             marginBottom: 20,
@@ -235,6 +239,7 @@ function CpanelStoreSlidesPageContent() {
             subtitle: editingSlide.subtitle,
             description: editingSlide.description || editingSlide.subtitle,
             link: editingSlide.link,
+            position: Number(editingSlide.position) || 1,
             customWidth: editingSlide.customWidth,
             mobileHeight: editingSlide.mobileHeight,
             desktopHeight: editingSlide.desktopHeight,
@@ -297,6 +302,52 @@ function CpanelStoreSlidesPageContent() {
         }
       }
     );
+  };
+
+  const handleQuickMovePosition = async (slide: StoreSlide, delta: number) => {
+    const currentPos = slide.position || 1;
+    const newPos = Math.max(1, currentPos + delta);
+    if (newPos === currentPos) return;
+
+    try {
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      const headers: Record<string, string> = isMock
+        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+        : { "Content-Type": "application/json" };
+
+      const res = await fetch("/api/admin/store", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "edit_slide",
+          slide: {
+            id: slide.id,
+            imageUrl: slide.imageUrl,
+            title: slide.title,
+            subtitle: slide.subtitle,
+            description: slide.description,
+            link: slide.link,
+            position: newPos,
+            customWidth: slide.customWidth,
+            mobileHeight: slide.mobileHeight,
+            desktopHeight: slide.desktopHeight,
+            marginBottom: slide.marginBottom,
+            isCrop: slide.isCrop,
+            isHidden: slide.isHidden,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Slide moved to position #${newPos}`);
+        setSlides(data.slides || []);
+      } else {
+        toast.error(data.error || "Failed to update position.");
+      }
+    } catch {
+      toast.error("Network error updating slide position.");
+    }
   };
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
@@ -424,6 +475,22 @@ function CpanelStoreSlidesPageContent() {
               </div>
 
               <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-orange-500 flex items-center gap-1 block">
+                  <span className="material-symbols-outlined text-[14px]">format_list_numbered</span>
+                  Slide Position / Order (#)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  placeholder="e.g. 1"
+                  value={slidePosition}
+                  onChange={(e) => setSlidePosition(Math.max(1, parseInt(e.target.value) || 1))}
+                  className={cn("h-10 px-3 rounded-xl text-xs font-mono font-bold outline-none border transition-all w-full", inputClass)}
+                />
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 block">Subtitle / Caption</label>
                 <input
                   type="text"
@@ -510,7 +577,29 @@ function CpanelStoreSlidesPageContent() {
                         <div className="min-w-0 flex-1 space-y-1">
                           <h4 className="font-extrabold text-xs uppercase tracking-tight truncate">{slide.title || "Untitled Slide"}</h4>
                           <p className="text-[11px] text-gray-400 font-medium truncate">{slide.subtitle || slide.description || "No subtitle provided."}</p>
-                          <div className="flex flex-wrap gap-2 pt-1">
+                          <div className="flex flex-wrap gap-2 pt-1 items-center">
+                            <div className="flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                                Position #{slide.position || 1}
+                              </span>
+                              <button
+                                type="button"
+                                title="Move Up"
+                                onClick={() => handleQuickMovePosition(slide, -1)}
+                                disabled={(slide.position || 1) <= 1}
+                                className="w-5 h-5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-orange-500/10 hover:text-orange-500 text-gray-500 disabled:opacity-30 cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[12px] font-bold">arrow_upward</span>
+                              </button>
+                              <button
+                                type="button"
+                                title="Move Down"
+                                onClick={() => handleQuickMovePosition(slide, 1)}
+                                className="w-5 h-5 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-orange-500/10 hover:text-orange-500 text-gray-500 cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[12px] font-bold">arrow_downward</span>
+                              </button>
+                            </div>
                             <span className={cn("px-2 py-0.5 rounded text-[8px] font-bold uppercase border", slide.isCrop !== false ? "bg-blue-500/10 border-blue-500/20 text-blue-500" : "bg-amber-500/10 border-amber-500/20 text-amber-500")}>
                               {slide.isCrop !== false ? "Cropped (Cover)" : "Non-Crop (Contain)"}
                             </span>
@@ -675,14 +764,30 @@ function CpanelStoreSlidesPageContent() {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
-                  <input
-                    type="text"
-                    value={editingSlide.link || ""}
-                    onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
-                    className={inputClass}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Action Link</label>
+                    <input
+                      type="text"
+                      value={editingSlide.link || ""}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, link: e.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-orange-500 tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">format_list_numbered</span>
+                      Position Order (#)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={editingSlide.position || 1}
+                      onChange={(e) => setEditingSlide({ ...editingSlide, position: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className={cn(inputClass, "font-mono font-bold")}
+                    />
+                  </div>
                 </div>
 
                 {/* Dedicated Per-Slide Height Customization (Mobile & Desktop) */}
