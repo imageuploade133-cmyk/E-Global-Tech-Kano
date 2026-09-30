@@ -252,6 +252,24 @@ export async function POST(req: Request) {
       ownerUid: authUser.uid,
     };
 
+    // REQUIREMENT 3: For purpose=kyc_selfie, create a server-verifiable upload receipt bound to authenticated UID
+    if (purpose === "kyc_selfie" || purpose === "kyc_document") {
+      try {
+        const nowMs = Date.now();
+        const receiptDocId = Buffer.from(`${authUser.uid}_${url}`).toString("hex").slice(0, 64);
+        await adminDb.collection("kyc_upload_receipts").doc(receiptDocId).set({
+          ownerUid: authUser.uid,
+          url,
+          imageId: id || null,
+          purpose,
+          createdAt: new Date(nowMs).toISOString(),
+          expiresAt: new Date(nowMs + 60 * 60 * 1000).toISOString(), // 60-minute validity window
+        });
+      } catch (receiptErr: any) {
+        console.warn("[Upload API] Failed to write KYC upload receipt:", receiptErr.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       url,

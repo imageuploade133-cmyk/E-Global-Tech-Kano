@@ -113,49 +113,43 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
         idToken = await user.getIdToken();
       }
 
-      // STEP 1: Securely upload selfie to ImgBB via authenticated /api/upload-image
-      let uploadedUrl = "";
-      if (selfieFile) {
-        const formData = new FormData();
-        formData.append("file", selfieFile);
-        formData.append("purpose", "kyc_selfie");
+      // STEP 1: Securely upload selfie to ImgBB via authenticated /api/upload-image (multipart File upload only)
+      let fileToUpload: File | null = selfieFile;
 
-        const uploadRes = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${idToken}`,
-          },
-          body: formData,
-        });
-
-        const uploadJson = await uploadRes.json();
-        if (!uploadRes.ok || !uploadJson.success || !uploadJson.url) {
-          throw new Error(uploadJson.error || "Failed to upload selfie image.");
+      if (!fileToUpload && selfiePreview && selfiePreview.startsWith("data:")) {
+        const arr = selfiePreview.split(",");
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
         }
-        uploadedUrl = uploadJson.url;
-      } else if (selfiePreview && selfiePreview.startsWith("data:")) {
-        const uploadRes = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            image: selfiePreview,
-            purpose: "kyc_selfie",
-          }),
-        });
-
-        const uploadJson = await uploadRes.json();
-        if (!uploadRes.ok || !uploadJson.success || !uploadJson.url) {
-          throw new Error(uploadJson.error || "Failed to upload selfie image.");
-        }
-        uploadedUrl = uploadJson.url;
+        fileToUpload = new File([u8arr], "kyc_selfie.jpg", { type: mime });
       }
 
-      if (!uploadedUrl) {
-        throw new Error("Could not process selfie image upload.");
+      if (!fileToUpload) {
+        throw new Error("A valid selfie image file is required for verification.");
       }
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("purpose", "kyc_selfie");
+
+      const uploadRes = await fetch("/api/upload-image", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: formData,
+      });
+
+      const uploadJson = await uploadRes.json();
+      if (!uploadRes.ok || !uploadJson.success || !uploadJson.url) {
+        throw new Error(uploadJson.error || "Failed to upload selfie image.");
+      }
+      const uploadedUrl = uploadJson.url;
 
       // STEP 2: Submit KYC payload with verified ImgBB URL (NO base64 fallback)
       const res = await fetch("/api/profile/verify-kyc", {

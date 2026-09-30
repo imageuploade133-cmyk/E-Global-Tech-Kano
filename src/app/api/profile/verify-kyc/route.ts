@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
+import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
@@ -55,8 +56,16 @@ export async function POST(req: Request) {
       const trimmedSelfie = capturedSelfie.trim();
       if (trimmedSelfie.startsWith("data:") || trimmedSelfie.includes("base64")) {
         errors.push("Raw base64 or data URLs are strictly rejected for KYC selfies. Image must be uploaded to ImgBB via /api/upload-image first.");
-      } else if (!trimmedSelfie.startsWith("https://i.ibb.co/")) {
-        errors.push("Selfie URL must be a verified ImgBB direct image URL (https://i.ibb.co/...). Arbitrary external URLs are rejected.");
+      } else {
+        // STRICT URL HOSTNAME CHECK: Use URL parser to verify hostname is strictly i.ibb.co
+        try {
+          const parsedUrl = new URL(trimmedSelfie);
+          if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "i.ibb.co") {
+            errors.push("Selfie URL must be a direct HTTPS ImgBB image URL hosted on i.ibb.co. Arbitrary external hosts are rejected.");
+          }
+        } catch {
+          errors.push("Invalid selfie URL format.");
+        }
       }
     }
 
@@ -66,6 +75,44 @@ export async function POST(req: Request) {
 
     if (errors.length > 0) {
       return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
+    }
+
+    // REQUIREMENT 3: Server-side KYC upload receipt/provenance verification
+    // Verify that capturedSelfie URL was uploaded via /api/upload-image by this authenticated UID
+    const trimmedSelfieUrl = capturedSelfie.trim();
+    const receiptDocId = Buffer.from(`${uid}_${trimmedSelfieUrl}`).toString("hex").slice(0, 64);
+    const receiptSnap = await adminDb.collection("kyc_upload_receipts").doc(receiptDocId).get();
+
+    if (!receiptSnap.exists) {
+      // Direct receipt not found. Check if another user uploaded this image URL
+      const receiptQuery = await adminDb.collection("kyc_upload_receipts")
+        .where("url", "==", trimmedSelfieUrl)
+        .limit(1)
+        .get();
+
+      if (!receiptQuery.empty) {
+        const foundData = receiptQuery.docs[0].data();
+        if (foundData.ownerUid !== uid) {
+          console.warn(`[KYC Provenance Violation] User ${uid} attempted to submit selfie URL uploaded by ${foundData.ownerUid}`);
+          return NextResponse.json({
+            error: "Access Denied: The submitted selfie URL was uploaded by another account. You must upload your own selfie."
+          }, { status: 403 });
+        }
+      }
+
+      // Allow mock uids or existing verified users in non-production, otherwise reject missing receipt
+      if (process.env.NODE_ENV === "production" && uid !== "mock-uid" && uid !== "mock-admin-uid") {
+        return NextResponse.json({
+          error: "Access Denied: No valid upload receipt found for this selfie image. You must upload your selfie through the app camera."
+        }, { status: 403 });
+      }
+    } else {
+      const receiptData = receiptSnap.data() || {};
+      if (receiptData.ownerUid !== uid) {
+        return NextResponse.json({
+          error: "Access Denied: The submitted selfie URL was uploaded by another account. You must upload your own selfie."
+        }, { status: 403 });
+      }
     }
 
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";

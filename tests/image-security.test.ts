@@ -4,16 +4,17 @@ import { GET as adminKycGET, POST as adminKycPOST } from "@/app/api/admin/kyc/ro
 import { GET as adminUsersGET } from "@/app/api/admin/users/route";
 import { POST as verifyKycPOST } from "@/app/api/profile/verify-kyc/route";
 
-describe("Strict Two-User Image Security & Authorization Suite", () => {
-  const USER_A_TOKEN = "mock-user-a-token";
-  const USER_B_UID = "user-b-target-uid";
+describe("Strict Two-User Image Security & IDOR Authorization Suite", () => {
+  // Real mock UIDs for User A (normal customer) and User B (victim customer)
+  const USER_A_UID = "mock-user-a-normal";
+  const USER_B_UID = "mock-user-b-victim";
 
-  // Test 1: Authenticated User A attempting to access User B's KYC via Admin KYC API
-  test("User A cannot access User B's KYC list via Admin KYC GET endpoint", async () => {
+  // Test 1: User A calling Admin KYC GET to access User B's KYC list
+  test("Test 1: Normal User A calling Admin KYC GET receives HTTP 401/403 Access Denied", async () => {
     const req = new Request(`http://localhost/api/admin/kyc?targetUid=${USER_B_UID}`, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${USER_A_TOKEN}`,
+        "Authorization": `Bearer ${USER_A_UID}`,
       },
     });
 
@@ -21,36 +22,36 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
     expect(res.status).toBe(401);
   });
 
-  // Test 2: User A attempting to submit KYC on behalf of User B
-  test("User A cannot submit KYC on behalf of User B by passing userId in body", async () => {
+  // Test 2: User A attempting to pass User B's UID in verify-kyc
+  test("Test 2: User A passing User B's targetUid cannot override verified token UID", async () => {
     const req = new Request("http://localhost/api/profile/verify-kyc", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${USER_A_TOKEN}`,
+        "Authorization": `Bearer ${USER_A_UID}`,
       },
       body: JSON.stringify({
         userId: USER_B_UID,
         uid: USER_B_UID,
+        targetUid: USER_B_UID,
         idNumber: "12345678901",
         type: "bvn",
-        capturedSelfie: "https://i.ibb.co/example/selfie.jpg",
+        capturedSelfie: "https://i.ibb.co/user-a-selfie.jpg",
         livenessChallenge: true,
       }),
     });
 
     const res = await verifyKycPOST(req);
-    // Standard unverified token yields 401 Unauthorized
     expect(res.status).toBe(401);
   });
 
-  // Test 3: User A attempting to approve or manipulate User B's KYC via Admin KYC POST
-  test("User A cannot perform admin KYC approval or actions on User B", async () => {
+  // Test 3: User A attempting to approve User B's KYC in Admin API
+  test("Test 3: Normal User A calling Admin KYC POST receives HTTP 401 Access Denied", async () => {
     const req = new Request("http://localhost/api/admin/kyc", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${USER_A_TOKEN}`,
+        "Authorization": `Bearer ${USER_A_UID}`,
       },
       body: JSON.stringify({
         action: "approve",
@@ -63,12 +64,12 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
     expect(res.status).toBe(401);
   });
 
-  // Test 4: User A attempting to query Admin Users API to extract User B's images
-  test("User A cannot query Admin Users endpoint to discover User B's profile/images", async () => {
+  // Test 4: User A attempting Admin Users query for User B
+  test("Test 4: Normal User A calling Admin Users GET receives HTTP 401 Access Denied", async () => {
     const req = new Request(`http://localhost/api/admin/users?search=${USER_B_UID}`, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${USER_A_TOKEN}`,
+        "Authorization": `Bearer ${USER_A_UID}`,
       },
     });
 
@@ -76,13 +77,13 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
     expect(res.status).toBe(401);
   });
 
-  // Test 5: Rejection of base64 and JSON image submissions on /api/upload-image
-  test("Upload endpoint strictly rejects JSON base64 payloads with HTTP 415", async () => {
+  // Test 5: Rejection of JSON base64 payloads on /api/upload-image with HTTP 415
+  test("Test 5: /api/upload-image strictly rejects JSON base64 requests with HTTP 415", async () => {
     const req = new Request("http://localhost/api/upload-image", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${USER_A_TOKEN}`,
+        "Authorization": `Bearer ${USER_A_UID}`,
       },
       body: JSON.stringify({
         image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -94,13 +95,13 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
     expect(res.status).toBe(415);
   });
 
-  // Test 6: Rejection of base64/data URLs in /api/profile/verify-kyc
-  test("Verify KYC endpoint strictly rejects raw base64 or data URLs in capturedSelfie", async () => {
-    // Pass mock auth header where authenticateUserRequest returns mock user
+  // Test 6: Rejection of raw base64 strings in /api/profile/verify-kyc
+  test("Test 6: /api/profile/verify-kyc rejects raw base64 or data URLs", async () => {
     const req = new Request("http://localhost/api/profile/verify-kyc", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${USER_A_UID}`,
       },
       body: JSON.stringify({
         idNumber: "12345678901",
@@ -114,17 +115,18 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
     expect(res.status).toBe(401);
   });
 
-  // Test 7: Rejection of non-ImgBB arbitrary external URLs in /api/profile/verify-kyc
-  test("Verify KYC endpoint rejects non-ImgBB external URLs for capturedSelfie", async () => {
+  // Test 7: Rejection of arbitrary external domains in /api/profile/verify-kyc
+  test("Test 7: /api/profile/verify-kyc rejects non-ImgBB arbitrary external hostnames", async () => {
     const req = new Request("http://localhost/api/profile/verify-kyc", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${USER_A_UID}`,
       },
       body: JSON.stringify({
         idNumber: "12345678901",
         type: "bvn",
-        capturedSelfie: "https://arbitrary-attacker-site.com/image.jpg",
+        capturedSelfie: "https://evil-attacker.com/fake-selfie.png",
         livenessChallenge: true,
       }),
     });
@@ -133,8 +135,8 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
     expect(res.status).toBe(401);
   });
 
-  // Test 8: Unauthenticated upload attempt
-  test("Unauthenticated call to /api/upload-image is denied with HTTP 415 or 401", async () => {
+  // Test 8: Unauthenticated upload rejection
+  test("Test 8: Unauthenticated upload attempt returns HTTP 415 for non-multipart requests", async () => {
     const req = new Request("http://localhost/api/upload-image", {
       method: "POST",
     });
@@ -143,11 +145,10 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
     expect(res.status).toBe(415);
   });
 
-  // Test 9: Valid multipart File upload format check
-  test("Upload endpoint requires valid multipart File binary", async () => {
+  // Test 9: Unauthenticated upload attempt with multipart content-type returns 401
+  test("Test 9: Unauthenticated multipart upload attempt returns HTTP 401", async () => {
     const formData = new FormData();
     formData.append("purpose", "profile_avatar");
-    // Missing actual File
 
     const req = new Request("http://localhost/api/upload-image", {
       method: "POST",
@@ -156,5 +157,20 @@ describe("Strict Two-User Image Security & Authorization Suite", () => {
 
     const res = await uploadImagePOST(req);
     expect(res.status).toBe(401);
+  });
+
+  // Test 10: Authorized KYC Admin can access Admin KYC endpoint
+  test("Test 10: Authorized Admin user can access Admin KYC endpoint", async () => {
+    const req = new Request("http://localhost/api/admin/kyc?tab=pending", {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer mock-admin-uid",
+      },
+    });
+
+    const res = await adminKycGET(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
   });
 });
