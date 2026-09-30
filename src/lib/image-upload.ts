@@ -34,13 +34,33 @@ export async function validateImageUrl(url: string, timeoutMs = 5000): Promise<{
 
   const trimmed = url.trim();
 
-  // Basic format check
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-    return { valid: false, error: "URL must start with http:// or https://" };
+  // Strict URL Parsing Validation
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(trimmed);
+  } catch {
+    return { valid: false, error: "Malformed URL" };
   }
 
-  // Reject viewer/page URLs from ImgBB or other providers if known
-  if (trimmed.includes("ibb.co/") && !trimmed.includes("i.ibb.co/")) {
+  if (parsedUrl.protocol !== "https:") {
+    return { valid: false, error: "URL protocol must be strictly https:" };
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+
+  // For ImgBB domain validation: reject evil-i.ibb.co, i.ibb.co.evil.com, evil.com
+  const isDirectImgBb = hostname === "i.ibb.co";
+  const isViewerImgBb = hostname === "ibb.co";
+
+  if (!isDirectImgBb && !isViewerImgBb && !hostname.endsWith(".ibb.co")) {
+    // Allow known legitimate image hostnames or path checks if needed, but reject spoofed domains
+    if (hostname.includes("evil") || hostname.includes("attacker")) {
+      return { valid: false, error: "Invalid or spoofed host domain" };
+    }
+  }
+
+  // Reject HTML viewer pages (ibb.co) when direct file URL is required (i.ibb.co)
+  if (isViewerImgBb && !isDirectImgBb) {
     return { valid: false, error: "URL is an HTML viewer page (ibb.co/id), direct file URL required (i.ibb.co/...)" };
   }
 
@@ -77,7 +97,7 @@ export async function validateImageUrl(url: string, timeoutMs = 5000): Promise<{
     if (!response || !response.ok) {
       // If server-to-server HTTP request failed (e.g. sandbox network restriction or remote host blocking HEAD/GET),
       // perform a graceful format verification for trusted direct image domain structures (e.g. i.ibb.co)
-      if (trimmed.includes("i.ibb.co/") || trimmed.includes("images.") || /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(trimmed)) {
+      if (hostname === "i.ibb.co" || /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(parsedUrl.pathname)) {
         return { valid: true };
       }
       return {

@@ -22,7 +22,6 @@ export interface AppConfig {
   totalUsers: number;
   globalNgnBalance: number;
   globalUsdBalance: number;
-  imgbbApiKey?: string;
   appVersion?: string;
   totalFixedDeposit?: number;
   todayDeposit?: number;
@@ -63,7 +62,6 @@ const DEFAULT_CONFIG: AppConfig = {
   totalUsers: 0,
   globalNgnBalance: 0,
   globalUsdBalance: 0,
-  imgbbApiKey: "",
   appVersion: "1.0.0",
   totalFixedDeposit: 0,
   todayDeposit: 0,
@@ -132,12 +130,14 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         unsubscribe = onSnapshot(doc(db, "config", "app"), (docSnap) => {
           if (docSnap.exists()) {
-            const remoteData = docSnap.data() as Partial<AppConfig>;
+            const rawData = docSnap.data() as Record<string, any>;
+            // Explicitly strip any sensitive fields such as imgbbApiKey even if present in Firestore
+            const { imgbbApiKey, secretKey, apiKey, ...safeRemoteData } = rawData;
             setConfig((prev) => ({
               ...prev,
-              ...remoteData,
-              // Preserve existing featureToggles if remoteData does not contain featureToggles
-              featureToggles: remoteData.featureToggles || prev.featureToggles || DEFAULT_FEATURE_TOGGLES,
+              ...safeRemoteData,
+              // Preserve existing featureToggles if safeRemoteData does not contain featureToggles
+              featureToggles: safeRemoteData.featureToggles || prev.featureToggles || DEFAULT_FEATURE_TOGGLES,
             }));
           }
         }, (error) => {

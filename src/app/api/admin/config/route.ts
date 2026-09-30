@@ -2,6 +2,20 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
+/**
+ * Server-side config sanitization helper.
+ * Strictly strips sensitive secret keys (e.g. imgbbApiKey) from any config object
+ * before returning it to browser clients.
+ */
+function sanitizeConfigDoc<T extends Record<string, any>>(config: T): T {
+  if (!config || typeof config !== "object") return config;
+  const sanitized = { ...config };
+  delete sanitized.imgbbApiKey;
+  delete sanitized.secretKey;
+  delete sanitized.apiKey;
+  return sanitized;
+}
+
 export async function GET(req: Request) {
   try {
     const perm = await requireAdminPermission(req, "branding.manage");
@@ -175,9 +189,9 @@ export async function GET(req: Request) {
     };
 
     // REQUIREMENT 3 & 4: Ensure imgbbApiKey is NEVER returned to browser clients
-    delete (mergedConfig as any).imgbbApiKey;
+    const safeConfig = sanitizeConfigDoc(mergedConfig);
 
-    return NextResponse.json({ success: true, config: mergedConfig });
+    return NextResponse.json({ success: true, config: safeConfig });
   } catch (err: any) {
     console.error("[Admin Config GET API] Exception:", err.message);
     return NextResponse.json({ error: "Unauthorized or server exception", details: err.message }, { status: 401 });
@@ -203,11 +217,12 @@ export async function POST(req: Request) {
 
     // Fetch the updated document to return authoritative server data
     const updatedDoc = await adminDb.collection("config").doc("app").get();
+    const safeUpdatedConfig = sanitizeConfigDoc(updatedDoc.data() || {});
 
     return NextResponse.json({
       success: true,
       message: "Branding and app configuration updated successfully!",
-      config: updatedDoc.data()
+      config: safeUpdatedConfig,
     });
   } catch (err: any) {
     console.error("[Admin Config POST API] Error:", err.message);
