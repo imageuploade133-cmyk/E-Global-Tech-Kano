@@ -4,9 +4,6 @@ import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { extractImgBbDirectUrls, validateImageUrl, ImageMetadata } from "@/lib/image-upload";
 
-// Maximum allowable upload file size: 8 MB
-const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
-
 // Allowed image MIME types
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
