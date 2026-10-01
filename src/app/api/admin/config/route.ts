@@ -170,9 +170,16 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] profit aggregation failed:", err.message);
     }
 
+    const hasCustomImgbbApiKey = Boolean(
+      baseConfig.imgbbApiKey &&
+      typeof baseConfig.imgbbApiKey === "string" &&
+      baseConfig.imgbbApiKey.trim().length > 0
+    );
+
     // 3. Compile and merge aggregated values into config object
     const mergedConfig = {
       ...baseConfig,
+      hasCustomImgbbApiKey,
       totalUsers,
       globalNgnBalance,
       globalUsdBalance,
@@ -185,7 +192,7 @@ export async function GET(req: Request) {
       totalDataProfit,
     };
 
-    // REQUIREMENT 3 & 4: Ensure imgbbApiKey is NEVER returned to browser clients
+    // REQUIREMENT 3 & 4: Ensure raw imgbbApiKey is NEVER returned to browser clients
     const safeConfig = sanitizeConfigDoc(mergedConfig);
 
     return NextResponse.json({ success: true, config: safeConfig });
@@ -202,19 +209,53 @@ export async function POST(req: Request) {
       return perm.response!;
     }
 
-    const updates = await req.json();
+    const updates = await req.json() || {};
 
-    // REQUIREMENT 4: Prevent client/admin requests from setting or storing imgbbApiKey in config/app
+    // Check if custom ImgBB API key is being updated or explicitly cleared
+    let customImgbbApiKeyUpdate: string | undefined = undefined;
+    let shouldClearImgbbApiKey = false;
+
+    if ("imgbbApiKey" in updates) {
+      const val = updates.imgbbApiKey;
+      if (val === "" || val === null || updates.clearImgbbApiKey === true) {
+        shouldClearImgbbApiKey = true;
+      } else if (typeof val === "string" && val.trim().length > 0 && val.trim() !== "••••••••") {
+        customImgbbApiKeyUpdate = val.trim();
+      }
+    } else if (updates.clearImgbbApiKey === true) {
+      shouldClearImgbbApiKey = true;
+    }
+
+    // Sanitize non-sensitive updates for client response / config save
     const sanitizedUpdates = (updates && typeof updates === "object")
       ? sanitizeConfigDoc(updates)
       : updates;
 
-    // Secure Firestore write with await - wait for Firestore to confirm success before returning success
+    delete (sanitizedUpdates as any).clearImgbbApiKey;
+
+    // Secure Firestore write with await
     await adminDb.collection("config").doc("app").set(sanitizedUpdates, { merge: true });
+
+    // Handle ImgBB API Key updates securely on the server
+    if (customImgbbApiKeyUpdate) {
+      await adminDb.collection("config").doc("app").set({ imgbbApiKey: customImgbbApiKeyUpdate }, { merge: true });
+    } else if (shouldClearImgbbApiKey) {
+      await adminDb.collection("config").doc("app").set({ imgbbApiKey: "" }, { merge: true });
+    }
 
     // Fetch the updated document to return authoritative server data
     const updatedDoc = await adminDb.collection("config").doc("app").get();
-    const safeUpdatedConfig = sanitizeConfigDoc(updatedDoc.data() || {});
+    const updatedData = updatedDoc.data() || {};
+    const hasCustomImgbbApiKey = Boolean(
+      updatedData.imgbbApiKey &&
+      typeof updatedData.imgbbApiKey === "string" &&
+      updatedData.imgbbApiKey.trim().length > 0
+    );
+
+    const safeUpdatedConfig = {
+      ...sanitizeConfigDoc(updatedData),
+      hasCustomImgbbApiKey,
+    };
 
     return NextResponse.json({
       success: true,
