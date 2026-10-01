@@ -1,7 +1,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import { getMessaging } from "firebase-admin/messaging";
 
-export type NotificationType = "transaction" | "security" | "promo";
+export type NotificationType = "transaction" | "security" | "promo" | "system" | "order" | "chat";
 
 export interface NotificationPayload {
   title: string;
