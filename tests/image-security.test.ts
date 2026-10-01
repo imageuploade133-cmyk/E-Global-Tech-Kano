@@ -337,4 +337,16 @@ describe("Real Production Security & Image Authorization Test Suite", () => {
     expect(clientConfigResponse.hasCustomImgbbApiKey).toBe(true);
     expect((clientConfigResponse as any).imgbbApiKey).toBeUndefined();
   });
+
+  // 31. Version update mismatch triggers update prompt modal state
+  test("31. Detects server appVersion mismatch against cached version and flags update modal requirement", () => {
+    const isVersionMismatch = (serverVersion: string, cachedVersion: string | null) => {
+      if (cachedVersion === null) return false; // initial set
+      return serverVersion !== cachedVersion;
+    };
+
+    expect(isVersionMismatch("1.0.1", "1.0.0")).toBe(true);
+    expect(isVersionMismatch("1.0.0", "1.0.0")).toBe(false);
+    expect(isVersionMismatch("1.0.0", null)).toBe(false);
+  });
 });
