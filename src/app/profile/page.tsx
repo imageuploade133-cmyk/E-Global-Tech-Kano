@@ -70,6 +70,7 @@ export default function ProfilePage() {
   // Security Toggles State
   const isPinRequired = userData?.isPinRequired !== false;
   const isFaceIdEnabled = userData?.isFaceIdEnabled === true;
+  const is2faOtpEnabled = userData?.is2faOtpEnabled === true;
   const dailyLimit = userData?.dailyLimit ?? 500000;
 
   // Resolve or retrieve the permanent static account details if verified
@@ -185,12 +186,36 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSelectLimitCategory = async (limit: number) => {
+  const handleToggle2faOtp = async (enteredPin: string): Promise<boolean> => {
     try {
-      await updateUserData({ dailyLimit: limit });
-      toast.success(`Daily limit set to ₦${new Intl.NumberFormat("en-NG").format(limit)}`);
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      // Verify 4-digit Transaction PIN first
+      const verifyRes = await fetch("/api/auth/pin-verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ pin: enteredPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        toast.error(verifyData.error || "Invalid Access PIN.");
+        return false;
+      }
+
+      const targetState = !is2faOtpEnabled;
+      await updateUserData({ is2faOtpEnabled: targetState });
+      toast.success(targetState ? "2FA Login OTP Verification Enabled! 🛡️" : "2FA Login OTP Verification Disabled");
+      return true;
     } catch {
-      toast.error("Failed to update transfer limit");
+      toast.error("Failed to update 2FA state");
+      return false;
     }
   };
 
@@ -243,14 +268,15 @@ export default function ProfilePage() {
           <SecuritySettingsSection
             isPinRequired={isPinRequired}
             isFaceIdEnabled={isFaceIdEnabled}
+            is2faOtpEnabled={is2faOtpEnabled}
             onTogglePinRequired={handleTogglePinRequired}
             onToggleFaceId={handleToggleFaceId}
+            onToggle2faOtp={handleToggle2faOtp}
           />
 
           {/* Section: Daily Transfer Limit */}
           <TransferLimitsSection
             dailyLimit={dailyLimit}
-            onSelectLimitCategory={handleSelectLimitCategory}
           />
 
           {/* Section: Change Access PIN Form */}
