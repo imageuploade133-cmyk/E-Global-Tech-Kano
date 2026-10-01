@@ -41,6 +41,7 @@ function CpanelSettingsPageContent() {
   const [whatsappPollingIntervalMinutes, setWhatsappPollingIntervalMinutes] = useState(config.whatsappPollingIntervalMinutes || 1);
   const [imgbbApiKeyInput, setImgbbApiKeyInput] = useState(config.hasCustomImgbbApiKey ? "••••••••" : "");
   const [hasCustomImgbbApiKey, setHasCustomImgbbApiKey] = useState(Boolean(config.hasCustomImgbbApiKey));
+  const [appVersionInput, setAppVersionInput] = useState(config.appVersion || "1.0.0");
 
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -71,6 +72,7 @@ function CpanelSettingsPageContent() {
     setWhatsappPollingEnabled(config.whatsappPollingEnabled !== false);
     setWhatsappPollingIntervalMinutes(config.whatsappPollingIntervalMinutes || 1);
     setHasCustomImgbbApiKey(Boolean(config.hasCustomImgbbApiKey));
+    setAppVersionInput(config.appVersion || "1.0.0");
     if (config.hasCustomImgbbApiKey && !imgbbApiKeyInput) {
       setImgbbApiKeyInput("••••••••");
     }
@@ -107,6 +109,7 @@ function CpanelSettingsPageContent() {
         maxKycUploadSizeMb: uploadSizeInput,
         whatsappPollingEnabled,
         whatsappPollingIntervalMinutes,
+        appVersion: appVersionInput.trim() || "1.0.0",
       };
 
       if (imgbbApiKeyInput && imgbbApiKeyInput !== "••••••••") {
@@ -358,6 +361,56 @@ function CpanelSettingsPageContent() {
                   className={inputClass}
                 />
                 <p className="text-[9px] text-gray-400 mt-1">Configure the maximum permitted file size in MB for Identity document image uploads.</p>
+              </div>
+
+              {/* Platform App Version Release Controller */}
+              <div className={cn("p-4 rounded-xl border space-y-3 transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">system_update</span>
+                      Platform App Version Release & Deploy Update
+                    </label>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      Update or increment the system app version (e.g. 1.0.1, 1.0.2, 1.1.0) when deploying new updates to Vercel. All connected clients will instantly receive a full-screen drawer modal prompting them to click &quot;UPDATE NOW&quot; to clear storage and load fresh Vercel assets.
+                    </p>
+                  </div>
+                  <span className="font-mono px-2.5 py-1 bg-[#FC7A00]/10 border border-[#FC7A00]/30 text-[#FC7A00] rounded-xl text-[10px] font-black">
+                    LIVE: v{config.appVersion || "1.0.0"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Target Release Version</label>
+                    <input
+                      type="text"
+                      value={appVersionInput}
+                      onChange={(e) => setAppVersionInput(e.target.value)}
+                      placeholder="e.g. 1.0.1"
+                      className={cn(inputClass, "font-mono font-bold")}
+                    />
+                  </div>
+
+                  <div className="flex items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const parts = appVersionInput.split(".");
+                        if (parts.length === 3 && !isNaN(Number(parts[2]))) {
+                          parts[2] = String(Number(parts[2]) + 1);
+                          setAppVersionInput(parts.join("."));
+                        } else {
+                          setAppVersionInput("1.0.1");
+                        }
+                      }}
+                      className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer h-10 flex items-center gap-1 shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                      <span>+ Increment Version</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* ImgBB Image Storage Gateway API Key Controls */}

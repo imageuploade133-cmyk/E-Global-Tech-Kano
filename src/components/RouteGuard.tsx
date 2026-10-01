@@ -64,9 +64,9 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     second: "2-digit"
   }));
 
-  // System-wide update states for real-time versions
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(0);
+  // System-wide update states for real-time versions & full-screen drawer modal
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
 
   const initializingDeviceRef = useRef(false);
 
@@ -151,48 +151,59 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Real-time server-side version mismatch update controller (Bypasses caching on Ctrl+F5)
+  // Real-time server-side version mismatch update controller
   useEffect(() => {
     const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
     if (isMock) return;
     if (typeof window === "undefined" || !config?.appVersion) return;
 
     const serverVersion = config.appVersion;
-    const cachedVersion = sessionStorage.getItem("cached_app_version");
+    const cachedVersion = localStorage.getItem("app_version") || sessionStorage.getItem("cached_app_version");
 
     if (cachedVersion === null) {
+      localStorage.setItem("app_version", serverVersion);
       sessionStorage.setItem("cached_app_version", serverVersion);
     } else if (cachedVersion !== serverVersion) {
-      setIsUpdating(true);
-      setUpdateProgress(0);
-
-      const interval = setInterval(() => {
-        setUpdateProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-
-            // Programmatically purge all Cache Storage and Service Worker cached files instantly
-            if ("caches" in window) {
-              caches.keys().then((keys) => {
-                Promise.all(keys.map((key) => caches.delete(key)));
-              });
-            }
-
-            // Clear sessionStorage completely
-            sessionStorage.clear();
-
-            // Set new app version cache and force reload
-            sessionStorage.setItem("cached_app_version", serverVersion);
-            window.location.reload();
-            return 100;
-          }
-          return prev + 5;
-        });
-      }, 150);
-
-      return () => clearInterval(interval);
+      setShowVersionModal(true);
     }
   }, [config?.appVersion]);
+
+  const handlePerformAppUpdate = async () => {
+    if (!config?.appVersion) return;
+    setIsApplyingUpdate(true);
+
+    try {
+      // 1. Purge CacheStorage
+      if ("caches" in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      }
+
+      // 2. Unregister Service Workers
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+      }
+
+      // 3. Clear Local Storage and Session Storage
+      const newVersion = config.appVersion;
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // 4. Save new app version
+      localStorage.setItem("app_version", newVersion);
+      sessionStorage.setItem("cached_app_version", newVersion);
+
+      // 5. Force hard refresh from Vercel
+      toast.success("Update applied! Reloading fresh application...");
+      setTimeout(() => {
+        window.location.href = window.location.origin + pathname + "?v=" + Date.now();
+      }, 300);
+    } catch (err: any) {
+      console.error("[Update Error]:", err);
+      window.location.reload();
+    }
+  };
 
   // Detect and verify Flutterwave redirects globally on app startup
   useEffect(() => {
@@ -616,48 +627,88 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Render high-fidelity professional system update overlay (Ctrl+F5 instant reload powered)
-  if (isUpdating) {
+  // Render Full-Screen Drawer Modal when a new version update is detected
+  if (showVersionModal) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 p-6 z-[9999999] relative">
+      <div className="fixed inset-0 z-[9999999] bg-[#0c0f17] text-white flex flex-col justify-between p-6 md:p-12 overflow-hidden shadow-2xl select-none">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <AppLogo size={32} />
+            <span className="font-extrabold text-sm tracking-wider uppercase">E-GLOBAL PAY</span>
+          </div>
+          <span className="px-3 py-1 bg-orange-500/10 border border-orange-500/30 text-[#FC7A00] rounded-full text-[10px] font-black uppercase tracking-wider">
+            VERSION UPDATE
+          </span>
+        </div>
+
+        {/* Center Content Drawer */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm bg-white rounded-[32px] p-6 text-center space-y-6 border border-gray-800/10"
+          initial={{ y: 30, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="max-w-md mx-auto my-auto w-full text-center space-y-6"
         >
-          <div className="space-y-4">
-            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-4 border-gray-100 border-t-[#FC7A00] border-r-emerald-500"
-              />
-              <span className="material-symbols-outlined text-[28px] text-[#FC7A00] animate-bounce">sync</span>
-            </div>
-            <h2 className="font-hanken font-black text-lg text-black uppercase tracking-wider leading-none">
-              SYSTEM UPGRADE IN PROGRESS
-            </h2>
-            <p className="font-hanken text-[11px] text-[#FC7A00] font-extrabold uppercase tracking-widest mt-1">
-              Optimizing application files
-            </p>
-            <p className="font-hanken text-xs text-gray-500 leading-relaxed font-semibold">
-              We are applying a direct system-wide update to your application. Caches are being synchronized for instant launch.
-            </p>
+          <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+            <motion.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+              className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#FC7A00]/20 to-orange-500/5 border border-[#FC7A00]/30 flex items-center justify-center"
+            >
+              <span className="material-symbols-outlined text-[42px] text-[#FC7A00]">system_update</span>
+            </motion.div>
           </div>
 
           <div className="space-y-2">
-            <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-              <span>Memory Clearance</span>
-              <span className="font-mono text-black font-extrabold">{updateProgress}%</span>
+            <h1 className="font-hanken font-extrabold text-xl md:text-2xl uppercase tracking-tight text-white leading-tight">
+              NEW VERSION UPDATE AVAILABLE
+            </h1>
+            <div className="inline-block px-3 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full font-mono text-xs font-bold">
+              VERSION {config?.appVersion || "1.0.1"} READY
             </div>
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-[#FC7A00] to-emerald-500 rounded-full"
-                style={{ width: `${updateProgress}%` }}
-              />
+          </div>
+
+          <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 text-left space-y-3">
+            <p className="text-xs text-gray-300 font-semibold leading-relaxed">
+              An official new version update has been released on Vercel. Please click <span className="text-[#FC7A00] font-bold">UPDATE NOW</span> below to clear browser local storage and load the fresh deployment immediately.
+            </p>
+            <div className="space-y-2 pt-1 border-t border-gray-800/80">
+              <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
+                <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
+                <span>Clears local storage & browser cache</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
+                <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
+                <span>Loads latest Vercel deployment assets</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
+                <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
+                <span>Includes security patches & fixes</span>
+              </div>
             </div>
           </div>
         </motion.div>
+
+        {/* Bottom Action Footer */}
+        <div className="max-w-md mx-auto w-full pt-4">
+          <button
+            type="button"
+            disabled={isApplyingUpdate}
+            onClick={handlePerformAppUpdate}
+            className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] active:scale-98 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 disabled:opacity-60"
+          >
+            {isApplyingUpdate ? (
+              <>
+                <ButtonSpinner />
+                <span>Clearing Storage & Loading New Build...</span>
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-[18px]">download_for_offline</span>
+                <span>UPDATE NOW</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     );
   }
