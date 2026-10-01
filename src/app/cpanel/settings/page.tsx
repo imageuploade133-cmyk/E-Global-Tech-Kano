@@ -83,7 +83,7 @@ function CpanelSettingsPageContent() {
       await updateConfig({ imgbbApiKey: "", clearImgbbApiKey: true } as any);
       setImgbbApiKeyInput("");
       setHasCustomImgbbApiKey(false);
-      toast.success("Custom ImgBB API Key removed. System is now using Vercel environment key.");
+      toast.success("Custom ImgBB API Key removed. System is now using default server environment key.");
     } catch (err: any) {
       toast.error(err.message || "Failed to remove custom ImgBB key.");
     }
@@ -372,7 +372,7 @@ function CpanelSettingsPageContent() {
                       Platform App Version Release & Deploy Update
                     </label>
                     <p className="text-[9px] text-gray-400 mt-0.5">
-                      Update or increment the system app version (e.g. 1.0.1, 1.0.2, 1.1.0) when deploying new updates to Vercel. All connected clients will instantly receive a full-screen drawer modal prompting them to click &quot;UPDATE NOW&quot; to clear storage and load fresh Vercel assets.
+                      Update or increment the system app version (e.g. 1.0.1, 1.0.2, 1.1.0) when deploying new platform updates. All connected clients will instantly receive a full-screen drawer modal prompting them to click &quot;UPDATE NOW&quot; to clear storage and load fresh system assets.
                     </p>
                   </div>
                   <span className="font-mono px-2.5 py-1 bg-[#FC7A00]/10 border border-[#FC7A00]/30 text-[#FC7A00] rounded-xl text-[10px] font-black">
@@ -422,7 +422,7 @@ function CpanelSettingsPageContent() {
                       ImgBB Image Storage Gateway API Key
                     </label>
                     <p className="text-[9px] text-gray-400 mt-0.5">
-                      Enter a custom ImgBB API key to override the Vercel environment key. If left blank, the system will automatically use the key configured in Vercel environment.
+                      Enter a custom ImgBB API key to override the server environment key. If left blank, the system will automatically use the key configured in server environment.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -434,7 +434,7 @@ function CpanelSettingsPageContent() {
                           : "bg-blue-500/10 text-blue-600 border-blue-500/30"
                       )}
                     >
-                      {hasCustomImgbbApiKey ? "CUSTOM KEY ACTIVE" : "VERCEL ENV FALLBACK"}
+                      {hasCustomImgbbApiKey ? "CUSTOM KEY ACTIVE" : "SERVER ENV FALLBACK"}
                     </span>
                     {hasCustomImgbbApiKey && (
                       <button
@@ -458,8 +458,8 @@ function CpanelSettingsPageContent() {
                   />
                   <p className="text-[9px] text-gray-400">
                     {hasCustomImgbbApiKey
-                      ? "A custom key is currently active. Type a new key to change it, or click 'Remove Custom Key' to use Vercel env."
-                      : "Currently using Vercel process.env.IMGBB_API_KEY. Enter a key above if you wish to override it."}
+                      ? "A custom key is currently active. Type a new key to change it, or click 'Remove Custom Key' to use server env."
+                      : "Currently using server process.env.IMGBB_API_KEY. Enter a key above if you wish to override it."}
                   </p>
                 </div>
               </div>
