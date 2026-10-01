@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Target user ID is required for single user push notifications." }, { status: 400 });
     }
 
-    const adminEmail = perm.admin?.email || "admin@system";
+    const adminEmail = perm.auth?.email || "admin@system";
 
     const result = await NotificationService.sendAdminBroadcastNotification({
       target,
