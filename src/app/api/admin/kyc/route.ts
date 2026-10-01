@@ -259,6 +259,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected." }, { status: 400 });
       }
 
+      const assignedTier = requestBody.tier || "Tier 2";
+      const numDaily = Number(requestBody.dailyLimit) || (assignedTier === "Tier 3" ? 50000000 : assignedTier === "Tier 2" ? 5000000 : 500000);
+      const numSingle = Number(requestBody.singleLimit) || (assignedTier === "Tier 3" ? 10000000 : assignedTier === "Tier 2" ? 2000000 : 200000);
+
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${idToken}`
@@ -276,11 +280,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: result.message || "Failed to approve KYC in gateway." }, { status: response.status });
       }
 
+      // Update user document in Firestore with approved Tier level and custom limits
+      await adminDb.collection("users").doc(targetUid).set({
+        tier: assignedTier,
+        dailyLimit: numDaily,
+        singleLimit: numSingle,
+        kycStatus: "VERIFIED",
+        kycVerifiedAt: new Date().toISOString(),
+        kycVerifiedBy: perm.auth?.email || "admin@system",
+      }, { merge: true });
+
       try {
         const { NotificationService } = await import("@/services/notification-service");
         await NotificationService.sendPushNotification(targetUid, {
           title: "KYC Verified! 🎉",
-          body: "Congratulations! Your identity verification has been approved. Your virtual account is ready for full platform access.",
+          body: `Congratulations! Your identity verification has been approved for ${assignedTier}. Your daily transfer limit is ₦${numDaily.toLocaleString("en-NG")}.`,
           type: "security"
         });
       } catch (notifErr: any) {

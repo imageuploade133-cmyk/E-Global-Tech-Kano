@@ -399,9 +399,9 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
         { id: "users", label: "Users & Permissions", icon: "group", href: "/cpanel/users", permission: "users.view" },
         { id: "virtual_accounts", label: "Virtual Accounts", icon: "account_balance_wallet", href: "/cpanel/virtual-accounts", permission: "users.view" },
         { id: "kyc", label: "KYC Approvals", icon: "verified_user", href: "/cpanel/kyc", permission: "kyc.view" },
-        { id: "virtual_accounts", label: "Virtual Account", icon: "account_balance_wallet", href: "/cpanel/virtual-account", permission: "virtual_accounts.view" },
+        { id: "limit_requests", label: "Limit Requests", icon: "manage_accounts", href: "/cpanel/limit-requests", permission: "users.manage" },
         { id: "freeze", label: "Account Freeze", icon: "ac_unit", href: "/cpanel/freeze", permission: "freeze.manage" },
-        { id: "limits", label: "Account Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },
+        { id: "limits", label: "Global Transfer Limits", icon: "trending_up", href: "/cpanel/limits", permission: "limits.manage" },
       ]
     },
     {

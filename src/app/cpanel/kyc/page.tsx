@@ -51,9 +51,14 @@ function CpanelKycPageContent() {
   const [kycHasMore, setKycHasMore] = useState(false);
   const [kycTotalCount, setKycTotalCount] = useState(0);
 
-  // Inspector and Editor Drawer States
+  // Inspector, Editor & Approval Drawer States
   const [inspectingUser, setInspectingUser] = useState<PendingKycUser | null>(null);
   const [editingUser, setEditingUser] = useState<PendingKycUser | null>(null);
+  const [approvingKycUser, setApprovingKycUser] = useState<PendingKycUser | null>(null);
+  const [approveTier, setApproveTier] = useState<"Tier 1" | "Tier 2" | "Tier 3">("Tier 2");
+  const [approveProvider, setApproveProvider] = useState<"flutterwave" | "squad">("flutterwave");
+  const [approveDailyLimit, setApproveDailyLimit] = useState<number>(5000000);
+  const [approveSingleLimit, setApproveSingleLimit] = useState<number>(2000000);
 
   // Edit form state
   const [editName, setEditName] = useState("");
@@ -204,6 +209,53 @@ function CpanelKycPageContent() {
     fetchPendingKyc(false, kycTab);
   }, [kycTab]);
 
+  const handleKycApproveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvingKycUser) return;
+
+    setIsProcessingKyc(approvingKycUser.uid);
+    toast.loading("Approving KYC, setting transaction limits & provisioning account...");
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/kyc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "approve",
+          targetUid: approvingKycUser.uid,
+          provider: approveProvider,
+          tier: approveTier,
+          dailyLimit: approveDailyLimit,
+          singleLimit: approveSingleLimit,
+        }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "KYC Approved and virtual account provisioned!");
+        setPendingKycUser((prev) => prev.filter((u) => u.uid !== approvingKycUser.uid));
+        setApprovingKycUser(null);
+      } else {
+        toast.error(data.error || "Failed to approve KYC.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("API connection error during KYC approval.");
+    } finally {
+      setIsProcessingKyc(null);
+    }
+  };
+
   const handleProcessKyc = async (targetUid: string, action: "verify" | "approve" | "reject" | "retry" | "move_to_pending") => {
     setIsProcessingKyc(targetUid);
     const reason = rejectionReason[targetUid] || "";
@@ -234,7 +286,7 @@ function CpanelKycPageContent() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ action, targetUid, reason, provider }),
+        body: JSON.stringify({ action, targetUid, reason, provider, tier: "Tier 2" }),
       });
 
       const data = await res.json();
@@ -530,7 +582,13 @@ function CpanelKycPageContent() {
                             icon: "verified",
                             variant: "emerald",
                             disabled: !(u.kycStatus === "IDENTITY_VERIFIED" || u.kycStatus === "PENDING" || u.kycStatus === "UNVERIFIED"),
-                            onClick: () => handleProcessKyc(u.uid, "approve"),
+                            onClick: () => {
+                              setApprovingKycUser(u);
+                              setApproveProvider(selectedProvider[u.uid] || "flutterwave");
+                              setApproveTier("Tier 2");
+                              setApproveDailyLimit(5000000);
+                              setApproveSingleLimit(2000000);
+                            },
                           },
                           {
                             label: "Retry Provisioning",
@@ -819,6 +877,118 @@ function CpanelKycPageContent() {
                     <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
                   <span>Save KYC Details</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* KYC Approval & Transaction Limits Customizer Modal */}
+      {approvingKycUser && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+          <div className={cn("w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5", panelClass)}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-emerald-500 text-[24px]">verified</span>
+                <div>
+                  <h3 className="text-base font-extrabold uppercase">Approve KYC & Set Limits</h3>
+                  <p className="text-[10px] text-gray-400">Set customer Tier level and transaction limits.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setApprovingKycUser(null)}
+                className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleKycApproveSubmit} className="space-y-4 text-xs">
+              <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-2xl border space-y-1">
+                <span className="text-[10px] font-black uppercase text-gray-400">Customer</span>
+                <p className="font-extrabold text-sm text-gray-900 dark:text-white">{approvingKycUser.name}</p>
+                <p className="font-mono text-[11px] text-gray-400">{approvingKycUser.email}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Virtual Account Gateway Provider *</label>
+                <select
+                  value={approveProvider}
+                  onChange={(e) => setApproveProvider(e.target.value as any)}
+                  className={cn(inputClass, "cursor-pointer font-bold")}
+                >
+                  <option value="flutterwave">Flutterwave Gateway Rail</option>
+                  <option value="squad">Squadco (GTBank) Virtual Account Rail</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Assign Tier Level *</label>
+                <select
+                  value={approveTier}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setApproveTier(val);
+                    if (val === "Tier 3") {
+                      setApproveDailyLimit(50000000);
+                      setApproveSingleLimit(10000000);
+                    } else if (val === "Tier 2") {
+                      setApproveDailyLimit(5000000);
+                      setApproveSingleLimit(2000000);
+                    } else {
+                      setApproveDailyLimit(500000);
+                      setApproveSingleLimit(200000);
+                    }
+                  }}
+                  className={cn(inputClass, "cursor-pointer font-bold")}
+                >
+                  <option value="Tier 1">Tier 1 (₦500,000 / Day)</option>
+                  <option value="Tier 2">Tier 2 (₦5,000,000 / Day)</option>
+                  <option value="Tier 3">Tier 3 (₦50,000,000 / Day)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Daily Transfer Limit (₦)</label>
+                <input
+                  type="number"
+                  required
+                  min={100000}
+                  value={approveDailyLimit}
+                  onChange={(e) => setApproveDailyLimit(Number(e.target.value))}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold uppercase text-gray-400">Single Transfer Limit (₦)</label>
+                <input
+                  type="number"
+                  required
+                  min={50000}
+                  value={approveSingleLimit}
+                  onChange={(e) => setApproveSingleLimit(Number(e.target.value))}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200/50 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setApprovingKycUser(null)}
+                  disabled={!!isProcessingKyc}
+                  className="px-4 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!!isProcessingKyc}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isProcessingKyc && <ButtonSpinner />}
+                  <span>Approve & Set Limits</span>
                 </button>
               </div>
             </form>
