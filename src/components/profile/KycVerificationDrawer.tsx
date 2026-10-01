@@ -303,17 +303,17 @@ export function KycVerificationDrawer({
             <canvas ref={canvasRef} className="hidden" />
 
             {/* Content States Container */}
-            <div className="flex-grow flex flex-col justify-start items-center w-full px-6 overflow-y-auto text-center py-6 space-y-6">
+            <div className="flex-1 min-h-0 w-full px-6 overflow-y-auto text-center py-4 space-y-5">
 
               {/* STATE 1: PERSISTENT UNDER REVIEW FEEDBACK SCREEN */}
               {submitStep === "review" && (
-                <div className="flex flex-col items-center space-y-6 w-full py-4 animate-fadeIn">
-                  <div className="w-18 h-18 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 animate-bounce-subtle">
-                    <span className="material-symbols-outlined text-[40px]" style={{ fontVariationSettings: '"FILL" 1' }}>pending_actions</span>
+                <div className="flex flex-col items-center space-y-5 w-full py-2 animate-fadeIn">
+                  <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200/80 flex items-center justify-center text-amber-600 animate-bounce-subtle shadow-sm">
+                    <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>pending_actions</span>
                   </div>
 
-                  <div className="space-y-3">
-                    <span className="px-3.5 py-1 text-[10px] font-black tracking-widest uppercase bg-amber-100/60 text-amber-800 border border-amber-200/50 rounded-full">
+                  <div className="space-y-2">
+                    <span className="px-3.5 py-1 text-[10px] font-black tracking-widest uppercase bg-amber-100/80 text-amber-900 border border-amber-300/50 rounded-full shadow-xs">
                       Under Review
                     </span>
                     <h4 className="font-bodoni text-xl font-bold text-black tracking-tight pt-1">
@@ -324,59 +324,42 @@ export function KycVerificationDrawer({
                     </p>
                   </div>
 
-                  {/* Informational Guidelines Card */}
-                  <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4 text-left w-full space-y-3.5">
-                    <div className="flex gap-3">
-                      <span className="material-symbols-outlined text-[#FC7A00] font-black text-[20px]">verified_user</span>
+                  {/* Robust Verification Timeline Card */}
+                  <div className="bg-gradient-to-b from-gray-50 to-amber-50/20 border border-gray-200 rounded-2xl p-4 text-left w-full space-y-3.5 shadow-xs">
+                    <div className="flex gap-3 items-start">
+                      <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-[#FC7A00] shrink-0 mt-0.5">
+                        <span className="material-symbols-outlined font-bold text-[18px]">verified_user</span>
+                      </div>
                       <div className="space-y-0.5">
-                        <p className="text-[11px] font-extrabold uppercase text-gray-800 tracking-tight">Validation Queue Active</p>
-                        <p className="text-[10px] text-gray-500 font-semibold leading-relaxed">Our compliance desk is currently validating your linked bank references and selfie biometric markers.</p>
+                        <p className="text-[11px] font-extrabold uppercase text-gray-900 tracking-tight">Validation Queue Active</p>
+                        <p className="text-[10px] text-gray-600 font-semibold leading-relaxed">Our compliance desk is currently validating your linked bank references and selfie biometric markers.</p>
                       </div>
                     </div>
-                    <div className="flex gap-3">
-                      <span className="material-symbols-outlined text-emerald-500 font-black text-[20px]">account_balance_wallet</span>
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] font-extrabold uppercase text-gray-800 tracking-tight">Instant Account Provisioning</p>
-                        <p className="text-[10px] text-gray-500 font-semibold leading-relaxed">As soon as verified, static payment account links will be generated automatically for your profile.</p>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Interactive Button to Resend/Override and enter everything again */}
-                  <div className="space-y-3 w-full pt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsOverrideActive(true);
-                        setSubmitStep("form");
-                        toast.info("Input fields unlocked. Please re-enter your details.");
-                      }}
-                      className="w-full py-3.5 bg-black hover:bg-gray-900 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all shadow-xs"
-                    >
-                      Re-verify
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="w-full py-3 bg-gray-100 hover:bg-gray-150 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all"
-                    >
-                      Close
-                    </button>
+                    <div className="border-t border-gray-200/60 pt-3 flex gap-3 items-start">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                        <span className="material-symbols-outlined font-bold text-[18px]">account_balance_wallet</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] font-extrabold uppercase text-gray-900 tracking-tight">Instant Account Provisioning</p>
+                        <p className="text-[10px] text-gray-600 font-semibold leading-relaxed">As soon as verified, static payment account links will be generated automatically for your profile.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* STATE 2: INTERACTIVE KYC SUBMISSION FORM */}
               {submitStep === "form" && (
-                <form onSubmit={handleFormSubmit} className="w-full space-y-5 text-left animate-fadeIn">
+                <form id="kyc-form" onSubmit={handleFormSubmit} className="w-full space-y-4 text-left animate-fadeIn pb-2">
 
                   {/* Premium Warning banner */}
-                  <div className="bg-[#FFF8EC] border border-[#FFE8CC] rounded-2xl p-4 flex gap-3 text-left">
-                    <span className="material-symbols-outlined text-[#FC7A00] font-bold text-[24px] shrink-0">warning</span>
+                  <div className="bg-[#FFF8EC] border border-[#FFE8CC] rounded-2xl p-3.5 flex gap-3 text-left">
+                    <span className="material-symbols-outlined text-[#FC7A00] font-bold text-[22px] shrink-0 mt-0.5">warning</span>
                     <div>
                       <h4 className="font-hanken font-bold text-[11px] text-[#FC7A00] uppercase tracking-wider">Verification Required</h4>
-                      <p className="font-hanken text-[11px] leading-relaxed font-semibold text-[#8F4F00] mt-0.5">
-                        In compliance with Central Bank of Nigeria (CBN) regulations, you must link your verified BVN/NIN and record a live selfie to unlock funding, transfers, cards, and utility payments.
+                      <p className="font-hanken text-[10.5px] leading-relaxed font-semibold text-[#8F4F00] mt-0.5">
+                        In compliance with Central Bank of Nigeria (CBN) regulations, link your verified BVN/NIN and record a live selfie to unlock funding, transfers, cards, and utility payments.
                       </p>
                     </div>
                   </div>
@@ -389,7 +372,7 @@ export function KycVerificationDrawer({
                         type="button"
                         onClick={() => setKycType("bvn")}
                         className={cn(
-                          "py-2.5 text-xs font-black font-hanken rounded-full transition-all cursor-pointer uppercase tracking-wider",
+                          "py-2 text-xs font-black font-hanken rounded-full transition-all cursor-pointer uppercase tracking-wider",
                           kycType === "bvn" ? "bg-[#FC7A00] text-white shadow-sm" : "bg-transparent text-gray-400"
                         )}
                       >
@@ -399,7 +382,7 @@ export function KycVerificationDrawer({
                         type="button"
                         onClick={() => setKycType("nin")}
                         className={cn(
-                          "py-2.5 text-xs font-black font-hanken rounded-full transition-all cursor-pointer uppercase tracking-wider",
+                          "py-2 text-xs font-black font-hanken rounded-full transition-all cursor-pointer uppercase tracking-wider",
                           kycType === "nin" ? "bg-[#FC7A00] text-white shadow-sm" : "bg-transparent text-gray-400"
                         )}
                       >
@@ -420,24 +403,24 @@ export function KycVerificationDrawer({
                       value={idNumber}
                       onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, "").slice(0, 11))}
                       placeholder="22553441111"
-                      className="w-full bg-white border border-gray-300 rounded-2xl px-4 py-3.5 text-xs font-bold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00] shadow-sm transition-all"
+                      className="w-full bg-white border border-gray-300 rounded-2xl px-4 py-3 text-xs font-bold text-black placeholder-gray-400 outline-none focus:border-[#FC7A00] shadow-sm transition-all"
                     />
                   </div>
 
                   {/* Selfie match circular box camera */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block text-left">
                       Biometric Live Selfie Match
                     </label>
 
-                    <div className="border-2 border-dashed border-[#00C060] rounded-2xl p-4 flex flex-col items-center justify-center bg-gray-50/50 relative overflow-hidden">
+                    <div className="border-2 border-dashed border-[#00C060] rounded-2xl p-3.5 flex flex-col items-center justify-center bg-gray-50/50 relative overflow-hidden">
                       {selfiePreview ? (
-                        <div className="flex flex-col items-center space-y-3">
-                          <div className="relative w-28 h-26 rounded-full overflow-hidden border-4 border-[#00C060] shadow-md">
+                        <div className="flex flex-col items-center space-y-2">
+                          <div className="relative w-24 h-22 rounded-full overflow-hidden border-4 border-[#00C060] shadow-md">
                             <img src={selfiePreview} alt="Selfie Capture" className="w-full h-full object-cover" />
                           </div>
                           <div className="flex items-center gap-1.5 text-[#00C060] font-black text-xs uppercase tracking-wide">
-                            <span className="material-symbols-outlined text-[18px] font-bold">check_circle</span>
+                            <span className="material-symbols-outlined text-[16px] font-bold">check_circle</span>
                             <span>Selfie Capture Saved</span>
                           </div>
                           <button
@@ -446,7 +429,7 @@ export function KycVerificationDrawer({
                               setSelfiePreview(null);
                               startCamera();
                             }}
-                            className="text-xs text-gray-500 hover:text-black font-bold underline cursor-pointer"
+                            className="text-[11px] text-gray-500 hover:text-black font-bold underline cursor-pointer"
                           >
                             Tap to capture another picture
                           </button>
@@ -454,10 +437,10 @@ export function KycVerificationDrawer({
                       ) : (
                         <div
                           onClick={startCamera}
-                          className="flex flex-col items-center justify-center text-center space-y-2 py-3 cursor-pointer hover:bg-gray-100/50 w-full transition-colors rounded-xl"
+                          className="flex flex-col items-center justify-center text-center space-y-1.5 py-2 cursor-pointer hover:bg-gray-100/50 w-full transition-colors rounded-xl"
                         >
-                          <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[#00C060] animate-pulse">
-                            <span className="material-symbols-outlined text-[24px] font-bold">photo_camera</span>
+                          <div className="w-11 h-11 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-[#00C060] animate-pulse">
+                            <span className="material-symbols-outlined text-[22px] font-bold">photo_camera</span>
                           </div>
                           <p className="text-[11px] font-bold text-gray-700">Open Camera & Take Selfie</p>
                           <p className="text-[9px] text-gray-400 font-semibold">Align face to document for verification match</p>
@@ -471,7 +454,7 @@ export function KycVerificationDrawer({
                     <div
                       onClick={() => fileInputRef.current?.click()}
                       className={cn(
-                        "border border-dashed border-gray-300 rounded-xl p-3.5 flex flex-col items-center justify-center cursor-pointer hover:border-[#FC7A00] transition-colors bg-gray-50/50",
+                        "border border-dashed border-gray-300 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer hover:border-[#FC7A00] transition-colors bg-gray-50/50",
                         filePreview ? "border-[#FC7A00] bg-orange-50/5" : ""
                       )}
                     >
@@ -484,27 +467,19 @@ export function KycVerificationDrawer({
                       />
                       {filePreview ? (
                         <div className="flex items-center gap-3">
-                          <div className="relative w-12 h-10 rounded-lg overflow-hidden border border-gray-200">
+                          <div className="relative w-10 h-8 rounded-lg overflow-hidden border border-gray-200">
                             <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
                           </div>
                           <p className="text-[10px] font-bold text-[#FC7A00]">ID Document Image Selected</p>
                         </div>
                       ) : (
                         <div className="text-center flex items-center gap-2">
-                          <span className="material-symbols-outlined text-[20px] text-gray-400">upload_file</span>
+                          <span className="material-symbols-outlined text-[18px] text-gray-400">upload_file</span>
                           <p className="text-[10px] font-bold text-gray-700">Optionally Upload Document Slip Scan Photo</p>
                         </div>
                       )}
                     </div>
                   </div>
-
-                  {/* Submit Button */}
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-3.5 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    Verify
-                  </button>
                 </form>
               )}
 
@@ -531,16 +506,16 @@ export function KycVerificationDrawer({
 
               {/* STATE 4: SUCCESS FEEDBACK SCREEN */}
               {submitStep === "success" && (
-                <div className="flex flex-col items-center justify-center space-y-8 w-full py-16 px-4 animate-fadeIn flex-grow">
-                  <div className="w-20 h-20 rounded-full bg-orange-50 border-2 border-orange-100 flex items-center justify-center text-[#FC7A00] animate-bounce-subtle shadow-md shadow-orange-500/10">
-                    <span className="material-symbols-outlined text-[42px]" style={{ fontVariationSettings: '"FILL" 1' }}>pending_actions</span>
+                <div className="flex flex-col items-center justify-center space-y-6 w-full py-6 px-2 animate-fadeIn">
+                  <div className="w-18 h-18 rounded-full bg-orange-50 border-2 border-orange-100 flex items-center justify-center text-[#FC7A00] animate-bounce-subtle shadow-md shadow-orange-500/10">
+                    <span className="material-symbols-outlined text-[38px]" style={{ fontVariationSettings: '"FILL" 1' }}>pending_actions</span>
                   </div>
 
-                  <div className="space-y-3.5 text-center">
+                  <div className="space-y-2 text-center">
                     <span className="px-3.5 py-1 text-[10px] font-black tracking-widest uppercase bg-orange-100 text-[#FC7A00] border border-orange-200/50 rounded-full">
                       Submitted Successfully
                     </span>
-                    <h4 className="font-bodoni text-2xl font-bold text-black tracking-tight pt-1">Pending In Review</h4>
+                    <h4 className="font-bodoni text-xl font-bold text-black tracking-tight pt-1">Pending In Review</h4>
                     <p className="font-hanken text-xs text-gray-500 leading-relaxed max-w-[280px] mx-auto font-semibold">
                       Your account will be approved or rejected in 30 minutes. Thanks for banking with us.
                     </p>
@@ -554,23 +529,12 @@ export function KycVerificationDrawer({
                       </p>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onSuccess();
-                    }}
-                    className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] active:scale-95 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer shadow-sm transition-all"
-                  >
-                    Done
-                  </button>
                 </div>
               )}
 
               {/* STATE 5: FAILED SUBMISSION NOTIFICATION */}
               {submitStep === "failed" && (
-                <div className="flex flex-col items-center space-y-5 w-full pt-10 animate-fadeIn">
+                <div className="flex flex-col items-center space-y-5 w-full pt-6 animate-fadeIn">
                   <div className="w-16 h-16 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
                     <span className="material-symbols-outlined text-[36px] font-bold">gpp_maybe</span>
                   </div>
@@ -581,24 +545,76 @@ export function KycVerificationDrawer({
                       {statusMessage}
                     </p>
                   </div>
-
-                  <div className="flex flex-col gap-2 w-full pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setSubmitStep("form")}
-                      className="w-full py-4 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer"
-                    >
-                      Try Again
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="w-full py-4 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer"
-                    >
-                      Close Window
-                    </button>
-                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* ANCHORED BOTTOM ACTION BAR FOR ALL STATES */}
+            <div className="w-full bg-white border-t border-gray-100 p-4 shrink-0 flex flex-col gap-2.5 shadow-lg">
+              {submitStep === "form" && (
+                <button
+                  type="submit"
+                  form="kyc-form"
+                  disabled={isSubmitting || !idNumber || idNumber.length !== 11 || (!selfiePreview && !filePreview)}
+                  className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-3.5 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  Verify
+                </button>
+              )}
+
+              {submitStep === "review" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOverrideActive(true);
+                      setSubmitStep("form");
+                      toast.info("Input fields unlocked. Please re-enter your details.");
+                    }}
+                    className="w-full py-3.5 bg-black hover:bg-gray-900 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all shadow-xs"
+                  >
+                    Re-verify
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-3 bg-gray-100 hover:bg-gray-150 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all"
+                  >
+                    Close
+                  </button>
+                </>
+              )}
+
+              {submitStep === "success" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSuccess();
+                  }}
+                  className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] active:scale-95 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer shadow-sm transition-all"
+                >
+                  Done
+                </button>
+              )}
+
+              {submitStep === "failed" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSubmitStep("form")}
+                    className="w-full py-3.5 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer"
+                  >
+                    Try Again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-3 bg-gray-100 hover:bg-gray-200 active:scale-95 text-black text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer"
+                  >
+                    Close Window
+                  </button>
+                </>
               )}
             </div>
           </motion.div>
