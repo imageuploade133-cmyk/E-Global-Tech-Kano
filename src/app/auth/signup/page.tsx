@@ -62,6 +62,45 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
+  // Email Domain Typo Resolver & Vibration Feedback
+  const checkEmailTypo = (emailStr: string): string | null => {
+    if (!emailStr || !emailStr.includes("@")) return null;
+    const parts = emailStr.trim().toLowerCase().split("@");
+    if (parts.length !== 2) return null;
+
+    const [username, domain] = parts;
+    if (!domain) return null;
+
+    const gmailTypos = [
+      "gamil.com", "glmail.com", "gmaill.com", "gmail.co", "gmai.com",
+      "gmeil.com", "gmail.con", "gamil.co", "gmial.com", "gmal.com",
+      "gmai.co", "gmaill.co", "gamil.net", "gmai.net", "gmail.cm"
+    ];
+    const yahooTypos = [
+      "yahou.com", "yaho.com", "yahoo.co", "yaho.co", "yaho0.com",
+      "yaho.com.ng", "yaho.org", "yahoomail.co"
+    ];
+    const hotmailTypos = [
+      "hotmial.com", "hotmai.com", "hotmal.com", "hotmail.co", "hotmial.co"
+    ];
+    const outlookTypos = [
+      "outlok.com", "outlook.co", "outloook.com", "outlok.co"
+    ];
+    const icloudTypos = [
+      "icoud.com", "iclud.com", "icloud.co", "icloude.com"
+    ];
+
+    if (gmailTypos.includes(domain)) return `${username}@gmail.com`;
+    if (yahooTypos.includes(domain)) return `${username}@yahoo.com`;
+    if (hotmailTypos.includes(domain)) return `${username}@hotmail.com`;
+    if (outlookTypos.includes(domain)) return `${username}@outlook.com`;
+    if (icloudTypos.includes(domain)) return `${username}@icloud.com`;
+
+    return null;
+  };
+
+  const suggestedEmail = checkEmailTypo(email);
+
   // OTP Verification Channel Selector States ("whatsapp" | "email")
   const [otpChannel, setOtpChannel] = useState<"whatsapp" | "email">("whatsapp");
   const [isOtpRequested, setIsOtpRequested] = useState(false);
@@ -359,8 +398,17 @@ export default function SignUpPage() {
         return;
       }
 
+      const emailCorrection = checkEmailTypo(email);
+      if (emailCorrection && emailCorrection !== email) {
+        if (typeof window !== "undefined" && "vibrate" in navigator) {
+          try { navigator.vibrate([100, 50, 100]); } catch {}
+        }
+        toast.warning(`Typo detected in email! Did you mean ${emailCorrection}? Tap 'Fix Email' below.`);
+        return;
+      }
+
       if (!isOtpVerified) {
-        toast.error("Please verify your WhatsApp number with the OTP code first.");
+        toast.error("Please verify your contact with the OTP code first.");
         return;
       }
 
@@ -650,11 +698,47 @@ export default function SignUpPage() {
                         type="email"
                         required
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEmail(val);
+                          const typoFix = checkEmailTypo(val);
+                          if (typoFix && typoFix !== val) {
+                            if (typeof window !== "undefined" && "vibrate" in navigator) {
+                              try { navigator.vibrate([100, 50, 100]); } catch {}
+                            }
+                          }
+                        }}
                         className="w-full bg-white border-0 rounded-[14px] px-4 py-3.5 text-xs font-semibold text-black placeholder-gray-400 outline-none"
                         placeholder="doe@example.com"
                       />
                     </div>
+
+                    {/* Email Typo Notification & One-Tap Fix Banner */}
+                    {suggestedEmail && suggestedEmail !== email && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-amber-50 border border-amber-300 rounded-2xl p-3 flex items-center justify-between gap-2 shadow-xs mt-2"
+                      >
+                        <div className="flex items-center gap-2 text-amber-900 text-xs font-semibold">
+                          <span className="material-symbols-outlined text-amber-600 text-base animate-pulse">error_med</span>
+                          <span className="text-[11px]">
+                            Did you mean <strong className="font-mono text-black">{suggestedEmail}</strong>?
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmail(suggestedEmail);
+                            toast.success(`Email updated to ${suggestedEmail}`);
+                          }}
+                          className="px-3 py-1.5 bg-[#FC7A00] hover:brightness-105 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-xs">auto_fix</span>
+                          <span>Fix Email</span>
+                        </button>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
 
@@ -957,24 +1041,48 @@ export default function SignUpPage() {
                   </div>
                 </div>
 
-                {/* Password Strength Indicator */}
-                {password && (
-                  <div className="space-y-1.5 text-left bg-gray-50 p-3 rounded-2xl border border-gray-150">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-black uppercase text-gray-400">Password Strength</span>
-                      <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded text-white", pStrength.color)}>
-                        {pStrength.label}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-gray-250 rounded-full overflow-hidden">
-                      <div
-                        className={cn("h-full transition-all duration-300", pStrength.color)}
-                        style={{ width: `${(pStrength.score / 5) * 100}%` }}
-                      />
-                    </div>
-                    <p className="text-[8px] text-gray-400 font-semibold leading-tight">Must include at least 8 characters, an uppercase letter, a lowercase letter, a number, and a special character.</p>
+                {/* Password Strength Guidance & Requirement Checklist */}
+                <div className="space-y-3 text-left bg-gray-50 p-4 rounded-2xl border border-gray-200 shadow-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">Password Strength</span>
+                    <span className={cn("text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full text-white shadow-xs", pStrength.color)}>
+                      {pStrength.label}
+                    </span>
                   </div>
-                )}
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={cn("h-full transition-all duration-300 rounded-full", pStrength.color)}
+                      style={{ width: `${(pStrength.score / 5) * 100}%` }}
+                    />
+                  </div>
+
+                  {/* Interactive Requirement Checklist */}
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password Requirements</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] font-semibold">
+                      {[
+                        { label: "8+ characters", valid: password.length >= 8 },
+                        { label: "Uppercase letter (A-Z)", valid: /[A-Z]/.test(password) },
+                        { label: "Lowercase letter (a-z)", valid: /[a-z]/.test(password) },
+                        { label: "Numeric digit (0-9)", valid: /\d/.test(password) },
+                        { label: "Special character (@$!%*?&#)", valid: /[@$!%*?&]/.test(password) },
+                      ].map((req, rIdx) => (
+                        <div
+                          key={rIdx}
+                          className={cn(
+                            "flex items-center gap-1.5 transition-colors",
+                            req.valid ? "text-emerald-700 font-bold" : "text-gray-400"
+                          )}
+                        >
+                          <span className={cn("material-symbols-outlined text-[14px]", req.valid ? "text-emerald-600 font-bold" : "text-gray-300")}>
+                            {req.valid ? "check_circle" : "cancel"}
+                          </span>
+                          <span>{req.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
                 {/* Terms checkbox */}
                 <div className="space-y-3 text-left pt-2">
