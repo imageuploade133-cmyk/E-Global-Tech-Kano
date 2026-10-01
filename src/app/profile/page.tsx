@@ -219,15 +219,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSelectLimitCategory = async (limit: number) => {
-    try {
-      await updateUserData({ dailyLimit: limit });
-      toast.success(`Daily limit set to ₦${new Intl.NumberFormat("en-NG").format(limit)}`);
-    } catch {
-      toast.error("Failed to update transfer limit");
-    }
-  };
-
   const handleLogoutConfirm = async () => {
     setIsLogoutOpen(false);
     await handleAppSignOut(router);
@@ -286,7 +277,6 @@ export default function ProfilePage() {
           {/* Section: Daily Transfer Limit */}
           <TransferLimitsSection
             dailyLimit={dailyLimit}
-            onSelectLimitCategory={handleSelectLimitCategory}
           />
 
           {/* Section: Change Access PIN Form */}
