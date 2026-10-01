@@ -86,6 +86,135 @@ export default function PinPage() {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isSavingNewPin, setIsSavingNewPin] = useState(false);
 
+  // 2FA Login OTP Stage States on Access PIN screen
+  const [is2faStage, setIs2faStage] = useState(false);
+  const [login2faChannel, setLogin2faChannel] = useState<"email" | "whatsapp">("email");
+  const [login2faOtpDigits, setLogin2faOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [login2faCooldown, setLogin2faCooldown] = useState(0);
+  const [isSending2faOtp, setIsSending2faOtp] = useState(false);
+  const [isVerifying2faOtp, setIsVerifying2faOtp] = useState(false);
+  const [masked2faEmail, setMasked2faEmail] = useState("");
+  const [masked2faPhone, setMasked2faPhone] = useState("");
+  const login2faInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // 2FA Cooldown countdown timer
+  useEffect(() => {
+    if (login2faCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setLogin2faCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [login2faCooldown]);
+
+  const handleLogin2faOtpChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const updated = [...login2faOtpDigits];
+    updated[index] = digit;
+    setLogin2faOtpDigits(updated);
+
+    if (digit && index < 5) {
+      login2faInputRefs.current[index + 1]?.focus();
+    }
+
+    if (updated.join("").length === 6) {
+      executeVerify2faOtp(updated.join(""));
+    }
+  };
+
+  const handleLogin2faOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !login2faOtpDigits[index] && index > 0) {
+      login2faInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleLogin2faOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasteData) return;
+    const updated = ["", "", "", "", "", ""];
+    for (let i = 0; i < pasteData.length; i++) {
+      updated[i] = pasteData[i];
+    }
+    setLogin2faOtpDigits(updated);
+    const targetIdx = Math.min(pasteData.length, 5);
+    login2faInputRefs.current[targetIdx]?.focus();
+
+    if (updated.join("").length === 6) {
+      executeVerify2faOtp(updated.join(""));
+    }
+  };
+
+  const dispatch2faOtp = async (selectedChannel: "email" | "whatsapp" = login2faChannel) => {
+    if (!user) return;
+    setIsSending2faOtp(true);
+    toast.loading(`Sending 2FA OTP code via ${selectedChannel === "email" ? "Email" : "WhatsApp"}...`);
+
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/auth/login-2fa-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "send", channel: selectedChannel }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || "2FA OTP code sent!");
+        if (data.maskedEmail) setMasked2faEmail(data.maskedEmail);
+        if (data.maskedPhone) setMasked2faPhone(data.maskedPhone);
+        if (data.devOtp) toast.info(`Dev Mode OTP: ${data.devOtp}`);
+        setLogin2faCooldown(60);
+      } else {
+        toast.error(data.error || "Failed to send 2FA OTP code.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network error sending 2FA OTP code.");
+    } finally {
+      setIsSending2faOtp(false);
+    }
+  };
+
+  const executeVerify2faOtp = async (code: string) => {
+    if (!user || code.length !== 6) return;
+    setIsVerifying2faOtp(true);
+    toast.loading("Verifying 2FA OTP code...");
+
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/auth/login-2fa-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "verify", otp: code }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setPinVerified(true);
+        toast.success("2FA Login Authenticated! Welcome back. 🛡️");
+        router.push("/");
+      } else {
+        toast.error(data.error || "Invalid 2FA OTP code.");
+        setLogin2faOtpDigits(["", "", "", "", "", ""]);
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network error verifying 2FA OTP code.");
+    } finally {
+      setIsVerifying2faOtp(false);
+    }
+  };
+
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Masked contact info for UI display
@@ -423,6 +552,13 @@ export default function PinPage() {
       await delay(500);
 
       if (res.ok && data.success) {
+        if (userData?.is2faOtpEnabled === true) {
+          setIsVerifying(false);
+          setIs2faStage(true);
+          dispatch2faOtp("email");
+          return;
+        }
+
         setPinVerified(true);
         toast.success("Identity verified");
         router.push("/");
@@ -440,6 +576,138 @@ export default function PinPage() {
   };
 
   if (loading) return null;
+
+  if (is2faStage) {
+    return (
+      <div className="flex flex-col min-h-screen bg-white p-6 md:p-8 items-center justify-between relative overflow-hidden font-hanken text-black">
+        {/* Top Brand Logo */}
+        <div className="w-full flex flex-col items-center text-center mt-6">
+          <div className="relative w-14 h-14 mb-3 flex items-center justify-center">
+            <AppLogo size={56} />
+          </div>
+          <h1 className="font-hanken font-bold text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
+          <span className="px-3 py-1 bg-orange-50 border border-orange-200 text-[#FC7A00] font-black uppercase text-[10px] tracking-widest rounded-full shadow-2xs">
+            2FA Security Active
+          </span>
+        </div>
+
+        {/* Center 2FA OTP Card */}
+        <div className="w-full max-w-sm mx-auto flex flex-col items-center text-center space-y-5 my-6">
+          <div className="w-16 h-16 rounded-full bg-orange-50 border-2 border-orange-100 flex items-center justify-center text-[#FC7A00] shadow-sm animate-bounce-subtle">
+            <span className="material-symbols-outlined text-[36px]" style={{ fontVariationSettings: '"FILL" 1' }}>shield_lock</span>
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="font-bodoni font-bold text-2xl text-black tracking-tight">2FA OTP Verification</h2>
+            <p className="font-hanken text-xs text-gray-500 font-semibold leading-relaxed max-w-xs mx-auto">
+              Access PIN verified! Please enter the 6-digit OTP code sent to{" "}
+              <span className="font-mono font-bold text-black">{login2faChannel === "email" ? (masked2faEmail || displayEmail) : (masked2faPhone || displayPhone)}</span>.
+            </p>
+          </div>
+
+          {/* Channel Selector Pills */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-2xl w-full border border-gray-200">
+            <button
+              type="button"
+              disabled={isSending2faOtp}
+              onClick={() => {
+                setLogin2faChannel("email");
+                dispatch2faOtp("email");
+              }}
+              className={cn(
+                "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                login2faChannel === "email" ? "bg-[#FC7A00] text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black"
+              )}
+            >
+              <span className="material-symbols-outlined text-[16px]">mail</span>
+              <span>Email</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isSending2faOtp}
+              onClick={() => {
+                setLogin2faChannel("whatsapp");
+                dispatch2faOtp("whatsapp");
+              }}
+              className={cn(
+                "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                login2faChannel === "whatsapp" ? "bg-emerald-600 text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black"
+              )}
+            >
+              <span className="material-symbols-outlined text-[16px]">chat</span>
+              <span>WhatsApp</span>
+            </button>
+          </div>
+
+          {/* 6 Digit Input Boxes */}
+          <div className="flex gap-2 justify-center my-2 w-full">
+            {[0, 1, 2, 3, 4, 5].map((idx) => (
+              <input
+                key={idx}
+                ref={(el) => { login2faInputRefs.current[idx] = el; }}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={1}
+                value={login2faOtpDigits[idx]}
+                disabled={isVerifying2faOtp || isSending2faOtp}
+                onChange={(e) => handleLogin2faOtpChange(idx, e.target.value)}
+                onKeyDown={(e) => handleLogin2faOtpKeyDown(idx, e)}
+                onPaste={handleLogin2faOtpPaste}
+                className={cn(
+                  "w-11 h-13 bg-white border-2 rounded-xl text-center font-mono font-black text-xl text-black transition-all outline-none shadow-xs",
+                  login2faOtpDigits[idx]
+                    ? "border-[#FC7A00] bg-orange-50/20 ring-2 ring-[#FC7A00]/20"
+                    : "border-gray-200 focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20"
+                )}
+              />
+            ))}
+          </div>
+
+          {/* Resend Timer / Button */}
+          <div className="pt-1">
+            {login2faCooldown > 0 ? (
+              <p className="text-xs text-gray-400 font-bold">Resend code in {login2faCooldown}s</p>
+            ) : (
+              <button
+                type="button"
+                disabled={isSending2faOtp}
+                onClick={() => dispatch2faOtp(login2faChannel)}
+                className="text-xs font-bold text-[#FC7A00] hover:underline cursor-pointer disabled:opacity-50 flex items-center gap-1.5 justify-center mx-auto uppercase tracking-wider"
+              >
+                {isSending2faOtp ? "Dispatching New Code..." : "Resend OTP Code"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Verify & Cancel Actions */}
+        <div className="w-full max-w-sm mx-auto flex flex-col gap-2.5 pb-6">
+          <button
+            type="button"
+            disabled={isVerifying2faOtp || login2faOtpDigits.join("").length !== 6}
+            onClick={() => executeVerify2faOtp(login2faOtpDigits.join(""))}
+            className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer hover:brightness-105 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+          >
+            {isVerifying2faOtp ? "Verifying 2FA Code..." : "Authenticate & Continue"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIs2faStage(false);
+              setPin("");
+              setLogin2faOtpDigits(["", "", "", "", "", ""]);
+            }}
+            className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
+          >
+            ← Return to Access PIN
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-8 items-center justify-between relative overflow-hidden">
