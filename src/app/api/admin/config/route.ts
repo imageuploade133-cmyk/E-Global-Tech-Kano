@@ -170,11 +170,28 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] profit aggregation failed:", err.message);
     }
 
-    const hasCustomImgbbApiKey = Boolean(
-      baseConfig.imgbbApiKey &&
-      typeof baseConfig.imgbbApiKey === "string" &&
-      baseConfig.imgbbApiKey.trim().length > 0
-    );
+    let hasCustomImgbbApiKey = false;
+    try {
+      const secretsSnap = await adminDb.collection("config").doc("app_secrets").get();
+      if (secretsSnap.exists && secretsSnap.data()?.imgbbApiKey) {
+        hasCustomImgbbApiKey = Boolean(
+          typeof secretsSnap.data()?.imgbbApiKey === "string" &&
+          secretsSnap.data()?.imgbbApiKey.trim().length > 0
+        );
+      } else {
+        hasCustomImgbbApiKey = Boolean(
+          baseConfig.imgbbApiKey &&
+          typeof baseConfig.imgbbApiKey === "string" &&
+          baseConfig.imgbbApiKey.trim().length > 0
+        );
+      }
+    } catch {
+      hasCustomImgbbApiKey = Boolean(
+        baseConfig.imgbbApiKey &&
+        typeof baseConfig.imgbbApiKey === "string" &&
+        baseConfig.imgbbApiKey.trim().length > 0
+      );
+    }
 
     // 3. Compile and merge aggregated values into config object
     const mergedConfig = {
@@ -236,21 +253,33 @@ export async function POST(req: Request) {
     // Secure Firestore write with await
     await adminDb.collection("config").doc("app").set(sanitizedUpdates, { merge: true });
 
-    // Handle ImgBB API Key updates securely on the server
+    // Handle ImgBB API Key updates securely in admin-isolated config/app_secrets
     if (customImgbbApiKeyUpdate) {
-      await adminDb.collection("config").doc("app").set({ imgbbApiKey: customImgbbApiKeyUpdate }, { merge: true });
+      await adminDb.collection("config").doc("app_secrets").set({ imgbbApiKey: customImgbbApiKeyUpdate, updatedAt: new Date().toISOString() }, { merge: true });
+      await adminDb.collection("config").doc("app").set({ hasCustomImgbbApiKey: true, imgbbApiKey: "" }, { merge: true });
     } else if (shouldClearImgbbApiKey) {
-      await adminDb.collection("config").doc("app").set({ imgbbApiKey: "" }, { merge: true });
+      await adminDb.collection("config").doc("app_secrets").set({ imgbbApiKey: "", updatedAt: new Date().toISOString() }, { merge: true });
+      await adminDb.collection("config").doc("app").set({ hasCustomImgbbApiKey: false, imgbbApiKey: "" }, { merge: true });
     }
 
     // Fetch the updated document to return authoritative server data
     const updatedDoc = await adminDb.collection("config").doc("app").get();
     const updatedData = updatedDoc.data() || {};
-    const hasCustomImgbbApiKey = Boolean(
-      updatedData.imgbbApiKey &&
-      typeof updatedData.imgbbApiKey === "string" &&
-      updatedData.imgbbApiKey.trim().length > 0
-    );
+
+    let hasCustomImgbbApiKey = false;
+    try {
+      const secretsSnap = await adminDb.collection("config").doc("app_secrets").get();
+      if (secretsSnap.exists && secretsSnap.data()?.imgbbApiKey) {
+        hasCustomImgbbApiKey = Boolean(
+          typeof secretsSnap.data()?.imgbbApiKey === "string" &&
+          secretsSnap.data()?.imgbbApiKey.trim().length > 0
+        );
+      } else {
+        hasCustomImgbbApiKey = Boolean(updatedData.hasCustomImgbbApiKey);
+      }
+    } catch {
+      hasCustomImgbbApiKey = Boolean(updatedData.hasCustomImgbbApiKey);
+    }
 
     const safeUpdatedConfig = {
       ...sanitizeConfigDoc(updatedData),
