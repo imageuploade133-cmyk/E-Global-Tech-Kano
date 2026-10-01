@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { useAuth } from "@/lib/AuthContext";
+import { auth } from "@/lib/firebase";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadImageSecurely } from "@/lib/image-upload";
@@ -154,6 +155,11 @@ export function KycVerificationDrawer({
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (typeof window !== "undefined" && navigator.onLine === false) {
+      toast.error("No Internet Connection: Please check your Wi-Fi or mobile data and try again.");
+      return;
+    }
+
     if (!idNumber || idNumber.length !== 11) {
       toast.error("Please enter a valid 11-digit BVN or NIN document number.");
       return;
@@ -166,51 +172,57 @@ export function KycVerificationDrawer({
 
     setIsSubmitting(true);
     setSubmitStep("uploading");
-
-    // Securely display customer loading text instead of raw developer credentials
-    setStatusMessage("Securing encrypted connection and preparing document bundle...");
-
-    let uploadedUrl = "";
-    const activeImageSource = selfiePreview || filePreview || "";
-
-    // Convert active image source (data URL from camera or selected file) into a real File for multipart upload
-    let fileToUpload: File | null = selectedFile;
-    if (!fileToUpload && selfiePreview && selfiePreview.startsWith("data:")) {
-      try {
-        const arr = selfiePreview.split(",");
-        const mimeMatch = arr[0].match(/:(.*?);/);
-        const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        fileToUpload = new File([u8arr], "kyc_selfie.jpg", { type: mime });
-      } catch (e) {
-        console.error("Failed to convert selfie preview to file object:", e);
-      }
-    }
-
-    if (fileToUpload) {
-      const uploadResult = await uploadImageSecurely(fileToUpload, "kyc_selfie");
-      if (uploadResult.success && uploadResult.url) {
-        uploadedUrl = uploadResult.url;
-      } else {
-        throw new Error(uploadResult.error || "Failed to upload selfie image to ImgBB.");
-      }
-    } else {
-      throw new Error("No valid image file available for upload.");
-    }
-
-    setSubmitStep("submitting");
-    setStatusMessage("Transmitting identity parameters securely to human administrator review queue...");
+    setStatusMessage("Securing connection and uploading document image to ImgBB...");
 
     try {
-      let idToken = "";
-      if (typeof window !== "undefined" && (window as any).firebaseUserToken) {
-        idToken = (window as any).firebaseUserToken;
+      let uploadedUrl = "";
+
+      // Convert active image source into a File object for ImgBB upload
+      let fileToUpload: File | null = selectedFile;
+      if (!fileToUpload && selfiePreview && selfiePreview.startsWith("data:")) {
+        try {
+          const arr = selfiePreview.split(",");
+          const mimeMatch = arr[0].match(/:(.*?);/);
+          const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          fileToUpload = new File([u8arr], "kyc_selfie.jpg", { type: mime });
+        } catch (e) {
+          console.error("Failed to convert selfie preview to file object:", e);
+        }
       }
+
+      if (fileToUpload) {
+        const uploadResult = await uploadImageSecurely(fileToUpload, "kyc_selfie");
+        if (uploadResult.success && uploadResult.url) {
+          uploadedUrl = uploadResult.url;
+        } else {
+          throw new Error(uploadResult.error || "Failed to upload selfie image to ImgBB.");
+        }
+      } else {
+        throw new Error("No valid image file available for upload.");
+      }
+
+      setSubmitStep("submitting");
+      setStatusMessage("Transmitting full identity parameters to verification queue...");
+
+      // Retrieve authoritative Firebase ID token
+      let idToken = "";
+      if (auth.currentUser) {
+        try {
+          idToken = await auth.currentUser.getIdToken();
+        } catch (tErr) {
+          console.error("Failed to retrieve user ID token:", tErr);
+        }
+      }
+
+      // Execute network fetch with timeout guard
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       const res = await fetch("/api/profile/verify-kyc", {
         method: "POST",
@@ -218,24 +230,42 @@ export function KycVerificationDrawer({
           "Content-Type": "application/json",
           "Authorization": idToken ? `Bearer ${idToken}` : ""
         },
+        signal: controller.signal,
         body: JSON.stringify({
-          idNumber,
+          idNumber: idNumber.trim(),
           type: kycType,
           capturedSelfie: uploadedUrl,
-          livenessChallenge: "Face Match selfie capture"
+          livenessChallenge: "Face Match selfie capture",
+          firstName: userData?.firstName || "",
+          lastName: userData?.lastName || "",
+          email: userData?.email || "",
+          phoneNumber: userData?.phoneNumber || userData?.phone || "",
+          country: userData?.country || "Nigeria",
         })
       });
 
+      clearTimeout(timeoutId);
       const data = await res.json();
+
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Verification submission failed on backend.");
       }
 
       setSubmitStep("success");
-      toast.success("Identity details saved successfully!");
+      toast.success("Identity details submitted successfully!");
     } catch (err: any) {
-      // Securely demote raw backend exceptions to professional generic notices
-      setStatusMessage("An error occurred while uploading your identification. Please ensure you have a stable network connection and try again.");
+      const isTimeout = err.name === "AbortError";
+      const isOffline = typeof window !== "undefined" && navigator.onLine === false;
+
+      if (isOffline) {
+        setStatusMessage("No Internet Connection. Please check your network connection and try again.");
+        toast.error("No Internet Connection");
+      } else if (isTimeout) {
+        setStatusMessage("Network Connection Slow: The request timed out. Please check your internet connection and try again.");
+        toast.error("Connection timed out. Please try again.");
+      } else {
+        setStatusMessage(err?.message || "An error occurred while uploading your identification. Please try again.");
+      }
       setSubmitStep("failed");
     } finally {
       setIsSubmitting(false);
@@ -311,7 +341,7 @@ export function KycVerificationDrawer({
                   </div>
 
                   {/* Interactive Button to Resend/Override and enter everything again */}
-                  <div className="space-y-4 w-full pt-4">
+                  <div className="space-y-3 w-full pt-4">
                     <button
                       type="button"
                       onClick={() => {
@@ -319,16 +349,16 @@ export function KycVerificationDrawer({
                         setSubmitStep("form");
                         toast.info("Input fields unlocked. Please re-enter your details.");
                       }}
-                      className="w-full py-4 bg-black hover:bg-gray-900 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all shadow-sm"
+                      className="w-full py-3.5 bg-black hover:bg-gray-900 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all shadow-xs"
                     >
-                      Resend Verification / Re-enter KYC
+                      Re-verify
                     </button>
                     <button
                       type="button"
                       onClick={onClose}
-                      className="w-full py-3.5 bg-gray-100 hover:bg-gray-150 text-gray-700 text-xs font-bold uppercase tracking-widest rounded-2xl cursor-pointer active:scale-95 transition-all"
+                      className="w-full py-3 bg-gray-100 hover:bg-gray-150 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all"
                     >
-                      Go Back to Home
+                      Close
                     </button>
                   </div>
                 </div>
@@ -357,21 +387,21 @@ export function KycVerificationDrawer({
                         type="button"
                         onClick={() => setKycType("bvn")}
                         className={cn(
-                          "py-2.5 text-xs font-black font-hanken rounded-full transition-all cursor-pointer",
+                          "py-2.5 text-xs font-black font-hanken rounded-full transition-all cursor-pointer uppercase tracking-wider",
                           kycType === "bvn" ? "bg-[#FC7A00] text-white shadow-sm" : "bg-transparent text-gray-400"
                         )}
                       >
-                        BANK VERIFICATION (BVN)
+                        BVN
                       </button>
                       <button
                         type="button"
                         onClick={() => setKycType("nin")}
                         className={cn(
-                          "py-2.5 text-xs font-black font-hanken rounded-full transition-all cursor-pointer",
+                          "py-2.5 text-xs font-black font-hanken rounded-full transition-all cursor-pointer uppercase tracking-wider",
                           kycType === "nin" ? "bg-[#FC7A00] text-white shadow-sm" : "bg-transparent text-gray-400"
                         )}
                       >
-                        NATIONAL ID (NIN)
+                        NIN
                       </button>
                     </div>
                   </div>
@@ -469,9 +499,9 @@ export function KycVerificationDrawer({
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_4px_15px_rgba(252,122,0,0.15)] flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-3.5 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Submit KYC Details
+                    Verify
                   </button>
                 </form>
               )}
@@ -529,9 +559,9 @@ export function KycVerificationDrawer({
                       onClose();
                       onSuccess();
                     }}
-                    className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] active:scale-95 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md shadow-orange-500/10 transition-all"
+                    className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] active:scale-95 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer shadow-sm transition-all"
                   >
-                    Close & Check Status Later
+                    Done
                   </button>
                 </div>
               )}

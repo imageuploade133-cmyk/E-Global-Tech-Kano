@@ -5,6 +5,7 @@ import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
+import { auth } from "@/lib/firebase";
 
 interface VerificationRequiredDrawerProps {
   isOpen: boolean;
@@ -89,8 +90,15 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
     reader.readAsDataURL(file);
   };
 
+  const { userData } = useAuth();
+
   const handleVerifyKyc = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (typeof window !== "undefined" && navigator.onLine === false) {
+      toast.error("No Internet Connection: Please check your Wi-Fi or mobile data and try again.");
+      return;
+    }
 
     if (!idNumber || !/^\d{11}$/.test(idNumber.trim())) {
       toast.error(`Please enter a valid 11-digit ${idType.toUpperCase()} number.`);
@@ -103,14 +111,12 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
     }
 
     setIsSubmitting(true);
-    toast.loading(`Uploading selfie and submitting ${idType.toUpperCase()} details...`);
+    toast.loading("Uploading image & submitting details...");
 
     try {
-      const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
-      let idToken = "mock-token";
-
-      if (!isMock && user) {
-        idToken = await user.getIdToken();
+      let idToken = "";
+      if (auth.currentUser) {
+        idToken = await auth.currentUser.getIdToken();
       }
 
       // STEP 1: Securely upload selfie to ImgBB via authenticated /api/upload-image (multipart File upload only)
@@ -151,7 +157,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       }
       const uploadedUrl = uploadJson.url;
 
-      // STEP 2: Submit KYC payload with verified ImgBB URL (NO base64 fallback)
+      // STEP 2: Submit KYC payload with full user profile details
       const res = await fetch("/api/profile/verify-kyc", {
         method: "POST",
         headers: {
@@ -163,6 +169,10 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
           type: idType,
           capturedSelfie: uploadedUrl,
           livenessChallenge: true,
+          firstName: userData?.firstName || "",
+          lastName: userData?.lastName || "",
+          email: userData?.email || "",
+          phoneNumber: userData?.phoneNumber || userData?.phone || "",
         }),
       });
 
@@ -174,10 +184,15 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       }
 
       setIsSubmittedSuccessfully(true);
-      toast.success("KYC submission registered! Pending administrator approval.");
+      toast.success("Identity details submitted! Pending approval.");
     } catch (err: any) {
       toast.dismiss();
-      toast.error(err.message || "Failed to submit identity. Please verify details and try again.");
+      const isOffline = typeof window !== "undefined" && navigator.onLine === false;
+      if (isOffline) {
+        toast.error("No Internet Connection: Please check your connection and try again.");
+      } else {
+        toast.error(err.message || "Failed to submit identity. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -252,24 +267,24 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
                       <button
                         type="button"
                         onClick={() => setIdType("bvn")}
-                        className={`py-3.5 px-4 rounded-2xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        className={`py-3 px-4 rounded-2xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                           idType === "bvn"
                             ? "bg-black border-black text-white"
                             : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
                         }`}
                       >
-                        Bank Verification (BVN)
+                        BVN
                       </button>
                       <button
                         type="button"
                         onClick={() => setIdType("nin")}
-                        className={`py-3.5 px-4 rounded-2xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        className={`py-3 px-4 rounded-2xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                           idType === "nin"
                             ? "bg-black border-black text-white"
                             : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
                         }`}
                       >
-                        National ID (NIN)
+                        NIN
                       </button>
                     </div>
                   </div>
@@ -355,9 +370,9 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
                   <button
                     type="submit"
                     disabled={isSubmitting || !idNumber || idNumber.length !== 11 || (!selfieFile && !selfiePreview)}
-                    className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
+                    className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                   >
-                    {isSubmitting ? "Submitting Verification..." : "Submit KYC details"}
+                    {isSubmitting ? "Submitting..." : "Verify"}
                   </button>
                 </div>
               </form>

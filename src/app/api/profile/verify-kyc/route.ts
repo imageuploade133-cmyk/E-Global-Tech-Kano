@@ -137,6 +137,60 @@ export async function POST(req: Request) {
       }, { status: 403 });
     }
 
+    // Fetch user profile from Firestore users collection
+    let userDocData: any = {};
+    try {
+      const userSnap = await adminDb.collection("users").doc(uid).get();
+      if (userSnap.exists) {
+        userDocData = userSnap.data() || {};
+      }
+    } catch (e: any) {
+      console.warn("[KYC API] Could not fetch user doc:", e?.message);
+    }
+
+    const firstName = body.firstName || userDocData.firstName || nameFallback.split(" ")[0] || "User";
+    const lastName = body.lastName || userDocData.lastName || nameFallback.split(" ").slice(1).join(" ") || "User";
+    const phone = body.phoneNumber || body.phone || userDocData.phoneNumber || userDocData.phone || "";
+    const userEmail = body.email || userDocData.email || emailFallback || "";
+    const userBvn = type === "bvn" ? idNumber.trim() : (userDocData.bvn || "");
+    const userNin = type === "nin" ? idNumber.trim() : (userDocData.nin || "");
+
+    // Persist complete KYC submission into Firestore kyc_submissions collection & users collection
+    const kycSubmissionData = {
+      userId: uid,
+      uid,
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`.trim(),
+      email: userEmail,
+      phone,
+      phoneNumber: phone,
+      documentType: type,
+      documentNumber: idNumber.trim(),
+      kycDocumentType: type,
+      kycDocumentNumber: idNumber.trim(),
+      bvn: userBvn,
+      nin: userNin,
+      capturedSelfie: trimmedSelfieUrl,
+      status: "PENDING",
+      kycStatus: "PENDING_REVIEW",
+      submittedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    await adminDb.collection("kyc_submissions").doc(uid).set(kycSubmissionData, { merge: true });
+
+    // Update user document status and document numbers
+    const userUpdates: Record<string, any> = {
+      kycStatus: "PENDING_REVIEW",
+      kycSubmittedAt: nowIso,
+      capturedSelfie: trimmedSelfieUrl,
+    };
+    if (type === "bvn") userUpdates.bvn = idNumber.trim();
+    if (type === "nin") userUpdates.nin = idNumber.trim();
+
+    await adminDb.collection("users").doc(uid).set(userUpdates, { merge: true });
+
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     const headers: Record<string, string> = {
@@ -145,18 +199,20 @@ export async function POST(req: Request) {
     };
     if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
 
-    // Forward the KYC request to the payment-gateway
+    // Forward the full KYC request to the payment-gateway
     const response = await fetch(`${GATEWAY_URL}/api/profile/verify-kyc`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        firstName: nameFallback.split(" ")[0] || "User",
-        lastName: nameFallback.split(" ").slice(1).join(" ") || "User",
+        userId: uid,
+        uid,
+        firstName,
+        lastName,
         documentType: type,
         documentNumber: idNumber.trim(),
-        email: emailFallback,
-        phone: "", // Will be resolved natively inside gateway
-        capturedSelfie,
+        email: userEmail,
+        phone,
+        capturedSelfie: trimmedSelfieUrl,
         livenessChallenge,
       }),
     });
