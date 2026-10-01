@@ -265,9 +265,11 @@ export async function POST(req: Request) {
     // Secure Firestore write with await
     await adminDb.collection("config").doc("app").set(sanitizedUpdates, { merge: true });
 
-    // Check if appVersion was updated to a new version, and broadcast push notifications to users
+    // Check if appVersion was updated to a new version, and broadcast push notifications to users if enabled
     const newAppVersion = typeof sanitizedUpdates?.appVersion === "string" ? sanitizedUpdates.appVersion.trim() : "";
-    if (newAppVersion && newAppVersion !== oldAppVersion) {
+    const isPushNotificationEnabled = sanitizedUpdates?.appVersionPushNotificationEnabled !== false;
+
+    if (newAppVersion && newAppVersion !== oldAppVersion && isPushNotificationEnabled) {
       NotificationService.broadcastAppUpdateNotification(newAppVersion).catch((err) => {
         console.error("[Admin Config POST] Broadcast update notification error:", err?.message || err);
       });

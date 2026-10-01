@@ -51,9 +51,11 @@ export interface AppConfig {
   globalMinTransferAmount?: number;
   hasCustomImgbbApiKey?: boolean;
   imgbbApiKey?: string;
+  appVersionPushNotificationEnabled?: boolean;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
+  appVersionPushNotificationEnabled: true,
   featureToggles: DEFAULT_FEATURE_TOGGLES,
   logoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
   receiptLogoUrl: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
@@ -133,9 +135,12 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         unsubscribe = onSnapshot(doc(db, "config", "app"), (docSnap) => {
           if (docSnap.exists()) {
             const rawData = docSnap.data() as Record<string, any>;
-            const hasCustomKey = Boolean(rawData.imgbbApiKey && typeof rawData.imgbbApiKey === "string" && rawData.imgbbApiKey.trim());
             // Explicitly strip any sensitive fields such as imgbbApiKey even if present in Firestore
             const { imgbbApiKey, secretKey, apiKey, ...safeRemoteData } = rawData;
+            const hasCustomKey = Boolean(
+              safeRemoteData.hasCustomImgbbApiKey ||
+              (rawData.imgbbApiKey && typeof rawData.imgbbApiKey === "string" && rawData.imgbbApiKey.trim())
+            );
             setConfig((prev) => ({
               ...prev,
               ...safeRemoteData,
