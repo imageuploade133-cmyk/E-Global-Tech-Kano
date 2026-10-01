@@ -330,7 +330,7 @@ export function NotificationDetailModal({
                 <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
                 <span>Open Store Orders</span>
               </Link>
-            ) : notification.url && notification.url !== "/" ? (
+            ) : notification.url && notification.url !== "/" && notification.url !== "app" && notification.url !== "none" ? (
               notification.url.startsWith("http://") || notification.url.startsWith("https://") ? (
                 <button
                   type="button"
