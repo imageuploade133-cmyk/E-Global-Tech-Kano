@@ -315,7 +315,10 @@ export class NotificationService {
       const body = `Version ${newVersion} has been released. Tap to update now for new features and performance enhancements!`;
 
       const messaging = getMessaging();
-      const tokenDocs = tokensSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      const tokenDocs = tokensSnap.docs.map(docSnap => {
+        const data = docSnap.data() as { token?: string; userId?: string; [key: string]: any };
+        return { id: docSnap.id, ...data };
+      });
 
       let sentCount = 0;
       const invalidTokenIds: string[] = [];
