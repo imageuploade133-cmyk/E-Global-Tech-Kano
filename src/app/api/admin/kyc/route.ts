@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { mintFirebaseIdToken } from "@/lib/admin-auth";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-import { adminDb, adminApp } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
@@ -252,21 +252,22 @@ export async function POST(req: Request) {
       idToken = await mintFirebaseIdToken(uid);
     }
 
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     if (action === "approve") {
       if (!provider || (provider !== "flutterwave" && provider !== "squad")) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected." }, { status: 400 });
       }
 
-      // Forward approval request to payment-gateway secure human-only endpoint with strict Bearer Authorization header and explicit provider in body
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/approve`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ provider })
       });
 
@@ -292,14 +293,15 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "reject") {
-      // Forward rejection request to payment-gateway secure human-only endpoint with strict Bearer Authorization header
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/reject`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ reason })
       });
 
@@ -318,14 +320,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A valid provider ('flutterwave' or 'squad') must be explicitly selected for retry." }, { status: 400 });
       }
 
-      // Forward retry provisioning request to payment-gateway
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      };
+      if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
       const response = await fetch(`${GATEWAY_URL}/api/admin/kyc/${targetUid}/retry-provisioning`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": gatewayApiKey,
-          "Authorization": `Bearer ${idToken}`
-        },
+        headers,
         body: JSON.stringify({ provider })
       });
 
@@ -347,7 +350,6 @@ export async function POST(req: Request) {
         });
       }
 
-      // Update Firestore user document
       const userRef = adminDb.collection("users").doc(targetUid);
       await userRef.update({
         kycStatus: "UNVERIFIED",
@@ -359,7 +361,6 @@ export async function POST(req: Request) {
         nin: null
       });
 
-      // Clear matching document from kyc_submissions collection
       try {
         const subQuery = await adminDb.collection("kyc_submissions")
           .where("userId", "==", targetUid)
@@ -372,8 +373,6 @@ export async function POST(req: Request) {
       } catch (subErr: any) {
         console.error(`[Admin KYC reset_kyc] Error deleting submissions:`, subErr.message);
       }
-
-      console.log(`[Admin KYC reset_kyc] KYC status reset to UNVERIFIED for user ${targetUid}`);
 
       return NextResponse.json({
         success: true,
@@ -388,7 +387,6 @@ export async function POST(req: Request) {
         });
       }
 
-      // Read target user first to ensure they are indeed unverified (kycStatus !== 'VERIFIED')
       const targetUserDoc = await adminDb.collection("users").doc(targetUid).get();
       if (!targetUserDoc.exists) {
         return NextResponse.json({ error: "User profile not found in system records." }, { status: 404 });
@@ -403,7 +401,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Access denied: Administrative accounts cannot be deleted." }, { status: 403 });
       }
 
-      // Delete from Firebase Auth
       const { deleteFirebaseAuthUser } = await import("@/lib/firebase-auth-rest");
       try {
         await deleteFirebaseAuthUser(targetUid);
@@ -411,13 +408,10 @@ export async function POST(req: Request) {
         console.warn(`[Admin KYC delete_unverified] User not found or error in Firebase Auth:`, authErr.message);
       }
 
-      // Delete user document from Firestore
       await adminDb.collection("users").doc(targetUid).delete();
 
-      // Delete associated collections
       try {
         const batch = adminDb.batch();
-        // Delete wallets
         const walletsQuery = await adminDb.collection("wallets")
           .where("userId", "==", targetUid)
           .get();
@@ -425,7 +419,6 @@ export async function POST(req: Request) {
           batch.delete(doc.ref);
         });
 
-        // Delete submissions
         const subQuery = await adminDb.collection("kyc_submissions")
           .where("userId", "==", targetUid)
           .get();

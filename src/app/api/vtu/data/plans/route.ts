@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     network = searchParams.get("network") || "";
 
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
-    const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const apiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     // Retrieve admin global custom profit margin setting from Firestore to apply markup dynamically
     let profitMargin = 0;
@@ -36,12 +36,14 @@ export async function GET(req: Request) {
       }
     }
 
+    const headers: Record<string, string> = {
+      "Authorization": `Bearer ${idToken}`,
+    };
+    if (apiKey) headers["x-api-key"] = apiKey;
+
     const gatewayRes = await fetch(`${gatewayUrl}/api/vtu/data/plans?network=${network}`, {
       method: "GET",
-      headers: {
-        "Authorization": `Bearer ${idToken}`,
-        "x-api-key": apiKey,
-      },
+      headers,
     });
 
     if (!gatewayRes.ok) {

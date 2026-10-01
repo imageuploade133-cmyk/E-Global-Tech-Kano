@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     }
 
     const authHeader = req.headers.get("Authorization") || "";
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     const body = await req.json().catch(() => ({}));
     const { otpCode, channel = "whatsapp" } = body;
@@ -86,13 +86,15 @@ export async function POST(req: Request) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 50000);
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": authHeader,
+    };
+    if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
     const response = await fetch(`${GATEWAY_URL}/api/auth/pin-verify-otp`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": authHeader,
-        "x-api-key": gatewayApiKey,
-      },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeoutId));

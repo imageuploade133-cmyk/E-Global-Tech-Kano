@@ -223,7 +223,7 @@ export async function POST(req: Request) {
 
       // Generate card payment checkout link
       const gatewayUrl = (process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org").replace(/\/$/, "");
-      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+      const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
       const txRef = `TX-STORE-${orderId}`;
       const requestHost = req.headers.get("host") || "";
@@ -237,13 +237,17 @@ export async function POST(req: Request) {
 
       // Request VM proxy S2S payment initialization
       try {
+        const proxyHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) {
+          proxyHeaders["X-API-Key"] = gatewayApiKey;
+          proxyHeaders["Authorization"] = `Bearer ${gatewayApiKey}`;
+        }
+
         const vmProxyRes = await fetch(`${gatewayUrl}/api/flutterwave/proxy`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": gatewayApiKey,
-            "Authorization": `Bearer ${gatewayApiKey}`,
-          },
+          headers: proxyHeaders,
           body: JSON.stringify({
             method: "POST",
             endpoint: "/payments",
@@ -282,13 +286,17 @@ export async function POST(req: Request) {
       // Secondary: VM initialize fallback
       if (!paymentUrl) {
         try {
+          const initHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (gatewayApiKey) {
+            initHeaders["X-API-Key"] = gatewayApiKey;
+            initHeaders["Authorization"] = `Bearer ${gatewayApiKey}`;
+          }
+
           const vmInitRes = await fetch(`${gatewayUrl}/api/flutterwave/initialize`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-API-Key": gatewayApiKey,
-              "Authorization": `Bearer ${gatewayApiKey}`,
-            },
+            headers: initHeaders,
             body: JSON.stringify({
               amount: calculatedTotalAmount,
               currency: "NGN",

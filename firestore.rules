@@ -27,7 +27,9 @@ service cloud.firestore {
                           'isVerified', 'isAdmin', 'totalDeposits', 'totalWithdrawals',
                           'lastFundingAt', 'lastWithdrawalAt', 'createdAt', 'balance',
                           'pin', 'pinHash', 'pinAttempts', 'lockedUntil',
-                          'kycHashedId', 'kycVerifiedAt', 'kycRejectedAt', 'kycRejectionReason'
+                          'kycHashedId', 'kycVerifiedAt', 'kycRejectedAt', 'kycRejectionReason',
+                          'capturedSelfie', 'kycCapturedSelfie', 'kycDocument', 'kycDocumentUrl',
+                          'bvn', 'nin', 'kycNumber', 'kycType'
                         ])) || isAdmin());
 
       allow delete: if isAdmin();

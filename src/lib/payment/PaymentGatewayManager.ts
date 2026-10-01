@@ -105,7 +105,7 @@ export class PaymentGatewayManager {
   }): Promise<{ name: string; payBills: (payload: BillPaymentPayload, idToken?: string) => Promise<BillPaymentResponse> }> {
     console.log(`[PaymentGatewayManager] Selecting gateway for feature: ${params.feature}`);
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
-    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY || "default_gateway_secure_key_12345";
+    const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
     // Option 1 Design: If feature is airtime, route to Clubkonnect VTU endpoint on the Payment Gateway
     if (params.feature === "airtime") {
@@ -114,13 +114,15 @@ export class PaymentGatewayManager {
         payBills: async (payload: BillPaymentPayload, idToken?: string) => {
           console.log(`[PaymentGatewayManager] Routing airtime purchase S2S to Clubkonnect VTU endpoint | ref=${payload.reference}`);
 
+          const headers: Record<string, string> = {
+            "Authorization": `Bearer ${idToken || ""}`,
+            "Content-Type": "application/json",
+          };
+          if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
           const response = await fetch(`${gatewayUrl}/api/vtu/airtime`, {
             method: "POST",
-            headers: {
-              "Authorization": `Bearer ${idToken || ""}`,
-              "x-api-key": gatewayApiKey,
-              "Content-Type": "application/json",
-            },
+            headers,
             body: JSON.stringify({
               network: payload.biller_name || "MTN",
               phone: payload.customer_id,
@@ -158,13 +160,15 @@ export class PaymentGatewayManager {
     return {
       name: "flutterwave",
       payBills: async (payload: BillPaymentPayload, idToken?: string) => {
+        const headers: Record<string, string> = {
+          "Authorization": `Bearer ${idToken || ""}`,
+          "Content-Type": "application/json",
+        };
+        if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
+
         const response = await fetch(`${gatewayUrl}/api/flutterwave/bills`, {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${idToken || ""}`,
-            "x-api-key": gatewayApiKey,
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({
             country: "NG",
             customer: payload.customer_id,

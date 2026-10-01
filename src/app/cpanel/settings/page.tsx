@@ -36,7 +36,6 @@ function CpanelSettingsPageContent() {
   const [phone1Input, setPhone1Input] = useState(config.supportPhone1);
   const [phone2Input, setPhone2Input] = useState(config.supportPhone2);
   const [emailInput, setEmailInput] = useState(config.supportEmail);
-  const [apiKeyInput, setApiKeyInput] = useState(config.imgbbApiKey || "");
   const [uploadSizeInput, setUploadSizeInput] = useState(config.maxKycUploadSizeMb || 10);
   const [whatsappPollingEnabled, setWhatsappPollingEnabled] = useState(config.whatsappPollingEnabled !== false);
   const [whatsappPollingIntervalMinutes, setWhatsappPollingIntervalMinutes] = useState(config.whatsappPollingIntervalMinutes || 1);
@@ -66,7 +65,6 @@ function CpanelSettingsPageContent() {
     setPhone1Input(config.supportPhone1);
     setPhone2Input(config.supportPhone2);
     setEmailInput(config.supportEmail);
-    setApiKeyInput(config.imgbbApiKey || "");
     setUploadSizeInput(config.maxKycUploadSizeMb || 10);
     setWhatsappPollingEnabled(config.whatsappPollingEnabled !== false);
     setWhatsappPollingIntervalMinutes(config.whatsappPollingIntervalMinutes || 1);
@@ -89,7 +87,6 @@ function CpanelSettingsPageContent() {
         supportPhone1: phone1Input,
         supportPhone2: phone2Input,
         supportEmail: emailInput,
-        imgbbApiKey: apiKeyInput,
         maxKycUploadSizeMb: uploadSizeInput,
         whatsappPollingEnabled,
         whatsappPollingIntervalMinutes,
@@ -322,17 +319,6 @@ function CpanelSettingsPageContent() {
               Live Brand Configurations
             </h3>
             <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div className={cn("space-y-1 p-4 rounded-xl border transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
-                <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Imgbb API Key (Image Upload Rail)</label>
-                <input
-                  type="text"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Enter Imgbb v1 api key"
-                  className={inputClass}
-                />
-              </div>
-
               <div className={cn("space-y-1 p-4 rounded-xl border transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
                 <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider">Max KYC Document Upload Size (MB)</label>
                 <input

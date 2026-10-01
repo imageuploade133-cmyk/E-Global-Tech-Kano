@@ -19,7 +19,8 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
   // Verification states
   const [idType, setIdType] = useState<"bvn" | "nin">("bvn");
   const [idNumber, setIdNumber] = useState("");
-  const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
 
@@ -30,7 +31,8 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
   useEffect(() => {
     if (isOpen) {
       setIdNumber("");
-      setSelfieBase64(null);
+      setSelfiePreview(null);
+      setSelfieFile(null);
       setIsSubmitting(false);
       setIsSubmittedSuccessfully(false);
     }
@@ -49,7 +51,6 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
   }, [isOpen]);
 
   const handleDragEnd = async (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    // Disable drag dismiss if currently submitting or successfully verified to prevent state interruption
     if (isSubmitting || isSubmittedSuccessfully) return;
     if (info.offset.y > 100 || info.velocity.y > 500) {
       onClose();
@@ -70,15 +71,16 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
 
     const file = files[0];
     if (file.size > 8 * 1024 * 1024) {
-      toast.error("Selfie image is too large. Please take another picture.");
+      toast.error("Selfie image is too large. Max allowable size is 8MB.");
       return;
     }
 
+    setSelfieFile(file);
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
-        setSelfieBase64(reader.result);
-        toast.success("Selfie captured successfully! Face biometrics detected.");
+        setSelfiePreview(reader.result);
+        toast.success("Selfie captured successfully!");
       }
     };
     reader.onerror = () => {
@@ -95,13 +97,13 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       return;
     }
 
-    if (!selfieBase64) {
-      toast.error("A selfie picture is strictly required for live facial match authentication.");
+    if (!selfieFile && !selfiePreview) {
+      toast.error("A selfie picture is strictly required for identity verification.");
       return;
     }
 
     setIsSubmitting(true);
-    toast.loading(`Submitting ${idType.toUpperCase()} database and registering selfie live scan...`);
+    toast.loading(`Uploading selfie and submitting ${idType.toUpperCase()} details...`);
 
     try {
       const isMock = typeof window !== "undefined" && sessionStorage.getItem("mock") === "true";
@@ -111,6 +113,45 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
         idToken = await user.getIdToken();
       }
 
+      // STEP 1: Securely upload selfie to ImgBB via authenticated /api/upload-image (multipart File upload only)
+      let fileToUpload: File | null = selfieFile;
+
+      if (!fileToUpload && selfiePreview && selfiePreview.startsWith("data:")) {
+        const arr = selfiePreview.split(",");
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        fileToUpload = new File([u8arr], "kyc_selfie.jpg", { type: mime });
+      }
+
+      if (!fileToUpload) {
+        throw new Error("A valid selfie image file is required for verification.");
+      }
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("purpose", "kyc_selfie");
+
+      const uploadRes = await fetch("/api/upload-image", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: formData,
+      });
+
+      const uploadJson = await uploadRes.json();
+      if (!uploadRes.ok || !uploadJson.success || !uploadJson.url) {
+        throw new Error(uploadJson.error || "Failed to upload selfie image.");
+      }
+      const uploadedUrl = uploadJson.url;
+
+      // STEP 2: Submit KYC payload with verified ImgBB URL (NO base64 fallback)
       const res = await fetch("/api/profile/verify-kyc", {
         method: "POST",
         headers: {
@@ -120,8 +161,8 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
         body: JSON.stringify({
           idNumber: idNumber.trim(),
           type: idType,
-          capturedSelfie: selfieBase64,
-          livenessChallenge: true, // required by API
+          capturedSelfie: uploadedUrl,
+          livenessChallenge: true,
         }),
       });
 
@@ -268,16 +309,16 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
                     <div
                       onClick={triggerCamera}
                       className={`w-full p-5 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
-                        selfieBase64
+                        selfiePreview
                           ? "border-emerald-500 bg-emerald-50/20"
                           : "border-black/20 hover:border-black/40 bg-gray-50/50"
                       }`}
                     >
-                      {selfieBase64 ? (
+                      {selfiePreview ? (
                         <div className="flex flex-col items-center space-y-3 relative">
                           <div className="relative w-24 h-24 rounded-full border-4 border-emerald-500 overflow-hidden shadow-md scale-102">
                             <img
-                              src={selfieBase64}
+                              src={selfiePreview}
                               alt="Selfie"
                               className="w-full h-full object-cover"
                             />
@@ -313,7 +354,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
                 <div className="pt-6 border-t border-gray-100 w-full mt-6">
                   <button
                     type="submit"
-                    disabled={isSubmitting || !idNumber || idNumber.length !== 11 || !selfieBase64}
+                    disabled={isSubmitting || !idNumber || idNumber.length !== 11 || (!selfieFile && !selfiePreview)}
                     className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:brightness-105 active:scale-98 transition-all disabled:opacity-50"
                   >
                     {isSubmitting ? "Submitting Verification..." : "Submit KYC details"}
