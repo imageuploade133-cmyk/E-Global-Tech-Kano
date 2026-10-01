@@ -19,7 +19,8 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
   const [isLoadingRequest, setIsLoadingRequest] = useState(false);
 
   const currentTier = String(userData?.tier || (userData?.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
-  const singleLimit = userData?.singleLimit ?? (currentTier === "Tier 3" ? 10000000 : currentTier === "Tier 2" ? 2000000 : 200000);
+  const singleLimit = Number(userData?.singleLimit) || (currentTier === "Tier 3" ? 10000000 : currentTier === "Tier 2" ? 2000000 : 200000);
+  const numDailyLimit = Number(dailyLimit) || 500000;
 
   // Modal back button interception
   useModalBackHandler(isDrawerOpen, () => setIsModalDrawerOpen(false), "tier-upgrade-drawer");
@@ -77,7 +78,7 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
         <div className="bg-gray-50/80 border border-gray-150 rounded-2xl p-3.5 space-y-1">
           <span className="text-[9px] font-extrabold uppercase tracking-widest text-gray-400 block">Daily Limit</span>
           <p className="font-hanken font-black text-base text-gray-900">
-            ₦{new Intl.NumberFormat("en-NG").format(dailyLimit)}
+            ₦{new Intl.NumberFormat("en-NG").format(numDailyLimit)}
           </p>
         </div>
 
