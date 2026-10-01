@@ -165,6 +165,18 @@ function TierUpgradeDrawerModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 4-Digit Transaction PIN verification state
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsPinModalOpen(false);
+      setPinDigits(["", "", "", ""]);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       setFullName(userData?.name || user?.displayName || "");
@@ -194,7 +206,7 @@ function TierUpgradeDrawerModal({
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePreSubmitValidation = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!fullName.trim()) {
@@ -217,8 +229,41 @@ function TierUpgradeDrawerModal({
       return;
     }
 
-    setIsSubmitting(true);
-    toast.loading("Uploading documents & submitting upgrade request...");
+    // Open 4-digit PIN verification modal
+    setPinDigits(["", "", "", ""]);
+    setIsPinModalOpen(true);
+  };
+
+  const handlePinDigitPress = (digit: string) => {
+    const emptyIdx = pinDigits.findIndex((d) => d === "");
+    if (emptyIdx !== -1) {
+      const updated = [...pinDigits];
+      updated[emptyIdx] = digit;
+      setPinDigits(updated);
+
+      if (emptyIdx === 3) {
+        const fullPin = updated.join("");
+        executeVerifiedSubmit(fullPin);
+      }
+    }
+  };
+
+  const handlePinBackspace = () => {
+    const lastFilledIdx = pinDigits.map((d) => d !== "").lastIndexOf(true);
+    if (lastFilledIdx !== -1) {
+      const updated = [...pinDigits];
+      updated[lastFilledIdx] = "";
+      setPinDigits(updated);
+    }
+  };
+
+  const handlePinClear = () => {
+    setPinDigits(["", "", "", ""]);
+  };
+
+  const executeVerifiedSubmit = async (enteredPin: string) => {
+    setIsVerifyingPin(true);
+    toast.loading("Verifying transaction PIN...");
 
     try {
       let idToken = "";
@@ -226,7 +271,31 @@ function TierUpgradeDrawerModal({
         idToken = await user.getIdToken();
       }
 
-      // 1. Upload Proof of Address
+      // 1. Verify 4-digit Transaction PIN first
+      const verifyRes = await fetch("/api/auth/pin-verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ pin: enteredPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+      toast.dismiss();
+
+      if (!verifyRes.ok || !verifyData.success) {
+        toast.error(verifyData.error || "Invalid 4-digit Transaction PIN. Request aborted.");
+        setPinDigits(["", "", "", ""]);
+        setIsVerifyingPin(false);
+        return;
+      }
+
+      setIsPinModalOpen(false);
+      setIsSubmitting(true);
+      toast.loading("Uploading documents & submitting upgrade request...");
+
+      // 2. Upload Proof of Address
       let proofUrl = addressPreview || "";
       if (addressFile) {
         const addressUpload = await uploadImageSecurely(addressFile, "kyc_document");
@@ -237,7 +306,7 @@ function TierUpgradeDrawerModal({
         }
       }
 
-      // 2. Upload Live Selfie
+      // 3. Upload Live Selfie
       let liveSelfieUrl = selfiePreview || "";
       if (selfieFile) {
         const selfieUpload = await uploadImageSecurely(selfieFile, "kyc_selfie");
@@ -248,7 +317,7 @@ function TierUpgradeDrawerModal({
         }
       }
 
-      // 3. Post payload to backend
+      // 4. Post payload to backend
       const res = await fetch("/api/profile/tier-upgrade", {
         method: "POST",
         headers: {
@@ -279,6 +348,7 @@ function TierUpgradeDrawerModal({
       toast.error(err.message || "An error occurred during submission.");
     } finally {
       setIsSubmitting(false);
+      setIsVerifyingPin(false);
     }
   };
 
@@ -358,7 +428,7 @@ function TierUpgradeDrawerModal({
                 </div>
               </div>
             ) : (
-              <form id="tier-upgrade-form" onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-2 text-left">
+              <form id="tier-upgrade-form" onSubmit={handlePreSubmitValidation} className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-2 text-left">
 
                 {/* Target Tier Selector */}
                 <div className="space-y-1.5">
@@ -509,6 +579,93 @@ function TierUpgradeDrawerModal({
           </motion.div>
         </>
       )}
+
+      {/* 4-Digit Transaction PIN Verification Pad Modal */}
+      <AnimatePresence>
+        {isPinModalOpen && (
+          <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-xs bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black"
+            >
+              <div className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-[24px]">lock</span>
+              </div>
+
+              <div>
+                <h4 className="font-extrabold text-base uppercase text-gray-900">Enter Access PIN</h4>
+                <p className="text-[11px] text-gray-500 mt-1 font-semibold">
+                  Enter your 4-digit transaction PIN to confirm tier limit upgrade application.
+                </p>
+              </div>
+
+              {/* 4 Pin Boxes */}
+              <div className="flex justify-center gap-3 py-2">
+                {[0, 1, 2, 3].map((idx) => (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "w-12 h-12 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-2xl transition-all shadow-xs",
+                      pinDigits[idx] ? "border-[#FC7A00] bg-orange-50/20 text-[#FC7A00]" : "border-gray-200 text-gray-400 bg-gray-50"
+                    )}
+                  >
+                    {pinDigits[idx] ? "•" : ""}
+                  </div>
+                ))}
+              </div>
+
+              {/* Numeric Keypad Grid */}
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    disabled={isVerifyingPin}
+                    onClick={() => handlePinDigitPress(num)}
+                    className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {num}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={isVerifyingPin}
+                  onClick={handlePinClear}
+                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-xs uppercase text-gray-600 active:scale-95 transition-all cursor-pointer"
+                >
+                  CLEAR
+                </button>
+                <button
+                  type="button"
+                  disabled={isVerifyingPin}
+                  onClick={() => handlePinDigitPress("0")}
+                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  0
+                </button>
+                <button
+                  type="button"
+                  disabled={isVerifyingPin}
+                  onClick={handlePinBackspace}
+                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                >
+                  <span className="material-symbols-outlined text-[20px]">backspace</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPinModalOpen(false)}
+                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer"
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 }

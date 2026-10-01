@@ -58,7 +58,7 @@ export function KycVerificationDrawer({
     if (isOpen) {
       setIsOverrideActive(false);
 
-      // If the user's KYC is currently pending in review, immediately default to the "review" state
+      // If the user's KYC is currently pending in review, enforce persistent "review" state and do not allow form input
       if (isUserKycPending) {
         setSubmitStep("review");
       } else {
@@ -563,26 +563,13 @@ export function KycVerificationDrawer({
               )}
 
               {submitStep === "review" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsOverrideActive(true);
-                      setSubmitStep("form");
-                      toast.info("Input fields unlocked. Please re-enter your details.");
-                    }}
-                    className="w-full py-3.5 bg-black hover:bg-gray-900 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all shadow-xs"
-                  >
-                    Re-verify
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="w-full py-3 bg-gray-100 hover:bg-gray-150 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all"
-                  >
-                    Close
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-3.5 bg-black hover:bg-gray-900 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-95 transition-all shadow-xs"
+                >
+                  Close Window
+                </button>
               )}
 
               {submitStep === "success" && (
