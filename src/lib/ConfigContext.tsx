@@ -49,6 +49,8 @@ export interface AppConfig {
   whatsappPollingIntervalMinutes?: number;
   minTransferAmount?: number;
   globalMinTransferAmount?: number;
+  hasCustomImgbbApiKey?: boolean;
+  imgbbApiKey?: string;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -131,11 +133,13 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         unsubscribe = onSnapshot(doc(db, "config", "app"), (docSnap) => {
           if (docSnap.exists()) {
             const rawData = docSnap.data() as Record<string, any>;
+            const hasCustomKey = Boolean(rawData.imgbbApiKey && typeof rawData.imgbbApiKey === "string" && rawData.imgbbApiKey.trim());
             // Explicitly strip any sensitive fields such as imgbbApiKey even if present in Firestore
             const { imgbbApiKey, secretKey, apiKey, ...safeRemoteData } = rawData;
             setConfig((prev) => ({
               ...prev,
               ...safeRemoteData,
+              hasCustomImgbbApiKey: hasCustomKey,
               // Preserve existing featureToggles if safeRemoteData does not contain featureToggles
               featureToggles: safeRemoteData.featureToggles || prev.featureToggles || DEFAULT_FEATURE_TOGGLES,
             }));

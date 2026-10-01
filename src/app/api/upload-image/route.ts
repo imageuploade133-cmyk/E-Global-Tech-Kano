@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { adminDb } from "@/lib/firebase-admin";
 import { authenticateUserRequest } from "@/lib/auth-util";
+import { verifyAdminAuth } from "@/lib/admin-auth";
 import { extractImgBbDirectUrls, validateImageUrl, ImageMetadata } from "@/lib/image-upload";
 
 // Allowed image MIME types
@@ -19,7 +20,11 @@ const ALLOWED_PURPOSES = new Set([
   "kyc_selfie",
   "kyc_document",
   "store_product",
+  "store_category",
   "estate_property",
+  "estate_listing",
+  "estate_logo",
+  "estate_banner",
   "admin_asset",
   "general",
   "banner",
@@ -29,6 +34,13 @@ const ALLOWED_PURPOSES = new Set([
   "statement_signature",
   "statement_stamp",
   "statement_watermark",
+  "bank_logo",
+  "bill_logo",
+  "report_evidence",
+  "agent_avatar",
+  "editor_inline_image",
+  "broadcast_image",
+  "broadcast_doc",
 ]);
 
 /**
@@ -120,20 +132,25 @@ export async function POST(req: Request) {
       );
     }
 
-    // STEP 1: Require Authentication via Session or Firebase ID Token
+    // STEP 1: Require Authentication via Firebase ID Token or CPanel Admin Session Cookie
     let authUser: { uid: string; email?: string } | null = null;
     try {
       authUser = await authenticateUserRequest(req);
     } catch (authErr: any) {
-      return NextResponse.json(
-        { error: "Unauthorized: Authentication required to upload images." },
-        { status: 401 }
-      );
+      // Fall back to verifyAdminAuth for CPanel Admin session cookie authentication
+      try {
+        const adminAuth = await verifyAdminAuth(req);
+        if (adminAuth && adminAuth.isAdmin) {
+          authUser = { uid: adminAuth.uid, email: adminAuth.email };
+        }
+      } catch (adminErr: any) {
+        // Both standard user auth and admin cookie auth failed
+      }
     }
 
     if (!authUser || !authUser.uid) {
       return NextResponse.json(
-        { error: "Unauthorized: Valid user identity required." },
+        { error: "Unauthorized: Authentication required to upload images." },
         { status: 401 }
       );
     }
@@ -205,12 +222,28 @@ export async function POST(req: Request) {
       );
     }
 
-    // REQUIREMENT 3: Resolve ImgBB API key strictly from server process environment variables ONLY
-    const apiKey = process.env.IMGBB_API_KEY;
+    // REQUIREMENT 3: Resolve ImgBB API key. Check CPanel config/app 'imgbbApiKey' first, then process.env.IMGBB_API_KEY
+    let apiKey: string | undefined;
+
+    try {
+      const appConfigSnap = await adminDb.collection("config").doc("app").get();
+      if (appConfigSnap.exists) {
+        const appConfigData = appConfigSnap.data();
+        if (appConfigData?.imgbbApiKey && typeof appConfigData.imgbbApiKey === "string" && appConfigData.imgbbApiKey.trim()) {
+          apiKey = appConfigData.imgbbApiKey.trim();
+        }
+      }
+    } catch (configErr: any) {
+      console.warn("[Upload API] Failed to fetch custom imgbbApiKey from config app:", configErr.message);
+    }
+
+    if (!apiKey) {
+      apiKey = process.env.IMGBB_API_KEY;
+    }
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "ImgBB API Key is not configured in server environment." },
+        { error: "ImgBB API Key is not configured in CPanel settings or server environment." },
         { status: 500 }
       );
     }

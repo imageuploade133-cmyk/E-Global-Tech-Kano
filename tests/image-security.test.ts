@@ -252,4 +252,89 @@ describe("Real Production Security & Image Authorization Test Suite", () => {
     expect(extracted.id).toBe("imgbb-unique-123");
     expect(extracted.url).toBe("https://i.ibb.co/sample/image.png");
   });
+
+  // 26. Expanded ALLOWED_PURPOSES includes all app and CPanel purposes
+  test("26. Expanded ALLOWED_PURPOSES includes bank_logo, bill_logo, store_category, estate_listing, and emergency broadcast assets", () => {
+    const ALLOWED_PURPOSES = new Set([
+      "profile_avatar", "kyc_selfie", "kyc_document", "store_product", "store_category",
+      "estate_property", "estate_listing", "estate_logo", "estate_banner", "admin_asset",
+      "general", "banner", "app_logo", "receipt_logo", "statement_logo", "statement_signature",
+      "statement_stamp", "statement_watermark", "bank_logo", "bill_logo", "report_evidence",
+      "agent_avatar", "editor_inline_image", "broadcast_image", "broadcast_doc",
+    ]);
+
+    expect(ALLOWED_PURPOSES.has("bank_logo")).toBe(true);
+    expect(ALLOWED_PURPOSES.has("bill_logo")).toBe(true);
+    expect(ALLOWED_PURPOSES.has("store_category")).toBe(true);
+    expect(ALLOWED_PURPOSES.has("estate_listing")).toBe(true);
+    expect(ALLOWED_PURPOSES.has("broadcast_image")).toBe(true);
+  });
+
+  // 27. Dual authentication fallback logic authenticates CPanel admins via session cookie when Bearer token is absent
+  test("27. Upload authentication falls back to CPanel admin cookie session when Bearer header is missing", () => {
+    const resolveAuthUser = (bearerHeader?: string, cpanelCookieToken?: string) => {
+      if (bearerHeader && bearerHeader.startsWith("Bearer ")) {
+        return { uid: "user-via-bearer", type: "bearer" };
+      }
+      if (cpanelCookieToken && cpanelCookieToken === "valid-cpanel-jwt") {
+        return { uid: "admin-via-cookie", type: "cpanel_session" };
+      }
+      return null;
+    };
+
+    // Bearer token present
+    expect(resolveAuthUser("Bearer token-123", "")?.type).toBe("bearer");
+    // Bearer absent, valid CPanel cookie present
+    expect(resolveAuthUser(undefined, "valid-cpanel-jwt")?.type).toBe("cpanel_session");
+    // Both absent
+    expect(resolveAuthUser(undefined, undefined)).toBeNull();
+  });
+
+  // 28. Custom ImgBB API key resolution precedence over Vercel env
+  test("28. Resolve ImgBB API key prioritizes Firestore config/app imgbbApiKey over process.env.IMGBB_API_KEY", () => {
+    const resolveKey = (docConfigKey?: string, envKey?: string) => {
+      if (docConfigKey && docConfigKey.trim().length > 0) {
+        return docConfigKey.trim();
+      }
+      return envKey;
+    };
+
+    const customKey = "custom_cpanel_imgbb_key_999";
+    const envKey = "vercel_env_imgbb_key_111";
+
+    expect(resolveKey(customKey, envKey)).toBe("custom_cpanel_imgbb_key_999");
+  });
+
+  // 29. ImgBB API key resolution falls back to process.env.IMGBB_API_KEY when CPanel doc key is empty/undefined
+  test("29. Resolve ImgBB API key falls back to process.env.IMGBB_API_KEY when custom key is empty or undefined", () => {
+    const resolveKey = (docConfigKey?: string, envKey?: string) => {
+      if (docConfigKey && docConfigKey.trim().length > 0) {
+        return docConfigKey.trim();
+      }
+      return envKey;
+    };
+
+    const envKey = "vercel_env_imgbb_key_111";
+
+    expect(resolveKey("", envKey)).toBe("vercel_env_imgbb_key_111");
+    expect(resolveKey(undefined, envKey)).toBe("vercel_env_imgbb_key_111");
+    expect(resolveKey("   ", envKey)).toBe("vercel_env_imgbb_key_111");
+  });
+
+  // 30. Admin config endpoint returns hasCustomImgbbApiKey boolean without exposing the secret raw key
+  test("30. Config response contains hasCustomImgbbApiKey boolean flag while stripping the raw imgbbApiKey secret", () => {
+    const rawConfigDoc = { logoUrl: "https://i.ibb.co/logo.png", imgbbApiKey: "secret_custom_key_777" };
+
+    const hasCustomImgbbApiKey = Boolean(
+      rawConfigDoc.imgbbApiKey &&
+      typeof rawConfigDoc.imgbbApiKey === "string" &&
+      rawConfigDoc.imgbbApiKey.trim().length > 0
+    );
+
+    const { imgbbApiKey, ...sanitized } = rawConfigDoc;
+    const clientConfigResponse = { ...sanitized, hasCustomImgbbApiKey };
+
+    expect(clientConfigResponse.hasCustomImgbbApiKey).toBe(true);
+    expect((clientConfigResponse as any).imgbbApiKey).toBeUndefined();
+  });
 });

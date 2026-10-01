@@ -39,6 +39,8 @@ function CpanelSettingsPageContent() {
   const [uploadSizeInput, setUploadSizeInput] = useState(config.maxKycUploadSizeMb || 10);
   const [whatsappPollingEnabled, setWhatsappPollingEnabled] = useState(config.whatsappPollingEnabled !== false);
   const [whatsappPollingIntervalMinutes, setWhatsappPollingIntervalMinutes] = useState(config.whatsappPollingIntervalMinutes || 1);
+  const [imgbbApiKeyInput, setImgbbApiKeyInput] = useState(config.hasCustomImgbbApiKey ? "••••••••" : "");
+  const [hasCustomImgbbApiKey, setHasCustomImgbbApiKey] = useState(Boolean(config.hasCustomImgbbApiKey));
 
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -68,13 +70,28 @@ function CpanelSettingsPageContent() {
     setUploadSizeInput(config.maxKycUploadSizeMb || 10);
     setWhatsappPollingEnabled(config.whatsappPollingEnabled !== false);
     setWhatsappPollingIntervalMinutes(config.whatsappPollingIntervalMinutes || 1);
+    setHasCustomImgbbApiKey(Boolean(config.hasCustomImgbbApiKey));
+    if (config.hasCustomImgbbApiKey && !imgbbApiKeyInput) {
+      setImgbbApiKeyInput("••••••••");
+    }
   }, [config]);
+
+  const handleClearImgbbApiKey = async () => {
+    try {
+      await updateConfig({ imgbbApiKey: "", clearImgbbApiKey: true } as any);
+      setImgbbApiKeyInput("");
+      setHasCustomImgbbApiKey(false);
+      toast.success("Custom ImgBB API Key removed. System is now using Vercel environment key.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove custom ImgBB key.");
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingBranding(true);
     try {
-      await updateConfig({
+      const payload: Record<string, any> = {
         logoUrl: logoInput,
         receiptLogoUrl: receiptLogoInput,
         receiptName: receiptNameInput,
@@ -90,8 +107,18 @@ function CpanelSettingsPageContent() {
         maxKycUploadSizeMb: uploadSizeInput,
         whatsappPollingEnabled,
         whatsappPollingIntervalMinutes,
-      });
-      toast.success("Global branding, Statement logo, Signature, and Stamp settings applied!");
+      };
+
+      if (imgbbApiKeyInput && imgbbApiKeyInput !== "••••••••") {
+        payload.imgbbApiKey = imgbbApiKeyInput;
+      }
+
+      await updateConfig(payload);
+      if (imgbbApiKeyInput && imgbbApiKeyInput !== "••••••••") {
+        setHasCustomImgbbApiKey(true);
+        setImgbbApiKeyInput("••••••••");
+      }
+      toast.success("Global branding, ImgBB API key, and system settings applied!");
     } catch (err: unknown) {
       console.error(err);
       toast.error("Failed to commit settings updates to system storage.");
@@ -331,6 +358,57 @@ function CpanelSettingsPageContent() {
                   className={inputClass}
                 />
                 <p className="text-[9px] text-gray-400 mt-1">Configure the maximum permitted file size in MB for Identity document image uploads.</p>
+              </div>
+
+              {/* ImgBB Image Storage Gateway API Key Controls */}
+              <div className={cn("p-4 rounded-xl border space-y-3 transition-colors duration-300", isDark ? "bg-orange-950/20 border-orange-900/30" : "bg-orange-50/50 border-orange-100")}>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-[#FC7A00] tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">cloud_upload</span>
+                      ImgBB Image Storage Gateway API Key
+                    </label>
+                    <p className="text-[9px] text-gray-400 mt-0.5">
+                      Enter a custom ImgBB API key to override the Vercel environment key. If left blank, the system will automatically use the key configured in Vercel environment.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border",
+                        hasCustomImgbbApiKey
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-blue-500/10 text-blue-600 border-blue-500/30"
+                      )}
+                    >
+                      {hasCustomImgbbApiKey ? "CUSTOM KEY ACTIVE" : "VERCEL ENV FALLBACK"}
+                    </span>
+                    {hasCustomImgbbApiKey && (
+                      <button
+                        type="button"
+                        onClick={handleClearImgbbApiKey}
+                        className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                      >
+                        Remove Custom Key
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <input
+                    type="password"
+                    value={imgbbApiKeyInput}
+                    onChange={(e) => setImgbbApiKeyInput(e.target.value)}
+                    placeholder={hasCustomImgbbApiKey ? "•••••••• (Enter new key to update)" : "Enter custom ImgBB API key"}
+                    className={inputClass}
+                  />
+                  <p className="text-[9px] text-gray-400">
+                    {hasCustomImgbbApiKey
+                      ? "A custom key is currently active. Type a new key to change it, or click 'Remove Custom Key' to use Vercel env."
+                      : "Currently using Vercel process.env.IMGBB_API_KEY. Enter a key above if you wish to override it."}
+                  </p>
+                </div>
               </div>
 
               {/* WhatsApp Automatic Connection Polling Controls */}

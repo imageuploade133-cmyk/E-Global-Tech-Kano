@@ -182,6 +182,7 @@ export async function uploadImageSecurely(
 
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/upload-image");
+      xhr.withCredentials = true;
 
       if (idToken) {
         xhr.setRequestHeader("Authorization", `Bearer ${idToken}`);
