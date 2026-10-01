@@ -159,14 +159,19 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     if (isMock) return;
     if (typeof window === "undefined" || !config?.appVersion) return;
 
-    const serverVersion = config.appVersion;
-    const cachedVersion = localStorage.getItem("app_version") || sessionStorage.getItem("cached_app_version");
+    const serverVersion = (config.appVersion || "1.0.0").trim();
+    const localVersion = (localStorage.getItem("app_version") || "").trim();
+    const sessionVersion = (sessionStorage.getItem("cached_app_version") || "").trim();
+    const currentCachedVersion = localVersion || sessionVersion;
 
-    if (cachedVersion === null) {
+    if (!currentCachedVersion) {
       localStorage.setItem("app_version", serverVersion);
       sessionStorage.setItem("cached_app_version", serverVersion);
-    } else if (cachedVersion !== serverVersion) {
+      setShowVersionModal(false);
+    } else if (currentCachedVersion !== serverVersion) {
       setShowVersionModal(true);
+    } else {
+      setShowVersionModal(false);
     }
   }, [config?.appVersion]);
 
@@ -175,6 +180,12 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     setIsApplyingUpdate(true);
     setPlayStoreProgress(0);
     setPlayStoreStatusText("Downloading update...");
+
+    const serverVersion = config.appVersion.trim();
+
+    // Immediately record server version into storage & dismiss modal state to prevent repeat prompts
+    localStorage.setItem("app_version", serverVersion);
+    sessionStorage.setItem("cached_app_version", serverVersion);
 
     // Simulated Google Play Store downloading & installing progress
     const updateInterval = setInterval(() => {
@@ -188,7 +199,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
         if (next >= 100) {
           clearInterval(updateInterval);
-          executeAppPurgeAndReload();
+          executeAppPurgeAndReload(serverVersion);
           return 100;
         }
         return next;
@@ -196,7 +207,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     }, 120);
   };
 
-  const executeAppPurgeAndReload = async () => {
+  const executeAppPurgeAndReload = async (latestVersion: string) => {
     try {
       if ("caches" in window) {
         const cacheKeys = await caches.keys();
@@ -206,11 +217,12 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(registrations.map((reg) => reg.unregister()));
       }
-      const newVersion = config?.appVersion || "1.0.1";
-      localStorage.clear();
+
       sessionStorage.clear();
-      localStorage.setItem("app_version", newVersion);
-      sessionStorage.setItem("cached_app_version", newVersion);
+
+      // Write authoritative latest version into storage
+      localStorage.setItem("app_version", latestVersion);
+      sessionStorage.setItem("cached_app_version", latestVersion);
 
       setTimeout(() => {
         window.location.href = window.location.origin + pathname + "?v=" + Date.now();
