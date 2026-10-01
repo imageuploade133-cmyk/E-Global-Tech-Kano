@@ -180,8 +180,12 @@ function TierUpgradeDrawerModal({
 
   useEffect(() => {
     if (isOpen) {
-      setFullName(userData?.name || user?.displayName || "");
-      setBvn(userData?.bvn || userData?.nin || "");
+      const nameVal = userData?.name || user?.displayName || "";
+      setFullName(typeof nameVal === "string" ? nameVal : String(nameVal || ""));
+
+      const bvnVal = userData?.bvn || userData?.nin || "";
+      setBvn(typeof bvnVal === "string" ? bvnVal : String(bvnVal || ""));
+
       setAddressFile(null);
       setAddressPreview(null);
       setSelfieFile(null);
