@@ -301,4 +301,101 @@ export class NotificationService {
       console.error("[NotificationService] Reversal notification dispatch failed:", err?.message || err);
     }
   }
+
+  /**
+   * Broadcasts a real-time FCM push notification to all active users when an administrator releases a new app version.
+   */
+  public static async broadcastAppUpdateNotification(newVersion: string): Promise<number> {
+    if (!adminDb) return 0;
+    try {
+      const tokensSnap = await adminDb.collection("fcm_tokens").get();
+      if (tokensSnap.empty) return 0;
+
+      const title = "🚀 New Update Available!";
+      const body = `Version ${newVersion} has been released. Tap to update now for new features and performance enhancements!`;
+
+      const messaging = getMessaging();
+      const tokenDocs = tokensSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+
+      let sentCount = 0;
+      const invalidTokenIds: string[] = [];
+
+      for (const tDoc of tokenDocs) {
+        if (!tDoc.token) continue;
+        try {
+          const message = {
+            token: tDoc.token,
+            notification: { title, body },
+            data: {
+              title,
+              body,
+              type: "system",
+              version: newVersion,
+              url: "/",
+            },
+            android: {
+              priority: "high" as const,
+              notification: {
+                sound: "default",
+                channelId: "eglobal_wallet_high_channel",
+              },
+            },
+            apns: {
+              payload: {
+                aps: {
+                  alert: { title, body },
+                  sound: "default",
+                  badge: 1,
+                },
+              },
+            },
+            webpush: {
+              headers: { Urgency: "high" },
+              notification: {
+                icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+                badge: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
+              },
+            },
+          };
+
+          await messaging.send(message);
+          sentCount++;
+
+          if (tDoc.userId) {
+            adminDb.collection("users").doc(tDoc.userId).collection("notifications").add({
+              title,
+              body,
+              message: body,
+              type: "system",
+              read: false,
+              createdAt: new Date().toISOString(),
+              version: newVersion,
+            }).catch(() => {});
+          }
+        } catch (fcmErr: any) {
+          const errMsg = fcmErr.message || "";
+          if (
+            fcmErr.code === "messaging/invalid-registration-token" ||
+            fcmErr.code === "messaging/registration-token-not-registered" ||
+            errMsg.includes("not-registered") ||
+            errMsg.includes("invalid-registration-token")
+          ) {
+            invalidTokenIds.push(tDoc.id);
+          }
+        }
+      }
+
+      if (invalidTokenIds.length > 0) {
+        const batch = adminDb.batch();
+        invalidTokenIds.forEach(id => batch.delete(adminDb.collection("fcm_tokens").doc(id)));
+        await batch.commit().catch(() => {});
+      }
+
+      console.log(`[NotificationService] App update v${newVersion} push notification broadcasted to ${sentCount} device(s).`);
+      return sentCount;
+    } catch (err: any) {
+      console.error("[NotificationService] Failed to broadcast app update notification:", err.message);
+      return 0;
+    }
+  }
 }
