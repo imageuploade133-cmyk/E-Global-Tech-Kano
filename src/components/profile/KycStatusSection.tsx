@@ -195,10 +195,10 @@ export function KycStatusSection({
           <button
             type="button"
             onClick={onOpenKycDrawer}
-            className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-4 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_4px_15px_rgba(252,122,0,0.15)] flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full bg-gradient-to-r from-[#FC7A00] to-[#FF9022] hover:brightness-110 text-white py-3.5 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-wider active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px] font-bold">verified_user</span>
-            Verify My Identity
+            Verify Now
           </button>
         </div>
       )}
