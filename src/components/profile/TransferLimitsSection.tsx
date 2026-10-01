@@ -18,7 +18,7 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
   const [upgradeRequest, setUpgradeRequest] = useState<any>(null);
   const [isLoadingRequest, setIsLoadingRequest] = useState(false);
 
-  const currentTier = userData?.tier || (userData?.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1");
+  const currentTier = String(userData?.tier || (userData?.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
   const singleLimit = userData?.singleLimit ?? (currentTier === "Tier 3" ? 10000000 : currentTier === "Tier 2" ? 2000000 : 200000);
 
   // Modal back button interception
