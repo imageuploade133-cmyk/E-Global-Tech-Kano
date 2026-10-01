@@ -42,6 +42,7 @@ function CpanelSettingsPageContent() {
   const [imgbbApiKeyInput, setImgbbApiKeyInput] = useState(config.hasCustomImgbbApiKey ? "••••••••" : "");
   const [hasCustomImgbbApiKey, setHasCustomImgbbApiKey] = useState(Boolean(config.hasCustomImgbbApiKey));
   const [appVersionInput, setAppVersionInput] = useState(config.appVersion || "1.0.0");
+  const [appVersionPushEnabled, setAppVersionPushEnabled] = useState(config.appVersionPushNotificationEnabled !== false);
 
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -73,6 +74,7 @@ function CpanelSettingsPageContent() {
     setWhatsappPollingIntervalMinutes(config.whatsappPollingIntervalMinutes || 1);
     setHasCustomImgbbApiKey(Boolean(config.hasCustomImgbbApiKey));
     setAppVersionInput(config.appVersion || "1.0.0");
+    setAppVersionPushEnabled(config.appVersionPushNotificationEnabled !== false);
     if (config.hasCustomImgbbApiKey && !imgbbApiKeyInput) {
       setImgbbApiKeyInput("••••••••");
     }
@@ -110,6 +112,7 @@ function CpanelSettingsPageContent() {
         whatsappPollingEnabled,
         whatsappPollingIntervalMinutes,
         appVersion: appVersionInput.trim() || "1.0.0",
+        appVersionPushNotificationEnabled: appVersionPushEnabled,
       };
 
       if (imgbbApiKeyInput && imgbbApiKeyInput !== "••••••••") {
@@ -410,6 +413,29 @@ function CpanelSettingsPageContent() {
                       <span>+ Increment Version</span>
                     </button>
                   </div>
+                </div>
+
+                {/* Push Notification Toggle */}
+                <div className="flex items-center justify-between border-t border-gray-200/40 dark:border-gray-800 pt-2.5">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-orange-500">notifications_active</span>
+                      Broadcast Version Release Push Notification
+                    </span>
+                    <p className="text-[8.5px] text-gray-400">Automatically send real-time push alerts to registered user devices when app version changes.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAppVersionPushEnabled(!appVersionPushEnabled)}
+                    className={cn(
+                      "px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer border transition-all shrink-0",
+                      appVersionPushEnabled
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                        : "bg-red-500/10 text-red-500 border-red-500/30"
+                    )}
+                  >
+                    {appVersionPushEnabled ? "PUSH ON" : "PUSH OFF"}
+                  </button>
                 </div>
               </div>
 

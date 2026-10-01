@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
+import { NotificationService } from "@/services/notification-service";
 
 /**
  * Server-side config sanitization helper.
@@ -250,8 +251,29 @@ export async function POST(req: Request) {
 
     delete (sanitizedUpdates as any).clearImgbbApiKey;
 
+    // Fetch previous app version before committing updates
+    let oldAppVersion = "";
+    try {
+      const prevDocSnap = await adminDb.collection("config").doc("app").get();
+      if (prevDocSnap.exists) {
+        oldAppVersion = (prevDocSnap.data()?.appVersion || "").trim();
+      }
+    } catch {
+      // Ignore read failure
+    }
+
     // Secure Firestore write with await
     await adminDb.collection("config").doc("app").set(sanitizedUpdates, { merge: true });
+
+    // Check if appVersion was updated to a new version, and broadcast push notifications to users if enabled
+    const newAppVersion = typeof sanitizedUpdates?.appVersion === "string" ? sanitizedUpdates.appVersion.trim() : "";
+    const isPushNotificationEnabled = sanitizedUpdates?.appVersionPushNotificationEnabled !== false;
+
+    if (newAppVersion && newAppVersion !== oldAppVersion && isPushNotificationEnabled) {
+      NotificationService.broadcastAppUpdateNotification(newAppVersion).catch((err) => {
+        console.error("[Admin Config POST] Broadcast update notification error:", err?.message || err);
+      });
+    }
 
     // Handle ImgBB API Key updates securely in admin-isolated config/app_secrets
     if (customImgbbApiKeyUpdate) {
