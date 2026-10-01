@@ -715,16 +715,68 @@ function PushNotificationsContent() {
                   </div>
                 </div>
 
-                {/* Target Action Link */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Target Action Link / Screen Deep Link (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. /bills, /store, /referrals, or https://..."
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    className={inputClass}
-                  />
+                {/* Target Action Link Selector */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Target Action Link (App Screen or External URL)</label>
+
+                  {/* Quick Preset Buttons */}
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] font-extrabold uppercase text-gray-400">Quick App Screen Presets:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: "🛒 Store", path: "/store" },
+                        { label: "🏡 Estate", path: "/estate" },
+                        { label: "⚡ Bills", path: "/bills" },
+                        { label: "📈 Investments", path: "/investment" },
+                        { label: "💬 Live Support", path: "/support" },
+                        { label: "📜 History", path: "/history" },
+                        { label: "👤 Profile", path: "/profile" },
+                        { label: "🎁 Referrals", path: "/referrals" },
+                      ].map((preset) => (
+                        <button
+                          key={preset.path}
+                          type="button"
+                          onClick={() => setUrl(preset.path)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer",
+                            url === preset.path
+                              ? "bg-[#FC7A00] border-[#FC7A00] text-white"
+                              : isDark
+                              ? "bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600"
+                              : "bg-gray-100 border-gray-200 text-gray-700 hover:border-gray-300"
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="e.g. /store, /bills, /estate or https://example.com"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  {url && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                      {url.startsWith("http://") || url.startsWith("https://") ? (
+                        <span className="text-emerald-500 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                          External Website Link (Opens in native external browser)
+                        </span>
+                      ) : (
+                        <span className="text-[#FC7A00] flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">open_in_browser</span>
+                          Internal App Screen Deep Link
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Real-time Mobile Push Card Preview */}

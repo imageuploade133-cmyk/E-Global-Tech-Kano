@@ -330,6 +330,33 @@ export function NotificationDetailModal({
                 <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
                 <span>Open Store Orders</span>
               </Link>
+            ) : notification.url && notification.url !== "/" ? (
+              notification.url.startsWith("http://") || notification.url.startsWith("https://") ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onCloseParentTray();
+                    window.open(notification.url, "_blank", "noopener,noreferrer");
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-none text-center cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                  <span>Visit Web Link</span>
+                </button>
+              ) : (
+                <Link
+                  href={notification.url}
+                  onClick={() => {
+                    onClose();
+                    onCloseParentTray();
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-none text-center cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">open_in_browser</span>
+                  <span>Open Target Screen ({notification.url})</span>
+                </Link>
+              )
             ) : null}
 
             <button

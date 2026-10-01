@@ -477,6 +477,7 @@ export class NotificationService {
               title,
               body,
               type,
+              image: imageUrl,
               imageUrl,
               bannerUrl: imageUrl,
               url: url || "/",
@@ -508,6 +509,9 @@ export class NotificationService {
                 icon: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
                 badge: "https://i.ibb.co/WWjZrtC7/E-Tech.png",
                 ...(imageUrl ? { image: imageUrl } : {}),
+              },
+              fcmOptions: {
+                ...(url ? { link: url } : {}),
               },
             },
           };
