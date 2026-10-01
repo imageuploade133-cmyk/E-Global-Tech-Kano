@@ -194,7 +194,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
       localStorage.setItem("app_version", newVersion);
       sessionStorage.setItem("cached_app_version", newVersion);
 
-      // 5. Force hard refresh from Vercel
+      // 5. Force hard refresh of static assets
       toast.success("Update applied! Reloading fresh application...");
       setTimeout(() => {
         window.location.href = window.location.origin + pathname + "?v=" + Date.now();
@@ -669,7 +669,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
 
           <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 text-left space-y-3">
             <p className="text-xs text-gray-300 font-semibold leading-relaxed">
-              An official new version update has been released on Vercel. Please click <span className="text-[#FC7A00] font-bold">UPDATE NOW</span> below to clear browser local storage and load the fresh deployment immediately.
+              An official new system version update has been released. Please click <span className="text-[#FC7A00] font-bold">UPDATE NOW</span> below to clear browser local storage and load the fresh deployment immediately.
             </p>
             <div className="space-y-2 pt-1 border-t border-gray-800/80">
               <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
@@ -678,7 +678,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
                 <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
-                <span>Loads latest Vercel deployment assets</span>
+                <span>Loads latest system update assets</span>
               </div>
               <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
                 <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
