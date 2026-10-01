@@ -56,13 +56,13 @@ export async function POST(req: Request) {
     } else {
       const trimmedSelfie = capturedSelfie.trim();
       if (trimmedSelfie.startsWith("data:") || trimmedSelfie.includes("base64")) {
-        errors.push("Raw base64 or data URLs are strictly rejected for KYC selfies. Image must be uploaded to ImgBB via /api/upload-image first.");
+        errors.push("Raw base64 or data URLs are strictly rejected for KYC selfies. Image must be uploaded via /api/upload-image first.");
       } else {
         // STRICT URL HOSTNAME CHECK: Use URL parser to verify hostname is strictly i.ibb.co
         try {
           const parsedUrl = new URL(trimmedSelfie);
           if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "i.ibb.co") {
-            errors.push("Selfie URL must be a direct HTTPS ImgBB image URL hosted on i.ibb.co. Arbitrary external hosts are rejected.");
+            errors.push("Selfie URL must be a direct HTTPS image URL hosted on secure storage. Arbitrary external hosts are rejected.");
           }
         } catch {
           errors.push("Invalid selfie URL format.");

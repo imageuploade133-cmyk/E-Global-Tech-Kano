@@ -158,11 +158,13 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       const uploadedUrl = uploadJson.url;
 
       // STEP 2: Submit KYC payload with full user profile details
+      const sessionId = typeof window !== "undefined" ? (localStorage.getItem("active_session_id") || "") : "";
       const res = await fetch("/api/profile/verify-kyc", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${idToken}`,
+          "X-Session-ID": sessionId,
         },
         body: JSON.stringify({
           idNumber: idNumber.trim(),

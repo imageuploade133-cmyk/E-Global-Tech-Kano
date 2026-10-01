@@ -253,7 +253,7 @@ export async function POST(req: Request) {
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "ImgBB API Key is not configured in CPanel settings or server environment." },
+        { error: "Image Storage API Key is not configured in CPanel settings or server environment." },
         { status: 500 }
       );
     }

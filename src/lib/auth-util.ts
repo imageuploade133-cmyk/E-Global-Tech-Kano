@@ -198,17 +198,17 @@ export async function authenticateUserRequest(req: Request): Promise<DecodedToke
     return decoded;
   }
 
-  // 2. Determine if this request is session establishment, registration finalization, PIN recovery, or wallet funding/status checkout
+  // 2. Determine if this request is session establishment, registration finalization, PIN recovery, profile KYC, or wallet funding/status checkout
   let isSessionExempt = false;
   if (req.url) {
     try {
       const reqUrl = new URL(req.url, "http://localhost");
       const pName = reqUrl.pathname;
-      if (pName.includes("/api/auth/") || pName.includes("/api/payments/")) {
+      if (pName.includes("/api/auth/") || pName.includes("/api/payments/") || pName.includes("/api/profile/")) {
         isSessionExempt = true;
       }
     } catch {
-      if (req.url.includes("/api/auth/") || req.url.includes("/api/payments/")) {
+      if (req.url.includes("/api/auth/") || req.url.includes("/api/payments/") || req.url.includes("/api/profile/")) {
         isSessionExempt = true;
       }
     }

@@ -18,6 +18,8 @@ export interface Notification {
   bankName?: string;
   channel?: string;
   url?: string;
+  imageUrl?: string;
+  bannerUrl?: string;
 }
 
 interface NotificationItemProps {
@@ -82,8 +84,8 @@ export function NotificationItem({
           </span>
         </div>
 
-        <div className="flex-grow pr-6">
-          <div className="flex justify-between items-start mb-1">
+        <div className="flex-grow pr-6 space-y-1.5">
+          <div className="flex justify-between items-start">
             <h4
               className={cn(
                 "text-[14px] leading-tight font-hanken",
@@ -96,6 +98,17 @@ export function NotificationItem({
               {n.time}
             </span>
           </div>
+
+          {(n.imageUrl || n.bannerUrl) && (
+            <div className="w-full max-h-32 rounded-xl overflow-hidden border border-gray-100 bg-gray-50 my-1.5">
+              <img
+                src={n.imageUrl || n.bannerUrl}
+                alt="Notification Banner"
+                className="w-full h-28 object-cover"
+              />
+            </div>
+          )}
+
           <p
             className={cn(
               "text-[12px] leading-relaxed font-hanken",

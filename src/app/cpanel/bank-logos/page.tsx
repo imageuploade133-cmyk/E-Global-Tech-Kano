@@ -455,7 +455,7 @@ function CpanelBankLogosPageContent() {
                           type="button"
                           disabled={isUploading}
                           className={cn("w-10 h-10 border rounded-xl flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-100 border-gray-200 text-gray-700")}
-                          title="Upload image file to ImgBB"
+                          title="Upload image file"
                         >
                           {isUploading ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">upload</span>}
                         </button>
