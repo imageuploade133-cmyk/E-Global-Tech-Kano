@@ -64,9 +64,11 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     second: "2-digit"
   }));
 
-  // System-wide update states for real-time versions & full-screen drawer modal
+  // System-wide update states for real-time versions & Google Play Store update modal
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [playStoreProgress, setPlayStoreProgress] = useState(0);
+  const [playStoreStatusText, setPlayStoreStatusText] = useState("Downloading update...");
 
   const initializingDeviceRef = useRef(false);
 
@@ -171,36 +173,49 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const handlePerformAppUpdate = async () => {
     if (!config?.appVersion) return;
     setIsApplyingUpdate(true);
+    setPlayStoreProgress(0);
+    setPlayStoreStatusText("Downloading update...");
 
+    // Simulated Google Play Store downloading & installing progress
+    const updateInterval = setInterval(() => {
+      setPlayStoreProgress((prev) => {
+        const next = prev + Math.floor(Math.random() * 8) + 5;
+        if (next >= 60 && next < 90) {
+          setPlayStoreStatusText("Installing update...");
+        } else if (next >= 90) {
+          setPlayStoreStatusText("Completing installation...");
+        }
+
+        if (next >= 100) {
+          clearInterval(updateInterval);
+          executeAppPurgeAndReload();
+          return 100;
+        }
+        return next;
+      });
+    }, 120);
+  };
+
+  const executeAppPurgeAndReload = async () => {
     try {
-      // 1. Purge CacheStorage
       if ("caches" in window) {
         const cacheKeys = await caches.keys();
         await Promise.all(cacheKeys.map((key) => caches.delete(key)));
       }
-
-      // 2. Unregister Service Workers
       if ("serviceWorker" in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(registrations.map((reg) => reg.unregister()));
       }
-
-      // 3. Clear Local Storage and Session Storage
-      const newVersion = config.appVersion;
+      const newVersion = config?.appVersion || "1.0.1";
       localStorage.clear();
       sessionStorage.clear();
-
-      // 4. Save new app version
       localStorage.setItem("app_version", newVersion);
       sessionStorage.setItem("cached_app_version", newVersion);
 
-      // 5. Force hard refresh of static assets
-      toast.success("Update applied! Reloading fresh application...");
       setTimeout(() => {
         window.location.href = window.location.origin + pathname + "?v=" + Date.now();
-      }, 300);
-    } catch (err: any) {
-      console.error("[Update Error]:", err);
+      }, 200);
+    } catch {
       window.location.reload();
     }
   };
@@ -630,62 +645,108 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Render Full-Screen Drawer Modal when a new version update is detected
   if (showVersionModal) {
     return (
-      <div className="fixed inset-0 z-[9999999] bg-[#0c0f17] text-white flex flex-col justify-between p-6 md:p-12 overflow-hidden shadow-2xl select-none">
+      <div className="fixed inset-0 z-[9999999] bg-[#ffffff] text-gray-900 flex flex-col justify-between p-6 md:p-10 overflow-hidden select-none font-hanken">
         {/* Top Header Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <AppLogo size={32} />
-            <span className="font-extrabold text-sm tracking-wider uppercase">E-GLOBAL PAY</span>
+            <span className="font-black text-sm tracking-wider uppercase text-gray-900">E-GLOBAL PAY</span>
           </div>
-          <span className="px-3 py-1 bg-orange-500/10 border border-orange-500/30 text-[#FC7A00] rounded-full text-[10px] font-black uppercase tracking-wider">
-            VERSION UPDATE
+          <span className="px-3 py-1 bg-orange-50 border border-orange-200 text-[#FC7A00] rounded-full text-[10px] font-black uppercase tracking-wider">
+            v{config?.appVersion || "1.0.1"}
           </span>
         </div>
 
         {/* Center Content Drawer */}
         <motion.div
-          initial={{ y: 30, opacity: 0 }}
+          initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           className="max-w-md mx-auto my-auto w-full text-center space-y-6"
         >
-          <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-              className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#FC7A00]/20 to-orange-500/5 border border-[#FC7A00]/30 flex items-center justify-center"
-            >
-              <span className="material-symbols-outlined text-[42px] text-[#FC7A00]">system_update</span>
-            </motion.div>
-          </div>
+          {/* Main Display: Google Play Store style loader vs App Update Emblem */}
+          {!isApplyingUpdate ? (
+            <div className="relative w-24 h-20 mx-auto flex items-center justify-center">
+              <div className="w-20 h-20 rounded-3xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FC7A00] shadow-xs">
+                <span className="material-symbols-outlined text-[42px]" style={{ fontVariationSettings: '"FILL" 1' }}>system_update</span>
+              </div>
+            </div>
+          ) : (
+            <div className="relative w-28 h-28 mx-auto flex flex-col items-center justify-center">
+              {/* Google Play Store Ring Spinner */}
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  {/* Track Circle */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    stroke="#f3f4f6"
+                    strokeWidth="8"
+                    fill="transparent"
+                  />
+                  {/* Progress Circle (Google Play Store Green / Brand Accent) */}
+                  <motion.circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    stroke="#01875f"
+                    strokeWidth="8"
+                    strokeDasharray={264}
+                    strokeDashoffset={264 - (264 * playStoreProgress) / 100}
+                    strokeLinecap="round"
+                    fill="transparent"
+                    transition={{ ease: "easeInOut" }}
+                  />
+                </svg>
+
+                {/* Center Percentage Count */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-xl font-black text-[#01875f]">{playStoreProgress}%</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
-            <h1 className="font-hanken font-extrabold text-xl md:text-2xl uppercase tracking-tight text-white leading-tight">
-              NEW VERSION UPDATE AVAILABLE
+            <h1 className="font-hanken font-black text-2xl text-gray-900 uppercase tracking-tight leading-tight">
+              {isApplyingUpdate ? playStoreStatusText : "New Update"}
             </h1>
-            <div className="inline-block px-3 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full font-mono text-xs font-bold">
-              VERSION {config?.appVersion || "1.0.1"} READY
-            </div>
+            <p className="text-xs text-gray-500 font-semibold max-w-sm mx-auto leading-relaxed">
+              {isApplyingUpdate
+                ? "Please wait while the update is being downloaded and installed..."
+                : "A new update is ready for your app. Update now to enjoy new features, enhanced security, and performance improvements."}
+            </p>
           </div>
 
-          <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 text-left space-y-3">
-            <p className="text-xs text-gray-300 font-semibold leading-relaxed">
-              An official new system version update has been released. Please click <span className="text-[#FC7A00] font-bold">UPDATE NOW</span> below to clear browser local storage and load the fresh deployment immediately.
-            </p>
-            <div className="space-y-2 pt-1 border-t border-gray-800/80">
-              <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
-                <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
-                <span>Clears local storage & browser cache</span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
-                <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
-                <span>Loads latest system update assets</span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold">
-                <span className="material-symbols-outlined text-[15px] text-emerald-500">check_circle</span>
-                <span>Includes security patches & fixes</span>
+          {!isApplyingUpdate && (
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-left space-y-2.5 shadow-xs">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">What&apos;s Included in this update</p>
+              <div className="space-y-2 text-xs font-bold text-gray-700">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-[#01875f]">check_circle</span>
+                  <span>Enhanced security and stability improvements</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-[#01875f]">check_circle</span>
+                  <span>Faster transaction processing speeds</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-[#01875f]">check_circle</span>
+                  <span>New features and user interface refinements</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {isApplyingUpdate && (
+            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-[#01875f] rounded-full"
+                style={{ width: `${playStoreProgress}%` }}
+                transition={{ duration: 0.2 }}
+              />
+            </div>
+          )}
         </motion.div>
 
         {/* Bottom Action Footer */}
@@ -694,16 +755,16 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
             type="button"
             disabled={isApplyingUpdate}
             onClick={handlePerformAppUpdate}
-            className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] active:scale-98 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 disabled:opacity-60"
+            className="w-full py-4 bg-[#01875f] hover:bg-[#016f4e] active:scale-98 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 disabled:opacity-75"
           >
             {isApplyingUpdate ? (
               <>
                 <ButtonSpinner />
-                <span>Clearing Storage & Loading New Build...</span>
+                <span>{playStoreStatusText} ({playStoreProgress}%)</span>
               </>
             ) : (
               <>
-                <span className="material-symbols-outlined text-[18px]">download_for_offline</span>
+                <span className="material-symbols-outlined text-[18px]">download</span>
                 <span>UPDATE NOW</span>
               </>
             )}
