@@ -34,7 +34,7 @@ const ButtonSpinner = () => (
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { user, loading, isPinVerified, userData, updateUserData, deviceAuthState } = useAuth();
-  const { config } = useAppConfig();
+  const { config, isConfigLoaded } = useAppConfig();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -156,15 +156,18 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Real-time server-side version mismatch update controller
   useEffect(() => {
     const isMock = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
-    if (isMock) return;
+    if (isMock || !isConfigLoaded) return;
     if (typeof window === "undefined" || !config?.appVersion) return;
 
-    const serverVersion = (config.appVersion || "1.0.0").trim();
+    const serverVersion = (config.appVersion || "").trim();
+    if (!serverVersion) return;
+
     const localVersion = (localStorage.getItem("app_version") || "").trim();
     const sessionVersion = (sessionStorage.getItem("cached_app_version") || "").trim();
     const currentCachedVersion = localVersion || sessionVersion;
 
     if (!currentCachedVersion) {
+      // First time loading: register current server version silently without modal trigger
       localStorage.setItem("app_version", serverVersion);
       sessionStorage.setItem("cached_app_version", serverVersion);
       setShowVersionModal(false);
@@ -173,7 +176,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     } else {
       setShowVersionModal(false);
     }
-  }, [config?.appVersion]);
+  }, [config?.appVersion, isConfigLoaded]);
 
   const handlePerformAppUpdate = async () => {
     if (!config?.appVersion) return;

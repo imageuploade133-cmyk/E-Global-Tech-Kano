@@ -270,7 +270,7 @@ export async function POST(req: Request) {
     const isPushNotificationEnabled = sanitizedUpdates?.appVersionPushNotificationEnabled !== false;
 
     if (newAppVersion && newAppVersion !== oldAppVersion && isPushNotificationEnabled) {
-      NotificationService.broadcastAppUpdateNotification(newAppVersion).catch((err) => {
+      await NotificationService.broadcastAppUpdateNotification(newAppVersion).catch((err) => {
         console.error("[Admin Config POST] Broadcast update notification error:", err?.message || err);
       });
     }

@@ -315,19 +315,24 @@ export class NotificationService {
       const body = `Version ${newVersion} has been released. Tap to update now for new features and performance enhancements!`;
 
       const messaging = getMessaging();
-      const tokenDocs = tokensSnap.docs.map(docSnap => {
-        const data = docSnap.data() as { token?: string; userId?: string; [key: string]: any };
-        return { id: docSnap.id, ...data };
-      });
+      const tokenDocs = tokensSnap.docs
+        .map(docSnap => {
+          const data = docSnap.data() as { token?: string; userId?: string; [key: string]: any };
+          return { id: docSnap.id, ...data };
+        })
+        .filter(t => Boolean(t.token));
+
+      if (tokenDocs.length === 0) return 0;
 
       let sentCount = 0;
       const invalidTokenIds: string[] = [];
+      const affectedUserIds = new Set<string>();
 
-      for (const tDoc of tokenDocs) {
-        if (!tDoc.token) continue;
+      // Dispatch FCM push messages concurrently using Promise.allSettled
+      const sendPromises = tokenDocs.map(async (tDoc) => {
         try {
           const message = {
-            token: tDoc.token,
+            token: tDoc.token!,
             notification: { title, body },
             data: {
               title,
@@ -363,18 +368,7 @@ export class NotificationService {
 
           await messaging.send(message);
           sentCount++;
-
-          if (tDoc.userId) {
-            adminDb.collection("users").doc(tDoc.userId).collection("notifications").add({
-              title,
-              body,
-              message: body,
-              type: "system",
-              read: false,
-              createdAt: new Date().toISOString(),
-              version: newVersion,
-            }).catch(() => {});
-          }
+          if (tDoc.userId) affectedUserIds.add(tDoc.userId);
         } catch (fcmErr: any) {
           const errMsg = fcmErr.message || "";
           if (
@@ -386,11 +380,36 @@ export class NotificationService {
             invalidTokenIds.push(tDoc.id);
           }
         }
+      });
+
+      await Promise.allSettled(sendPromises);
+
+      // Save notification to affected user notification inboxes
+      if (affectedUserIds.size > 0 && adminDb) {
+        const nowIso = new Date().toISOString();
+        const savePromises = Array.from(affectedUserIds).map((uid) => {
+          return adminDb!
+            .collection("users")
+            .doc(uid)
+            .collection("notifications")
+            .doc(`app-update-${newVersion}`)
+            .set({
+              title,
+              body,
+              message: body,
+              type: "system",
+              read: false,
+              createdAt: nowIso,
+              version: newVersion,
+            }, { merge: true })
+            .catch(() => {});
+        });
+        await Promise.allSettled(savePromises);
       }
 
-      if (invalidTokenIds.length > 0) {
+      if (invalidTokenIds.length > 0 && adminDb) {
         const batch = adminDb.batch();
-        invalidTokenIds.forEach(id => batch.delete(adminDb.collection("fcm_tokens").doc(id)));
+        invalidTokenIds.forEach(id => batch.delete(adminDb!.collection("fcm_tokens").doc(id)));
         await batch.commit().catch(() => {});
       }
 
