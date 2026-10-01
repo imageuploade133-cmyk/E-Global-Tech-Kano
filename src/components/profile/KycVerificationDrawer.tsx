@@ -224,11 +224,13 @@ export function KycVerificationDrawer({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000);
 
+      const sessionId = typeof window !== "undefined" ? (localStorage.getItem("active_session_id") || "") : "";
       const res = await fetch("/api/profile/verify-kyc", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": idToken ? `Bearer ${idToken}` : ""
+          "Authorization": idToken ? `Bearer ${idToken}` : "",
+          "X-Session-ID": sessionId,
         },
         signal: controller.signal,
         body: JSON.stringify({

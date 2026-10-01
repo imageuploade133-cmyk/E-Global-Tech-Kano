@@ -188,6 +188,11 @@ export async function uploadImageSecurely(
         xhr.setRequestHeader("Authorization", `Bearer ${idToken}`);
       }
 
+      const sessionId = typeof window !== "undefined" ? (localStorage.getItem("active_session_id") || "") : "";
+      if (sessionId) {
+        xhr.setRequestHeader("X-Session-ID", sessionId);
+      }
+
       if (xhr.upload && onProgress) {
         onProgress(5);
         xhr.upload.onprogress = (e) => {
