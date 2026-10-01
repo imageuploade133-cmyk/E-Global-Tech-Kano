@@ -456,7 +456,7 @@ function PushNotificationsContent() {
             <div className="text-center py-16 border border-dashed rounded-2xl flex flex-col items-center justify-center p-6 space-y-3 border-gray-200 dark:border-gray-800">
               <span className="material-symbols-outlined text-[36px] text-gray-400">notifications_off</span>
               <p className="text-xs uppercase font-black text-gray-400">No Push Broadcasts Found</p>
-              <p className="text-[11px] text-gray-500 font-semibold max-w-sm mx-auto leading-relaxed">Click "Send Push Notification" above to dispatch your first rich push alert to user devices.</p>
+              <p className="text-[11px] text-gray-500 font-semibold max-w-sm mx-auto leading-relaxed">Click &quot;Send Push Notification&quot; above to dispatch your first rich push alert to user devices.</p>
             </div>
           ) : (
             <div className="overflow-x-auto no-scrollbar">
