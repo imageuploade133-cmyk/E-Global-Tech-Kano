@@ -222,19 +222,29 @@ export async function POST(req: Request) {
       );
     }
 
-    // REQUIREMENT 3: Resolve ImgBB API key. Check CPanel config/app 'imgbbApiKey' first, then process.env.IMGBB_API_KEY
+    // REQUIREMENT 3: Resolve ImgBB API key. Check CPanel config/app_secrets first, then config/app, then process.env.IMGBB_API_KEY
     let apiKey: string | undefined;
 
     try {
-      const appConfigSnap = await adminDb.collection("config").doc("app").get();
-      if (appConfigSnap.exists) {
-        const appConfigData = appConfigSnap.data();
-        if (appConfigData?.imgbbApiKey && typeof appConfigData.imgbbApiKey === "string" && appConfigData.imgbbApiKey.trim()) {
-          apiKey = appConfigData.imgbbApiKey.trim();
+      const secretsSnap = await adminDb.collection("config").doc("app_secrets").get();
+      if (secretsSnap.exists) {
+        const secretsData = secretsSnap.data();
+        if (secretsData?.imgbbApiKey && typeof secretsData.imgbbApiKey === "string" && secretsData.imgbbApiKey.trim()) {
+          apiKey = secretsData.imgbbApiKey.trim();
+        }
+      }
+
+      if (!apiKey) {
+        const appConfigSnap = await adminDb.collection("config").doc("app").get();
+        if (appConfigSnap.exists) {
+          const appConfigData = appConfigSnap.data();
+          if (appConfigData?.imgbbApiKey && typeof appConfigData.imgbbApiKey === "string" && appConfigData.imgbbApiKey.trim()) {
+            apiKey = appConfigData.imgbbApiKey.trim();
+          }
         }
       }
     } catch (configErr: any) {
-      console.warn("[Upload API] Failed to fetch custom imgbbApiKey from config app:", configErr.message);
+      console.warn("[Upload API] Failed to fetch custom imgbbApiKey from config secrets:", configErr.message);
     }
 
     if (!apiKey) {

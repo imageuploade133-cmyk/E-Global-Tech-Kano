@@ -26,7 +26,7 @@ interface BannerSlide {
   imageUrl: string;
   title?: string;
   description?: string;
-  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "estate";
+  targetPage: "all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate";
   link?: string;
   position?: number;
   customWidth?: number | null;
@@ -69,7 +69,7 @@ function AdminBannersPageContent() {
   const [imageUrl, setImageUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer" | "estate">("all");
+  const [targetPage, setTargetPage] = useState<"all" | "bills" | "investment" | "referral" | "transfer" | "store" | "estate">("all");
   const [link, setLink] = useState("");
   const [position, setPosition] = useState<number>(1);
   const [isUploading, setIsUploading] = useState(false);
@@ -883,6 +883,7 @@ function AdminBannersPageContent() {
                   <option value="investment">Investment Page</option>
                   <option value="referral">Referral Page</option>
                   <option value="transfer">Secure Transfer Drawer</option>
+                  <option value="store">Public Store Page</option>
                   <option value="estate">E-Global Estate Page</option>
                 </select>
               </div>
@@ -988,7 +989,9 @@ function AdminBannersPageContent() {
                             b.targetPage === "bills" && "bg-indigo-500/10 border-indigo-500/20 text-indigo-500",
                             b.targetPage === "investment" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
                             b.targetPage === "referral" && "bg-teal-500/10 border-teal-500/20 text-teal-500",
-                            b.targetPage === "transfer" && "bg-blue-500/10 border-blue-500/20 text-blue-500"
+                            b.targetPage === "transfer" && "bg-blue-500/10 border-blue-500/20 text-blue-500",
+                            b.targetPage === "store" && "bg-purple-500/10 border-purple-500/20 text-purple-500",
+                            b.targetPage === "estate" && "bg-rose-500/10 border-rose-500/20 text-rose-500"
                           )}>
                             Page: {b.targetPage}
                           </span>
@@ -1140,6 +1143,7 @@ function AdminBannersPageContent() {
                       <option value="investment">Investment</option>
                       <option value="referral">Referral</option>
                       <option value="transfer">Transfer</option>
+                      <option value="store">Public Store Page</option>
                       <option value="estate">Estate Marketplace</option>
                     </select>
                   </div>
