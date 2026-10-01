@@ -98,6 +98,7 @@ const DEFAULT_CONFIG: AppConfig = {
 
 interface ConfigContextProps {
   config: AppConfig;
+  isConfigLoaded: boolean;
   updateConfig: (updates: Partial<AppConfig>) => Promise<void>;
   resetConfig: () => Promise<void>;
   syncRealFirebaseData: () => Promise<void>;
@@ -107,6 +108,7 @@ const ConfigContext = createContext<ConfigContextProps | undefined>(undefined);
 
 export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
+  const [isConfigLoaded, setIsConfigLoaded] = useState<boolean>(false);
 
   // Helper to fetch public visual configuration via serverless API
   const fetchPublicConfigFallback = async () => {
@@ -121,6 +123,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } catch (err) {
       console.warn("Failed to fetch public config fallback:", err);
+    } finally {
+      setIsConfigLoaded(true);
     }
   };
 
@@ -148,8 +152,12 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               // Preserve existing featureToggles if safeRemoteData does not contain featureToggles
               featureToggles: safeRemoteData.featureToggles || prev.featureToggles || DEFAULT_FEATURE_TOGGLES,
             }));
+            setIsConfigLoaded(true);
+          } else {
+            setIsConfigLoaded(true);
           }
         }, (error) => {
+          setIsConfigLoaded(true);
           if (error.code === "permission-denied") {
             fetchPublicConfigFallback();
           } else {
@@ -269,7 +277,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <ConfigContext.Provider value={{ config, updateConfig, resetConfig, syncRealFirebaseData }}>
+    <ConfigContext.Provider value={{ config, isConfigLoaded, updateConfig, resetConfig, syncRealFirebaseData }}>
       {children}
     </ConfigContext.Provider>
   );
