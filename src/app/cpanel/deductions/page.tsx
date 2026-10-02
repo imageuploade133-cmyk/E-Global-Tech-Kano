@@ -99,6 +99,25 @@ export default function GlobalDeductionsPage() {
   const [description, setDescription] = useState("Standard service maintenance fee for active wallet accounts");
   const [amount, setAmount] = useState<number | "">(500);
 
+  // Preset Deduction Titles
+  const PRESET_DEDUCTIONS = [
+    { title: "Monthly Account Maintenance Fee", defaultDesc: "Standard service maintenance fee for active wallet accounts", defaultAmt: 500 },
+    { title: "Annual Wallet Service Fee", defaultDesc: "Annual account maintenance and security service charge", defaultAmt: 1000 },
+    { title: "SMS Alert & Notification Charge", defaultDesc: "Monthly SMS notification and transaction alert maintenance fee", defaultAmt: 200 },
+    { title: "Account Verification & KYC Fee", defaultDesc: "Identity verification and automated KYC portal processing fee", defaultAmt: 300 },
+    { title: "Government Stamp Duty Charge", defaultDesc: "Regulatory electronic transfer stamp duty charge", defaultAmt: 50 },
+    { title: "Custom Administrative Fee", defaultDesc: "", defaultAmt: "" },
+  ];
+
+  const handleSelectPreset = (presetTitle: string) => {
+    const selected = PRESET_DEDUCTIONS.find((p) => p.title === presetTitle);
+    if (selected) {
+      setName(selected.title);
+      if (selected.defaultDesc) setDescription(selected.defaultDesc);
+      if (selected.defaultAmt !== "") setAmount(selected.defaultAmt);
+    }
+  };
+
   const [previewData, setPreviewData] = useState<DeductionPreview | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -757,18 +776,18 @@ export default function GlobalDeductionsPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-x-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 max-w-lg w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[32px] p-6 shadow-2xl z-[99999] font-hanken overflow-hidden"
+              className="fixed inset-x-4 top-[5%] bottom-[5%] sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 md:left-1/2 md:-translate-x-1/2 max-w-lg w-full max-h-[90vh] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[28px] sm:rounded-[32px] p-5 sm:p-6 shadow-2xl z-[99999] font-hanken flex flex-col overflow-hidden"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-gray-800 shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-[#FC7A00] flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[24px]">payments</span>
+                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-[#FC7A00] flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">payments</span>
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-base text-gray-900 dark:text-white">
+                    <h3 className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-white">
                       {modalStep === "form" ? "Assess Global Wallet Deduction" : "Confirm Deduction Execution"}
                     </h3>
-                    <p className="text-[11px] text-gray-400 font-semibold">
+                    <p className="text-[10px] sm:text-[11px] text-gray-400 font-semibold">
                       {modalStep === "form" ? "Step 1: Set Deduction Amount & Purpose" : "Step 2: Review Preview Impact across Users"}
                     </p>
                   </div>
@@ -776,25 +795,46 @@ export default function GlobalDeductionsPage() {
 
                 <button
                   onClick={() => setShowModal(false)}
-                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer border-0"
+                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-black dark:hover:text-white flex items-center justify-center cursor-pointer border-0 shrink-0"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               </div>
 
+              <div className="flex-1 overflow-y-auto pt-3.5 space-y-4 no-scrollbar">
               {modalStep === "form" ? (
-                <form onSubmit={handlePreview} className="space-y-4 pt-4">
+                <form id="deduction-form" onSubmit={handlePreview} className="space-y-4">
+                  {/* Deduction Preset Selection */}
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-black uppercase tracking-wider text-[#FC7A00]">
-                      Deduction Title / Name
+                    <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
+                      Select Deduction Preset / Template
                     </label>
+                    <select
+                      onChange={(e) => handleSelectPreset(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-white outline-none focus:border-[#FC7A00] font-bold cursor-pointer"
+                    >
+                      {PRESET_DEDUCTIONS.map((p) => (
+                        <option key={p.title} value={p.title}>
+                          {p.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase tracking-wider text-[#FC7A00]">
+                        Deduction Title / Name (Customizable)
+                      </label>
+                      <span className="text-[9.5px] text-gray-400 font-semibold">Editable</span>
+                    </div>
                     <input
                       type="text"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Monthly Maintenance Fee"
-                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-xs text-gray-900 dark:text-white outline-none focus:border-[#FC7A00]"
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-xs text-gray-900 dark:text-white outline-none focus:border-[#FC7A00] font-bold"
                     />
                   </div>
 
