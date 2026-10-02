@@ -193,14 +193,14 @@ export default function ProfilePage() {
         idToken = await user.getIdToken();
       }
 
-      // Verify 4-digit Transaction PIN first
-      const verifyRes = await fetch("/api/auth/pin-verify-otp", {
+      // Verify 4-digit Access PIN first
+      const verifyRes = await fetch("/api/auth/pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ pin: enteredPin }),
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
       });
 
       const verifyData = await verifyRes.json();
