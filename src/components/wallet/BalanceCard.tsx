@@ -2522,7 +2522,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       </div>
 
       {/* Deposit Limit Exceeded Warning Banner */}
-      {(Boolean(userData?.depositLimitExceeded) || (userData?.unlimitedDeposits !== true && (Number(userData?.dailyDepositLimit) || 1000000) > 0 && (Number(userData?.todayDepositTotal) || 0) > (Number(userData?.dailyDepositLimit) || 1000000))) && (
+      {(userData?.depositLimitExceeded || (userData?.unlimitedDeposits !== true && (userData?.dailyDepositLimit ?? 1000000) > 0 && (userData?.todayDepositTotal ?? 0) > (userData?.dailyDepositLimit ?? 1000000))) && (
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
