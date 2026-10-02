@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { uploadImageSecurely } from "@/lib/image-upload";
@@ -148,6 +149,11 @@ function TierUpgradeDrawerModal({
   onRequestSubmitted,
 }: TierUpgradeDrawerModalProps) {
   const { userData, user } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Modal Back Handler for drawer
   useModalBackHandler(isOpen, onClose, "tier-upgrade-full-drawer");
@@ -359,7 +365,9 @@ function TierUpgradeDrawerModal({
     }
   };
 
-  return (
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -681,6 +689,7 @@ function TierUpgradeDrawerModal({
           </div>
         )}
       </AnimatePresence>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

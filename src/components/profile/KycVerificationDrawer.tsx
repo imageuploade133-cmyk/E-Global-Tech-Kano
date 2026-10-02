@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { useAuth } from "@/lib/AuthContext";
@@ -23,6 +24,11 @@ export function KycVerificationDrawer({
 }: KycVerificationDrawerProps) {
   const { config } = useAppConfig();
   const { userData } = useAuth();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [kycType, setKycType] = useState<"bvn" | "nin">("bvn");
   const [idNumber, setIdNumber] = useState("");
@@ -274,7 +280,9 @@ export function KycVerificationDrawer({
     }
   };
 
-  return (
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -675,6 +683,7 @@ export function KycVerificationDrawer({
           )}
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

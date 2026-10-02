@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence, PanInfo, useAnimation } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { toast } from "sonner";
@@ -14,6 +15,11 @@ interface VerificationRequiredDrawerProps {
 
 export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useModalBackHandler(isOpen, onClose, "verification-required-drawer");
 
@@ -200,7 +206,9 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
     }
   };
 
-  return (
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -411,6 +419,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
