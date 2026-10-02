@@ -955,6 +955,7 @@ export default function GlobalDeductionsPage() {
                   </div>
                 </div>
               )}
+              </div>
             </motion.div>
           </>
         )}
