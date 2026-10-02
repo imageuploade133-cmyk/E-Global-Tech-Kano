@@ -186,89 +186,36 @@ export default function ProfilePage() {
     }
   };
 
-  const handleToggle2faOtp = async (enteredPin: string, otpCode?: string): Promise<{ success: boolean; requiresOtp?: boolean; maskedEmail?: string; maskedPhone?: string }> => {
+  const handleToggle2faOtp = async (enteredPin: string): Promise<boolean> => {
     try {
       let idToken = "";
       if (user) {
         idToken = await user.getIdToken();
       }
 
-      // Step 1: Verify 4-digit Access PIN
-      const verifyRes = await fetch("/api/auth/pin", {
+      // Verify 4-digit Transaction PIN first
+      const verifyRes = await fetch("/api/auth/pin-verify-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ action: "verify", pin: enteredPin }),
+        body: JSON.stringify({ pin: enteredPin }),
       });
 
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok || !verifyData.success) {
-        toast.error(verifyData.error || verifyData.message || "Invalid Access PIN.");
-        return { success: false };
+        toast.error(verifyData.error || "Invalid Access PIN.");
+        return false;
       }
 
       const targetState = !is2faOtpEnabled;
-
-      // If disabling 2FA or if OTP code is already provided, verify/update directly
-      if (!targetState) {
-        // Disabling 2FA
-        await updateUserData({ is2faOtpEnabled: false });
-        toast.success("2FA Login OTP Verification Disabled");
-        return { success: true };
-      }
-
-      // Enabling 2FA: Check if OTP code has been submitted
-      if (!otpCode) {
-        // First step: PIN verified. Request server to dispatch 2FA OTP code.
-        const sendOtpRes = await fetch("/api/auth/login-2fa-otp", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ action: "send", channel: "email" }),
-        });
-
-        const sendOtpData = await sendOtpRes.json();
-        if (!sendOtpRes.ok) {
-          toast.error(sendOtpData.error || "Failed to dispatch 2FA OTP code.");
-          return { success: false };
-        }
-
-        toast.success("Access PIN verified! 2FA OTP code sent. 📩");
-        return {
-          success: true,
-          requiresOtp: true,
-          maskedEmail: sendOtpData.maskedEmail,
-          maskedPhone: sendOtpData.maskedPhone,
-        };
-      }
-
-      // Second step: Verify submitted 6-digit OTP code
-      const verifyOtpRes = await fetch("/api/auth/login-2fa-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ action: "verify", otpCode }),
-      });
-
-      const verifyOtpData = await verifyOtpRes.json();
-      if (!verifyOtpRes.ok || !verifyOtpData.success) {
-        toast.error(verifyOtpData.error || "Invalid 2FA OTP code.");
-        return { success: false };
-      }
-
-      // Enable 2FA on user record
-      await updateUserData({ is2faOtpEnabled: true });
-      toast.success("2FA Login OTP Verification Enabled! 🛡️");
-      return { success: true };
+      await updateUserData({ is2faOtpEnabled: targetState });
+      toast.success(targetState ? "2FA Login OTP Verification Enabled! 🛡️" : "2FA Login OTP Verification Disabled");
+      return true;
     } catch {
       toast.error("Failed to update 2FA state");
-      return { success: false };
+      return false;
     }
   };
 

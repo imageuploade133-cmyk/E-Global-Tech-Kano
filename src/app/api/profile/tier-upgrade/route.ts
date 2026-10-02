@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json() || {};
-    const { fullName, bvn, idCardFrontUrl, idCardBackUrl, proofOfAddressUrl, selfieUrl, targetTier = "Tier 2" } = body;
+    const { fullName, bvn, proofOfAddressUrl, selfieUrl, targetTier = "Tier 2" } = body;
 
     if (!fullName || !fullName.trim()) {
       return NextResponse.json({ error: "Full Name is required." }, { status: 400 });
@@ -52,14 +52,6 @@ export async function POST(req: Request) {
 
     if (!bvn || bvn.trim().length !== 11) {
       return NextResponse.json({ error: "A valid 11-digit BVN or NIN number is required." }, { status: 400 });
-    }
-
-    if (!idCardFrontUrl || !idCardFrontUrl.trim()) {
-      return NextResponse.json({ error: "Government ID Card (Front side) picture is required." }, { status: 400 });
-    }
-
-    if (!idCardBackUrl || !idCardBackUrl.trim()) {
-      return NextResponse.json({ error: "Government ID Card (Back side) picture is required." }, { status: 400 });
     }
 
     if (!proofOfAddressUrl || !proofOfAddressUrl.trim()) {
@@ -81,8 +73,6 @@ export async function POST(req: Request) {
       email: authUser.email || userData.email || "",
       phoneNumber: userData.phoneNumber || userData.phone || "",
       bvn: bvn.trim(),
-      idCardFrontUrl: idCardFrontUrl.trim(),
-      idCardBackUrl: idCardBackUrl.trim(),
       proofOfAddressUrl: proofOfAddressUrl.trim(),
       selfieUrl: selfieUrl.trim(),
       targetTier,
