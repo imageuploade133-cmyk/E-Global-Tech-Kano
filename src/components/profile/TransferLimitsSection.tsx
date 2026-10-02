@@ -435,7 +435,9 @@ export function TierUpgradeDrawerModal({
 
       if (res.ok && data.success) {
         toast.success("Tier upgrade request submitted successfully!");
-        onRequestSubmitted();
+        if (typeof onRequestSubmitted === "function") {
+          onRequestSubmitted();
+        }
         onClose();
       } else {
         toast.error(data.error || "Failed to submit upgrade request.");
