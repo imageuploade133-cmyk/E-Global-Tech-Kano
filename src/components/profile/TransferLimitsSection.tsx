@@ -144,13 +144,6 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
   );
 }
 
-interface TierUpgradeDrawerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  upgradeRequest: any;
-  onRequestSubmitted: () => void;
-}
-
 export interface TierUpgradeDrawerModalProps {
   isOpen: boolean;
   onClose: () => void;
