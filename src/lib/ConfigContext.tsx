@@ -22,6 +22,9 @@ export interface AppConfig {
   totalUsers: number;
   globalNgnBalance: number;
   globalUsdBalance: number;
+  globalXofBalance?: number;
+  todayPayout?: number;
+  todayNetFlow?: number;
   appVersion?: string;
   totalFixedDeposit?: number;
   todayDeposit?: number;
@@ -66,6 +69,9 @@ const DEFAULT_CONFIG: AppConfig = {
   totalUsers: 0,
   globalNgnBalance: 0,
   globalUsdBalance: 0,
+  globalXofBalance: 0,
+  todayPayout: 0,
+  todayNetFlow: 0,
   appVersion: "1.0.0",
   totalFixedDeposit: 0,
   todayDeposit: 0,
