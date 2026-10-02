@@ -64,7 +64,7 @@ function AdminDashboardContent() {
 
   const handleRefreshFirebaseMetrics = async () => {
     setIsSyncingFirebase(true);
-    toast.loading("Querying real-time Firestore database matrices...");
+    toast.loading("Querying real-time database metrics...");
     try {
       await syncRealFirebaseData();
       toast.dismiss();
@@ -132,7 +132,7 @@ function AdminDashboardContent() {
                 </h4>
               </div>
               <p className={cn("text-[11px] font-semibold mt-1", isDark ? "text-gray-400" : "text-gray-600")}>
-                Recalculate total registered accounts, multi-currency pool reserves (NGN, USD, XOF), and today&apos;s payouts directly from Firestore.
+                Recalculate total registered accounts, multi-currency pool reserves (NGN, USD, XOF), and today&apos;s payouts directly from database.
               </p>
             </div>
             <button

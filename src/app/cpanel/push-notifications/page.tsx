@@ -748,7 +748,7 @@ function PushNotificationsContent() {
 
                 {target === "user" && (
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-orange-500 tracking-wider">Target User ID (Firebase UID)</label>
+                    <label className="text-[10px] font-black uppercase text-orange-500 tracking-wider">Target User ID (Account UID)</label>
                     <input
                       type="text"
                       required
