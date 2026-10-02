@@ -216,9 +216,19 @@ function LimitRequestsContent() {
           </div>
         </div>
 
-        <button onClick={toggleTheme} className={cn("w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-amber-400 hover:bg-gray-800" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50")}>
-          <span className="material-symbols-outlined text-[20px]">{isDark ? "light_mode" : "dark_mode"}</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/cpanel/limits"
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[18px]">tune</span>
+            <span>Account Limits Manager</span>
+          </Link>
+
+          <button onClick={toggleTheme} className={cn("w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer", isDark ? "bg-gray-900 border-gray-800 text-amber-400 hover:bg-gray-800" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50")}>
+            <span className="material-symbols-outlined text-[20px]">{isDark ? "light_mode" : "dark_mode"}</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
