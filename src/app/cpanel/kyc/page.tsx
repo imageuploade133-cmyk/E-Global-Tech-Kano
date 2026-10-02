@@ -387,7 +387,15 @@ function CpanelKycPageContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href="/cpanel/limits"
+              className="px-3.5 h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">tune</span>
+              <span>Account Limits Manager</span>
+            </Link>
+
             <button
               type="button"
               onClick={toggleTheme}
@@ -396,6 +404,7 @@ function CpanelKycPageContent() {
               <span className="material-symbols-outlined text-[18px]">{isDark ? "light_mode" : "dark_mode"}</span>
               <span className="hidden sm:inline">{isDark ? "Light Mode" : "Dark Mode"}</span>
             </button>
+
             <Link
               href="/cpanel"
               className="px-4 h-10 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5"

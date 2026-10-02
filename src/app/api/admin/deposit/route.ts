@@ -1,192 +1,199 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
+import { WalletService } from "@/services/wallet-service";
 import { NotificationService } from "@/services/notification-service";
-import { FieldValue } from "firebase-admin/firestore";
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const perm = await requireAdminPermission(req, "deposit.manage");
-    if (!perm.authorized || !perm.auth) {
+    const perm = await requireAdminPermission(req, "wallets.manage");
+    if (!perm.authorized) {
       return perm.response!;
     }
-    const { uid } = perm.auth;
 
-    const { targetUid, amount, currency } = await req.json();
-
-    // 2. Validate inputs rigorously
-    if (!targetUid) {
-      return NextResponse.json({ error: "Missing target user identifier." }, { status: 400 });
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database not initialized" }, { status: 500 });
     }
 
-    const parsedAmount = Number(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      return NextResponse.json({ error: "Deposit amount must be a valid positive number." }, { status: 400 });
-    }
+    const { searchParams } = new URL(req.url);
+    const query = searchParams.get("query")?.trim() || "";
 
-    const allowedCurrencies = ["NGN", "USD", "EUR", "GBP", "GHS", "KES", "XOF", "XAF", "CAD", "ZAR", "TZS", "UGX", "RWF", "ZMW"];
-    if (!currency || !allowedCurrencies.includes(currency)) {
-      return NextResponse.json({ error: `Invalid currency. Allowed: ${allowedCurrencies.join(", ")}` }, { status: 400 });
-    }
+    // 1. Fetch recent admin deposits audit log
+    const depositsSnap = await adminDb
+      .collection("transactions")
+      .where("type", "in", ["DEPOSIT", "ADMIN_DEPOSIT", "WALLET_FUNDING"])
+      .orderBy("createdAt", "desc")
+      .limit(30)
+      .get();
 
-    if (uid === "mock-admin-uid") {
-      return NextResponse.json({
-        success: true,
-        message: `Mock User account credited with ${currency} ${parsedAmount.toLocaleString()} successfully!`
-      });
-    }
+    const depositLogs = depositsSnap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-    // 3. Atomically perform wallet & legacy profile update
-    const userRef = adminDb.collection("users").doc(targetUid);
-    const walletRef = adminDb.collection("wallets").doc(`${targetUid}_${currency}`);
+    // 2. Search users if query provided
+    let searchResults: any[] = [];
+    if (query) {
+      const qLower = query.toLowerCase();
 
-    const result = await adminDb.runTransaction(async (transaction) => {
-      const [userSnap, walletSnap] = await Promise.all([
-        transaction.get(userRef),
-        transaction.get(walletRef)
-      ]);
+      // Search users collection by email, name, or phone prefix
+      const usersSnap = await adminDb.collection("users").limit(20).get();
 
-      if (!userSnap.exists) {
-        throw new Error("Target user account profile not found in database.");
-      }
+      const matchedDocs = usersSnap.docs.filter((doc) => {
+        const data = doc.data();
+        const uid = doc.id.toLowerCase();
+        const email = (data.email || "").toLowerCase();
+        const name = (data.name || "").toLowerCase();
+        const phone = (data.phoneNumber || "").toLowerCase();
+        const vaNumber = (data.virtualAccountNumber || "").toLowerCase();
 
-      const userData = userSnap.data() || {};
-      const currentLegacyBalance = Number(userData.balance) || 0;
-
-      let currentWalletBalance = 0;
-      if (walletSnap.exists) {
-        currentWalletBalance = Number(walletSnap.data()?.balance) || 0;
-      }
-
-      // Atomic debt recovery calculation if currency is NGN
-      let debtRecovered = 0;
-      let netCreditToBalance = parsedAmount;
-
-      if (currency === "NGN") {
-        const currentDebt = Math.max(0, Number(userData.outstandingDebt) || 0);
-        if (currentDebt > 0) {
-          const amtMinor = Math.round(parsedAmount * 100);
-          const debtMinor = Math.round(currentDebt * 100);
-          const recoveredMinor = Math.min(amtMinor, debtMinor);
-          const netCreditMinor = amtMinor - recoveredMinor;
-
-          debtRecovered = recoveredMinor / 100;
-          netCreditToBalance = netCreditMinor / 100;
-        }
-      }
-
-      const newWalletBalance = currentWalletBalance + netCreditToBalance;
-
-      // Update wallet balance
-      transaction.set(walletRef, {
-        userId: targetUid,
-        currency: currency,
-        balance: newWalletBalance,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-
-      // If currency is NGN, update the legacy balance on user profile & outstanding debt
-      if (currency === "NGN") {
-        const newLegacyBalance = currentLegacyBalance + netCreditToBalance;
-        const userUpdates: Record<string, any> = {
-          balance: newLegacyBalance
-        };
-        if (debtRecovered > 0) {
-          userUpdates.outstandingDebt = FieldValue.increment(-debtRecovered);
-        }
-        transaction.update(userRef, userUpdates);
-      }
-
-      if (debtRecovered > 0) {
-        const secureRef = `ADMIN-CR-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
-        const debtTxRef = `recovery-${secureRef}`;
-        const debtTxDocRef = adminDb.collection("transactions").doc(`tx-${debtTxRef}`);
-        transaction.set(debtTxDocRef, {
-          userId: targetUid,
-          amount: debtRecovered,
-          currency: currency,
-          reference: debtTxRef,
-          type: "DEBT_RECOVERY",
-          category: "DEDUCTION",
-          direction: "DEBIT",
-          description: `Automatic Recovery for Outstanding Debt (₦${debtRecovered.toLocaleString()})`,
-          recipientName: "System Recovery",
-          status: "SUCCESS",
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          fee: 0,
-          totalDebited: debtRecovered,
-          totalCredited: 0,
-          createdAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-          metadata: {
-            depositReference: secureRef,
-            recoveredAmount: debtRecovered,
-            originalAmount: parsedAmount,
-          },
-        });
-      }
-
-      // Generate a highly secure reference number
-      const secureRef = `ADMIN-CR-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
-      const txDocRef = adminDb.collection("transactions").doc(`tx-${secureRef}`);
-
-      // Write transaction history ledger record
-      transaction.set(txDocRef, {
-        userId: targetUid,
-        amount: parsedAmount,
-        currency: currency,
-        type: "DEPOSIT",
-        category: "DEPOSIT",
-        direction: "CREDIT",
-        status: "SUCCESS",
-        description: `Cash Deposit (${currency})`,
-        reference: secureRef,
-        recipientName: "Cash Deposit",
-        senderName: "Administrator Credit",
-        provider: "System Deposit",
-        fee: 0,
-        totalCredited: parsedAmount,
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        createdAt: new Date().toISOString()
+        return (
+          uid.includes(qLower) ||
+          email.includes(qLower) ||
+          name.includes(qLower) ||
+          phone.includes(qLower) ||
+          vaNumber.includes(qLower)
+        );
       });
 
-      return {
-        secureRef,
-        newBalance: newWalletBalance
-      };
-    });
+      // For each matched user, load their multi-currency wallet balances
+      searchResults = await Promise.all(
+        matchedDocs.map(async (doc) => {
+          const uData = doc.data();
+          const uid = doc.id;
 
-    // 4. Dispatch high-fidelity push notifications safely in the background
-    try {
-      const currencySymbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : "CFA";
-      await NotificationService.sendPushNotification(targetUid, {
-        title: "Cash Deposit Received",
-        body: `Your wallet has been credited with ${currencySymbol}${parsedAmount.toLocaleString()} via Cash Deposit.`,
-        type: "transaction",
-        url: "/history",
-        amount: parsedAmount,
-        currency: currency || "NGN",
-        reference: result.secureRef,
-        recipientName: "Main Wallet",
-        bankName: "Cash Deposit",
-        channel: "Cash Deposit",
-      });
-    } catch (notifErr: any) {
-      console.error("[Admin Deposit Notif Error]:", notifErr.message);
+          // Fetch NGN, USD, EUR, GBP wallet balances
+          const currencies = ["NGN", "USD", "EUR", "GBP"];
+          const balances: Record<string, number> = {};
+
+          await Promise.all(
+            currencies.map(async (curr) => {
+              try {
+                const wSnap = await adminDb!.collection("wallets").doc(`${uid}_${curr}`).get();
+                if (wSnap.exists) {
+                  balances[curr] = Number(wSnap.data()?.balance) || 0;
+                } else if (curr === "NGN") {
+                  balances[curr] = Number(uData.balance) || 0;
+                } else {
+                  balances[curr] = 0;
+                }
+              } catch {
+                balances[curr] = 0;
+              }
+            })
+          );
+
+          return {
+            uid,
+            name: uData.name || uData.displayName || "E-Global Customer",
+            email: uData.email || "",
+            phoneNumber: uData.phoneNumber || uData.phone || "",
+            photoURL: uData.photoURL || null,
+            virtualAccountNumber: uData.virtualAccountNumber || null,
+            virtualAccountBankName: uData.virtualAccountBankName || null,
+            balances,
+          };
+        })
+      );
     }
 
     return NextResponse.json({
       success: true,
-      message: `Successfully credited ${currency} ${parsedAmount.toLocaleString()} to user account.`,
-      reference: result.secureRef,
-      newBalance: result.newBalance
+      searchResults,
+      depositLogs,
+    });
+  } catch (err: any) {
+    console.error("[Admin Deposit GET] Error:", err.message);
+    return NextResponse.json({ error: "Failed to load deposit data", details: err.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const perm = await requireAdminPermission(req, "wallets.manage");
+    if (!perm.authorized) {
+      return perm.response!;
+    }
+
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database not initialized" }, { status: 500 });
+    }
+
+    const body = (await req.json()) || {};
+    const { targetUid, currency = "NGN", amount, narration } = body;
+
+    if (!targetUid || typeof targetUid !== "string") {
+      return NextResponse.json({ error: "Target customer UID is required." }, { status: 400 });
+    }
+
+    const numAmount = Number(amount);
+    if (!numAmount || isNaN(numAmount) || numAmount <= 0) {
+      return NextResponse.json({ error: "Valid positive deposit amount is required." }, { status: 400 });
+    }
+
+    // Verify target user document exists
+    const userDoc = await adminDb.collection("users").doc(targetUid).get();
+    if (!userDoc.exists) {
+      return NextResponse.json({ error: "Target customer profile doc not found." }, { status: 404 });
+    }
+
+    const userData = userDoc.data() || {};
+    const adminEmail = perm.auth?.email || "admin@system";
+    const ref = `ADMIN-DEP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const depositNarration = narration?.trim() || `Administrative Credit Deposit by ${adminEmail}`;
+
+    // Execute atomic credit deposit via WalletService
+    const creditResult = await WalletService.creditWallet(
+      targetUid,
+      numAmount,
+      currency,
+      depositNarration,
+      "DEPOSIT",
+      ref
+    );
+
+    // Save detailed admin audit record
+    await adminDb.collection("transactions").doc(ref).set({
+      id: ref,
+      reference: ref,
+      userId: targetUid,
+      type: "DEPOSIT",
+      category: "DEPOSIT",
+      direction: "CREDIT",
+      status: "SUCCESS",
+      amount: numAmount,
+      totalCredited: numAmount,
+      currency,
+      description: depositNarration,
+      adminEmail,
+      isAdminDeposit: true,
+      metadata: {
+        adminEmail,
+        depositedAt: new Date().toISOString(),
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+
+    // Dispatch FCM Push Notification to target customer
+    const currSym = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "₦";
+    await NotificationService.sendPushNotification(targetUid, {
+      title: "Account Credited 💰",
+      body: `Your ${currency} wallet has been credited with ${currSym}${numAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}.`,
+      type: "transaction",
+      reference: ref,
+      txRef: ref,
+      amount: numAmount,
     });
 
-  } catch (err: unknown) {
-    const error = err as Error;
-    console.error("[Admin Deposit POST API] Secure Deposit Failed:", error.message);
-    return NextResponse.json({ error: error.message || "Secured deposit operation failed." }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      message: `Successfully deposited ${currSym}${numAmount.toLocaleString()} into ${userData.name || targetUid}'s ${currency} wallet!`,
+      reference: ref,
+      newBalance: creditResult.newBalance,
+    });
+  } catch (err: any) {
+    console.error("[Admin Deposit POST] Error:", err.message);
+    return NextResponse.json({ error: "Deposit execution failed", details: err.message }, { status: 500 });
   }
 }

@@ -423,6 +423,7 @@ function CpanelLayoutContent({ children }: { children: React.ReactNode }) {
     {
       title: "Financials & Markups",
       items: [
+        { id: "deposit", label: "Deposit Fund", icon: "add_card", href: "/cpanel/deposit", permission: "wallets.manage" },
         { id: "deductions", label: "Global Wallet Deductions", icon: "payments", href: "/cpanel/deductions", permission: "wallet.deductions.manage" },
         { id: "profit", label: "Commission Markups", icon: "tune", href: "/cpanel/vtu-profit", permission: "vtu.manage" },
         { id: "exchange_rates", label: "Exchange Rates & Swaps", icon: "currency_exchange", href: "/cpanel/exchange-rates", permission: "exchange_rates.manage" },
