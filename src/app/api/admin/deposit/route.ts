@@ -188,7 +188,6 @@ export async function POST(req: Request) {
       body: `Your ${currency} wallet has been credited with ${currSym}${numAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}.`,
       type: "transaction",
       reference: ref,
-      txRef: ref,
       amount: numAmount,
     });
 
