@@ -149,6 +149,9 @@ function TierUpgradeDrawerModal({
 }: TierUpgradeDrawerModalProps) {
   const { userData, user } = useAuth();
 
+  // Modal Back Handler for drawer
+  useModalBackHandler(isOpen, onClose, "tier-upgrade-full-drawer");
+
   // Form inputs auto-filled from userData
   const [fullName, setFullName] = useState("");
   const [bvn, setBvn] = useState("");
@@ -171,15 +174,12 @@ function TierUpgradeDrawerModal({
   const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
+  useModalBackHandler(isPinModalOpen, () => setIsPinModalOpen(false), "tier-upgrade-pin-modal");
+
   useEffect(() => {
     if (isOpen) {
       setIsPinModalOpen(false);
       setPinDigits(["", "", "", ""]);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
       const nameVal = userData?.name || user?.displayName || "";
       setFullName(typeof nameVal === "string" ? nameVal : String(nameVal || ""));
 
@@ -197,18 +197,20 @@ function TierUpgradeDrawerModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setAddressFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setAddressPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    if (addressPreview && addressPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(addressPreview);
+    }
+    setAddressPreview(URL.createObjectURL(file));
   };
 
   const handleSelfieFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setSelfieFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setSelfiePreview(reader.result as string);
-    reader.readAsDataURL(file);
+    if (selfiePreview && selfiePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(selfiePreview);
+    }
+    setSelfiePreview(URL.createObjectURL(file));
   };
 
   const handlePreSubmitValidation = (e: React.FormEvent) => {
@@ -373,24 +375,32 @@ function TierUpgradeDrawerModal({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 260, mass: 0.95 }}
-            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[32px] p-6 pb-8 z-[99999] flex flex-col justify-between h-[92vh] max-h-[92vh] overflow-hidden text-black shadow-2xl border-t border-gray-100"
+            transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+            className="fixed inset-0 w-full h-full bg-white z-[100000] flex flex-col justify-between overflow-hidden p-6 pb-8 text-black"
           >
-            {/* Handle bar */}
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4 shrink-0" />
-
-            {/* Header */}
-            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-3 mb-3 shrink-0">
-              <div className="w-8" />
-              <h3 className="font-hanken font-black text-sm text-black uppercase tracking-wider">
-                Request Tier Upgrade
-              </h3>
+            {/* Full-Screen Top Header Bar */}
+            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-2 shrink-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-100 transition-all cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+              </button>
+
+              <div className="text-center">
+                <h3 className="font-hanken font-black text-base text-black uppercase tracking-wider">
+                  Request Tier Upgrade
+                </h3>
+                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Submit verification documents to unlock higher limits</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[20px] font-bold">close</span>
               </button>
             </div>
 

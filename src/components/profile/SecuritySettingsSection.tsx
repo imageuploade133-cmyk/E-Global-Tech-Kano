@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 interface SecuritySettingsSectionProps {
   isPinRequired: boolean;
@@ -29,6 +30,8 @@ export function SecuritySettingsSection({
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  useModalBackHandler(isPinModalOpen, () => setIsPinModalOpen(false), "2fa-otp-pin-modal");
 
   const handleInitiate2faToggle = () => {
     setPinDigits(["", "", "", ""]);
