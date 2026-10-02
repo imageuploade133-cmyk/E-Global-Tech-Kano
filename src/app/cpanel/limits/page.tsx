@@ -36,8 +36,13 @@ function CpanelLimitsPageContent() {
   const [hasSearched, setHasSearched] = useState(false);
   const [savingUid, setSavingUid] = useState<string | null>(null);
 
-  // Global Minimum Transfer state
+  // Global Minimum Transfer & Tier Upgrade Limits state
   const [globalMinTransfer, setGlobalMinTransfer] = useState<number>(100);
+  const [tier2DailyLimit, setTier2DailyLimit] = useState<number>(5000000);
+  const [tier2SingleLimit, setTier2SingleLimit] = useState<number>(2000000);
+  const [tier3DailyLimit, setTier3DailyLimit] = useState<number>(50000000);
+  const [tier3SingleLimit, setTier3SingleLimit] = useState<number>(10000000);
+  const [tierUpgradeSelectionTitle, setTierUpgradeSelectionTitle] = useState<string>("SELECT TARGET UPGRADE TIER");
   const [isSavingGlobalMin, setIsSavingGlobalMin] = useState<boolean>(false);
   const [isLoadingGlobalMin, setIsLoadingGlobalMin] = useState<boolean>(true);
 
@@ -65,8 +70,13 @@ function CpanelLimitsPageContent() {
         const headers: Record<string, string> = isMock ? { Authorization: "Bearer mock-admin-token" } : {};
         const res = await fetch("/api/admin/limits", { headers });
         const data = await res.json();
-        if (data.success && typeof data.globalMinTransferAmount === "number") {
-          setGlobalMinTransfer(data.globalMinTransferAmount);
+        if (data.success) {
+          if (typeof data.globalMinTransferAmount === "number") setGlobalMinTransfer(data.globalMinTransferAmount);
+          if (typeof data.tier2DailyLimit === "number") setTier2DailyLimit(data.tier2DailyLimit);
+          if (typeof data.tier2SingleLimit === "number") setTier2SingleLimit(data.tier2SingleLimit);
+          if (typeof data.tier3DailyLimit === "number") setTier3DailyLimit(data.tier3DailyLimit);
+          if (typeof data.tier3SingleLimit === "number") setTier3SingleLimit(data.tier3SingleLimit);
+          if (data.tierUpgradeSelectionTitle) setTierUpgradeSelectionTitle(data.tierUpgradeSelectionTitle);
         }
       } catch (err) {
         console.warn("Failed to load active global minimum transfer limit:", err);
@@ -99,17 +109,20 @@ function CpanelLimitsPageContent() {
         body: JSON.stringify({
           action: "update_global_min_transfer",
           globalMinTransferAmount: globalMinTransfer,
+          tier2DailyLimit,
+          tier2SingleLimit,
+          tier3DailyLimit,
+          tier3SingleLimit,
+          tierUpgradeSelectionTitle,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(data.message || "Global minimum transfer limit saved successfully!");
-        if (typeof data.globalMinTransferAmount === "number") {
-          setGlobalMinTransfer(data.globalMinTransferAmount);
-        }
+        toast.success(data.message || "Global limits & Tier Upgrade settings saved successfully!");
+        if (typeof data.globalMinTransferAmount === "number") setGlobalMinTransfer(data.globalMinTransferAmount);
       } else {
-        toast.error(data.error || "Failed to update global minimum transfer limit.");
+        toast.error(data.error || "Failed to update global limits.");
       }
     } catch (err: any) {
       toast.error(err.message || "Network error updating global minimum transfer limit.");
@@ -304,6 +317,60 @@ function CpanelLimitsPageContent() {
               <span>Save Minimum Limit</span>
             </button>
           </form>
+
+          {/* Tier Upgrade Defaults & Display Text Customizer */}
+          <div className="pt-4 border-t border-gray-200/40 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-orange-500 text-[20px]">workspace_premium</span>
+              <h3 className="font-extrabold text-xs uppercase tracking-wider">Tier Upgrade Defaults &amp; Selection Title</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400">
+                  Target Upgrade Tier Selection Title (User View)
+                </label>
+                <input
+                  type="text"
+                  value={tierUpgradeSelectionTitle}
+                  onChange={(e) => setTierUpgradeSelectionTitle(e.target.value)}
+                  placeholder="e.g. SELECT TARGET UPGRADE TIER"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Tier 2 Daily Limit (₦)</label>
+                  <input
+                    type="number"
+                    value={tier2DailyLimit}
+                    onChange={(e) => setTier2DailyLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Tier 3 Daily Limit (₦)</label>
+                  <input
+                    type="number"
+                    value={tier3DailyLimit}
+                    onChange={(e) => setTier3DailyLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSaveGlobalMinTransfer()}
+              disabled={isLoadingGlobalMin || isSavingGlobalMin}
+              className="px-5 h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSavingGlobalMin ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[16px]">save</span>}
+              <span>Save Tier Customization Settings</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Panel */}

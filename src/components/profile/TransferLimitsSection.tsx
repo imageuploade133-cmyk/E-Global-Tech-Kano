@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
+import { useAppConfig } from "@/lib/ConfigContext";
 import { uploadImageSecurely } from "@/lib/image-upload";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -157,6 +158,7 @@ function TierUpgradeDrawerModal({
   onRequestSubmitted,
 }: TierUpgradeDrawerModalProps) {
   const { userData, user } = useAuth();
+  const { config } = useAppConfig();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -411,20 +413,12 @@ function TierUpgradeDrawerModal({
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
 
-              <div className="text-center">
+              <div className="text-center flex-1 pr-10">
                 <h3 className="font-hanken font-black text-base text-black uppercase tracking-wider">
-                  REQUEST TIER UPGRADE
+                  UPGRADE LIMITS
                 </h3>
                 <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Submit verification documents to unlock higher limits</p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => { triggerHaptic(); onClose(); }}
-                className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer active:scale-95"
-              >
-                <span className="material-symbols-outlined text-[20px] font-bold">close</span>
-              </button>
             </div>
 
             {/* Content Body */}
@@ -470,7 +464,9 @@ function TierUpgradeDrawerModal({
 
                 {/* Target Tier Selector */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Target Upgrade Tier</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                    {config?.tierUpgradeSelectionTitle || "SELECT TARGET UPGRADE TIER"}
+                  </label>
                   <div className="grid grid-cols-2 gap-2 p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200/80">
                     <button
                       type="button"
@@ -483,7 +479,9 @@ function TierUpgradeDrawerModal({
                       )}
                     >
                       <span className="text-xs">Tier 2</span>
-                      <span className="text-[9.5px] opacity-90 font-mono font-bold mt-0.5">₦5,000,000 / Day</span>
+                      <span className="text-[9.5px] opacity-90 font-mono font-bold mt-0.5">
+                        ₦{new Intl.NumberFormat("en-NG").format(config?.tier2DailyLimit ?? 5000000)} / DAY
+                      </span>
                     </button>
 
                     <button
@@ -497,20 +495,23 @@ function TierUpgradeDrawerModal({
                       )}
                     >
                       <span className="text-xs">Tier 3</span>
-                      <span className="text-[9.5px] opacity-90 font-mono font-bold mt-0.5">₦50,000,000 / Day</span>
+                      <span className="text-[9.5px] opacity-90 font-mono font-bold mt-0.5">
+                        ₦{new Intl.NumberFormat("en-NG").format(config?.tier3DailyLimit ?? 50000000)} / DAY
+                      </span>
                     </button>
                   </div>
                 </div>
 
-                {/* Auto-filled Full Name */}
+                {/* Auto-filled Full Name (Read-Only / Muted) */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Full Name (Auto-filled)</label>
                   <input
                     type="text"
                     required
+                    readOnly
+                    disabled
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-xs font-extrabold text-black outline-none focus:border-[#FC7A00]"
+                    className="w-full bg-gray-100/80 border border-gray-200 text-gray-500 rounded-2xl px-4 py-3 text-xs font-extrabold cursor-not-allowed select-none outline-none"
                   />
                 </div>
 
