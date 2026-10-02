@@ -88,6 +88,7 @@ export default function PinPage() {
 
   // 2FA Login OTP Stage States on Access PIN screen
   const [is2faStage, setIs2faStage] = useState(false);
+  const [has2faOtpBeenSent, setHas2faOtpBeenSent] = useState(false);
   const [login2faChannel, setLogin2faChannel] = useState<"email" | "whatsapp">("email");
   const [login2faOtpDigits, setLogin2faOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [login2faCooldown, setLogin2faCooldown] = useState(0);
@@ -168,6 +169,7 @@ export default function PinPage() {
         if (data.maskedEmail) setMasked2faEmail(data.maskedEmail);
         if (data.maskedPhone) setMasked2faPhone(data.maskedPhone);
         if (data.devOtp) toast.info(`Dev Mode OTP: ${data.devOtp}`);
+        setHas2faOtpBeenSent(true);
         setLogin2faCooldown(60);
       } else {
         toast.error(data.error || "Failed to send 2FA OTP code.");
@@ -555,7 +557,6 @@ export default function PinPage() {
         if (userData?.is2faOtpEnabled === true) {
           setIsVerifying(false);
           setIs2faStage(true);
-          dispatch2faOtp("email");
           return;
         }
 
@@ -606,38 +607,46 @@ export default function PinPage() {
           </div>
 
           {/* Channel Selector Pills */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-2xl w-full border border-gray-200">
-            <button
-              type="button"
-              disabled={isSending2faOtp}
-              onClick={() => {
-                setLogin2faChannel("email");
-                dispatch2faOtp("email");
-              }}
-              className={cn(
-                "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5",
-                login2faChannel === "email" ? "bg-[#FC7A00] text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black"
-              )}
-            >
-              <span className="material-symbols-outlined text-[16px]">mail</span>
-              <span>Email</span>
-            </button>
+          <div className="space-y-2 w-full">
+            <p className="text-[10.5px] font-bold text-gray-400 uppercase tracking-wider text-left">Select Delivery Channel</p>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-2xl w-full border border-gray-200">
+              <button
+                type="button"
+                disabled={isSending2faOtp || login2faCooldown > 0}
+                onClick={() => {
+                  if (login2faCooldown > 0) return;
+                  setLogin2faChannel("email");
+                }}
+                className={cn(
+                  "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5",
+                  login2faChannel === "email" ? "bg-[#FC7A00] text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black",
+                  login2faCooldown > 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                )}
+              >
+                <span className="material-symbols-outlined text-[16px]">mail</span>
+                <span>Email</span>
+              </button>
 
-            <button
-              type="button"
-              disabled={isSending2faOtp}
-              onClick={() => {
-                setLogin2faChannel("whatsapp");
-                dispatch2faOtp("whatsapp");
-              }}
-              className={cn(
-                "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5",
-                login2faChannel === "whatsapp" ? "bg-emerald-600 text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black"
-              )}
-            >
-              <span className="material-symbols-outlined text-[16px]">chat</span>
-              <span>WhatsApp</span>
-            </button>
+              <button
+                type="button"
+                disabled={isSending2faOtp || login2faCooldown > 0}
+                onClick={() => {
+                  if (login2faCooldown > 0) return;
+                  setLogin2faChannel("whatsapp");
+                }}
+                className={cn(
+                  "py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5",
+                  login2faChannel === "whatsapp" ? "bg-emerald-600 text-white shadow-xs" : "bg-transparent text-gray-500 hover:text-black",
+                  login2faCooldown > 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                )}
+              >
+                <span className="material-symbols-outlined text-[16px]">chat</span>
+                <span>WhatsApp</span>
+              </button>
+            </div>
+            {login2faCooldown > 0 && (
+              <p className="text-[10px] text-amber-600 font-bold tracking-wide">Channel locked during active 60s cooldown</p>
+            )}
           </div>
 
           {/* 6 Digit Input Boxes */}
@@ -665,9 +674,18 @@ export default function PinPage() {
             ))}
           </div>
 
-          {/* Resend Timer / Button */}
-          <div className="pt-1">
-            {login2faCooldown > 0 ? (
+          {/* Send OTP / Resend Timer Button */}
+          <div className="pt-1 w-full">
+            {!has2faOtpBeenSent ? (
+              <button
+                type="button"
+                disabled={isSending2faOtp}
+                onClick={() => dispatch2faOtp(login2faChannel)}
+                className="w-full py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer disabled:opacity-50 transition-all shadow-xs"
+              >
+                {isSending2faOtp ? "Sending 2FA OTP Code..." : `Send OTP Code via ${login2faChannel === "email" ? "Email" : "WhatsApp"}`}
+              </button>
+            ) : login2faCooldown > 0 ? (
               <p className="text-xs text-gray-400 font-bold">Resend code in {login2faCooldown}s</p>
             ) : (
               <button
