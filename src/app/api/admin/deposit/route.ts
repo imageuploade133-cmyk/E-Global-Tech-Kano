@@ -92,8 +92,8 @@ export async function GET(req: Request) {
           const uData = doc.data();
           const uid = doc.id;
 
-          // Fetch NGN, USD, EUR, GBP wallet balances
-          const currencies = ["NGN", "USD", "EUR", "GBP"];
+          // Fetch NGN, USD, XOF, EUR, GBP wallet balances
+          const currencies = ["NGN", "USD", "XOF", "EUR", "GBP"];
           const balances: Record<string, number> = {};
 
           await Promise.all(
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
     }, { merge: true });
 
     // Dispatch FCM Push Notification to target customer
-    const currSym = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "₦";
+    const currSym = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "XOF" ? "CFA" : "₦";
     await NotificationService.sendPushNotification(targetUid, {
       title: "Account Credited 💰",
       body: `Your ${currency} wallet has been credited with ${currSym}${numAmount.toLocaleString("en-NG", { minimumFractionDigits: 2 })}.`,

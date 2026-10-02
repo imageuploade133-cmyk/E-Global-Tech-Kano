@@ -303,13 +303,15 @@ function AdminDepositPageContent() {
   };
 
   const getCurrencySymbol = (curr: string) => {
-    switch (curr) {
+    switch (curr?.toUpperCase()) {
       case "USD":
         return "$";
       case "EUR":
         return "€";
       case "GBP":
         return "£";
+      case "XOF":
+        return "CFA";
       default:
         return "₦";
     }
@@ -404,8 +406,8 @@ function AdminDepositPageContent() {
                     </div>
 
                     {/* Virtual Account & Multi-currency balances breakdown */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-gray-200/40 dark:border-gray-800">
-                      {["NGN", "USD", "EUR", "GBP"].map((curr) => {
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-gray-200/40 dark:border-gray-800">
+                      {["NGN", "USD", "XOF", "EUR", "GBP"].map((curr) => {
                         const bal = customer.balances[curr] ?? 0;
                         const sym = getCurrencySymbol(curr);
                         return (
@@ -586,8 +588,8 @@ function AdminDepositPageContent() {
                 {/* Currency Selector */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Wallet Currency *</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {["NGN", "USD", "EUR", "GBP"].map((curr) => {
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    {["NGN", "USD", "XOF", "EUR", "GBP"].map((curr) => {
                       const active = depositCurrency === curr;
                       return (
                         <button
