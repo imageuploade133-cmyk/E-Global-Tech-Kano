@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface SecuritySettingsSectionProps {
   isPinRequired: boolean;
@@ -40,11 +41,13 @@ export function SecuritySettingsSection({
   useModalBackHandler(isPinModalOpen, () => setIsPinModalOpen(false), "2fa-otp-pin-modal");
 
   const handleInitiate2faToggle = () => {
+    triggerHaptic();
     setPinDigits(["", "", "", ""]);
     setIsPinModalOpen(true);
   };
 
   const handlePinDigitPress = (digit: string) => {
+    triggerHaptic();
     const emptyIdx = pinDigits.findIndex((d) => d === "");
     if (emptyIdx !== -1) {
       const updated = [...pinDigits];
@@ -59,6 +62,7 @@ export function SecuritySettingsSection({
   };
 
   const handlePinBackspace = () => {
+    triggerHaptic();
     const lastFilledIdx = pinDigits.map((d) => d !== "").lastIndexOf(true);
     if (lastFilledIdx !== -1) {
       const updated = [...pinDigits];
@@ -68,6 +72,7 @@ export function SecuritySettingsSection({
   };
 
   const handlePinClear = () => {
+    triggerHaptic();
     setPinDigits(["", "", "", ""]);
   };
 
@@ -164,30 +169,57 @@ export function SecuritySettingsSection({
         </button>
       </div>
 
-      {/* 4-Digit Access PIN Verification Modal */}
+      {/* 4-Digit Access PIN Verification Drawer Modal */}
       {mounted && typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {isPinModalOpen && (
-            <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <>
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="w-full max-w-xs bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsPinModalOpen(false)}
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[99998]"
+              />
+
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-[28px] border-t border-gray-200 p-6 pb-8 z-[100000] flex flex-col items-center shadow-2xl text-black font-hanken select-none"
               >
-                <div className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mx-auto">
-                  <span className="material-symbols-outlined text-[24px]">security</span>
+                {/* Drag bar indicator */}
+                <div className="w-10 h-1 bg-gray-300 rounded-full mb-4" />
+
+                {/* Header */}
+                <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+                  <div className="w-8" />
+                  <h2 className="font-hanken font-bold text-base text-black text-center uppercase tracking-wider">
+                    Confirm 2FA Action
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsPinModalOpen(false)}
+                    className="w-8 h-8 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                  </button>
                 </div>
 
-                <div>
-                  <h4 className="font-extrabold text-base uppercase text-gray-900">Confirm Access PIN</h4>
-                  <p className="text-[11px] text-gray-500 mt-1 font-semibold">
+                <div className="w-14 h-14 rounded-full bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mb-3 shadow-xs">
+                  <span className="material-symbols-outlined text-[28px]">shield_person</span>
+                </div>
+
+                <div className="text-center space-y-1 mb-4">
+                  <h4 className="font-extrabold text-sm uppercase text-gray-900">Enter Access PIN</h4>
+                  <p className="text-[11px] text-gray-500 max-w-xs font-semibold leading-relaxed">
                     Enter your 4-digit PIN to {is2faOtpEnabled ? "disable" : "enable"} 2FA Login OTP verification.
                   </p>
                 </div>
 
                 {/* 4 Pin Boxes */}
-                <div className="flex justify-center gap-3 py-2">
+                <div className="flex justify-center gap-3 mb-5">
                   {[0, 1, 2, 3].map((idx) => (
                     <div
                       key={idx}
@@ -201,8 +233,8 @@ export function SecuritySettingsSection({
                   ))}
                 </div>
 
-                {/* Keypad */}
-                <div className="grid grid-cols-3 gap-2 pt-2">
+                {/* Numeric Keypad Grid */}
+                <div className="grid grid-cols-3 gap-2 w-full max-w-xs mb-4">
                   {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
                     <button
                       key={num}
@@ -243,12 +275,12 @@ export function SecuritySettingsSection({
                 <button
                   type="button"
                   onClick={() => setIsPinModalOpen(false)}
-                  className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer"
+                  className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer active:scale-95 transition-all"
                 >
                   Cancel
                 </button>
               </motion.div>
-            </div>
+            </>
           )}
         </AnimatePresence>,
         document.body

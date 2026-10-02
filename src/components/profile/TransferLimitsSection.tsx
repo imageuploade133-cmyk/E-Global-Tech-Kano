@@ -8,6 +8,14 @@ import { uploadImageSecurely } from "@/lib/image-upload";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { triggerHaptic } from "@/lib/haptics";
+
+function maskBvnNin(val?: string | null): string {
+  if (!val) return "";
+  const clean = val.toString().trim();
+  if (clean.length < 5) return clean;
+  return `${clean.slice(0, 3)}******${clean.slice(-2)}`;
+}
 
 interface TransferLimitsSectionProps {
   dailyLimit?: number;
@@ -104,7 +112,7 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
             </div>
             <button
               type="button"
-              onClick={() => setIsModalDrawerOpen(true)}
+              onClick={() => { triggerHaptic(); setIsModalDrawerOpen(true); }}
               className="text-[10px] font-black uppercase tracking-wider text-amber-900 underline cursor-pointer"
             >
               Inspect
@@ -113,11 +121,11 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
         ) : (
           <button
             type="button"
-            onClick={() => setIsModalDrawerOpen(true)}
+            onClick={() => { triggerHaptic(); setIsModalDrawerOpen(true); }}
             className="w-full py-3.5 bg-black hover:bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">upgrade</span>
-            <span>Request Tier Upgrade</span>
+            <span>REQUEST TIER UPGRADE</span>
           </button>
         )}
       </div>
@@ -200,6 +208,7 @@ function TierUpgradeDrawerModal({
   }, [isOpen, userData, user]);
 
   const handleAddressFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
     const file = e.target.files?.[0];
     if (!file) return;
     setAddressFile(file);
@@ -210,6 +219,7 @@ function TierUpgradeDrawerModal({
   };
 
   const handleSelfieFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
     const file = e.target.files?.[0];
     if (!file) return;
     setSelfieFile(file);
@@ -221,6 +231,7 @@ function TierUpgradeDrawerModal({
 
   const handlePreSubmitValidation = (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic();
 
     if (!fullName.trim()) {
       toast.error("Please enter your full name.");
@@ -248,6 +259,7 @@ function TierUpgradeDrawerModal({
   };
 
   const handlePinDigitPress = (digit: string) => {
+    triggerHaptic();
     const emptyIdx = pinDigits.findIndex((d) => d === "");
     if (emptyIdx !== -1) {
       const updated = [...pinDigits];
@@ -262,6 +274,7 @@ function TierUpgradeDrawerModal({
   };
 
   const handlePinBackspace = () => {
+    triggerHaptic();
     const lastFilledIdx = pinDigits.map((d) => d !== "").lastIndexOf(true);
     if (lastFilledIdx !== -1) {
       const updated = [...pinDigits];
@@ -271,6 +284,7 @@ function TierUpgradeDrawerModal({
   };
 
   const handlePinClear = () => {
+    triggerHaptic();
     setPinDigits(["", "", "", ""]);
   };
 
@@ -390,22 +404,23 @@ function TierUpgradeDrawerModal({
             <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-2 shrink-0">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => { triggerHaptic(); onClose(); }}
                 className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-100 transition-all cursor-pointer active:scale-95"
+                title="Back"
               >
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
 
               <div className="text-center">
                 <h3 className="font-hanken font-black text-base text-black uppercase tracking-wider">
-                  Request Tier Upgrade
+                  REQUEST TIER UPGRADE
                 </h3>
                 <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Submit verification documents to unlock higher limits</p>
               </div>
 
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => { triggerHaptic(); onClose(); }}
                 className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer active:scale-95"
               >
                 <span className="material-symbols-outlined text-[20px] font-bold">close</span>
@@ -456,29 +471,33 @@ function TierUpgradeDrawerModal({
                 {/* Target Tier Selector */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Select Target Upgrade Tier</label>
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-2xl border border-gray-200">
+                  <div className="grid grid-cols-2 gap-2 p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200/80">
                     <button
                       type="button"
-                      onClick={() => setTargetTier("Tier 2")}
+                      onClick={() => { triggerHaptic(); setTargetTier("Tier 2"); }}
                       className={cn(
-                        "py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer uppercase tracking-wider flex flex-col items-center justify-center",
-                        targetTier === "Tier 2" ? "bg-[#FC7A00] text-white shadow-sm" : "bg-transparent text-gray-500"
+                        "py-3 rounded-xl transition-all cursor-pointer uppercase tracking-wider flex flex-col items-center justify-center border",
+                        targetTier === "Tier 2"
+                          ? "bg-[#FC7A00] border-[#FC7A00] text-white shadow-xs font-black"
+                          : "bg-transparent border-transparent text-gray-600 hover:text-black font-extrabold"
                       )}
                     >
-                      <span>Tier 2</span>
-                      <span className="text-[9px] opacity-80 font-normal font-mono">₦5M / Day</span>
+                      <span className="text-xs">Tier 2</span>
+                      <span className="text-[9.5px] opacity-90 font-mono font-bold mt-0.5">₦5,000,000 / Day</span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => setTargetTier("Tier 3")}
+                      onClick={() => { triggerHaptic(); setTargetTier("Tier 3"); }}
                       className={cn(
-                        "py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer uppercase tracking-wider flex flex-col items-center justify-center",
-                        targetTier === "Tier 3" ? "bg-[#FC7A00] text-white shadow-sm" : "bg-transparent text-gray-500"
+                        "py-3 rounded-xl transition-all cursor-pointer uppercase tracking-wider flex flex-col items-center justify-center border",
+                        targetTier === "Tier 3"
+                          ? "bg-[#FC7A00] border-[#FC7A00] text-white shadow-xs font-black"
+                          : "bg-transparent border-transparent text-gray-600 hover:text-black font-extrabold"
                       )}
                     >
-                      <span>Tier 3</span>
-                      <span className="text-[9px] opacity-80 font-normal font-mono">₦50M / Day</span>
+                      <span className="text-xs">Tier 3</span>
+                      <span className="text-[9.5px] opacity-90 font-mono font-bold mt-0.5">₦50,000,000 / Day</span>
                     </button>
                   </div>
                 </div>
@@ -495,22 +514,43 @@ function TierUpgradeDrawerModal({
                   />
                 </div>
 
-                {/* Auto-filled BVN / NIN */}
+                {/* BVN / NIN Input (Masked & Read-only if linked) */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">BVN / NIN (Auto-filled)</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                      BVN / NIN Number
+                    </label>
+                    {Boolean(userData?.bvn || userData?.nin) && (
+                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <span className="material-symbols-outlined text-[13px]">lock</span>
+                        Linked &amp; Verified
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
                     maxLength={11}
-                    value={bvn}
-                    onChange={(e) => setBvn(e.target.value.replace(/\D/g, "").slice(0, 11))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-xs font-mono font-bold text-black outline-none focus:border-[#FC7A00]"
+                    readOnly={Boolean(userData?.bvn || userData?.nin)}
+                    disabled={Boolean(userData?.bvn || userData?.nin)}
+                    value={Boolean(userData?.bvn || userData?.nin) ? maskBvnNin(userData?.bvn || userData?.nin) : bvn}
+                    onChange={(e) => {
+                      if (!userData?.bvn && !userData?.nin) {
+                        setBvn(e.target.value.replace(/\D/g, "").slice(0, 11));
+                      }
+                    }}
+                    className={cn(
+                      "w-full rounded-2xl px-4 py-3 text-xs font-mono font-bold outline-none border transition-all",
+                      Boolean(userData?.bvn || userData?.nin)
+                        ? "bg-gray-100/80 border-gray-200 text-gray-500 cursor-not-allowed select-none"
+                        : "bg-gray-50 border-gray-200 text-black focus:border-[#FC7A00]"
+                    )}
                   />
                 </div>
 
                 {/* Upload Proof of Address */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Proof of Address Document</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Proof of Address Document *</label>
                   <input
                     type="file"
                     ref={addressInputRef}
@@ -519,23 +559,36 @@ function TierUpgradeDrawerModal({
                     className="hidden"
                   />
                   <div
-                    onClick={() => addressInputRef.current?.click()}
+                    onClick={() => { triggerHaptic(); addressInputRef.current?.click(); }}
                     className={cn(
-                      "p-3.5 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-50/50",
-                      addressPreview ? "border-emerald-500 bg-emerald-50/10" : "border-gray-300 hover:border-[#FC7A00]"
+                      "p-4 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all bg-gray-50/50 hover:bg-gray-100/50",
+                      addressPreview ? "border-emerald-500 bg-emerald-50/20" : "border-gray-300 hover:border-[#FC7A00]"
                     )}
                   >
                     {addressPreview ? (
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-12 h-10 rounded-lg overflow-hidden border border-gray-200">
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-emerald-300 shrink-0 shadow-xs">
                           <img src={addressPreview} alt="Address Doc" className="w-full h-full object-cover" />
                         </div>
-                        <span className="text-[11px] font-bold text-emerald-600">Proof of Address Scan Attached</span>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-xs font-black text-emerald-800 truncate">
+                            {addressFile?.name || "Proof of Address Scan Attached"}
+                          </p>
+                          <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">
+                            {addressFile ? `${(addressFile.size / 1024 / 1024).toFixed(2)} MB • Ready for submission` : "Uploaded Scan Attached"}
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-emerald-600 font-bold text-xl">check_circle</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-center text-gray-500">
-                        <span className="material-symbols-outlined text-[20px]">upload_file</span>
-                        <span className="text-xs font-bold text-gray-700">Upload Utility Bill / Bank Statement Scan</span>
+                      <div className="flex items-center gap-3 text-left py-1">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-[#FC7A00] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">upload_file</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Upload Utility Bill or Bank Statement</p>
+                          <p className="text-[10px] font-semibold text-gray-400 mt-0.5">JPEG, PNG, WEBP scan showing physical address</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -543,7 +596,7 @@ function TierUpgradeDrawerModal({
 
                 {/* Upload Live Selfie */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Live Biometric Selfie Picture</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Live Biometric Selfie Picture *</label>
                   <input
                     type="file"
                     ref={selfieInputRef}
@@ -553,23 +606,36 @@ function TierUpgradeDrawerModal({
                     className="hidden"
                   />
                   <div
-                    onClick={() => selfieInputRef.current?.click()}
+                    onClick={() => { triggerHaptic(); selfieInputRef.current?.click(); }}
                     className={cn(
-                      "p-3.5 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-50/50",
-                      selfiePreview ? "border-emerald-500 bg-emerald-50/10" : "border-gray-300 hover:border-[#FC7A00]"
+                      "p-4 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all bg-gray-50/50 hover:bg-gray-100/50",
+                      selfiePreview ? "border-emerald-500 bg-emerald-50/20" : "border-gray-300 hover:border-[#FC7A00]"
                     )}
                   >
                     {selfiePreview ? (
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500">
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="relative w-12 h-12 rounded-full border-2 border-emerald-500 overflow-hidden shrink-0 shadow-xs">
                           <img src={selfiePreview} alt="Selfie" className="w-full h-full object-cover" />
                         </div>
-                        <span className="text-[11px] font-bold text-emerald-600">Live Selfie Capture Attached</span>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-xs font-black text-emerald-800 truncate">
+                            Biometric Live Selfie Attached
+                          </p>
+                          <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">
+                            Face match oval capture verified
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-emerald-600 font-bold text-xl">check_circle</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-center text-gray-500">
-                        <span className="material-symbols-outlined text-[20px]">photo_camera</span>
-                        <span className="text-xs font-bold text-gray-700">Take or Upload Selfie Photo</span>
+                      <div className="flex items-center gap-3 text-left py-1">
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">photo_camera</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Take or Upload Biometric Selfie</p>
+                          <p className="text-[10px] font-semibold text-gray-400 mt-0.5">Align face clearly in frame for live biometric check</p>
+                        </div>
                       </div>
                     )}
                   </div>
