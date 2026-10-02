@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { triggerHaptic } from "@/lib/haptics";
 
-function maskBvnNin(val?: string | null): string {
+function maskBvnNin(val?: unknown): string {
   if (!val) return "";
-  const clean = val.toString().trim();
+  const clean = String(val).trim();
   if (clean.length < 5) return clean;
   return `${clean.slice(0, 3)}******${clean.slice(-2)}`;
 }
