@@ -263,7 +263,7 @@ export class WalletService {
     let updatedDepositTotal = 0;
     let isDepositLimitExceeded = false;
 
-    if (ucCurrency === "NGN" && !isBonus && user && type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING") {
+    if (ucCurrency === "NGN" && !isBonus && user && (type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING")) {
       const todayIsoDate = new Date().toISOString().split("T")[0];
       const lastDepositDate = user.data.lastDepositDate || "";
       const currentTodayDepositTotal = lastDepositDate === todayIsoDate ? (Number(user.data.todayDepositTotal) || 0) : 0;
