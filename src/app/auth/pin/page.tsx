@@ -649,31 +649,6 @@ export default function PinPage() {
             )}
           </div>
 
-          {/* 6 Digit Input Boxes */}
-          <div className="flex gap-2 justify-center my-2 w-full">
-            {[0, 1, 2, 3, 4, 5].map((idx) => (
-              <input
-                key={idx}
-                ref={(el) => { login2faInputRefs.current[idx] = el; }}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={1}
-                value={login2faOtpDigits[idx]}
-                disabled={isVerifying2faOtp || isSending2faOtp}
-                onChange={(e) => handleLogin2faOtpChange(idx, e.target.value)}
-                onKeyDown={(e) => handleLogin2faOtpKeyDown(idx, e)}
-                onPaste={handleLogin2faOtpPaste}
-                className={cn(
-                  "w-11 h-13 bg-white border-2 rounded-xl text-center font-mono font-black text-xl text-black transition-all outline-none shadow-xs",
-                  login2faOtpDigits[idx]
-                    ? "border-[#FC7A00] bg-orange-50/20 ring-2 ring-[#FC7A00]/20"
-                    : "border-gray-200 focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20"
-                )}
-              />
-            ))}
-          </div>
-
           {/* Send OTP / Resend Timer Button */}
           <div className="pt-1 w-full">
             {!has2faOtpBeenSent ? (
@@ -681,35 +656,66 @@ export default function PinPage() {
                 type="button"
                 disabled={isSending2faOtp}
                 onClick={() => dispatch2faOtp(login2faChannel)}
-                className="w-full py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer disabled:opacity-50 transition-all shadow-xs"
+                className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer disabled:opacity-50 transition-all shadow-xs"
               >
                 {isSending2faOtp ? "Sending 2FA OTP Code..." : `Send OTP Code via ${login2faChannel === "email" ? "Email" : "WhatsApp"}`}
               </button>
-            ) : login2faCooldown > 0 ? (
-              <p className="text-xs text-gray-400 font-bold">Resend code in {login2faCooldown}s</p>
             ) : (
-              <button
-                type="button"
-                disabled={isSending2faOtp}
-                onClick={() => dispatch2faOtp(login2faChannel)}
-                className="text-xs font-bold text-[#FC7A00] hover:underline cursor-pointer disabled:opacity-50 flex items-center gap-1.5 justify-center mx-auto uppercase tracking-wider"
-              >
-                {isSending2faOtp ? "Dispatching New Code..." : "Resend OTP Code"}
-              </button>
+              <div className="space-y-4 w-full pt-2">
+                <p className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">Enter 6-Digit Security OTP</p>
+                <div className="flex gap-2 justify-center w-full">
+                  {[0, 1, 2, 3, 4, 5].map((idx) => (
+                    <input
+                      key={idx}
+                      ref={(el) => { login2faInputRefs.current[idx] = el; }}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={login2faOtpDigits[idx]}
+                      disabled={isVerifying2faOtp || isSending2faOtp}
+                      onChange={(e) => handleLogin2faOtpChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleLogin2faOtpKeyDown(idx, e)}
+                      onPaste={handleLogin2faOtpPaste}
+                      className={cn(
+                        "w-11 h-13 bg-white border-2 rounded-xl text-center font-mono font-black text-xl text-black transition-all outline-none shadow-xs",
+                        login2faOtpDigits[idx]
+                          ? "border-[#FC7A00] bg-orange-50/20 ring-2 ring-[#FC7A00]/20"
+                          : "border-gray-200 focus:border-[#FC7A00] focus:ring-2 focus:ring-[#FC7A00]/20"
+                      )}
+                    />
+                  ))}
+                </div>
+
+                {login2faCooldown > 0 ? (
+                  <p className="text-xs text-gray-400 font-bold">Resend code in {login2faCooldown}s</p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isSending2faOtp}
+                    onClick={() => dispatch2faOtp(login2faChannel)}
+                    className="text-xs font-bold text-[#FC7A00] hover:underline cursor-pointer disabled:opacity-50 flex items-center gap-1.5 justify-center mx-auto uppercase tracking-wider"
+                  >
+                    {isSending2faOtp ? "Dispatching New Code..." : "Resend OTP Code"}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
 
         {/* Bottom Verify & Cancel Actions */}
         <div className="w-full max-w-sm mx-auto flex flex-col gap-2.5 pb-6">
-          <button
-            type="button"
-            disabled={isVerifying2faOtp || login2faOtpDigits.join("").length !== 6}
-            onClick={() => executeVerify2faOtp(login2faOtpDigits.join(""))}
-            className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer hover:brightness-105 active:scale-95 transition-all shadow-sm disabled:opacity-50"
-          >
-            {isVerifying2faOtp ? "Verifying 2FA Code..." : "Authenticate & Continue"}
-          </button>
+          {has2faOtpBeenSent && (
+            <button
+              type="button"
+              disabled={isVerifying2faOtp || login2faOtpDigits.join("").length !== 6}
+              onClick={() => executeVerify2faOtp(login2faOtpDigits.join(""))}
+              className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer hover:brightness-105 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+            >
+              {isVerifying2faOtp ? "Verifying 2FA Code..." : "Authenticate & Continue"}
+            </button>
+          )}
 
           <button
             type="button"
