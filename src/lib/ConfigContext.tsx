@@ -52,6 +52,11 @@ export interface AppConfig {
   whatsappPollingIntervalMinutes?: number;
   minTransferAmount?: number;
   globalMinTransferAmount?: number;
+  tier2DailyLimit?: number;
+  tier2SingleLimit?: number;
+  tier3DailyLimit?: number;
+  tier3SingleLimit?: number;
+  tierUpgradeSelectionTitle?: string;
   hasCustomImgbbApiKey?: boolean;
   imgbbApiKey?: string;
   appVersionPushNotificationEnabled?: boolean;
@@ -100,6 +105,11 @@ const DEFAULT_CONFIG: AppConfig = {
   statementWatermarkUrl: "",
   statementWatermarkSize: 100,
   statementWatermarkOpacity: 0.15,
+  tier2DailyLimit: 5000000,
+  tier2SingleLimit: 2000000,
+  tier3DailyLimit: 50000000,
+  tier3SingleLimit: 10000000,
+  tierUpgradeSelectionTitle: "SELECT TARGET UPGRADE TIER",
 };
 
 interface ConfigContextProps {
