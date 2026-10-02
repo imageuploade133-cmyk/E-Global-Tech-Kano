@@ -100,7 +100,7 @@ export default function GlobalDeductionsPage() {
   const [amount, setAmount] = useState<number | "">(500);
 
   // Preset Deduction Titles
-  const PRESET_DEDUCTIONS = [
+  const PRESET_DEDUCTIONS: Array<{ title: string; defaultDesc: string; defaultAmt: number | "" }> = [
     { title: "Monthly Account Maintenance Fee", defaultDesc: "Standard service maintenance fee for active wallet accounts", defaultAmt: 500 },
     { title: "Annual Wallet Service Fee", defaultDesc: "Annual account maintenance and security service charge", defaultAmt: 1000 },
     { title: "SMS Alert & Notification Charge", defaultDesc: "Monthly SMS notification and transaction alert maintenance fee", defaultAmt: 200 },
@@ -114,7 +114,7 @@ export default function GlobalDeductionsPage() {
     if (selected) {
       setName(selected.title);
       if (selected.defaultDesc) setDescription(selected.defaultDesc);
-      if (selected.defaultAmt !== "") setAmount(selected.defaultAmt);
+      setAmount(selected.defaultAmt);
     }
   };
 
