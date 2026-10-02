@@ -23,6 +23,8 @@ interface LimitRequest {
   email: string;
   phoneNumber?: string;
   bvn: string;
+  idCardFrontUrl?: string;
+  idCardBackUrl?: string;
   proofOfAddressUrl?: string;
   selfieUrl?: string;
   targetTier: string;
@@ -474,7 +476,38 @@ function LimitRequestsContent() {
                     </div>
                   </div>
 
-                  {/* Documents Inspection */}
+                  {/* Government ID Inspection */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] uppercase font-black text-gray-400">Government ID (Front)</p>
+                      {selectedRequest.idCardFrontUrl ? (
+                        <div
+                          onClick={() => setImageModalUrl(selectedRequest.idCardFrontUrl!)}
+                          className="rounded-2xl border overflow-hidden h-36 cursor-pointer hover:opacity-90"
+                        >
+                          <img src={selectedRequest.idCardFrontUrl} alt="ID Front" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-[10px]">No front image.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] uppercase font-black text-gray-400">Government ID (Back)</p>
+                      {selectedRequest.idCardBackUrl ? (
+                        <div
+                          onClick={() => setImageModalUrl(selectedRequest.idCardBackUrl!)}
+                          className="rounded-2xl border overflow-hidden h-36 cursor-pointer hover:opacity-90"
+                        >
+                          <img src={selectedRequest.idCardBackUrl} alt="ID Back" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-[10px]">No back image.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Proof of Address Inspection */}
                   <div className="space-y-2">
                     <p className="text-[10px] uppercase font-black text-gray-400">Proof of Address Document</p>
                     {selectedRequest.proofOfAddressUrl ? (
