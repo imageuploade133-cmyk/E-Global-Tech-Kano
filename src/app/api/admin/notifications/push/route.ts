@@ -51,8 +51,62 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json() || {};
-    const { target = "all", targetUserId, title, message, type = "promo", imageUrl, url } = body;
+    const { action = "send", id, target = "all", targetUserId, title, message, type = "promo", imageUrl, url } = body;
 
+    if (!adminDb) {
+      return NextResponse.json({ error: "Database not initialized" }, { status: 500 });
+    }
+
+    // 1. Action: DELETE notification log
+    if (action === "delete") {
+      if (!id) {
+        return NextResponse.json({ error: "Notification record ID is required for deletion." }, { status: 400 });
+      }
+
+      await adminDb.collection("admin_push_notifications").doc(id).delete();
+
+      return NextResponse.json({
+        success: true,
+        message: "Notification record deleted successfully.",
+      });
+    }
+
+    // 2. Action: UPDATE notification log
+    if (action === "update") {
+      if (!id) {
+        return NextResponse.json({ error: "Notification record ID is required for editing." }, { status: 400 });
+      }
+
+      if (!title || !title.trim()) {
+        return NextResponse.json({ error: "Notification title is required." }, { status: 400 });
+      }
+
+      if (!message || !message.trim()) {
+        return NextResponse.json({ error: "Notification message body is required." }, { status: 400 });
+      }
+
+      const updateData: any = {
+        title: title.trim(),
+        message: message.trim(),
+        type,
+        imageUrl: imageUrl ? imageUrl.trim() : "",
+        url: url ? url.trim() : "",
+        updatedAt: new Date().toISOString(),
+        updatedBy: perm.auth?.email || "admin@system",
+      };
+
+      if (target) updateData.target = target;
+      if (targetUserId) updateData.targetUserId = targetUserId;
+
+      await adminDb.collection("admin_push_notifications").doc(id).update(updateData);
+
+      return NextResponse.json({
+        success: true,
+        message: "Notification updated successfully.",
+      });
+    }
+
+    // 3. Default Action: SEND / BROADCAST push notification
     if (!title || !title.trim()) {
       return NextResponse.json({ error: "Notification title is required." }, { status: 400 });
     }

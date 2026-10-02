@@ -69,8 +69,11 @@ function PushNotificationsContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
-  // Form states inside Create Modal Drawer
+  // Form states inside Create / Edit Modal Drawer
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const [target, setTarget] = useState<"all" | "user">("all");
   const [targetUserId, setTargetUserId] = useState("");
   const [title, setTitle] = useState("");
@@ -80,6 +83,10 @@ function PushNotificationsContent() {
   const [url, setUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  // Delete modal state
+  const [deletingLog, setDeletingLog] = useState<PushNotificationLog | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Full image preview modal state
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
@@ -203,7 +210,89 @@ function PushNotificationsContent() {
     }
   };
 
-  const handleSendPush = async (e: React.FormEvent) => {
+  const handleOpenCreateModal = () => {
+    setIsEditMode(false);
+    setEditingId(null);
+    setTarget("all");
+    setTargetUserId("");
+    setTitle("");
+    setMessage("");
+    setType("promo");
+    setImageUrl("");
+    setUrl("");
+    setIsModalOpen(true);
+  };
+
+  const handleOpenResendModal = (log: PushNotificationLog) => {
+    setIsEditMode(false);
+    setEditingId(null);
+    setTarget(log.target);
+    setTargetUserId(log.targetUserId || "");
+    setTitle(log.title);
+    setMessage(log.body);
+    setType(log.type);
+    setImageUrl(log.imageUrl || "");
+    setUrl(log.url || "");
+    setIsModalOpen(true);
+    toast.info("Notification parameters pre-filled for re-send.");
+  };
+
+  const handleOpenEditModal = (log: PushNotificationLog) => {
+    setIsEditMode(true);
+    setEditingId(log.id);
+    setTarget(log.target);
+    setTargetUserId(log.targetUserId || "");
+    setTitle(log.title);
+    setMessage(log.body);
+    setType(log.type);
+    setImageUrl(log.imageUrl || "");
+    setUrl(log.url || "");
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteNotification = async () => {
+    if (!deletingLog) return;
+    setIsDeleting(true);
+    toast.loading("Deleting notification record...");
+
+    try {
+      const isMock = sessionStorage.getItem("mock") === "true";
+      let idToken = "mock-admin-token";
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/notifications/push", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+          action: "delete",
+          id: deletingLog.id
+        })
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || "Notification record deleted successfully!");
+        setDeletingLog(null);
+        fetchLogs();
+      } else {
+        toast.error(data.error || "Failed to delete notification record.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network error deleting notification record.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSendOrUpdatePush = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim()) {
@@ -222,7 +311,7 @@ function PushNotificationsContent() {
     }
 
     setIsSending(true);
-    toast.loading("Dispatching push notification to target devices...");
+    toast.loading(isEditMode ? "Updating notification record..." : "Dispatching push notification to target devices...");
 
     try {
       const isMock = sessionStorage.getItem("mock") === "true";
@@ -238,6 +327,8 @@ function PushNotificationsContent() {
           "Authorization": `Bearer ${idToken}`
         },
         body: JSON.stringify({
+          action: isEditMode ? "update" : "send",
+          id: isEditMode ? editingId : undefined,
           target,
           targetUserId: target === "user" ? targetUserId.trim() : null,
           title: title.trim(),
@@ -252,8 +343,10 @@ function PushNotificationsContent() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        toast.success(data.message || "Push notification broadcasted successfully!");
+        toast.success(data.message || (isEditMode ? "Notification updated successfully!" : "Push notification broadcasted successfully!"));
         setIsModalOpen(false);
+        setEditingId(null);
+        setIsEditMode(false);
         setTitle("");
         setMessage("");
         setImageUrl("");
@@ -261,11 +354,11 @@ function PushNotificationsContent() {
         setTargetUserId("");
         fetchLogs();
       } else {
-        toast.error(data.error || "Failed to broadcast push notification.");
+        toast.error(data.error || "Operation failed.");
       }
     } catch {
       toast.dismiss();
-      toast.error("Network error sending push notification.");
+      toast.error("Network communication error.");
     } finally {
       setIsSending(false);
     }
@@ -358,7 +451,7 @@ function PushNotificationsContent() {
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreateModal}
             className="px-4 py-2.5 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
           >
             <span className="material-symbols-outlined text-[18px] font-bold">add_alert</span>
@@ -468,7 +561,7 @@ function PushNotificationsContent() {
                     <th className="py-3 px-3">Type</th>
                     <th className="py-3 px-3">Audience</th>
                     <th className="py-3 px-3">Delivery Stats</th>
-                    <th className="py-3 px-3">Sender Admin</th>
+                    <th className="py-3 px-3">Actions</th>
                     <th className="py-3 px-3 text-right">Date & Time</th>
                   </tr>
                 </thead>
@@ -528,8 +621,36 @@ function PushNotificationsContent() {
                         )}
                       </td>
 
-                      <td className="py-3.5 px-3 text-gray-500 dark:text-gray-400 font-medium">
-                        {log.adminEmail || "Admin"}
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenResendModal(log)}
+                            className="p-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-[#FC7A00] font-bold text-[10px] uppercase flex items-center gap-1 transition-all cursor-pointer"
+                            title="Re-send notification"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">replay</span>
+                            <span>Re-send</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(log)}
+                            className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 font-bold text-[10px] uppercase flex items-center gap-1 transition-all cursor-pointer"
+                            title="Edit notification"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">edit</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDeletingLog(log)}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-[10px] uppercase flex items-center gap-1 transition-all cursor-pointer"
+                            title="Delete record"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">delete</span>
+                          </button>
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-3 text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
@@ -576,7 +697,9 @@ function PushNotificationsContent() {
               <div className="flex items-center justify-between border-b pb-4 mb-5 border-gray-200/50">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#FC7A00]">campaign</span>
-                  <h3 className="font-extrabold text-base">Send FCM Push Notification</h3>
+                  <h3 className="font-extrabold text-base">
+                    {isEditMode ? "Edit Notification Record" : "Send FCM Push Notification"}
+                  </h3>
                 </div>
                 <button
                   type="button"
@@ -587,7 +710,7 @@ function PushNotificationsContent() {
                 </button>
               </div>
 
-              <form onSubmit={handleSendPush} className="space-y-4">
+              <form onSubmit={handleSendOrUpdatePush} className="space-y-4">
 
                 {/* Target Audience Selector */}
                 <div className="space-y-1.5">
@@ -724,6 +847,7 @@ function PushNotificationsContent() {
                     <span className="text-[9px] font-extrabold uppercase text-gray-400">Quick App Screen Presets:</span>
                     <div className="flex flex-wrap gap-1.5">
                       {[
+                        { label: "📱 Just Open App", path: "" },
                         { label: "🛒 Store", path: "/store" },
                         { label: "🏡 Estate", path: "/estate" },
                         { label: "⚡ Bills", path: "/bills" },
@@ -734,7 +858,7 @@ function PushNotificationsContent() {
                         { label: "🎁 Referrals", path: "/referrals" },
                       ].map((preset) => (
                         <button
-                          key={preset.path}
+                          key={preset.label}
                           type="button"
                           onClick={() => setUrl(preset.path)}
                           className={cn(
@@ -813,18 +937,63 @@ function PushNotificationsContent() {
                   {isSending ? (
                     <>
                       <ButtonSpinner />
-                      <span>Broadcasting Push Notification...</span>
+                      <span>{isEditMode ? "Saving Changes..." : "Broadcasting Push Notification..."}</span>
                     </>
                   ) : (
                     <>
-                      <span className="material-symbols-outlined text-[18px]">send</span>
-                      <span>Broadcast Push Notification</span>
+                      <span className="material-symbols-outlined text-[18px]">{isEditMode ? "save" : "send"}</span>
+                      <span>{isEditMode ? "Save Changes" : "Broadcast Push Notification"}</span>
                     </>
                   )}
                 </button>
               </form>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deletingLog && (
+          <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={cn("w-full max-w-sm rounded-3xl p-6 text-center space-y-4 shadow-2xl border", isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-100 text-gray-900")}
+            >
+              <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-[24px]">delete</span>
+              </div>
+
+              <div>
+                <h4 className="font-extrabold text-base uppercase">Delete Notification Record?</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium leading-relaxed">
+                  Are you sure you want to delete the broadcast log for <strong className="text-black dark:text-white">&quot;{deletingLog.title}&quot;</strong>? This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setDeletingLog(null)}
+                  className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-2xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDeleteNotification}
+                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase rounded-2xl cursor-pointer transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting..." : "Delete Record"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
