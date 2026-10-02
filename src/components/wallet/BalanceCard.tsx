@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { KycVerificationDrawer } from "@/components/profile/KycVerificationDrawer";
+import { TierUpgradeDrawerModal } from "@/components/profile/TransferLimitsSection";
 import BannerSlideshow from "@/components/BannerSlideshow";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { AppLogo } from "@/components/AppLogo";
@@ -85,6 +86,7 @@ const BankLogo: React.FC<BankLogoProps> = ({ name, code, logoUrl, logoBackupUrl 
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName, isLoading }) => {
   const [isVisible, setIsVisible] = useState(false);
   const { userData, user } = useAuth();
+  const [isTierUpgradeOpen, setIsTierUpgradeOpen] = useState(false);
 
   useEffect(() => {
     const saved = sessionStorage.getItem("balance_visible");
@@ -2519,6 +2521,37 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         </div>
       </div>
 
+      {/* Deposit Limit Exceeded Warning Banner */}
+      {(Boolean(userData?.depositLimitExceeded) || (userData?.unlimitedDeposits !== true && (Number(userData?.dailyDepositLimit) || 1000000) > 0 && (Number(userData?.todayDepositTotal) || 0) > (Number(userData?.dailyDepositLimit) || 1000000))) && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3.5 p-3.5 bg-amber-500/10 border-[1.5px] border-amber-500/40 rounded-xl flex items-center justify-between gap-3 text-left relative overflow-hidden select-none shadow-sm"
+        >
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 flex-shrink-0">
+              <span className="material-symbols-outlined text-[20px] font-black animate-pulse">error</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-hanken font-extrabold text-xs text-amber-800 uppercase tracking-wide flex items-center gap-1">
+                Deposit Limit Exceeded
+              </h4>
+              <p className="font-hanken text-[10.5px] text-amber-700 font-bold mt-0.5 leading-snug">
+                Your account is pending because your deposit limit was exceeded. You cannot spend funds until upgraded.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => { triggerHaptic(); setIsTierUpgradeOpen(true); }}
+            className="px-3 py-1.5 bg-[#FC7A00] hover:bg-[#e06600] text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-xs active:scale-95 shrink-0"
+          >
+            Upgrade Limit
+          </button>
+        </motion.div>
+      )}
+
       {/* Frozen Account Alert Notice Banner */}
       {(userData?.isFrozen || userData?.status === "FROZEN") && (
         <motion.div
@@ -4838,6 +4871,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       isOpen={isKycDrawerOpen}
       onClose={() => setIsKycDrawerOpen(false)}
       onSuccess={() => setIsKycDrawerOpen(false)}
+    />
+
+    {/* Tier Upgrade Drawer Modal */}
+    <TierUpgradeDrawerModal
+      isOpen={isTierUpgradeOpen}
+      onClose={() => setIsTierUpgradeOpen(false)}
+      onRequestSubmitted={() => setIsTierUpgradeOpen(false)}
     />
     </>
   );
