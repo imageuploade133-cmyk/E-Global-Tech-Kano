@@ -35,6 +35,7 @@ export function SecuritySettingsSection({
 
   // 4-Digit PIN Verification Pad Modal state
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinAction, setPinAction] = useState<"2fa_toggle" | "pin_toggle">("2fa_toggle");
   const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
@@ -42,6 +43,14 @@ export function SecuritySettingsSection({
 
   const handleInitiate2faToggle = () => {
     triggerHaptic();
+    setPinAction("2fa_toggle");
+    setPinDigits(["", "", "", ""]);
+    setIsPinModalOpen(true);
+  };
+
+  const handleInitiatePinToggle = () => {
+    triggerHaptic();
+    setPinAction("pin_toggle");
     setPinDigits(["", "", "", ""]);
     setIsPinModalOpen(true);
   };
@@ -56,7 +65,7 @@ export function SecuritySettingsSection({
 
       if (emptyIdx === 3) {
         const fullPin = updated.join("");
-        executeVerified2faToggle(fullPin);
+        executeVerifiedAction(fullPin);
       }
     }
   };
@@ -76,15 +85,39 @@ export function SecuritySettingsSection({
     setPinDigits(["", "", "", ""]);
   };
 
-  const executeVerified2faToggle = async (enteredPin: string) => {
+  const executeVerifiedAction = async (enteredPin: string) => {
     setIsVerifyingPin(true);
     try {
-      const success = await onToggle2faOtp(enteredPin);
-      if (success) {
-        setIsPinModalOpen(false);
+      if (pinAction === "2fa_toggle") {
+        const success = await onToggle2faOtp(enteredPin);
+        if (success) {
+          setIsPinModalOpen(false);
+        } else {
+          setPinDigits(["", "", "", ""]);
+        }
       } else {
-        setPinDigits(["", "", "", ""]);
+        // Verify PIN via /api/auth/pin before toggling PIN Requirement
+        const idToken = await user?.getIdToken();
+        const res = await fetch("/api/auth/pin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ action: "verify", pin: enteredPin }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          await onTogglePinRequired();
+          setIsPinModalOpen(false);
+        } else {
+          toast.error(data.message || data.error || "Incorrect Access PIN");
+          setPinDigits(["", "", "", ""]);
+        }
       }
+    } catch {
+      toast.error("PIN verification error");
+      setPinDigits(["", "", "", ""]);
     } finally {
       setIsVerifyingPin(false);
     }
@@ -103,7 +136,7 @@ export function SecuritySettingsSection({
           <p className="font-hanken text-[10px] text-gray-400 font-semibold">Enforce PIN check on login/payment flows</p>
         </div>
         <button
-          onClick={onTogglePinRequired}
+          onClick={handleInitiatePinToggle}
           className={cn(
             "w-12 h-6 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative cursor-pointer",
             isPinRequired ? "bg-[#07B038]" : "bg-gray-200"
@@ -214,7 +247,9 @@ export function SecuritySettingsSection({
                 <div className="text-center space-y-1 mb-4">
                   <h4 className="font-extrabold text-sm uppercase text-gray-900">Enter Access PIN</h4>
                   <p className="text-[11px] text-gray-500 max-w-xs font-semibold leading-relaxed">
-                    Enter your 4-digit PIN to {is2faOtpEnabled ? "disable" : "enable"} 2FA Login OTP verification.
+                    {pinAction === "2fa_toggle"
+                      ? `Enter your 4-digit PIN to ${is2faOtpEnabled ? "disable" : "enable"} 2FA Login OTP verification.`
+                      : `Enter your 4-digit PIN to ${isPinRequired ? "disable" : "enable"} Access PIN requirement.`}
                   </p>
                 </div>
 

@@ -17,6 +17,7 @@ import { AppLogo } from "@/components/AppLogo";
 import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
 import { triggerHaptic } from "@/lib/haptics";
+import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
 
 interface BalanceCardProps {
   balance: number;
@@ -4111,100 +4112,112 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   exit={{ opacity: 0 }}
                   className="space-y-4 flex-1 flex flex-col justify-between items-center text-center w-full max-w-md mx-auto"
                 >
-                  <div className="space-y-4 w-full">
-                    <div className="text-center space-y-1">
-                      <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-[#FC7A00] mx-auto">
-                        <span className="material-symbols-outlined text-[24px] font-black">lock</span>
-                      </div>
-                      <h4 className="font-hanken font-extrabold text-base text-black mt-2">Enter Transaction PIN</h4>
-                      <p className="font-hanken text-[11px] text-gray-400">Authorize your transfer securely using your 4-digit PIN.</p>
-                    </div>
-
-                    {/* Displaying user Balance and amount user wants to Transfer inside UI card */}
-                    <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-2 font-hanken text-left">
-                      <div className="flex justify-between text-xs font-bold text-gray-700">
-                        <span>Amount to Transfer:</span>
-                        <span className="font-mono font-black text-[#E11D48]">
-                          ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs font-semibold text-gray-500 border-t border-gray-200/60 pt-2">
-                        <span>My Wallet Balance:</span>
-                        <span className="font-mono text-black font-extrabold">
-                          ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 4 Box PIN Indicators */}
-                    <div className="space-y-2 text-center py-1">
-                      <div className="flex justify-center gap-2 pt-1">
-                        {[0, 1, 2, 3].map((idx) => (
-                          <div
-                            key={idx}
-                            className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
-                              trfPin.length > idx
-                                ? "border-[#FC7A00] bg-orange-50/40 text-black"
-                                : "border-gray-200 bg-white"
-                            }`}
-                          >
-                            {trfPin[idx] ? "•" : ""}
+                  {userData?.is2faOtpEnabled === true ? (
+                    <TwoFactorOtpVerificationView
+                      user={user}
+                      title="2FA Transfer Verification"
+                      description={`Authorizing ₦${trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })} transfer.`}
+                      onVerifiedSuccess={() => executeOutwardTransfer("0000")}
+                      onCancel={() => setTrfStep("confirm")}
+                    />
+                  ) : (
+                    <>
+                      <div className="space-y-4 w-full">
+                        <div className="text-center space-y-1">
+                          <div className="w-12 h-12 bg-orange-50 border border-orange-100 rounded-full flex items-center justify-center text-[#FC7A00] mx-auto">
+                            <span className="material-symbols-outlined text-[24px] font-black">lock</span>
                           </div>
-                        ))}
+                          <h4 className="font-hanken font-extrabold text-base text-black mt-2">Enter Transaction PIN</h4>
+                          <p className="font-hanken text-[11px] text-gray-400">Authorize your transfer securely using your 4-digit PIN.</p>
+                        </div>
+
+                        {/* Displaying user Balance and amount user wants to Transfer inside UI card */}
+                        <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-2 font-hanken text-left">
+                          <div className="flex justify-between text-xs font-bold text-gray-700">
+                            <span>Amount to Transfer:</span>
+                            <span className="font-mono font-black text-[#E11D48]">
+                              ₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs font-semibold text-gray-500 border-t border-gray-200/60 pt-2">
+                            <span>My Wallet Balance:</span>
+                            <span className="font-mono text-black font-extrabold">
+                              ₦{balance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 4 Box PIN Indicators */}
+                        <div className="space-y-2 text-center py-1">
+                          <div className="flex justify-center gap-2 pt-1">
+                            {[0, 1, 2, 3].map((idx) => (
+                              <div
+                                key={idx}
+                                className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
+                                  trfPin.length > idx
+                                    ? "border-[#FC7A00] bg-orange-50/40 text-black"
+                                    : "border-gray-200 bg-white"
+                                }`}
+                              >
+                                {trfPin[idx] ? "•" : ""}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Standardized Transaction Keypad Grid */}
-                  <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => {
-                          if (trfPin.length < 4) setTrfPin((prev) => prev + num);
-                        }}
-                        className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
-                      >
-                        {num}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setTrfPin("")}
-                      className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
-                    >
-                      CLEAR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (trfPin.length < 4) setTrfPin((prev) => prev + "0");
-                      }}
-                      className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
-                    >
-                      0
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleTrfPinDelete()}
-                      className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">backspace</span>
-                    </button>
-                  </div>
+                      {/* Standardized Transaction Keypad Grid */}
+                      <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => {
+                              if (trfPin.length < 4) setTrfPin((prev) => prev + num);
+                            }}
+                            className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                          >
+                            {num}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setTrfPin("")}
+                          className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
+                        >
+                          CLEAR
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (trfPin.length < 4) setTrfPin((prev) => prev + "0");
+                          }}
+                          className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                        >
+                          0
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTrfPinDelete()}
+                          className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">backspace</span>
+                        </button>
+                      </div>
 
-                  {/* Authorize Transfer button */}
-                  <div className="w-full max-w-xs mx-auto pt-1 pb-2">
-                    <button
-                      type="button"
-                      disabled={trfPin.length < 4}
-                      onClick={() => executeOutwardTransfer(trfPin)}
-                      className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98"
-                    >
-                      Authorize Transfer
-                    </button>
-                  </div>
+                      {/* Authorize Transfer button */}
+                      <div className="w-full max-w-xs mx-auto pt-1 pb-2">
+                        <button
+                          type="button"
+                          disabled={trfPin.length < 4}
+                          onClick={() => executeOutwardTransfer(trfPin)}
+                          className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98"
+                        >
+                          Authorize Transfer
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               )}
 
@@ -4716,6 +4729,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             ) : (
               /* PIN Authorization Step */
               <div className="space-y-5 flex flex-col items-center text-center w-full max-w-md mx-auto">
+                {userData?.is2faOtpEnabled === true ? (
+                  <TwoFactorOtpVerificationView
+                    user={user}
+                    title="2FA Currency Swap Verification"
+                    description={`Authorizing currency swap from ${swapFromCurrency} to ${swapToCurrency}.`}
+                    onVerifiedSuccess={() => handleSwapExecute()}
+                    onCancel={() => setSwapStep("form")}
+                  />
+                ) : (
+                  <>
                 <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4.5 space-y-3 font-hanken shadow-xs w-full text-left">
                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Swap Summary Breakdown</p>
 
@@ -4836,6 +4859,8 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                     </>
                   )}
                 </button>
+                  </>
+                )}
               </div>
             )}
           </div>

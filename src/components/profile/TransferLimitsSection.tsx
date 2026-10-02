@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { triggerHaptic } from "@/lib/haptics";
+import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
 
 function maskBvnNin(val?: unknown): string {
   if (!val) return "";
@@ -678,80 +679,95 @@ export function TierUpgradeDrawerModal({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-xs bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black"
+              className="w-full max-w-sm bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black"
             >
-              <div className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mx-auto">
-                <span className="material-symbols-outlined text-[24px]">lock</span>
-              </div>
-
-              <div>
-                <h4 className="font-extrabold text-base uppercase text-gray-900">Enter Access PIN</h4>
-                <p className="text-[11px] text-gray-500 mt-1 font-semibold">
-                  Enter your 4-digit transaction PIN to confirm tier limit upgrade application.
-                </p>
-              </div>
-
-              {/* 4 Pin Boxes */}
-              <div className="flex justify-center gap-3 py-2">
-                {[0, 1, 2, 3].map((idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "w-12 h-12 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-2xl transition-all shadow-xs",
-                      pinDigits[idx] ? "border-[#FC7A00] bg-orange-50/20 text-[#FC7A00]" : "border-gray-200 text-gray-400 bg-gray-50"
-                    )}
-                  >
-                    {pinDigits[idx] ? "•" : ""}
+              {userData?.is2faOtpEnabled === true ? (
+                <TwoFactorOtpVerificationView
+                  user={user}
+                  title="Tier Upgrade Verification"
+                  description="Select delivery channel and verify 2FA OTP to submit tier limit upgrade request."
+                  onVerifiedSuccess={() => {
+                    setIsPinModalOpen(false);
+                    executeVerifiedSubmit("0000");
+                  }}
+                  onCancel={() => setIsPinModalOpen(false)}
+                />
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mx-auto">
+                    <span className="material-symbols-outlined text-[24px]">lock</span>
                   </div>
-                ))}
-              </div>
 
-              {/* Numeric Keypad Grid */}
-              <div className="grid grid-cols-3 gap-2 pt-2">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                  <div>
+                    <h4 className="font-extrabold text-base uppercase text-gray-900">Enter Access PIN</h4>
+                    <p className="text-[11px] text-gray-500 mt-1 font-semibold">
+                      Enter your 4-digit transaction PIN to confirm tier limit upgrade application.
+                    </p>
+                  </div>
+
+                  {/* 4 Pin Boxes */}
+                  <div className="flex justify-center gap-3 py-2">
+                    {[0, 1, 2, 3].map((idx) => (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "w-12 h-12 rounded-2xl border-2 flex items-center justify-center font-mono font-black text-2xl transition-all shadow-xs",
+                          pinDigits[idx] ? "border-[#FC7A00] bg-orange-50/20 text-[#FC7A00]" : "border-gray-200 text-gray-400 bg-gray-50"
+                        )}
+                      >
+                        {pinDigits[idx] ? "•" : ""}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Numeric Keypad Grid */}
+                  <div className="grid grid-cols-3 gap-2 pt-2">
+                    {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        disabled={isVerifyingPin}
+                        onClick={() => handlePinDigitPress(num)}
+                        className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {num}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={isVerifyingPin}
+                      onClick={handlePinClear}
+                      className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-xs uppercase text-gray-600 active:scale-95 transition-all cursor-pointer"
+                    >
+                      CLEAR
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isVerifyingPin}
+                      onClick={() => handlePinDigitPress("0")}
+                      className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isVerifyingPin}
+                      onClick={handlePinBackspace}
+                      className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">backspace</span>
+                    </button>
+                  </div>
+
                   <button
-                    key={num}
                     type="button"
-                    disabled={isVerifyingPin}
-                    onClick={() => handlePinDigitPress(num)}
-                    className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                    onClick={() => setIsPinModalOpen(false)}
+                    className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer active:scale-95 transition-all"
                   >
-                    {num}
+                    Cancel
                   </button>
-                ))}
-                <button
-                  type="button"
-                  disabled={isVerifyingPin}
-                  onClick={handlePinClear}
-                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-xs uppercase text-gray-600 active:scale-95 transition-all cursor-pointer"
-                >
-                  CLEAR
-                </button>
-                <button
-                  type="button"
-                  disabled={isVerifyingPin}
-                  onClick={() => handlePinDigitPress("0")}
-                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  0
-                </button>
-                <button
-                  type="button"
-                  disabled={isVerifyingPin}
-                  onClick={handlePinBackspace}
-                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                >
-                  <span className="material-symbols-outlined text-[20px]">backspace</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsPinModalOpen(false)}
-                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer"
-              >
-                Cancel
-              </button>
+                </>
+              )}
             </motion.div>
           </div>
         )}
