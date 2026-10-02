@@ -17,19 +17,49 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query")?.trim() || "";
+    const pageSize = Math.min(Math.max(Number(searchParams.get("limit")) || 10, 1), 50);
+    const lastDocId = searchParams.get("lastDocId")?.trim() || searchParams.get("startAfter")?.trim() || "";
 
-    // 1. Fetch recent admin deposits audit log
-    const depositsSnap = await adminDb
+    // 1. Fetch total deposit audit records count using low-cost count() aggregation query
+    let totalLogsCount = 0;
+    try {
+      const countSnap = await adminDb
+        .collection("transactions")
+        .where("type", "in", ["DEPOSIT", "ADMIN_DEPOSIT", "WALLET_FUNDING"])
+        .count()
+        .get();
+      totalLogsCount = countSnap.data().count || 0;
+    } catch (countErr: any) {
+      console.warn("[Admin Deposit GET] Count aggregation error:", countErr.message);
+    }
+
+    // 2. Fetch paginated admin deposits audit log using cursor
+    let queryRef = adminDb
       .collection("transactions")
       .where("type", "in", ["DEPOSIT", "ADMIN_DEPOSIT", "WALLET_FUNDING"])
       .orderBy("createdAt", "desc")
-      .limit(30)
-      .get();
+      .limit(pageSize);
+
+    if (lastDocId) {
+      try {
+        const lastDocSnap = await adminDb.collection("transactions").doc(lastDocId).get();
+        if (lastDocSnap.exists) {
+          queryRef = queryRef.startAfter(lastDocSnap);
+        }
+      } catch (cursorErr: any) {
+        console.warn("[Admin Deposit GET] Cursor doc lookup warning:", cursorErr.message);
+      }
+    }
+
+    const depositsSnap = await queryRef.get();
 
     const depositLogs = depositsSnap.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
+
+    const lastFetchedDocId = depositsSnap.docs.length > 0 ? depositsSnap.docs[depositsSnap.docs.length - 1].id : null;
+    const hasMore = depositsSnap.docs.length === pageSize;
 
     // 2. Search users if query provided
     let searchResults: any[] = [];
@@ -101,6 +131,9 @@ export async function GET(req: Request) {
       success: true,
       searchResults,
       depositLogs,
+      totalLogsCount,
+      hasMore,
+      lastDocId: lastFetchedDocId,
     });
   } catch (err: any) {
     console.error("[Admin Deposit GET] Error:", err.message);
