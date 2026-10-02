@@ -403,21 +403,21 @@ function TierUpgradeDrawerModal({
             className="fixed inset-0 w-full h-full bg-white z-[100000] flex flex-col justify-between overflow-hidden p-6 pb-8 text-black"
           >
             {/* Full-Screen Top Header Bar */}
-            <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-2 shrink-0">
+            <div className="w-full flex items-center gap-3 border-b border-gray-100 pb-4 mb-2 shrink-0">
               <button
                 type="button"
                 onClick={() => { triggerHaptic(); onClose(); }}
-                className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-100 transition-all cursor-pointer active:scale-95"
+                className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-700 hover:text-black hover:bg-gray-100 transition-all cursor-pointer active:scale-95 shrink-0"
                 title="Back"
               >
                 <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
               </button>
 
-              <div className="text-center flex-1 pr-10">
-                <h3 className="font-hanken font-black text-base text-black uppercase tracking-wider">
+              <div className="text-left flex-1 min-w-0">
+                <h3 className="font-hanken font-black text-base text-black uppercase tracking-wider truncate">
                   UPGRADE LIMITS
                 </h3>
-                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Submit verification documents to unlock higher limits</p>
+                <p className="text-[10px] text-gray-400 font-semibold mt-0.5 truncate">Submit verification documents to unlock higher limits</p>
               </div>
             </div>
 
