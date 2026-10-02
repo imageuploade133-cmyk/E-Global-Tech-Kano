@@ -36,9 +36,12 @@ export async function GET(req: Request) {
     let totalUsers = 0;
     let globalNgnBalance = 0;
     let globalUsdBalance = 0;
+    let globalXofBalance = 0;
     let totalFixedDeposit = 0;
     let todayDeposit = 0;
     let todayTransfer = 0;
+    let todayPayout = 0;
+    let todayNetFlow = 0;
     let totalAirtimePurchase = 0;
     let totalBonus = 0;
 
@@ -50,31 +53,30 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] users count aggregation failed:", err.message);
     }
 
-    // B. Calculate global NGN balance from NGN wallets
+    // B. Calculate global NGN, USD, XOF pool balances and Bonus balances from wallets
     try {
-      const ngnWalletsSnap = await adminDb.collection("wallets")
-        .where("currency", "==", "NGN")
-        .get();
-      ngnWalletsSnap.forEach((doc) => {
-        globalNgnBalance += Number(doc.data().balance) || 0;
+      const walletsSnap = await adminDb.collection("wallets").get();
+      walletsSnap.forEach((doc) => {
+        const data = doc.data() || {};
+        const currency = String(data.currency || "").toUpperCase();
+        const bal = Number(data.balance) || 0;
+        const bonus = Number(data.bonusBalance) || 0;
+
+        if (currency === "NGN" || doc.id.endsWith("_NGN")) {
+          globalNgnBalance += bal;
+        } else if (currency === "USD" || doc.id.endsWith("_USD")) {
+          globalUsdBalance += bal;
+        } else if (currency === "XOF" || doc.id.endsWith("_XOF")) {
+          globalXofBalance += bal;
+        }
+
+        totalBonus += bonus;
       });
     } catch (err: any) {
-      console.warn("[Admin Config GET API] NGN wallets sum failed:", err.message);
+      console.warn("[Admin Config GET API] Wallets sum failed:", err.message);
     }
 
-    // C. Calculate global USD balance from USD wallets
-    try {
-      const usdWalletsSnap = await adminDb.collection("wallets")
-        .where("currency", "==", "USD")
-        .get();
-      usdWalletsSnap.forEach((doc) => {
-        globalUsdBalance += Number(doc.data().balance) || 0;
-      });
-    } catch (err: any) {
-      console.warn("[Admin Config GET API] USD wallets sum failed:", err.message);
-    }
-
-    // D. Sum active fixed deposits
+    // C. Sum active fixed deposits
     try {
       const activeInvestmentsSnap = await adminDb.collection("investments")
         .where("status", "==", "ACTIVE")
@@ -89,7 +91,7 @@ export async function GET(req: Request) {
       console.warn("[Admin Config GET API] active fixed deposits sum failed:", err.message);
     }
 
-    // E. Sum today's transactions (deposits and transfers)
+    // D. Sum today's transactions (deposits, transfers, payouts, net flow)
     try {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
@@ -98,22 +100,31 @@ export async function GET(req: Request) {
         .where("createdAt", ">=", startOfToday.toISOString())
         .get();
 
+      const payoutTypes = ["TRANSFER", "WITHDRAWAL", "CASHOUT", "AIRTIME", "DATA", "BILLS", "UTILITY", "CABLE", "ELECTRICITY", "STORE_PURCHASE", "CARD_FUND"];
+      const depositTypes = ["DEPOSIT", "VIRTUAL_ACCOUNT_DEPOSIT", "WALLET_FUNDING"];
+
       todayTxSnap.forEach((doc) => {
-        const data = doc.data();
-        const amt = Number(data.amount) || 0;
+        const data = doc.data() || {};
+        const debitedAmt = Number(data.totalDebited) || Number(data.amount) || 0;
+        const creditedAmt = Number(data.totalCredited) || Number(data.amount) || 0;
+
         if (data.status === "SUCCESS") {
-          if (data.type === "DEPOSIT") {
-            todayDeposit += amt;
-          } else if (data.type === "TRANSFER") {
-            todayTransfer += amt;
+          if (depositTypes.includes(data.type) || (data.direction === "CREDIT" && data.type !== "REFUND")) {
+            todayDeposit += creditedAmt;
+          } else if (payoutTypes.includes(data.type) || data.direction === "DEBIT") {
+            todayPayout += debitedAmt;
+            if (data.type === "TRANSFER") {
+              todayTransfer += debitedAmt;
+            }
           }
         }
       });
+      todayNetFlow = todayDeposit - todayPayout;
     } catch (err: any) {
       console.warn("[Admin Config GET API] today's transactions sum failed:", err.message);
     }
 
-    // F. Sum total successful airtime purchases
+    // E. Sum total successful airtime purchases
     try {
       const airtimeTxSnap = await adminDb.collection("transactions")
         .where("type", "==", "AIRTIME")
@@ -124,16 +135,6 @@ export async function GET(req: Request) {
       });
     } catch (err: any) {
       console.warn("[Admin Config GET API] airtime purchases sum failed:", err.message);
-    }
-
-    // G. Sum total bonus wallet balance from wallets
-    try {
-      const walletsSnap = await adminDb.collection("wallets").get();
-      walletsSnap.forEach((doc) => {
-        totalBonus += Number(doc.data().bonusBalance) || 0;
-      });
-    } catch (err: any) {
-      console.warn("[Admin Config GET API] total bonus sum failed:", err.message);
     }
 
     // H. Low-Cost Aggregations for Transfer Profit and Data Profit (Uses count() aggregation: 1 read per 1,000 txs)
@@ -201,9 +202,12 @@ export async function GET(req: Request) {
       totalUsers,
       globalNgnBalance,
       globalUsdBalance,
+      globalXofBalance,
       totalFixedDeposit,
       todayDeposit,
       todayTransfer,
+      todayPayout,
+      todayNetFlow,
       totalAirtimePurchase,
       totalBonus,
       totalTransferProfit,
