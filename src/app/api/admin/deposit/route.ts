@@ -142,15 +142,21 @@ export async function POST(req: Request) {
     const ref = `ADMIN-DEP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const depositNarration = narration?.trim() || `Administrative Credit Deposit by ${adminEmail}`;
 
-    // Execute atomic credit deposit via WalletService
-    const creditResult = await WalletService.creditWallet(
-      targetUid,
-      numAmount,
-      currency,
-      depositNarration,
-      "DEPOSIT",
-      ref
-    );
+    // Execute atomic credit deposit via WalletService inside runTransaction
+    const creditResult = await adminDb.runTransaction(async (transaction) => {
+      return await WalletService.creditWallet(transaction, {
+        userId: targetUid,
+        amount: numAmount,
+        currency,
+        reference: ref,
+        description: depositNarration,
+        recipientName: userData.name || targetUid,
+        type: "DEPOSIT",
+        category: "DEPOSIT",
+        direction: "CREDIT",
+        totalCredited: numAmount,
+      });
+    });
 
     // Save detailed admin audit record
     await adminDb.collection("transactions").doc(ref).set({
