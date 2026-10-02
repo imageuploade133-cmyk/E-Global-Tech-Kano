@@ -151,7 +151,14 @@ interface TierUpgradeDrawerModalProps {
   onRequestSubmitted: () => void;
 }
 
-function TierUpgradeDrawerModal({
+export interface TierUpgradeDrawerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  upgradeRequest?: any;
+  onRequestSubmitted?: () => void;
+}
+
+export function TierUpgradeDrawerModal({
   isOpen,
   onClose,
   upgradeRequest,
@@ -172,6 +179,15 @@ function TierUpgradeDrawerModal({
   const [fullName, setFullName] = useState("");
   const [bvn, setBvn] = useState("");
   const [targetTier, setTargetTier] = useState<"Tier 2" | "Tier 3">("Tier 2");
+
+  // Government ID Card Front & Back uploader
+  const [idFrontFile, setIdFrontFile] = useState<File | null>(null);
+  const [idFrontPreview, setIdFrontPreview] = useState<string | null>(null);
+  const idFrontInputRef = useRef<HTMLInputElement>(null);
+
+  const [idBackFile, setIdBackFile] = useState<File | null>(null);
+  const [idBackPreview, setIdBackPreview] = useState<string | null>(null);
+  const idBackInputRef = useRef<HTMLInputElement>(null);
 
   // Proof of Address file uploader
   const [addressFile, setAddressFile] = useState<File | null>(null);
@@ -202,12 +218,38 @@ function TierUpgradeDrawerModal({
       const bvnVal = userData?.bvn || userData?.nin || "";
       setBvn(typeof bvnVal === "string" ? bvnVal : String(bvnVal || ""));
 
+      setIdFrontFile(null);
+      setIdFrontPreview(null);
+      setIdBackFile(null);
+      setIdBackPreview(null);
       setAddressFile(null);
       setAddressPreview(null);
       setSelfieFile(null);
       setSelfiePreview(null);
     }
   }, [isOpen, userData, user]);
+
+  const handleIdFrontFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIdFrontFile(file);
+    if (idFrontPreview && idFrontPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(idFrontPreview);
+    }
+    setIdFrontPreview(URL.createObjectURL(file));
+  };
+
+  const handleIdBackFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIdBackFile(file);
+    if (idBackPreview && idBackPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(idBackPreview);
+    }
+    setIdBackPreview(URL.createObjectURL(file));
+  };
 
   const handleAddressFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerHaptic();
@@ -242,6 +284,16 @@ function TierUpgradeDrawerModal({
 
     if (!bvn || bvn.trim().length !== 11) {
       toast.error("Please enter a valid 11-digit BVN or NIN number.");
+      return;
+    }
+
+    if (!idFrontFile && !idFrontPreview) {
+      toast.error("Government ID Card (Front side) scan is required.");
+      return;
+    }
+
+    if (!idBackFile && !idBackPreview) {
+      toast.error("Government ID Card (Back side) scan is required.");
       return;
     }
 
@@ -324,7 +376,28 @@ function TierUpgradeDrawerModal({
       setIsSubmitting(true);
       toast.loading("Uploading documents & submitting upgrade request...");
 
-      // 2. Upload Proof of Address
+      // 2. Upload Government ID Front & Back
+      let idFrontUrl = idFrontPreview || "";
+      if (idFrontFile) {
+        const frontUpload = await uploadImageSecurely(idFrontFile, "kyc_document");
+        if (frontUpload.success && frontUpload.url) {
+          idFrontUrl = frontUpload.url;
+        } else {
+          throw new Error(frontUpload.error || "Failed to upload Government ID Front picture.");
+        }
+      }
+
+      let idBackUrl = idBackPreview || "";
+      if (idBackFile) {
+        const backUpload = await uploadImageSecurely(idBackFile, "kyc_document");
+        if (backUpload.success && backUpload.url) {
+          idBackUrl = backUpload.url;
+        } else {
+          throw new Error(backUpload.error || "Failed to upload Government ID Back picture.");
+        }
+      }
+
+      // 3. Upload Proof of Address
       let proofUrl = addressPreview || "";
       if (addressFile) {
         const addressUpload = await uploadImageSecurely(addressFile, "kyc_document");
@@ -335,7 +408,7 @@ function TierUpgradeDrawerModal({
         }
       }
 
-      // 3. Upload Live Selfie
+      // 4. Upload Live Selfie
       let liveSelfieUrl = selfiePreview || "";
       if (selfieFile) {
         const selfieUpload = await uploadImageSecurely(selfieFile, "kyc_selfie");
@@ -346,7 +419,7 @@ function TierUpgradeDrawerModal({
         }
       }
 
-      // 4. Post payload to backend
+      // 5. Post payload to backend
       const res = await fetch("/api/profile/tier-upgrade", {
         method: "POST",
         headers: {
@@ -356,6 +429,8 @@ function TierUpgradeDrawerModal({
         body: JSON.stringify({
           fullName: fullName.trim(),
           bvn: bvn.trim(),
+          idCardFrontUrl: idFrontUrl,
+          idCardBackUrl: idBackUrl,
           proofOfAddressUrl: proofUrl,
           selfieUrl: liveSelfieUrl,
           targetTier,
@@ -547,6 +622,98 @@ function TierUpgradeDrawerModal({
                         : "bg-gray-50 border-gray-200 text-black focus:border-[#FC7A00]"
                     )}
                   />
+                </div>
+
+                {/* Upload Government ID Card (Front Side) */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Government ID Card (Front Side) *</label>
+                  <input
+                    type="file"
+                    ref={idFrontInputRef}
+                    accept="image/*"
+                    onChange={handleIdFrontFileChange}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => { triggerHaptic(); idFrontInputRef.current?.click(); }}
+                    className={cn(
+                      "p-4 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all bg-gray-50/50 hover:bg-gray-100/50",
+                      idFrontPreview ? "border-emerald-500 bg-emerald-50/20" : "border-gray-300 hover:border-[#FC7A00]"
+                    )}
+                  >
+                    {idFrontPreview ? (
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-emerald-300 shrink-0 shadow-xs">
+                          <img src={idFrontPreview} alt="ID Front" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-xs font-black text-emerald-800 truncate">
+                            {idFrontFile?.name || "Government ID (Front) Attached"}
+                          </p>
+                          <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">
+                            Ready for submission
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-emerald-600 font-bold text-xl">check_circle</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 text-left py-1">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-[#FC7A00] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">badge</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Upload Government ID Card (Front Side)</p>
+                          <p className="text-[10px] font-semibold text-gray-400 mt-0.5">Clear photo of National ID, Voter Card, Passport or License</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Government ID Card (Back Side) */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Government ID Card (Back Side) *</label>
+                  <input
+                    type="file"
+                    ref={idBackInputRef}
+                    accept="image/*"
+                    onChange={handleIdBackFileChange}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => { triggerHaptic(); idBackInputRef.current?.click(); }}
+                    className={cn(
+                      "p-4 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all bg-gray-50/50 hover:bg-gray-100/50",
+                      idBackPreview ? "border-emerald-500 bg-emerald-50/20" : "border-gray-300 hover:border-[#FC7A00]"
+                    )}
+                  >
+                    {idBackPreview ? (
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-emerald-300 shrink-0 shadow-xs">
+                          <img src={idBackPreview} alt="ID Back" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-xs font-black text-emerald-800 truncate">
+                            {idBackFile?.name || "Government ID (Back) Attached"}
+                          </p>
+                          <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">
+                            Ready for submission
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-emerald-600 font-bold text-xl">check_circle</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 text-left py-1">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-[#FC7A00] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">badge</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Upload Government ID Card (Back Side)</p>
+                          <p className="text-[10px] font-semibold text-gray-400 mt-0.5">Clear photo of the back side of your Government ID</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Upload Proof of Address */}

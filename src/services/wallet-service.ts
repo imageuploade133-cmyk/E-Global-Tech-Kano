@@ -235,7 +235,7 @@ export class WalletService {
       user = preLoadedUser || (await this.getUserProfile(transaction, userId));
     }
 
-    // AUTOMATIC DEBT RECOVERY LOGIC (FOR NGN MAIN WALLET DEPOSITS/CREDITS)
+    // AUTOMATIC DEBT RECOVERY & DAILY DEPOSIT LIMIT TRACKING (FOR NGN MAIN WALLET DEPOSITS/CREDITS)
     let debtRecovered = 0;
     let netBalanceIncrement = 0;
 
@@ -258,6 +258,24 @@ export class WalletService {
     }
 
     const newBalance = currentBalance + netBalanceIncrement;
+
+    // Daily Deposit Limit Evaluation & Lock Triggers
+    let updatedDepositTotal = 0;
+    let isDepositLimitExceeded = false;
+
+    if (ucCurrency === "NGN" && !isBonus && user && type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING") {
+      const todayIsoDate = new Date().toISOString().split("T")[0];
+      const lastDepositDate = user.data.lastDepositDate || "";
+      const currentTodayDepositTotal = lastDepositDate === todayIsoDate ? (Number(user.data.todayDepositTotal) || 0) : 0;
+      updatedDepositTotal = currentTodayDepositTotal + creditAmount;
+
+      const dailyDepositLimit = user.data.dailyDepositLimit !== undefined ? Number(user.data.dailyDepositLimit) : 1000000;
+      const unlimitedDeposits = !!user.data.unlimitedDeposits;
+
+      if (!unlimitedDeposits && dailyDepositLimit > 0 && updatedDepositTotal > dailyDepositLimit) {
+        isDepositLimitExceeded = true;
+      }
+    }
 
     // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
     // Update specific wallet balance atomically
@@ -283,11 +301,20 @@ export class WalletService {
       }, { merge: true });
 
       if (ucCurrency === "NGN" && user) {
+        const todayIsoDate = new Date().toISOString().split("T")[0];
         const userUpdates: Record<string, any> = {
           balance: FieldValue.increment(netBalanceIncrement),
         };
         if (debtRecovered > 0) {
           userUpdates.outstandingDebt = FieldValue.increment(-debtRecovered);
+        }
+        if (updatedDepositTotal > 0) {
+          userUpdates.lastDepositDate = todayIsoDate;
+          userUpdates.todayDepositTotal = updatedDepositTotal;
+        }
+        if (isDepositLimitExceeded) {
+          userUpdates.depositLimitExceeded = true;
+          userUpdates.depositLimitExceededAt = new Date().toISOString();
         }
         transaction.update(user.ref, userUpdates);
       }
@@ -514,6 +541,23 @@ export class WalletService {
     const feeNum = Number(fee) || 0;
     const vatNum = Number(params.vat) || 0;
     const totalDeduction = amount + feeNum + vatNum;
+
+    // Enforce Deposit Limit Exceeded & Outstanding Debt locks for NGN main wallet debits
+    if (ucCurrency === "NGN" && !isBonus && user) {
+      const todayIsoDate = new Date().toISOString().split("T")[0];
+      const lastDepositDate = user.data.lastDepositDate || "";
+      const todayDepositTotal = lastDepositDate === todayIsoDate ? (Number(user.data.todayDepositTotal) || 0) : 0;
+      const dailyDepositLimit = user.data.dailyDepositLimit !== undefined ? Number(user.data.dailyDepositLimit) : 1000000;
+      const unlimitedDeposits = !!user.data.unlimitedDeposits;
+
+      const isExceeded = user.data.depositLimitExceeded === true || (!unlimitedDeposits && dailyDepositLimit > 0 && todayDepositTotal > dailyDepositLimit);
+
+      if (isExceeded) {
+        throw new Error(
+          "Your account is pending because your daily deposit limit has been exceeded. You cannot spend or transfer funds. Please contact support or submit a limit upgrade request."
+        );
+      }
+    }
 
     // Enforce outstanding debt check for NGN main wallet debits so indebted users cannot spend or transfer funds
     const outstandingDebt = (ucCurrency === "NGN" && !isBonus && user)
