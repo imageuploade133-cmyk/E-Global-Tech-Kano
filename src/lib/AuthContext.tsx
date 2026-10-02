@@ -18,10 +18,31 @@ interface UserData {
   email?: string;
   pin?: string;
   balance?: number;
+  bonusBalance?: number;
+  outstandingDebt?: number;
   isPinRequired?: boolean;
   isFaceIdEnabled?: boolean;
   dailyLimit?: number;
+  singleLimit?: number;
+  depositLimitExceeded?: boolean;
+  unlimitedDeposits?: boolean;
+  dailyDepositLimit?: number;
+  todayDepositTotal?: number;
+  tier?: string;
   photoURL?: string;
+  phoneNumber?: string;
+  phone?: string;
+  bvn?: string;
+  nin?: string;
+  kycStatus?: string;
+  isFrozen?: boolean;
+  status?: string;
+  freezeMessage?: string;
+  virtualAccountActive?: boolean;
+  virtualAccountNumber?: string;
+  virtualAccountBankName?: string;
+  accountId?: string | number;
+  is2faOtpEnabled?: boolean;
   [key: string]: unknown;
 }
 
