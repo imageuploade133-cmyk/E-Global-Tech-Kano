@@ -130,7 +130,8 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "verify") {
-      if (!otp || typeof otp !== "string" || otp.trim().length !== 6) {
+      const submittedOtp = (otp || body.otpCode || body.otp_code || "").toString().trim();
+      if (!submittedOtp || submittedOtp.length !== 6) {
         return NextResponse.json({ error: "Please enter the 6-digit OTP code." }, { status: 400 });
       }
 
@@ -153,7 +154,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Too many failed attempts. Please request a new OTP code." }, { status: 429 });
       }
 
-      const submittedHash = crypto.createHash("sha256").update(otp.trim()).digest("hex");
+      const submittedHash = crypto.createHash("sha256").update(submittedOtp).digest("hex");
       if (submittedHash !== otpData.otpHash) {
         await adminDb.collection("login_2fa_otps").doc(uid).update({
           attempts: (otpData.attempts || 0) + 1,
