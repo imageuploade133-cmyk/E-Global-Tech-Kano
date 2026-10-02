@@ -54,7 +54,15 @@ function AdminDepositPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<CustomerProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Deposit Audit Logs Pagination States
   const [depositLogs, setDepositLogs] = useState<DepositLog[]>([]);
+  const [isLogsLoading, setIsLogsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalLogsCount, setTotalLogsCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [lastDocId, setLastDocId] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
 
   // Deposit Form Drawer Modal
   const [selectedUser, setSelectedRequestUser] = useState<CustomerProfile | null>(null);
@@ -69,27 +77,60 @@ function AdminDepositPageContent() {
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
   useEffect(() => {
-    fetchInitialLogs();
+    fetchDepositLogs();
   }, [user]);
 
-  const fetchInitialLogs = async () => {
+  const fetchDepositLogs = async (cursorDocId?: string, direction?: "next" | "prev") => {
+    setIsLogsLoading(true);
     try {
       let idToken = "mock-admin-token";
       if (user) {
         idToken = await user.getIdToken();
       }
 
-      const res = await fetch("/api/admin/deposit", {
+      let url = "/api/admin/deposit?limit=10";
+      if (cursorDocId) {
+        url += `&lastDocId=${encodeURIComponent(cursorDocId)}`;
+      }
+
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${idToken}` }
       });
       const data = await res.json();
 
       if (res.ok && data.success) {
         setDepositLogs(data.depositLogs || []);
+        setTotalLogsCount(data.totalLogsCount || 0);
+        setHasMore(Boolean(data.hasMore));
+        setLastDocId(data.lastDocId || null);
+
+        if (direction === "next" && lastDocId) {
+          setCursorStack((prev) => [...prev, lastDocId]);
+          setCurrentPage((prev) => prev + 1);
+        } else if (direction === "prev") {
+          setCursorStack((prev) => prev.slice(0, -1));
+          setCurrentPage((prev) => Math.max(1, prev - 1));
+        } else if (!direction) {
+          setCursorStack([]);
+          setCurrentPage(1);
+        }
       }
     } catch (err) {
-      console.warn("Failed to load initial deposit logs:", err);
+      console.warn("Failed to load deposit audit logs:", err);
+    } finally {
+      setIsLogsLoading(false);
     }
+  };
+
+  const handleNextPage = () => {
+    if (!hasMore || !lastDocId || isLogsLoading) return;
+    fetchDepositLogs(lastDocId, "next");
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage <= 1 || isLogsLoading) return;
+    const previousCursor = cursorStack[cursorStack.length - 2] || undefined;
+    fetchDepositLogs(previousCursor, "prev");
   };
 
   const handleSearchUsers = async (e?: React.FormEvent) => {
@@ -248,7 +289,7 @@ function AdminDepositPageContent() {
         );
 
         setSelectedRequestUser(null);
-        fetchInitialLogs();
+        fetchDepositLogs();
       } else {
         toast.error(data.error || "Failed to credit customer wallet.");
       }
@@ -386,18 +427,27 @@ function AdminDepositPageContent() {
 
         {/* Deposit Audit Logs Table */}
         <div className={cn("rounded-2xl p-6 border transition-all shadow-none space-y-4", panelClass)}>
-          <div className="flex items-center gap-2 border-b pb-3 border-gray-200/50">
-            <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">history</span>
-            <h3 className="font-black text-xs uppercase tracking-wider">Recent Administrative Deposits Audit Log</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-gray-200/50">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#FC7A00] text-[20px]">history</span>
+              <h3 className="font-black text-xs uppercase tracking-wider">Recent Administrative Deposits Audit Log</h3>
+            </div>
+
+            {totalLogsCount > 0 && (
+              <span className="text-[10px] font-mono font-bold uppercase text-gray-400">
+                Total Audit Records: {totalLogsCount.toLocaleString()}
+              </span>
+            )}
           </div>
 
           {depositLogs.length === 0 ? (
             <div className="text-center py-12 border border-dashed rounded-2xl p-6 text-gray-400 text-xs font-bold uppercase tracking-widest">
-              No recent deposit audit records.
+              {isLogsLoading ? "Loading deposit logs..." : "No recent deposit audit records."}
             </div>
           ) : (
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left border-collapse">
+            <>
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className={cn("border-b text-[10px] font-black uppercase tracking-wider", isDark ? "border-gray-800 text-gray-400" : "border-gray-200 text-gray-500")}>
                     <th className="py-3 px-3">Reference ID</th>
@@ -448,6 +498,42 @@ function AdminDepositPageContent() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            <div className="pt-3 border-t border-gray-200/50 dark:border-gray-800 flex items-center justify-between text-xs font-bold">
+              <div className="text-[11px] font-mono text-gray-400">
+                Page {currentPage} {totalLogsCount > 0 ? `of ${Math.ceil(totalLogsCount / 10)}` : ""}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1 || isLogsLoading}
+                  onClick={handlePrevPage}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-40 disabled:pointer-events-none",
+                    isDark ? "bg-gray-800 border-gray-700 text-white hover:bg-gray-750" : "bg-gray-100 border-gray-200 text-gray-800 hover:bg-gray-200"
+                  )}
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                  <span>Previous</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!hasMore || isLogsLoading}
+                  onClick={handleNextPage}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-40 disabled:pointer-events-none",
+                    isDark ? "bg-gray-800 border-gray-700 text-white hover:bg-gray-750" : "bg-gray-100 border-gray-200 text-gray-800 hover:bg-gray-200"
+                  )}
+                >
+                  <span>Next</span>
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          </>
           )}
         </div>
 
