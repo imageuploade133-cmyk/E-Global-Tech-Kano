@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
-export interface GlobalTierLimitsConfig {
+interface GlobalTierLimitsConfig {
   tier1MaxBalance: number;
   tier1DailyDepositLimit: number;
   tier1DailyTransferLimit: number;
@@ -21,7 +21,7 @@ export interface GlobalTierLimitsConfig {
   dailyResetWindowHours: number;
 }
 
-export const DEFAULT_TIER_LIMITS: GlobalTierLimitsConfig = {
+const DEFAULT_TIER_LIMITS: GlobalTierLimitsConfig = {
   tier1MaxBalance: 300000,
   tier1DailyDepositLimit: 500000,
   tier1DailyTransferLimit: 500000,
