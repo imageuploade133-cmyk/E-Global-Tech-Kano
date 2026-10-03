@@ -299,13 +299,17 @@ export class WalletService {
         maxBalanceCap = typeof appConfig.tier1MaxBalance === "number" ? appConfig.tier1MaxBalance : 300000;
       }
 
+      const isDepositType = type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING";
+      let isLimitExceeded = false;
+      let limitExceededReason = "";
+
       if (maxBalanceCap > 0 && newBalance > maxBalanceCap) {
-        throw new Error(`Account balance limit exceeded for ${userTier}. Maximum allowed balance is ₦${maxBalanceCap.toLocaleString()}. Please upgrade your account level.`);
+        isLimitExceeded = true;
+        limitExceededReason = `Account balance limit exceeded for ${userTier}. Maximum allowed balance is ₦${maxBalanceCap.toLocaleString()}.`;
       }
 
       // 2. Daily Deposit / Inflow Cap
-      const isDepositType = type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING";
-      if (isDepositType && !user.data.unlimitedDeposits) {
+      if (!isLimitExceeded && isDepositType && !user.data.unlimitedDeposits) {
         let dailyDepositCap = 0;
         if (typeof user.data.dailyDepositLimit === "number") {
           dailyDepositCap = user.data.dailyDepositLimit;
@@ -324,12 +328,77 @@ export class WalletService {
           const currentDepositTotal = (lastDepositTime >= cutoffTime) ? (Number(user.data.todayDepositTotal) || 0) : 0;
 
           if (currentDepositTotal + creditAmount > dailyDepositCap) {
-            throw new Error(`Daily deposit limit of ₦${dailyDepositCap.toLocaleString()} exceeded for ${userTier}. Cumulative deposit in ${resetWindowHours}-hour window: ₦${currentDepositTotal.toLocaleString()}.`);
+            isLimitExceeded = true;
+            limitExceededReason = `Daily deposit limit of ₦${dailyDepositCap.toLocaleString()} exceeded for ${userTier}. Cumulative deposit in ${resetWindowHours}-hour window: ₦${currentDepositTotal.toLocaleString()}.`;
+          } else {
+            userUpdates.todayDepositTotal = currentDepositTotal + creditAmount;
+            userUpdates.lastDepositDate = new Date().toISOString();
           }
-
-          userUpdates.todayDepositTotal = currentDepositTotal + creditAmount;
-          userUpdates.lastDepositDate = new Date().toISOString();
         }
+      }
+
+      // IF DEPOSIT LIMIT OR BALANCE CAP EXCEEDED: Safely hold funds without crediting spendable balance
+      if (isLimitExceeded) {
+        // Record HELD transaction in general ledger so user and admin see transaction history
+        const ledgerDocId = docId || `tx-${reference}`;
+        const ledgerRef = adminDb.collection("transactions").doc(ledgerDocId);
+        const heldRecord: TransactionRecord = {
+          userId,
+          amount,
+          currency: ucCurrency,
+          reference,
+          flwId: flwId || null,
+          type,
+          category: params.category || "DEPOSIT",
+          direction: "CREDIT",
+          description: description || "Deposit Held Safely",
+          narration: params.narration || limitExceededReason,
+          recipientName,
+          status: "HELD_LIMIT_EXCEEDED",
+          date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+          time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          fee,
+          vat: params.vat,
+          markup: params.markup,
+          totalDebited: params.totalDebited,
+          totalCredited: 0,
+          provider: params.provider,
+          providerReference: params.providerReference || flwId || undefined,
+          providerTransactionId: params.providerTransactionId,
+          sessionId: params.sessionId,
+          createdAt: new Date().toISOString(),
+          walletType,
+          senderName: params.senderName,
+          senderAccountNumber: params.senderAccountNumber,
+          senderBankName: params.senderBankName,
+          virtualAccountNumber: params.virtualAccountNumber,
+          virtualAccountBankName: params.virtualAccountBankName,
+          metadata: {
+            ...params.metadata,
+            isHeldDeposit: true,
+            heldAmount: creditAmount,
+            heldReason: limitExceededReason,
+            heldAt: new Date().toISOString(),
+          },
+        };
+
+        Object.keys(heldRecord).forEach(
+          (key) => (heldRecord as any)[key] === undefined && delete (heldRecord as any)[key]
+        );
+
+        transaction.set(ledgerRef, heldRecord);
+
+        // Update user state to mark depositLimitExceeded = true
+        transaction.update(user.ref, {
+          depositLimitExceeded: true,
+          heldDepositCount: FieldValue.increment(1),
+          updatedAt: new Date().toISOString(),
+        });
+
+        return {
+          previousBalance: currentBalance,
+          newBalance: currentBalance,
+        };
       }
     }
 

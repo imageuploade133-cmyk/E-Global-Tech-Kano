@@ -290,7 +290,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
     (transaction.recipientName && transaction.recipientName.toLowerCase().includes("bulk"))
   );
   const isTransfer = !isSwap && !isRefund && !isBulkTransfer && (txType === "TRANSFER" || cat === "TRANSFER" || txType === "WITHDRAWAL" || (desc.includes("transfer") && !desc.includes("bank transfer") && !desc.includes("virtual account")));
-  const isDeposit = !isSwap && !isRefund && (txType === "DEPOSIT" || cat === "DEPOSIT" || txType === "VIRTUAL_ACCOUNT_DEPOSIT" || txType === "CASHOUT" || desc.includes("deposit") || desc.includes("virtual account"));
+  const isHeldDeposit = transaction.status === "HELD_LIMIT_EXCEEDED" || transaction.status === "HELD" || Boolean(transaction.metadata?.isHeldDeposit && !transaction.metadata?.wasHeldReleased);
+  const isDeposit = !isSwap && !isRefund && (txType === "DEPOSIT" || cat === "DEPOSIT" || txType === "VIRTUAL_ACCOUNT_DEPOSIT" || txType === "CASHOUT" || desc.includes("deposit") || desc.includes("virtual account") || isHeldDeposit);
   const isInvestment = !isSwap && !isRefund && (txType === "INVESTMENT" || cat === "INVESTMENT" || desc.includes("investment") || desc.includes("fixed deposit"));
 
   // Pure presentation values
@@ -808,7 +809,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                   {receiptHeaderName}
                 </p>
                 <h2 className="font-hanken font-bold text-sm text-gray-800 leading-snug mt-0.5">
-                  {txType === "STORE_ORDER_REFUND" || desc.includes("order cancel") || desc.includes("cancel & refund")
+                  {isHeldDeposit
+                    ? "Deposit Held Safely"
+                    : txType === "STORE_ORDER_REFUND" || desc.includes("order cancel") || desc.includes("cancel & refund")
                     ? "Order Cancel & Refund"
                     : isRefund
                     ? (isCardRefund
@@ -850,7 +853,7 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 </h2>
                 <h1 className="font-mono text-3xl font-black text-black tracking-tight mt-1">
                   {currencySymbol}
-                  {(isRefund ? (Number(transaction.totalCredited) || (transaction.amount + fee + vat)) : transaction.amount).toLocaleString(undefined, {
+                  {(isHeldDeposit ? (Number(transaction.metadata?.heldAmount) || transaction.amount) : isRefund ? (Number(transaction.totalCredited) || (transaction.amount + fee + vat)) : transaction.amount).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -865,6 +868,17 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Held Deposit Explanation Banner */}
+            {isHeldDeposit && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl space-y-1 text-center">
+                <span className="material-symbols-outlined text-amber-600 text-2xl font-bold">lock_clock</span>
+                <p className="font-hanken font-extrabold text-xs text-amber-900 uppercase tracking-wider">Funds Held Safely</p>
+                <p className="font-hanken text-[11px] text-amber-800 font-semibold leading-relaxed">
+                  {transaction.narration || (transaction.metadata as any)?.heldReason || "This deposit exceeded your account Tier limit. Upgrade your account level to release these funds into your spendable balance."}
+                </p>
+              </div>
+            )}
 
             {/* Type-Aware Structured Details */}
             <div className="space-y-4">
