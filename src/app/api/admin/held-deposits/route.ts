@@ -166,7 +166,7 @@ export async function POST(req: Request) {
           metadata: {
             ...txData.metadata,
             wasHeldReleased: true,
-            releasedBy: perm.adminUser?.email || "Admin",
+            releasedBy: perm.auth?.email || "Admin",
             releasedAt: new Date().toISOString(),
             originalStatus: "HELD_LIMIT_EXCEEDED",
           },
@@ -181,7 +181,7 @@ export async function POST(req: Request) {
           completedAt: new Date().toISOString(),
           "metadata.wasHeldReleased": true,
           "metadata.releasedAt": new Date().toISOString(),
-          "metadata.releasedBy": perm.adminUser?.email || "Admin",
+          "metadata.releasedBy": perm.auth?.email || "Admin",
         });
 
         // 3. Clear user's depositLimitExceeded flag if held deposits are cleared
@@ -226,7 +226,7 @@ export async function POST(req: Request) {
         status: "CANCELED",
         "metadata.canceledReason": cancelReason,
         "metadata.canceledAt": new Date().toISOString(),
-        "metadata.canceledBy": perm.adminUser?.email || "Admin",
+        "metadata.canceledBy": perm.auth?.email || "Admin",
         updatedAt: new Date().toISOString(),
       }, { merge: true });
 
