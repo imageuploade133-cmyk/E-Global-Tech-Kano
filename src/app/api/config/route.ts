@@ -23,10 +23,26 @@ export async function GET() {
         appVersion: data?.appVersion || "1.0.0",
         minTransferAmount: globalMinTransfer,
         globalMinTransferAmount: globalMinTransfer,
+        tier1MaxBalance: data?.tier1MaxBalance ?? 300000,
+        tier1DailyDepositLimit: data?.tier1DailyDepositLimit ?? 500000,
+        tier1DailyTransferLimit: data?.tier1DailyTransferLimit ?? 500000,
+        tier1SingleTransferLimit: data?.tier1SingleTransferLimit ?? 200000,
+
+        tier2MaxBalance: data?.tier2MaxBalance ?? 5000000,
+        tier2DailyDepositLimit: data?.tier2DailyDepositLimit ?? (data?.tier2DailyLimit ?? 5000000),
+        tier2DailyTransferLimit: data?.tier2DailyTransferLimit ?? (data?.tier2DailyLimit ?? 5000000),
         tier2DailyLimit: data?.tier2DailyLimit ?? 5000000,
+        tier2SingleTransferLimit: data?.tier2SingleTransferLimit ?? (data?.tier2SingleLimit ?? 2000000),
         tier2SingleLimit: data?.tier2SingleLimit ?? 2000000,
+
+        tier3MaxBalance: data?.tier3MaxBalance ?? 50000000,
+        tier3DailyDepositLimit: data?.tier3DailyDepositLimit ?? (data?.tier3DailyLimit ?? 50000000),
+        tier3DailyTransferLimit: data?.tier3DailyTransferLimit ?? (data?.tier3DailyLimit ?? 50000000),
         tier3DailyLimit: data?.tier3DailyLimit ?? 50000000,
+        tier3SingleTransferLimit: data?.tier3SingleTransferLimit ?? (data?.tier3SingleLimit ?? 10000000),
         tier3SingleLimit: data?.tier3SingleLimit ?? 10000000,
+
+        dailyResetWindowHours: data?.dailyResetWindowHours ?? 24,
         tierUpgradeSelectionTitle: data?.tierUpgradeSelectionTitle || "SELECT TARGET UPGRADE TIER",
         acceptableGovernmentIds: Array.isArray(data?.acceptableGovernmentIds) && data.acceptableGovernmentIds.length > 0
           ? data.acceptableGovernmentIds

@@ -29,9 +29,24 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
   const [upgradeRequest, setUpgradeRequest] = useState<any>(null);
   const [isLoadingRequest, setIsLoadingRequest] = useState(false);
 
+  const { config } = useAppConfig();
   const currentTier = String(userData?.tier || (userData?.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
-  const singleLimit = Number(userData?.singleLimit) || (currentTier === "Tier 3" ? 10000000 : currentTier === "Tier 2" ? 2000000 : 200000);
-  const numDailyLimit = Number(dailyLimit) || 500000;
+
+  const singleLimit = Number(userData?.singleLimit) || (
+    currentTier === "Tier 3"
+      ? (config?.tier3SingleTransferLimit ?? config?.tier3SingleLimit ?? 10000000)
+      : currentTier === "Tier 2"
+      ? (config?.tier2SingleTransferLimit ?? config?.tier2SingleLimit ?? 2000000)
+      : (config?.tier1SingleTransferLimit ?? 200000)
+  );
+
+  const numDailyLimit = Number(userData?.dailyTransferLimit ?? userData?.dailyLimit) || (
+    currentTier === "Tier 3"
+      ? (config?.tier3DailyTransferLimit ?? config?.tier3DailyLimit ?? 50000000)
+      : currentTier === "Tier 2"
+      ? (config?.tier2DailyTransferLimit ?? config?.tier2DailyLimit ?? 5000000)
+      : (config?.tier1DailyTransferLimit ?? 500000)
+  );
 
   // Modal back button interception
   useModalBackHandler(isDrawerOpen, () => setIsModalDrawerOpen(false), "tier-upgrade-drawer");

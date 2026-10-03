@@ -52,10 +52,26 @@ export interface AppConfig {
   whatsappPollingIntervalMinutes?: number;
   minTransferAmount?: number;
   globalMinTransferAmount?: number;
+  tier1MaxBalance?: number;
+  tier1DailyDepositLimit?: number;
+  tier1DailyTransferLimit?: number;
+  tier1SingleTransferLimit?: number;
+
+  tier2MaxBalance?: number;
+  tier2DailyDepositLimit?: number;
+  tier2DailyTransferLimit?: number;
   tier2DailyLimit?: number;
+  tier2SingleTransferLimit?: number;
   tier2SingleLimit?: number;
+
+  tier3MaxBalance?: number;
+  tier3DailyDepositLimit?: number;
+  tier3DailyTransferLimit?: number;
   tier3DailyLimit?: number;
+  tier3SingleTransferLimit?: number;
   tier3SingleLimit?: number;
+
+  dailyResetWindowHours?: number;
   tierUpgradeSelectionTitle?: string;
   acceptableGovernmentIds?: string[];
   hasCustomImgbbApiKey?: boolean;
@@ -106,10 +122,26 @@ const DEFAULT_CONFIG: AppConfig = {
   statementWatermarkUrl: "",
   statementWatermarkSize: 100,
   statementWatermarkOpacity: 0.15,
+  tier1MaxBalance: 300000,
+  tier1DailyDepositLimit: 500000,
+  tier1DailyTransferLimit: 500000,
+  tier1SingleTransferLimit: 200000,
+
+  tier2MaxBalance: 5000000,
+  tier2DailyDepositLimit: 5000000,
+  tier2DailyTransferLimit: 5000000,
   tier2DailyLimit: 5000000,
+  tier2SingleTransferLimit: 2000000,
   tier2SingleLimit: 2000000,
+
+  tier3MaxBalance: 50000000,
+  tier3DailyDepositLimit: 50000000,
+  tier3DailyTransferLimit: 50000000,
   tier3DailyLimit: 50000000,
+  tier3SingleTransferLimit: 10000000,
   tier3SingleLimit: 10000000,
+
+  dailyResetWindowHours: 24,
   tierUpgradeSelectionTitle: "SELECT TARGET UPGRADE TIER",
   acceptableGovernmentIds: ["National ID Card (NIN)", "International Passport", "Driver's License", "Voter's Card"],
 };
