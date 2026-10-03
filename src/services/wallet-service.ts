@@ -78,6 +78,27 @@ export interface TransactionRecord {
   metadata?: Record<string, unknown>;
 }
 
+let globalLimitsCache: Record<string, any> | null = null;
+let globalLimitsCacheTime = 0;
+
+async function getCachedTierLimits(): Promise<Record<string, any>> {
+  const now = Date.now();
+  if (globalLimitsCache && now - globalLimitsCacheTime < 60000) {
+    return globalLimitsCache;
+  }
+  try {
+    const docSnap = await adminDb.collection("config").doc("app").get();
+    if (docSnap.exists) {
+      globalLimitsCache = docSnap.data() || {};
+      globalLimitsCacheTime = now;
+      return globalLimitsCache;
+    }
+  } catch (err) {
+    console.warn("[WalletService] Failed to load config/app for limits, using defaults:", err);
+  }
+  return {};
+}
+
 export class WalletService {
   /**
    * Validates a transaction amount.
@@ -259,6 +280,59 @@ export class WalletService {
 
     const newBalance = currentBalance + netBalanceIncrement;
 
+    // TIER LIMIT & BALANCE CAP ENFORCEMENT (FOR NGN MAIN WALLET CREDITS)
+    const userUpdates: Record<string, any> = {};
+
+    if (ucCurrency === "NGN" && !isBonus && user) {
+      const appConfig = await getCachedTierLimits();
+      const userTier = String(user.data.tier || (user.data.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
+
+      // 1. Max Account Balance Cap
+      let maxBalanceCap = 0;
+      if (typeof user.data.maxAccountBalance === "number") {
+        maxBalanceCap = user.data.maxAccountBalance;
+      } else if (userTier === "Tier 3") {
+        maxBalanceCap = typeof appConfig.tier3MaxBalance === "number" ? appConfig.tier3MaxBalance : 50000000;
+      } else if (userTier === "Tier 2") {
+        maxBalanceCap = typeof appConfig.tier2MaxBalance === "number" ? appConfig.tier2MaxBalance : 5000000;
+      } else {
+        maxBalanceCap = typeof appConfig.tier1MaxBalance === "number" ? appConfig.tier1MaxBalance : 300000;
+      }
+
+      if (maxBalanceCap > 0 && newBalance > maxBalanceCap) {
+        throw new Error(`Account balance limit exceeded for ${userTier}. Maximum allowed balance is ₦${maxBalanceCap.toLocaleString()}. Please upgrade your account level.`);
+      }
+
+      // 2. Daily Deposit / Inflow Cap
+      const isDepositType = type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING";
+      if (isDepositType && !user.data.unlimitedDeposits) {
+        let dailyDepositCap = 0;
+        if (typeof user.data.dailyDepositLimit === "number") {
+          dailyDepositCap = user.data.dailyDepositLimit;
+        } else if (userTier === "Tier 3") {
+          dailyDepositCap = typeof appConfig.tier3DailyDepositLimit === "number" ? appConfig.tier3DailyDepositLimit : (typeof appConfig.tier3DailyLimit === "number" ? appConfig.tier3DailyLimit : 50000000);
+        } else if (userTier === "Tier 2") {
+          dailyDepositCap = typeof appConfig.tier2DailyDepositLimit === "number" ? appConfig.tier2DailyDepositLimit : (typeof appConfig.tier2DailyLimit === "number" ? appConfig.tier2DailyLimit : 5000000);
+        } else {
+          dailyDepositCap = typeof appConfig.tier1DailyDepositLimit === "number" ? appConfig.tier1DailyDepositLimit : 500000;
+        }
+
+        if (dailyDepositCap > 0) {
+          const resetWindowHours = typeof appConfig.dailyResetWindowHours === "number" && appConfig.dailyResetWindowHours > 0 ? appConfig.dailyResetWindowHours : 24;
+          const cutoffTime = Date.now() - resetWindowHours * 3600 * 1000;
+          const lastDepositTime = user.data.lastDepositDate ? new Date(user.data.lastDepositDate).getTime() : 0;
+          const currentDepositTotal = (lastDepositTime >= cutoffTime) ? (Number(user.data.todayDepositTotal) || 0) : 0;
+
+          if (currentDepositTotal + creditAmount > dailyDepositCap) {
+            throw new Error(`Daily deposit limit of ₦${dailyDepositCap.toLocaleString()} exceeded for ${userTier}. Cumulative deposit in ${resetWindowHours}-hour window: ₦${currentDepositTotal.toLocaleString()}.`);
+          }
+
+          userUpdates.todayDepositTotal = currentDepositTotal + creditAmount;
+          userUpdates.lastDepositDate = new Date().toISOString();
+        }
+      }
+    }
+
     // 2. ALL WRITES: Execute all updates, sets, and creations sequentially at the end
     // Update specific wallet balance atomically
     if (isBonus) {
@@ -283,9 +357,7 @@ export class WalletService {
       }, { merge: true });
 
       if (ucCurrency === "NGN" && user) {
-        const userUpdates: Record<string, any> = {
-          balance: FieldValue.increment(netBalanceIncrement),
-        };
+        userUpdates.balance = FieldValue.increment(netBalanceIncrement);
         if (debtRecovered > 0) {
           userUpdates.outstandingDebt = FieldValue.increment(-debtRecovered);
         }
@@ -530,6 +602,59 @@ export class WalletService {
       );
     }
 
+    const userUpdates: Record<string, any> = {};
+
+    // TIER LIMIT ENFORCEMENT (FOR NGN MAIN WALLET DEBITS / TRANSFERS)
+    if (ucCurrency === "NGN" && !isBonus && user) {
+      const isTransferType = type === "TRANSFER" || type === "CASHOUT" || type === "WITHDRAWAL";
+      if (isTransferType && !user.data.unlimitedTransfers) {
+        const appConfig = await getCachedTierLimits();
+        const userTier = String(user.data.tier || (user.data.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
+
+        // 1. Single Transfer Cap
+        let singleTransferCap = 0;
+        if (typeof user.data.maxSingleTransferLimit === "number") {
+          singleTransferCap = user.data.maxSingleTransferLimit;
+        } else if (userTier === "Tier 3") {
+          singleTransferCap = typeof appConfig.tier3SingleTransferLimit === "number" ? appConfig.tier3SingleTransferLimit : (typeof appConfig.tier3SingleLimit === "number" ? appConfig.tier3SingleLimit : 10000000);
+        } else if (userTier === "Tier 2") {
+          singleTransferCap = typeof appConfig.tier2SingleTransferLimit === "number" ? appConfig.tier2SingleTransferLimit : (typeof appConfig.tier2SingleLimit === "number" ? appConfig.tier2SingleLimit : 2000000);
+        } else {
+          singleTransferCap = typeof appConfig.tier1SingleTransferLimit === "number" ? appConfig.tier1SingleTransferLimit : 200000;
+        }
+
+        if (singleTransferCap > 0 && amount > singleTransferCap) {
+          throw new Error(`Single transfer amount of ₦${amount.toLocaleString()} exceeds single transfer limit of ₦${singleTransferCap.toLocaleString()} for ${userTier}.`);
+        }
+
+        // 2. Daily Transfer Cap
+        let dailyTransferCap = 0;
+        if (typeof user.data.dailyTransferLimit === "number" || typeof user.data.dailyLimit === "number") {
+          dailyTransferCap = (user.data.dailyTransferLimit ?? user.data.dailyLimit) as number;
+        } else if (userTier === "Tier 3") {
+          dailyTransferCap = typeof appConfig.tier3DailyTransferLimit === "number" ? appConfig.tier3DailyTransferLimit : (typeof appConfig.tier3DailyLimit === "number" ? appConfig.tier3DailyLimit : 50000000);
+        } else if (userTier === "Tier 2") {
+          dailyTransferCap = typeof appConfig.tier2DailyTransferLimit === "number" ? appConfig.tier2DailyTransferLimit : (typeof appConfig.tier2DailyLimit === "number" ? appConfig.tier2DailyLimit : 5000000);
+        } else {
+          dailyTransferCap = typeof appConfig.tier1DailyTransferLimit === "number" ? appConfig.tier1DailyTransferLimit : 500000;
+        }
+
+        if (dailyTransferCap > 0) {
+          const resetWindowHours = typeof appConfig.dailyResetWindowHours === "number" && appConfig.dailyResetWindowHours > 0 ? appConfig.dailyResetWindowHours : 24;
+          const cutoffTime = Date.now() - resetWindowHours * 3600 * 1000;
+          const lastTransferTime = user.data.lastTransferDate ? new Date(user.data.lastTransferDate).getTime() : 0;
+          const currentTransferTotal = (lastTransferTime >= cutoffTime) ? (Number(user.data.todayTransferTotal) || 0) : 0;
+
+          if (currentTransferTotal + totalDeduction > dailyTransferCap) {
+            throw new Error(`Daily transfer limit of ₦${dailyTransferCap.toLocaleString()} exceeded for ${userTier}. Cumulative transfer in ${resetWindowHours}-hour window: ₦${currentTransferTotal.toLocaleString()}.`);
+          }
+
+          userUpdates.todayTransferTotal = currentTransferTotal + totalDeduction;
+          userUpdates.lastTransferDate = new Date().toISOString();
+        }
+      }
+    }
+
     const newBalance = currentBalance - totalDeduction;
 
     // Update specific wallet balance atomically
@@ -555,9 +680,8 @@ export class WalletService {
       }, { merge: true });
 
       if (ucCurrency === "NGN" && user) {
-        transaction.update(user.ref, {
-          balance: FieldValue.increment(-totalDeduction),
-        });
+        userUpdates.balance = FieldValue.increment(-totalDeduction);
+        transaction.update(user.ref, userUpdates);
       }
     }
 

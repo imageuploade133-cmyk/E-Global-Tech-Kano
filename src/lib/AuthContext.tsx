@@ -126,7 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         balance: 750000,
         isPinRequired: true,
         isFaceIdEnabled: false,
-        dailyLimit: 500000,
         ...storedMock
       });
       setIsPinVerified(window.location.pathname !== "/auth/pin");
@@ -236,7 +235,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUserData({
               isPinRequired: true,
               isFaceIdEnabled: false,
-              dailyLimit: 500000,
               balance: data.balance !== undefined ? data.balance : 0.00,
               name: (data.displayName as string | undefined) || data.name || "",
               ...data
@@ -245,7 +243,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUserData({
               isPinRequired: true,
               isFaceIdEnabled: false,
-              dailyLimit: 500000,
               balance: 0.00,
             });
           }
