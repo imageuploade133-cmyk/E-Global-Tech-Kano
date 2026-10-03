@@ -64,7 +64,9 @@ async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
           title: "Held Deposit Released 💰",
           body: `Your held deposit of ₦${amountNum.toLocaleString("en-NG")} has been released and credited to your wallet balance following your Tier upgrade!`,
           type: "transaction",
-          data: { reference, amount: String(amountNum), type: "DEPOSIT" },
+          reference,
+          amount: amountNum,
+          url: "/history",
         }).catch(() => {});
       }
     }
