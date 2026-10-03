@@ -23,6 +23,8 @@ interface LimitRequest {
   email: string;
   phoneNumber?: string;
   bvn: string;
+  governmentIdUrl?: string;
+  governmentIdType?: string;
   proofOfAddressUrl?: string;
   selfieUrl?: string;
   targetTier: string;
@@ -332,6 +334,7 @@ function LimitRequestsContent() {
                   <tr className={cn("border-b text-[10px] font-black uppercase tracking-wider", isDark ? "border-gray-800 text-gray-400" : "border-gray-200 text-gray-500")}>
                     <th className="py-3 px-3">Customer Profile</th>
                     <th className="py-3 px-3">BVN / NIN</th>
+                    <th className="py-3 px-3">Gov ID Card</th>
                     <th className="py-3 px-3">Current → Target</th>
                     <th className="py-3 px-3">Proof Address</th>
                     <th className="py-3 px-3">Biometric Selfie</th>
@@ -349,6 +352,19 @@ function LimitRequestsContent() {
 
                       <td className="py-3.5 px-3 font-mono font-bold text-gray-700 dark:text-gray-300">
                         {r.bvn}
+                      </td>
+
+                      <td className="py-3.5 px-3">
+                        {r.governmentIdUrl ? (
+                          <button
+                            onClick={() => setImageModalUrl(r.governmentIdUrl!)}
+                            className="w-12 h-10 rounded-lg border border-orange-500/30 overflow-hidden shrink-0 cursor-pointer hover:scale-105 transition-transform relative group"
+                          >
+                            <img src={r.governmentIdUrl} alt="Gov ID" className="w-full h-full object-cover" />
+                          </button>
+                        ) : (
+                          <span className="text-gray-400 text-[10px]">No ID</span>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-3 font-bold">
@@ -475,6 +491,22 @@ function LimitRequestsContent() {
                   </div>
 
                   {/* Documents Inspection */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase font-black text-gray-400">
+                      Government ID Card ({selectedRequest.governmentIdType || "National ID Card"})
+                    </p>
+                    {selectedRequest.governmentIdUrl ? (
+                      <div
+                        onClick={() => setImageModalUrl(selectedRequest.governmentIdUrl!)}
+                        className="rounded-2xl border overflow-hidden max-h-48 cursor-pointer hover:opacity-90 border-orange-500/30"
+                      >
+                        <img src={selectedRequest.governmentIdUrl} alt="Government ID" className="w-full h-48 object-cover" />
+                      </div>
+                    ) : (
+                      <p className="text-gray-400">No Government ID uploaded.</p>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
                     <p className="text-[10px] uppercase font-black text-gray-400">Proof of Address Document</p>
                     {selectedRequest.proofOfAddressUrl ? (

@@ -43,6 +43,13 @@ function CpanelLimitsPageContent() {
   const [tier3DailyLimit, setTier3DailyLimit] = useState<number>(50000000);
   const [tier3SingleLimit, setTier3SingleLimit] = useState<number>(10000000);
   const [tierUpgradeSelectionTitle, setTierUpgradeSelectionTitle] = useState<string>("SELECT TARGET UPGRADE TIER");
+  const [acceptableGovernmentIds, setAcceptableGovernmentIds] = useState<string[]>([
+    "National ID Card (NIN)",
+    "International Passport",
+    "Driver's License",
+    "Voter's Card"
+  ]);
+  const [newGovIdInput, setNewGovIdInput] = useState<string>("");
   const [isSavingGlobalMin, setIsSavingGlobalMin] = useState<boolean>(false);
   const [isLoadingGlobalMin, setIsLoadingGlobalMin] = useState<boolean>(true);
 
@@ -77,6 +84,9 @@ function CpanelLimitsPageContent() {
           if (typeof data.tier3DailyLimit === "number") setTier3DailyLimit(data.tier3DailyLimit);
           if (typeof data.tier3SingleLimit === "number") setTier3SingleLimit(data.tier3SingleLimit);
           if (data.tierUpgradeSelectionTitle) setTierUpgradeSelectionTitle(data.tierUpgradeSelectionTitle);
+          if (Array.isArray(data.acceptableGovernmentIds) && data.acceptableGovernmentIds.length > 0) {
+            setAcceptableGovernmentIds(data.acceptableGovernmentIds);
+          }
         }
       } catch (err) {
         console.warn("Failed to load active global minimum transfer limit:", err);
@@ -114,6 +124,7 @@ function CpanelLimitsPageContent() {
           tier3DailyLimit,
           tier3SingleLimit,
           tierUpgradeSelectionTitle,
+          acceptableGovernmentIds,
         }),
       });
 
@@ -305,6 +316,56 @@ function CpanelLimitsPageContent() {
                   placeholder="e.g. 100"
                   className={cn(inputClass, "pl-8 pr-4 h-11 text-sm font-mono font-bold")}
                 />
+              </div>
+            </div>
+
+            {/* Acceptable Government ID Management */}
+            <div className="space-y-2 pt-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                Acceptable Government IDs for Tier Upgrades
+              </label>
+
+              <div className="flex flex-wrap gap-2 mb-2">
+                {acceptableGovernmentIds.map((idType, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-500/10 text-[#FC7A00] border border-orange-500/20 rounded-full text-xs font-bold"
+                  >
+                    <span>{idType}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAcceptableGovernmentIds(acceptableGovernmentIds.filter((_, i) => i !== index));
+                      }}
+                      className="w-4 h-4 rounded-full bg-orange-500/20 text-[#FC7A00] hover:bg-orange-500 hover:text-white flex items-center justify-center transition-colors text-[12px] font-black cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex gap-2 max-w-md">
+                <input
+                  type="text"
+                  placeholder="e.g. Residence Permit Card"
+                  value={newGovIdInput}
+                  onChange={(e) => setNewGovIdInput(e.target.value)}
+                  className={inputClass}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const trimmed = newGovIdInput.trim();
+                    if (trimmed && !acceptableGovernmentIds.includes(trimmed)) {
+                      setAcceptableGovernmentIds([...acceptableGovernmentIds, trimmed]);
+                      setNewGovIdInput("");
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-white rounded-xl text-xs font-extrabold uppercase shrink-0 cursor-pointer"
+                >
+                  + Add ID
+                </button>
               </div>
             </div>
 
