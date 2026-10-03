@@ -201,6 +201,9 @@ export async function POST(req: Request) {
         description: depositNarration,
         narration: depositNarration,
         recipientName: userData.name || targetUid,
+        senderName: "E-Global-Pay Admin",
+        senderBankName: "E-Global-Pay",
+        virtualAccountBankName: "E-Global-Pay",
         type: "DEPOSIT",
         category: "DEPOSIT",
         direction: "CREDIT",
@@ -208,6 +211,7 @@ export async function POST(req: Request) {
         metadata: {
           adminEmail,
           isAdminDeposit: true,
+          senderBankName: "E-Global-Pay",
           depositedAt: new Date().toISOString(),
         },
       });
