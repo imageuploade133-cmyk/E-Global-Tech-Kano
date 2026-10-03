@@ -177,11 +177,11 @@ export async function POST(req: Request) {
         if (hasCustom && typeof userData.maxSingleTransferLimit === "number" && Number(userData.maxSingleTransferLimit) > 0) {
           singleTransferCap = Number(userData.maxSingleTransferLimit);
         } else if (userTier === "Tier 3") {
-          singleTransferCap = 10000000;
+          singleTransferCap = typeof marginSnap.data()?.tier3SingleTransferLimit === "number" ? marginSnap.data()?.tier3SingleTransferLimit : 10000000;
         } else if (userTier === "Tier 2") {
-          singleTransferCap = 2000000;
+          singleTransferCap = typeof marginSnap.data()?.tier2SingleTransferLimit === "number" ? marginSnap.data()?.tier2SingleTransferLimit : 2000000;
         } else {
-          singleTransferCap = 200000;
+          singleTransferCap = typeof marginSnap.data()?.tier1SingleTransferLimit === "number" ? marginSnap.data()?.tier1SingleTransferLimit : 200000;
         }
 
         if (singleTransferCap > 0 && trfAmount > singleTransferCap) {

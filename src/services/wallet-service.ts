@@ -329,16 +329,17 @@ export class WalletService {
       }
 
       const isDepositType = type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING";
+      const isAdminBypass = params.metadata?.isAdminDeposit === true || params.metadata?.wasHeldReleased === true;
       let isLimitExceeded = false;
       let limitExceededReason = "";
 
-      if (maxBalanceCap > 0 && newBalance > maxBalanceCap) {
+      if (!isAdminBypass && maxBalanceCap > 0 && newBalance > maxBalanceCap) {
         isLimitExceeded = true;
         limitExceededReason = `Account balance limit exceeded for ${userTier}. Maximum allowed balance is ₦${maxBalanceCap.toLocaleString()}.`;
       }
 
       // 2. Daily Deposit / Inflow Cap
-      if (!isLimitExceeded && isDepositType && !user.data.unlimitedDeposits) {
+      if (!isAdminBypass && !isLimitExceeded && isDepositType && !user.data.unlimitedDeposits) {
         let dailyDepositCap = 0;
         if (hasCustom && typeof user.data.dailyDepositLimit === "number" && Number(user.data.dailyDepositLimit) > 0) {
           dailyDepositCap = Number(user.data.dailyDepositLimit);
