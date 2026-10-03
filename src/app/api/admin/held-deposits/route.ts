@@ -200,8 +200,7 @@ export async function POST(req: Request) {
 
       // Dispatch FCM Push Notification after transaction commits
       if (releasedUserId && releasedAmount > 0) {
-        NotificationService.sendPushNotification({
-          userId: releasedUserId,
+        NotificationService.sendPushNotification(releasedUserId, {
           title: "Held Deposit Released 💰",
           body: `Your held deposit of ₦${releasedAmount.toLocaleString()} has been released and credited to your available wallet balance!`,
           type: "transaction",
