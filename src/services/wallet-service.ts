@@ -287,10 +287,10 @@ export class WalletService {
       const appConfig = await getCachedTierLimits();
       const userTier = String(user.data.tier || (user.data.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
 
-      // 1. Max Account Balance Cap
+      // 1. Max Account Balance Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
       let maxBalanceCap = 0;
-      if (typeof user.data.maxAccountBalance === "number") {
-        maxBalanceCap = user.data.maxAccountBalance;
+      if (typeof user.data.maxAccountBalance === "number" && Number(user.data.maxAccountBalance) > 0) {
+        maxBalanceCap = Number(user.data.maxAccountBalance);
       } else if (userTier === "Tier 3") {
         maxBalanceCap = typeof appConfig.tier3MaxBalance === "number" ? appConfig.tier3MaxBalance : 50000000;
       } else if (userTier === "Tier 2") {
@@ -308,11 +308,11 @@ export class WalletService {
         limitExceededReason = `Account balance limit exceeded for ${userTier}. Maximum allowed balance is ₦${maxBalanceCap.toLocaleString()}.`;
       }
 
-      // 2. Daily Deposit / Inflow Cap
+      // 2. Daily Deposit / Inflow Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
       if (!isLimitExceeded && isDepositType && !user.data.unlimitedDeposits) {
         let dailyDepositCap = 0;
-        if (typeof user.data.dailyDepositLimit === "number") {
-          dailyDepositCap = user.data.dailyDepositLimit;
+        if (typeof user.data.dailyDepositLimit === "number" && Number(user.data.dailyDepositLimit) > 0) {
+          dailyDepositCap = Number(user.data.dailyDepositLimit);
         } else if (userTier === "Tier 3") {
           dailyDepositCap = typeof appConfig.tier3DailyDepositLimit === "number" ? appConfig.tier3DailyDepositLimit : (typeof appConfig.tier3DailyLimit === "number" ? appConfig.tier3DailyLimit : 50000000);
         } else if (userTier === "Tier 2") {
@@ -680,10 +680,10 @@ export class WalletService {
         const appConfig = await getCachedTierLimits();
         const userTier = String(user.data.tier || (user.data.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
 
-        // 1. Single Transfer Cap
+        // 1. Single Transfer Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
         let singleTransferCap = 0;
-        if (typeof user.data.maxSingleTransferLimit === "number") {
-          singleTransferCap = user.data.maxSingleTransferLimit;
+        if (typeof user.data.maxSingleTransferLimit === "number" && Number(user.data.maxSingleTransferLimit) > 0) {
+          singleTransferCap = Number(user.data.maxSingleTransferLimit);
         } else if (userTier === "Tier 3") {
           singleTransferCap = typeof appConfig.tier3SingleTransferLimit === "number" ? appConfig.tier3SingleTransferLimit : (typeof appConfig.tier3SingleLimit === "number" ? appConfig.tier3SingleLimit : 10000000);
         } else if (userTier === "Tier 2") {
@@ -696,10 +696,11 @@ export class WalletService {
           throw new Error(`Single transfer amount of ₦${amount.toLocaleString()} exceeds single transfer limit of ₦${singleTransferCap.toLocaleString()} for ${userTier}.`);
         }
 
-        // 2. Daily Transfer Cap
+        // 2. Daily Transfer Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
         let dailyTransferCap = 0;
-        if (typeof user.data.dailyTransferLimit === "number" || typeof user.data.dailyLimit === "number") {
-          dailyTransferCap = (user.data.dailyTransferLimit ?? user.data.dailyLimit) as number;
+        const customDaily = Number(user.data.dailyTransferLimit ?? user.data.dailyLimit);
+        if (typeof customDaily === "number" && customDaily > 0) {
+          dailyTransferCap = customDaily;
         } else if (userTier === "Tier 3") {
           dailyTransferCap = typeof appConfig.tier3DailyTransferLimit === "number" ? appConfig.tier3DailyTransferLimit : (typeof appConfig.tier3DailyLimit === "number" ? appConfig.tier3DailyLimit : 50000000);
         } else if (userTier === "Tier 2") {

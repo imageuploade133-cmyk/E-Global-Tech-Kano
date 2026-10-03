@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
+import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
+import { useAuth } from "@/lib/AuthContext";
 
 interface UserLimitItem {
   uid: string;
@@ -28,7 +30,13 @@ function ButtonSpinner() {
 
 function CpanelLimitsPageContent() {
   const router = useRouter();
+  const { user } = useAuth();
   const { isDark, toggleTheme } = useCpanelTheme();
+
+  // 2FA OTP Modal Authorization State
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null);
+  const [otpModalTitle, setOtpModalTitle] = useState("Authorize Limit Changes");
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<UserLimitItem[]>([]);
@@ -98,7 +106,7 @@ function CpanelLimitsPageContent() {
     initPage();
   }, [router]);
 
-  // Save Global Minimum Transfer Amount
+  // Save Global Minimum Transfer Amount (Gated with 2FA OTP)
   const handleSaveGlobalMinTransfer = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isNaN(globalMinTransfer) || globalMinTransfer < 0) {
@@ -106,40 +114,45 @@ function CpanelLimitsPageContent() {
       return;
     }
 
-    setIsSavingGlobalMin(true);
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const headers: Record<string, string> = isMock
-        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-        : { "Content-Type": "application/json" };
+    setOtpModalTitle("Authorize Global Limits Update");
+    setPendingAction(() => async () => {
+      setIsSavingGlobalMin(true);
+      try {
+        const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+        const headers: Record<string, string> = isMock
+          ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+          : { "Content-Type": "application/json" };
 
-      const res = await fetch("/api/admin/limits", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          action: "update_global_min_transfer",
-          globalMinTransferAmount: globalMinTransfer,
-          tier2DailyLimit,
-          tier2SingleLimit,
-          tier3DailyLimit,
-          tier3SingleLimit,
-          tierUpgradeSelectionTitle,
-          acceptableGovernmentIds,
-        }),
-      });
+        const res = await fetch("/api/admin/limits", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            action: "update_global_min_transfer",
+            globalMinTransferAmount: globalMinTransfer,
+            tier2DailyLimit,
+            tier2SingleLimit,
+            tier3DailyLimit,
+            tier3SingleLimit,
+            tierUpgradeSelectionTitle,
+            acceptableGovernmentIds,
+          }),
+        });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(data.message || "Global limits & Tier Upgrade settings saved successfully!");
-        if (typeof data.globalMinTransferAmount === "number") setGlobalMinTransfer(data.globalMinTransferAmount);
-      } else {
-        toast.error(data.error || "Failed to update global limits.");
+        const data = await res.json();
+        if (res.ok && data.success) {
+          toast.success(data.message || "Global limits & Tier Upgrade settings saved successfully!");
+          if (typeof data.globalMinTransferAmount === "number") setGlobalMinTransfer(data.globalMinTransferAmount);
+        } else {
+          toast.error(data.error || "Failed to update global limits.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Network error updating global minimum transfer limit.");
+      } finally {
+        setIsSavingGlobalMin(false);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Network error updating global minimum transfer limit.");
-    } finally {
-      setIsSavingGlobalMin(false);
-    }
+    });
+
+    setIsOtpModalOpen(true);
   };
 
   // Handle Search Users
@@ -174,39 +187,44 @@ function CpanelLimitsPageContent() {
     }
   };
 
-  // Save Limit Updates
+  // Save Limit Updates (Gated with 2FA OTP)
   const handleSaveLimits = async (userItem: UserLimitItem) => {
-    setSavingUid(userItem.uid);
-    try {
-      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
-      const headers: Record<string, string> = isMock
-        ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
-        : { "Content-Type": "application/json" };
+    setOtpModalTitle(`Authorize Limitations for ${userItem.name}`);
+    setPendingAction(() => async () => {
+      setSavingUid(userItem.uid);
+      try {
+        const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+        const headers: Record<string, string> = isMock
+          ? { "Content-Type": "application/json", Authorization: "Bearer mock-admin-token" }
+          : { "Content-Type": "application/json" };
 
-      const res = await fetch("/api/admin/limits", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          targetUid: userItem.uid,
-          dailyTransferLimit: userItem.dailyTransferLimit,
-          maxSingleTransferLimit: userItem.maxSingleTransferLimit,
-          dailyDepositLimit: userItem.dailyDepositLimit,
-          unlimitedTransfers: userItem.unlimitedTransfers,
-          unlimitedDeposits: userItem.unlimitedDeposits,
-        }),
-      });
+        const res = await fetch("/api/admin/limits", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            targetUid: userItem.uid,
+            dailyTransferLimit: userItem.dailyTransferLimit,
+            maxSingleTransferLimit: userItem.maxSingleTransferLimit,
+            dailyDepositLimit: userItem.dailyDepositLimit,
+            unlimitedTransfers: userItem.unlimitedTransfers,
+            unlimitedDeposits: userItem.unlimitedDeposits,
+          }),
+        });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Account limitations updated successfully!");
-      } else {
-        toast.error(data.error || "Failed to update account limitations.");
+        const data = await res.json();
+        if (res.ok && data.success) {
+          toast.success("Account limitations updated successfully!");
+        } else {
+          toast.error(data.error || "Failed to update account limitations.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Network error updating account limitations.");
+      } finally {
+        setSavingUid(null);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Network error updating account limitations.");
-    } finally {
-      setSavingUid(null);
-    }
+    });
+
+    setIsOtpModalOpen(true);
   };
 
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
@@ -630,6 +648,31 @@ function CpanelLimitsPageContent() {
         )}
 
       </div>
+
+      {/* Administrator 2FA OTP Verification Drawer Modal */}
+      {isOtpModalOpen && (
+        <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black">
+            <TwoFactorOtpVerificationView
+              user={user}
+              title={otpModalTitle}
+              description="Select delivery channel and verify 6-digit Security OTP code to authorize limit updates."
+              onVerifiedSuccess={() => {
+                setIsOtpModalOpen(false);
+                if (pendingAction) {
+                  pendingAction();
+                  setPendingAction(null);
+                }
+              }}
+              onCancel={() => {
+                setIsOtpModalOpen(false);
+                setPendingAction(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

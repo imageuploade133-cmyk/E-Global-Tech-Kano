@@ -2,8 +2,87 @@ import { NextResponse } from "next/server";
 import { mintFirebaseIdToken } from "@/lib/admin-auth";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { adminDb } from "@/lib/firebase-admin";
+import { WalletService } from "@/services/wallet-service";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
+
+async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
+  try {
+    const heldSnap = await adminDb.collection("transactions")
+      .where("userId", "==", userId)
+      .where("status", "==", "HELD_LIMIT_EXCEEDED")
+      .get();
+
+    if (heldSnap.empty) return;
+
+    for (const doc of heldSnap.docs) {
+      const txData = doc.data();
+      const amountNum = Number(txData.metadata?.heldAmount ?? txData.amount ?? 0);
+      const reference = txData.reference || doc.id;
+
+      if (amountNum > 0) {
+        await adminDb.runTransaction(async (transaction) => {
+          await WalletService.creditWallet(transaction, {
+            userId,
+            amount: amountNum,
+            currency: txData.currency || "NGN",
+            reference: `RELEASE-${reference}`,
+            docId: doc.id,
+            description: `Release of Held Deposit (Ref: ${reference})`,
+            recipientName: txData.recipientName || "Wallet Credit",
+            type: "DEPOSIT",
+            category: "DEPOSIT",
+            direction: "CREDIT",
+            narration: "Held deposit released automatically upon KYC approval",
+            totalCredited: amountNum,
+            fundingMethod: txData.fundingMethod || "Virtual Account",
+            senderName: txData.senderName,
+            senderAccountNumber: txData.senderAccountNumber,
+            senderBankName: txData.senderBankName,
+            virtualAccountNumber: txData.virtualAccountNumber,
+            virtualAccountBankName: txData.virtualAccountBankName,
+            metadata: {
+              ...txData.metadata,
+              wasHeldReleased: true,
+              releasedBy: adminEmail,
+              releasedAt: new Date().toISOString(),
+              releasedOnKycApproval: true,
+            },
+          });
+
+          transaction.update(doc.ref, {
+            status: "SUCCESS",
+            totalCredited: amountNum,
+            description: `Release of Held Deposit (Ref: ${reference})`,
+            narration: "Held deposit released automatically upon KYC approval",
+            completedAt: new Date().toISOString(),
+            "metadata.wasHeldReleased": true,
+            "metadata.releasedAt": new Date().toISOString(),
+            "metadata.releasedBy": adminEmail,
+          });
+        });
+
+        const { NotificationService } = await import("@/services/notification-service");
+        NotificationService.sendPushNotification(userId, {
+          title: "Held Deposit Released 💰",
+          body: `Your held deposit of ₦${amountNum.toLocaleString("en-NG")} has been released and credited to your wallet balance following your KYC verification!`,
+          type: "transaction",
+          reference,
+          amount: amountNum,
+          url: "/history",
+        }).catch(() => {});
+      }
+    }
+
+    await adminDb.collection("users").doc(userId).update({
+      depositLimitExceeded: false,
+      heldDepositCount: 0,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.warn("[KYC Auto-Release Held Deposits Warning]:", err.message);
+  }
+}
 
 async function parseResponseJson(response: Response, defaultMessage: string) {
   try {
@@ -281,14 +360,20 @@ export async function POST(req: Request) {
       }
 
       // Update user document in Firestore with approved Tier level and custom limits
+      const adminEmail = perm.auth?.email || "admin@system";
       await adminDb.collection("users").doc(targetUid).set({
         tier: assignedTier,
         dailyLimit: numDaily,
+        dailyTransferLimit: numDaily,
         singleLimit: numSingle,
+        maxSingleTransferLimit: numSingle,
         kycStatus: "VERIFIED",
         kycVerifiedAt: new Date().toISOString(),
-        kycVerifiedBy: perm.auth?.email || "admin@system",
+        kycVerifiedBy: adminEmail,
       }, { merge: true });
+
+      // Auto-release any pending held deposits for this user now that KYC is approved
+      await autoReleaseUserHeldDeposits(targetUid, adminEmail);
 
       try {
         const { NotificationService } = await import("@/services/notification-service");
