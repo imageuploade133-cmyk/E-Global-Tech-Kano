@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     const defaultTier1DailyDeposit = typeof appConfigData?.tier1DailyDepositLimit === "number" ? appConfigData.tier1DailyDepositLimit : 500000;
     const defaultTier1SingleTransfer = typeof appConfigData?.tier1SingleTransferLimit === "number" ? appConfigData.tier1SingleTransferLimit : 200000;
 
-    // Standard initial fields for new premium account
+    // Standard initial fields for new user account (Custom limits default to 0 so system falls back to Global Defaults)
     const initialProfile = {
       uid,
       name: fullName,
@@ -74,11 +74,11 @@ export async function POST(req: Request) {
       status: userSnap.exists && userSnap.data()?.status ? userSnap.data()?.status : "active",
       kycStatus: userSnap.exists && userSnap.data()?.kycStatus ? userSnap.data()?.kycStatus : "UNVERIFIED",
       role: userSnap.exists && userSnap.data()?.role ? userSnap.data()?.role : "USER",
-      dailyTransferLimit: userSnap.exists && typeof userSnap.data()?.dailyTransferLimit === "number" ? userSnap.data()?.dailyTransferLimit : defaultTier1DailyTransfer,
-      dailyLimit: userSnap.exists && typeof userSnap.data()?.dailyLimit === "number" ? userSnap.data()?.dailyLimit : defaultTier1DailyTransfer,
-      dailyDepositLimit: userSnap.exists && typeof userSnap.data()?.dailyDepositLimit === "number" ? userSnap.data()?.dailyDepositLimit : defaultTier1DailyDeposit,
-      maxSingleTransferLimit: userSnap.exists && typeof userSnap.data()?.maxSingleTransferLimit === "number" ? userSnap.data()?.maxSingleTransferLimit : defaultTier1SingleTransfer,
-      maxAccountBalance: userSnap.exists && typeof userSnap.data()?.maxAccountBalance === "number" ? userSnap.data()?.maxAccountBalance : defaultTier1MaxBalance,
+      dailyTransferLimit: userSnap.exists && typeof userSnap.data()?.dailyTransferLimit === "number" ? userSnap.data()?.dailyTransferLimit : 0,
+      dailyLimit: userSnap.exists && typeof userSnap.data()?.dailyLimit === "number" ? userSnap.data()?.dailyLimit : 0,
+      dailyDepositLimit: userSnap.exists && typeof userSnap.data()?.dailyDepositLimit === "number" ? userSnap.data()?.dailyDepositLimit : 0,
+      maxSingleTransferLimit: userSnap.exists && typeof userSnap.data()?.maxSingleTransferLimit === "number" ? userSnap.data()?.maxSingleTransferLimit : 0,
+      maxAccountBalance: userSnap.exists && typeof userSnap.data()?.maxAccountBalance === "number" ? userSnap.data()?.maxAccountBalance : 0,
       isPinRequired: userSnap.exists && userSnap.data()?.isPinRequired !== undefined ? userSnap.data()?.isPinRequired : true,
       isFaceIdEnabled: userSnap.exists && userSnap.data()?.isFaceIdEnabled !== undefined ? userSnap.data()?.isFaceIdEnabled : false,
       updatedAt: new Date().toISOString(),
