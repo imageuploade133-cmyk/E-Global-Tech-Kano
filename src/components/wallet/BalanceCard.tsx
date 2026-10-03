@@ -3725,6 +3725,19 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                             const amt = parseFloat(trfAmount) || 0;
                             const isBelowMin = amt < activeMinTransfer;
 
+                            const currentTierName = String(userData?.tier || (userData?.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
+                            const hasCustomLimits = userData?.hasCustomLimits === true;
+
+                            const userSingleCap = (hasCustomLimits && Number(userData?.maxSingleTransferLimit) > 0)
+                              ? Number(userData.maxSingleTransferLimit)
+                              : (currentTierName === "Tier 3"
+                                  ? (config?.tier3SingleTransferLimit ?? config?.tier3SingleLimit ?? 10000000)
+                                  : currentTierName === "Tier 2"
+                                  ? (config?.tier2SingleTransferLimit ?? config?.tier2SingleLimit ?? 2000000)
+                                  : (config?.tier1SingleTransferLimit ?? 200000));
+
+                            const isExceedingSingleLimit = !userData?.unlimitedTransfers && userSingleCap > 0 && amt > userSingleCap;
+
                             return (
                               <div className="bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-2 font-hanken text-xs">
                                 <div className="flex justify-between text-gray-500">
@@ -3747,11 +3760,45 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                                     <span className="font-mono text-emerald-600 font-black">₦{trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</span>
                                   )}
                                 </div>
+
                                 {isBelowMin && (
                                   <p className="text-[9px] text-[#E11D48] font-bold uppercase leading-none pt-1">
                                     ⚠️ Minimum required transfer limit is ₦{activeMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                   </p>
                                 )}
+
+                                {isExceedingSingleLimit && (
+                                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-left">
+                                    <p className="text-[10px] font-extrabold text-amber-900 leading-snug">
+                                      ⚠️ Transfer amount of ₦{amt.toLocaleString()} exceeds your {currentTierName} single transaction limit of ₦{userSingleCap.toLocaleString()}.
+                                    </p>
+                                    <div className="flex gap-2 pt-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          triggerHaptic();
+                                          setIsTransferOpen(false);
+                                          setIsTierUpgradeOpen(true);
+                                        }}
+                                        className="px-2.5 py-1 bg-[#FC7A00] text-white text-[9.5px] font-black uppercase tracking-wider rounded-lg shadow-2xs hover:brightness-105 active:scale-95 cursor-pointer"
+                                      >
+                                        Upgrade Tier
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          triggerHaptic();
+                                          setIsTransferOpen(false);
+                                          router.push("/support");
+                                        }}
+                                        className="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-[9.5px] font-black uppercase tracking-wider rounded-lg active:scale-95 cursor-pointer"
+                                      >
+                                        Contact Support
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
                                 {(() => {
                                   const debt = Number(userData?.outstandingDebt) || 0;
                                   const spendable = Math.max(0, balance - debt);
