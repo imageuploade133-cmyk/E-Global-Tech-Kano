@@ -22,6 +22,8 @@ interface UserData {
   outstandingDebt?: number;
   isPinRequired?: boolean;
   isFaceIdEnabled?: boolean;
+  isBiometricLoginEnabled?: boolean;
+  isBiometricTransferEnabled?: boolean;
   dailyLimit?: number;
   singleLimit?: number;
   depositLimitExceeded?: boolean;
@@ -126,6 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         balance: 750000,
         isPinRequired: true,
         isFaceIdEnabled: false,
+        isBiometricLoginEnabled: true,
+        isBiometricTransferEnabled: true,
         ...storedMock
       });
       setIsPinVerified(window.location.pathname !== "/auth/pin");
@@ -235,6 +239,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUserData({
               isPinRequired: true,
               isFaceIdEnabled: false,
+              isBiometricLoginEnabled: data.isBiometricLoginEnabled ?? false,
+              isBiometricTransferEnabled: data.isBiometricTransferEnabled ?? false,
               balance: data.balance !== undefined ? data.balance : 0.00,
               name: (data.displayName as string | undefined) || data.name || "",
               ...data
@@ -243,6 +249,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUserData({
               isPinRequired: true,
               isFaceIdEnabled: false,
+              isBiometricLoginEnabled: false,
+              isBiometricTransferEnabled: false,
               balance: 0.00,
             });
           }
