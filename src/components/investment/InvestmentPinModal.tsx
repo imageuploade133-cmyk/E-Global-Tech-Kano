@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { useAuth } from "@/lib/AuthContext";
@@ -25,8 +26,13 @@ export function InvestmentPinModal({
 }: InvestmentPinModalProps) {
   const { user, userData } = useAuth();
   const [pin, setPin] = useState("");
+  const [mounted, setMounted] = useState(false);
 
   useModalBackHandler(isOpen, onClose, "investment-pin-modal");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -34,7 +40,7 @@ export function InvestmentPinModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted || typeof document === "undefined") return null;
 
   const is2faActive = userData?.is2faOtpEnabled === true;
 
@@ -59,9 +65,9 @@ export function InvestmentPinModal({
     setPin((prev) => prev.slice(0, -1));
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[100000] flex items-end justify-center bg-black/60 backdrop-blur-sm">
         <div className="absolute inset-0" onClick={() => !isSubmitting && onClose()} />
 
         <motion.div
@@ -160,6 +166,7 @@ export function InvestmentPinModal({
           )}
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
