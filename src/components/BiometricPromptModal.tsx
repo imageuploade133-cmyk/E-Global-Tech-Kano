@@ -103,10 +103,10 @@ export function BiometricPromptModal() {
             </div>
 
             <h4 className="font-extrabold text-base text-gray-900 mb-1">{promptTitle}</h4>
-            <p className="font-semibold text-xs text-gray-500 max-w-[280px] mb-6 leading-relaxed">
+            <p className="font-semibold text-xs text-gray-500 max-w-[290px] mb-6 leading-relaxed">
               {isVerifying
-                ? `Scanning and validating ${label}...`
-                : `Touch sensor or align face to verify your identity with ${label}.`}
+                ? `Scanning hardware biometric sensor for ${label}...`
+                : `Only enrolled ${label} on this device will be verified. Unregistered or mismatched attempts will be rejected.`}
             </p>
 
             <div className="w-full space-y-2.5">

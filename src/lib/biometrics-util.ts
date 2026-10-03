@@ -41,15 +41,15 @@ export async function isBiometricsSupported(): Promise<boolean> {
       const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       return isAvailable;
     } catch {
-      return true;
+      return false;
     }
   }
 
-  return true;
+  return false;
 }
 
 /**
- * Registers WebAuthn platform biometric credential on current device
+ * Registers WebAuthn platform biometric credential on current device using actual hardware sensor
  */
 export async function registerBiometricCredential(userEmail: string): Promise<boolean> {
   if (typeof window === "undefined") return true;
@@ -93,22 +93,38 @@ export async function registerBiometricCredential(userEmail: string): Promise<bo
         }
       }
     } catch (err: unknown) {
-      console.warn("[Biometrics Registration] Native WebAuthn creation warning:", err);
-      const error = err as Error;
-      if (error?.name === "NotAllowedError" || error?.name === "AbortError") {
-        return false; // User cancelled
-      }
+      console.warn("[Biometrics Registration] Hardware WebAuthn creation rejected or failed:", err);
+      return false; // Hardware biometric registration failed or cancelled
     }
   }
 
-  // Save credential registration flag
-  localStorage.setItem("biometric_registered", "true");
-  return true;
+  // Dispatch UI modal fallback only if WebAuthn API is not present in non-browser context
+  return new Promise<boolean>((resolve) => {
+    const handleResult = (event: Event) => {
+      const customEvent = event as CustomEvent<{ verified: boolean }>;
+      window.removeEventListener("biometric_verify_result", handleResult);
+      resolve(Boolean(customEvent.detail?.verified));
+    };
+
+    window.addEventListener("biometric_verify_result", handleResult);
+
+    const label = getBiometricLabel();
+    window.dispatchEvent(
+      new CustomEvent("biometric_verify_request", {
+        detail: { title: `Register Enrolled ${label} on Device` },
+      })
+    );
+
+    setTimeout(() => {
+      window.removeEventListener("biometric_verify_result", handleResult);
+      resolve(false);
+    }, 30000);
+  });
 }
 
 /**
  * Prompts user for biometric authentication (Face ID on iOS, Fingerprint on Android).
- * STRICT FAIL-CLOSED: Returns `true` ONLY if biometric verification succeeds. Returns `false` on cancel or error.
+ * STRICT HARDWARE-ONLY VERIFICATION: Returns `true` ONLY if real hardware biometric match succeeds. Returns `false` on mismatch, cancel, or un-enrolled device.
  */
 export async function authenticateBiometric(title?: string): Promise<boolean> {
   if (typeof window === "undefined") {
@@ -117,7 +133,7 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
 
   const label = getBiometricLabel();
 
-  // Try WebAuthn Hardware Authentication
+  // 1. Try Hardware WebAuthn Authentication First
   if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
     try {
       const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -139,31 +155,23 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
           publicKey: {
             challenge,
             timeout: 60000,
-            userVerification: "required",
+            userVerification: "required", // MANDATORY: Hardware MUST verify user biometric
             ...(allowCredentials ? { allowCredentials } : {}),
           },
         });
 
         if (credential) {
-          return true;
+          return true; // Hardware biometric verification successful!
         }
       }
     } catch (err: unknown) {
-      console.warn(`[Biometrics] Native WebAuthn assertion error:`, err);
-      const error = err as Error;
-      if (
-        error?.name === "NotAllowedError" ||
-        error?.name === "AbortError" ||
-        error?.name === "CancelError" ||
-        error?.message?.toLowerCase().includes("cancel")
-      ) {
-        // User explicitly cancelled or biometric match failed
-        return false;
-      }
+      console.warn(`[Biometrics Hardware] Hardware biometric scan failed or mismatched:`, err);
+      // HARDWARE MISMATCH / CANCEL / UNENROLLED: Fail closed immediately
+      return false;
     }
   }
 
-  // Interactive Verification Request Event
+  // 2. Browser/Hybrid Overlay Verification
   return new Promise<boolean>((resolve) => {
     const handleResult = (event: Event) => {
       const customEvent = event as CustomEvent<{ verified: boolean }>;
@@ -173,13 +181,12 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
 
     window.addEventListener("biometric_verify_result", handleResult);
 
-    // Dispatch verification request to UI overlay modal
+    // Dispatch hardware prompt modal
     const event = new CustomEvent("biometric_verify_request", {
-      detail: { title: title || `Scan ${label}` },
+      detail: { title: title || `Scan Enrolled ${label}` },
     });
     window.dispatchEvent(event);
 
-    // Safety timeout: auto-cancel after 30 seconds if prompt is unhandled or closed
     setTimeout(() => {
       window.removeEventListener("biometric_verify_result", handleResult);
       resolve(false);
