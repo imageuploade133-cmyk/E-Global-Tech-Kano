@@ -229,13 +229,13 @@ function AdminDepositPageContent() {
       }
 
       // 1. Verify 4-digit Transaction PIN first
-      const verifyRes = await fetch("/api/auth/pin-verify-otp", {
+      const verifyRes = await fetch("/api/auth/pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ pin: enteredPin }),
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
       });
 
       const verifyData = await verifyRes.json();
@@ -669,26 +669,48 @@ function AdminDepositPageContent() {
         )}
       </AnimatePresence>
 
-      {/* 4-Digit Admin Access PIN Verification Pad Modal */}
+      {/* 4-Digit Admin Access PIN Verification Bottom Drawer Modal */}
       <AnimatePresence>
         {isPinModalOpen && (
-          <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-xs bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPinModalOpen(false)}
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100000]"
+            />
+
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 280, mass: 0.9 }}
+              className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-[32px] p-6 pb-8 text-center shadow-2xl z-[100001] border-t border-gray-100 font-hanken text-black max-h-[90vh] overflow-y-auto no-scrollbar space-y-5"
             >
-              <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                <span className="material-symbols-outlined text-[24px]">lock</span>
+              {/* Drag Handle Indicator */}
+              <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-2" />
+
+              <div className="flex items-center justify-between border-b pb-3 border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[20px]">lock</span>
+                  </div>
+                  <h4 className="font-extrabold text-base uppercase text-gray-900 text-left">Enter Access PIN</h4>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPinModalOpen(false)}
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                </button>
               </div>
 
-              <div>
-                <h4 className="font-extrabold text-base uppercase text-gray-900">Enter Access PIN</h4>
-                <p className="text-[11px] text-gray-500 mt-1 font-semibold">
-                  Enter your 4-digit administrative Access PIN to authorize wallet credit deposit.
-                </p>
-              </div>
+              <p className="text-[11px] text-gray-500 font-semibold text-left">
+                Enter your 4-digit administrative Access PIN to authorize wallet credit deposit for <strong className="text-gray-900">{selectedUser?.name}</strong>.
+              </p>
 
               {/* 4 Pin Boxes */}
               <div className="flex justify-center gap-3 py-2">
@@ -713,7 +735,7 @@ function AdminDepositPageContent() {
                     type="button"
                     disabled={isVerifyingPin}
                     onClick={() => handlePinDigitPress(num)}
-                    className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                    className="py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {num}
                   </button>
@@ -722,7 +744,7 @@ function AdminDepositPageContent() {
                   type="button"
                   disabled={isVerifyingPin}
                   onClick={handlePinClear}
-                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-xs uppercase text-gray-600 active:scale-95 transition-all cursor-pointer"
+                  className="py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-xs uppercase text-gray-600 active:scale-95 transition-all cursor-pointer"
                 >
                   CLEAR
                 </button>
@@ -730,7 +752,7 @@ function AdminDepositPageContent() {
                   type="button"
                   disabled={isVerifyingPin}
                   onClick={() => handlePinDigitPress("0")}
-                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                  className="py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                 >
                   0
                 </button>
@@ -738,7 +760,7 @@ function AdminDepositPageContent() {
                   type="button"
                   disabled={isVerifyingPin}
                   onClick={handlePinBackspace}
-                  className="py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                  className="py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-lg text-black active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                 >
                   <span className="material-symbols-outlined text-[20px]">backspace</span>
                 </button>
@@ -747,12 +769,12 @@ function AdminDepositPageContent() {
               <button
                 type="button"
                 onClick={() => setIsPinModalOpen(false)}
-                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer"
+                className="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase rounded-2xl cursor-pointer transition-all active:scale-95"
               >
                 Cancel
               </button>
             </motion.div>
-          </div>
+          </>
         )}
       </AnimatePresence>
 

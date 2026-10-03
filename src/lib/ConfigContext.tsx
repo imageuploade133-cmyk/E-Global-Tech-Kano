@@ -57,6 +57,7 @@ export interface AppConfig {
   tier3DailyLimit?: number;
   tier3SingleLimit?: number;
   tierUpgradeSelectionTitle?: string;
+  acceptableGovernmentIds?: string[];
   hasCustomImgbbApiKey?: boolean;
   imgbbApiKey?: string;
   appVersionPushNotificationEnabled?: boolean;
@@ -110,6 +111,7 @@ const DEFAULT_CONFIG: AppConfig = {
   tier3DailyLimit: 50000000,
   tier3SingleLimit: 10000000,
   tierUpgradeSelectionTitle: "SELECT TARGET UPGRADE TIER",
+  acceptableGovernmentIds: ["National ID Card (NIN)", "International Passport", "Driver's License", "Voter's Card"],
 };
 
 interface ConfigContextProps {

@@ -23,6 +23,9 @@ export async function GET(req: Request) {
     const tier3DailyLimit = appData?.tier3DailyLimit ?? 50000000;
     const tier3SingleLimit = appData?.tier3SingleLimit ?? 10000000;
     const tierUpgradeSelectionTitle = appData?.tierUpgradeSelectionTitle || "SELECT TARGET UPGRADE TIER";
+    const acceptableGovernmentIds = Array.isArray(appData?.acceptableGovernmentIds) && appData.acceptableGovernmentIds.length > 0
+      ? appData.acceptableGovernmentIds
+      : ["National ID Card (NIN)", "International Passport", "Driver's License", "Voter's Card"];
 
     if (!searchQuery) {
       return NextResponse.json({
@@ -33,6 +36,7 @@ export async function GET(req: Request) {
         tier3DailyLimit,
         tier3SingleLimit,
         tierUpgradeSelectionTitle,
+        acceptableGovernmentIds,
         users: []
       });
     }
@@ -112,6 +116,9 @@ export async function POST(req: Request) {
       if (body.tier3DailyLimit !== undefined) updateConfig.tier3DailyLimit = Number(body.tier3DailyLimit);
       if (body.tier3SingleLimit !== undefined) updateConfig.tier3SingleLimit = Number(body.tier3SingleLimit);
       if (body.tierUpgradeSelectionTitle !== undefined) updateConfig.tierUpgradeSelectionTitle = String(body.tierUpgradeSelectionTitle).trim();
+      if (Array.isArray(body.acceptableGovernmentIds)) {
+        updateConfig.acceptableGovernmentIds = body.acceptableGovernmentIds.map((item: any) => String(item).trim()).filter(Boolean);
+      }
 
       await limitsRef.set(updateConfig, { merge: true });
       await appRef.set(updateConfig, { merge: true });

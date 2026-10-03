@@ -174,6 +174,17 @@ export function TierUpgradeDrawerModal({
   const [bvn, setBvn] = useState("");
   const [targetTier, setTargetTier] = useState<"Tier 2" | "Tier 3">("Tier 2");
 
+  // Acceptable IDs from app config
+  const acceptableIds = Array.isArray(config?.acceptableGovernmentIds) && config.acceptableGovernmentIds.length > 0
+    ? config.acceptableGovernmentIds
+    : ["National ID Card (NIN)", "International Passport", "Driver's License", "Voter's Card"];
+
+  // Government ID file uploader
+  const [governmentIdType, setGovernmentIdType] = useState<string>(acceptableIds[0] || "National ID Card (NIN)");
+  const [governmentIdFile, setGovernmentIdFile] = useState<File | null>(null);
+  const [governmentIdPreview, setGovernmentIdPreview] = useState<string | null>(null);
+  const governmentIdInputRef = useRef<HTMLInputElement>(null);
+
   // Proof of Address file uploader
   const [addressFile, setAddressFile] = useState<File | null>(null);
   const [addressPreview, setAddressPreview] = useState<string | null>(null);
@@ -183,6 +194,9 @@ export function TierUpgradeDrawerModal({
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const selfieInputRef = useRef<HTMLInputElement>(null);
+
+  // Guidance / Sample Modal state
+  const [isSampleModalOpen, setIsSampleModalOpen] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -203,12 +217,27 @@ export function TierUpgradeDrawerModal({
       const bvnVal = userData?.bvn || userData?.nin || "";
       setBvn(typeof bvnVal === "string" ? bvnVal : String(bvnVal || ""));
 
+      setGovernmentIdFile(null);
+      setGovernmentIdPreview(null);
+      setGovernmentIdType(acceptableIds[0] || "National ID Card (NIN)");
       setAddressFile(null);
       setAddressPreview(null);
       setSelfieFile(null);
       setSelfiePreview(null);
+      setIsSampleModalOpen(false);
     }
   }, [isOpen, userData, user]);
+
+  const handleGovernmentIdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerHaptic();
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setGovernmentIdFile(file);
+    if (governmentIdPreview && governmentIdPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(governmentIdPreview);
+    }
+    setGovernmentIdPreview(URL.createObjectURL(file));
+  };
 
   const handleAddressFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerHaptic();
@@ -243,6 +272,11 @@ export function TierUpgradeDrawerModal({
 
     if (!bvn || bvn.trim().length !== 11) {
       toast.error("Please enter a valid 11-digit BVN or NIN number.");
+      return;
+    }
+
+    if (!governmentIdFile && !governmentIdPreview) {
+      toast.error("Government ID card scan or picture is required.");
       return;
     }
 
@@ -302,13 +336,13 @@ export function TierUpgradeDrawerModal({
       }
 
       // 1. Verify 4-digit Transaction PIN first
-      const verifyRes = await fetch("/api/auth/pin-verify-otp", {
+      const verifyRes = await fetch("/api/auth/pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ pin: enteredPin }),
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
       });
 
       const verifyData = await verifyRes.json();
@@ -325,7 +359,18 @@ export function TierUpgradeDrawerModal({
       setIsSubmitting(true);
       toast.loading("Uploading documents & submitting upgrade request...");
 
-      // 2. Upload Proof of Address
+      // 2. Upload Government ID
+      let govIdUrl = governmentIdPreview || "";
+      if (governmentIdFile) {
+        const govUpload = await uploadImageSecurely(governmentIdFile, "kyc_document");
+        if (govUpload.success && govUpload.url) {
+          govIdUrl = govUpload.url;
+        } else {
+          throw new Error(govUpload.error || "Failed to upload Government ID document.");
+        }
+      }
+
+      // 3. Upload Proof of Address
       let proofUrl = addressPreview || "";
       if (addressFile) {
         const addressUpload = await uploadImageSecurely(addressFile, "kyc_document");
@@ -336,7 +381,7 @@ export function TierUpgradeDrawerModal({
         }
       }
 
-      // 3. Upload Live Selfie
+      // 4. Upload Live Selfie
       let liveSelfieUrl = selfiePreview || "";
       if (selfieFile) {
         const selfieUpload = await uploadImageSecurely(selfieFile, "kyc_selfie");
@@ -347,7 +392,7 @@ export function TierUpgradeDrawerModal({
         }
       }
 
-      // 4. Post payload to backend
+      // 5. Post payload to backend
       const res = await fetch("/api/profile/tier-upgrade", {
         method: "POST",
         headers: {
@@ -357,6 +402,8 @@ export function TierUpgradeDrawerModal({
         body: JSON.stringify({
           fullName: fullName.trim(),
           bvn: bvn.trim(),
+          governmentIdUrl: govIdUrl,
+          governmentIdType,
           proofOfAddressUrl: proofUrl,
           selfieUrl: liveSelfieUrl,
           targetTier,
@@ -550,6 +597,80 @@ export function TierUpgradeDrawerModal({
                   />
                 </div>
 
+                {/* Upload Government ID Card */}
+                <div className="space-y-2 pt-1 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                      Government ID Card *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { triggerHaptic(); setIsSampleModalOpen(true); }}
+                      className="text-[10px] font-bold text-[#FC7A00] flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">info</span>
+                      View Upload Samples &amp; Guidance
+                    </button>
+                  </div>
+
+                  {/* Acceptable ID Type Selector */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-extrabold uppercase text-gray-400">Select Document Type:</label>
+                    <select
+                      value={governmentIdType}
+                      onChange={(e) => { triggerHaptic(); setGovernmentIdType(e.target.value); }}
+                      className="w-full bg-gray-50 border border-gray-200 text-black rounded-xl px-3.5 py-2.5 text-xs font-bold outline-none focus:border-[#FC7A00] cursor-pointer"
+                    >
+                      {acceptableIds.map((idName) => (
+                        <option key={idName} value={idName}>{idName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Government ID Dropzone */}
+                  <input
+                    type="file"
+                    ref={governmentIdInputRef}
+                    accept="image/*"
+                    onChange={handleGovernmentIdFileChange}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => { triggerHaptic(); governmentIdInputRef.current?.click(); }}
+                    className={cn(
+                      "p-4 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all bg-gray-50/50 hover:bg-gray-100/50",
+                      governmentIdPreview ? "border-emerald-500 bg-emerald-50/20" : "border-gray-300 hover:border-[#FC7A00]"
+                    )}
+                  >
+                    {governmentIdPreview ? (
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-emerald-300 shrink-0 shadow-xs">
+                          <img src={governmentIdPreview} alt="Gov ID" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-xs font-black text-emerald-800 truncate">
+                            {governmentIdType} Uploaded
+                          </p>
+                          <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">
+                            {governmentIdFile ? `${(governmentIdFile.size / 1024 / 1024).toFixed(2)} MB • Ready for submission` : "Uploaded ID Attached"}
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-emerald-600 font-bold text-xl">check_circle</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 text-left py-1">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-[#FC7A00] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">badge</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Upload Front Photo of {governmentIdType}</p>
+                          <p className="text-[10px] font-semibold text-gray-400 mt-0.5">JPEG, PNG, WEBP scan showing details clearly</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Upload Proof of Address */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Proof of Address Document *</label>
@@ -670,6 +791,94 @@ export function TierUpgradeDrawerModal({
           </motion.div>
         </>
       )}
+
+      {/* Government ID Guidance & Upload Sample Modal */}
+      <AnimatePresence>
+        {isSampleModalOpen && (
+          <div className="fixed inset-0 z-[100005] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white rounded-3xl p-6 text-left shadow-2xl space-y-4 border border-gray-100 font-hanken text-black max-h-[90vh] overflow-y-auto no-scrollbar"
+            >
+              <div className="flex items-center justify-between border-b pb-3 border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#FC7A00] text-[22px]">verified</span>
+                  <h4 className="font-extrabold text-sm uppercase text-gray-900">ID Upload Sample &amp; Guidance</h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSampleModalOpen(false)}
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] font-bold">close</span>
+                </button>
+              </div>
+
+              {/* Guidance Checklist */}
+              <div className="space-y-3">
+                <p className="text-xs text-gray-600 font-medium leading-relaxed">
+                  To ensure fast approval of your limit upgrade request, please upload a clear, legible photograph or scan of your government-issued identification document.
+                </p>
+
+                <div className="p-3 bg-orange-50/70 border border-orange-200 rounded-2xl space-y-2 text-xs">
+                  <p className="font-extrabold text-[#FC7A00] text-[11px] uppercase tracking-wider">Acceptable Government IDs:</p>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-bold text-gray-800 text-[11px]">
+                    {acceptableIds.map((item, idx) => (
+                      <li key={idx} className="flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px] text-emerald-600">check_circle</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="font-extrabold text-xs uppercase tracking-wider text-gray-900">Upload Guidelines &amp; Sample:</p>
+
+                  <div className="border border-gray-200 rounded-2xl p-3 bg-gray-50 space-y-2">
+                    <div className="relative w-full h-32 rounded-xl overflow-hidden bg-gray-200 border border-gray-300 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/80 via-gray-800/60 to-gray-900/80 flex flex-col items-center justify-center p-3 text-white text-center">
+                        <span className="material-symbols-outlined text-[36px] text-emerald-400">badge</span>
+                        <p className="font-mono font-extrabold text-xs uppercase tracking-wider mt-1 text-emerald-300">VALID GOVERNMENT ID</p>
+                        <p className="text-[10px] text-gray-300 font-semibold">Name, photo, ID number, and expiration date strictly legible</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 text-xs text-gray-700 font-semibold">
+                    <li className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-emerald-600 text-[18px] shrink-0">check</span>
+                      <span><strong>All 4 Corners Visible:</strong> Ensure the entire card is inside the photo frame without cutoffs.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-emerald-600 text-[18px] shrink-0">check</span>
+                      <span><strong>Clear &amp; Readable Text:</strong> No blur, glare, or heavy reflections covering text or photo.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-emerald-600 text-[18px] shrink-0">check</span>
+                      <span><strong>Valid &amp; Unexpired:</strong> Expired or damaged cards will be automatically rejected.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-rose-600 text-[18px] shrink-0">close</span>
+                      <span><strong>No Screenshots:</strong> Upload direct camera photos or original document scans.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsSampleModalOpen(false)}
+                className="w-full py-3.5 bg-[#FC7A00] hover:bg-[#e06600] text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer transition-all active:scale-95"
+              >
+                I Understand, Continue
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* 4-Digit Transaction PIN Verification Pad Modal */}
       <AnimatePresence>

@@ -28,6 +28,9 @@ export async function GET() {
         tier3DailyLimit: data?.tier3DailyLimit ?? 50000000,
         tier3SingleLimit: data?.tier3SingleLimit ?? 10000000,
         tierUpgradeSelectionTitle: data?.tierUpgradeSelectionTitle || "SELECT TARGET UPGRADE TIER",
+        acceptableGovernmentIds: Array.isArray(data?.acceptableGovernmentIds) && data.acceptableGovernmentIds.length > 0
+          ? data.acceptableGovernmentIds
+          : ["National ID Card (NIN)", "International Passport", "Driver's License", "Voter's Card"],
         newDeviceDetectorEnabled: data?.newDeviceDetectorEnabled !== false,
         bannerOverlayFadeEnabled: data?.bannerOverlayFadeEnabled !== false,
         bannerSlideIntervalSeconds: data?.bannerSlideIntervalSeconds || 5,
@@ -61,6 +64,7 @@ export async function GET() {
       tier3DailyLimit: 50000000,
       tier3SingleLimit: 10000000,
       tierUpgradeSelectionTitle: "SELECT TARGET UPGRADE TIER",
+      acceptableGovernmentIds: ["National ID Card (NIN)", "International Passport", "Driver's License", "Voter's Card"],
       newDeviceDetectorEnabled: true,
       bannerOverlayFadeEnabled: true,
       bannerSlideIntervalSeconds: 5,
