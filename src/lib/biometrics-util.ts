@@ -142,7 +142,7 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
         const allowCredentials = credentialId
           ? [
               {
-                id: stringToUint8Array(credentialId),
+                id: stringToUint8Array(credentialId) as unknown as BufferSource,
                 type: "public-key" as const,
               },
             ]
@@ -150,14 +150,15 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
 
         // First attempt with stored credential ID if present
         try {
-          const credential = await navigator.credentials.get({
+          const options: CredentialRequestOptions = {
             publicKey: {
               challenge,
               timeout: 60000,
               userVerification: "required", // MANDATORY: Hardware MUST verify user biometric
               ...(allowCredentials ? { allowCredentials } : {}),
             },
-          });
+          };
+          const credential = await navigator.credentials.get(options);
 
           if (credential) {
             return true; // Hardware biometric verification successful!
