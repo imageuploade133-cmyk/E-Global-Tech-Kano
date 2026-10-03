@@ -256,15 +256,42 @@ export class WalletService {
       user = preLoadedUser || (await this.getUserProfile(transaction, userId));
     }
 
+    // AUTOMATIC INFLOW FEE / STAMP DUTY LOGIC (FOR NGN MAIN WALLET DEPOSITS)
+    let autoInflowFee = 0;
+    let autoInflowNarration = "";
+    const isDepositType = type === "DEPOSIT" || type === "VIRTUAL_ACCOUNT_DEPOSIT" || type === "WALLET_FUNDING";
+
+    if (ucCurrency === "NGN" && !isBonus && isDepositType) {
+      const appConfig = await getCachedTierLimits();
+      const autoInflowConfig = appConfig.autoInflowDeduction;
+      if (autoInflowConfig?.enabled) {
+        const minThreshold = Number(autoInflowConfig.minThreshold) || 1000;
+        if (amount >= minThreshold) {
+          if (autoInflowConfig.chargeType === "PERCENTAGE") {
+            let pFee = (amount * Number(autoInflowConfig.feeAmount || 0)) / 100;
+            const maxCap = Number(autoInflowConfig.maxFeeCap) || 0;
+            if (maxCap > 0 && pFee > maxCap) pFee = maxCap;
+            autoInflowFee = Math.round(pFee * 100) / 100;
+          } else {
+            autoInflowFee = Number(autoInflowConfig.feeAmount) || 0;
+          }
+          autoInflowNarration = autoInflowConfig.feeNarration || "Stamp Duty Charge";
+        }
+      }
+    }
+
     // AUTOMATIC DEBT RECOVERY LOGIC (FOR NGN MAIN WALLET DEPOSITS/CREDITS)
     let debtRecovered = 0;
     let netBalanceIncrement = 0;
 
     const feeNum = Number(fee) || 0;
     const vatNum = Number(params.vat) || 0;
-    const creditAmount = params.totalCredited !== undefined && params.totalCredited !== null && Number(params.totalCredited) > 0
+    const grossCreditAmount = params.totalCredited !== undefined && params.totalCredited !== null && Number(params.totalCredited) > 0
       ? Number(params.totalCredited)
       : (amount + feeNum + vatNum);
+
+    // Apply auto inflow fee deduction to net credit amount
+    const creditAmount = Math.max(0, grossCreditAmount - autoInflowFee);
 
     if (ucCurrency === "NGN" && !isBonus && user) {
       const currentDebt = Math.max(0, Number(user.data.outstandingDebt) || 0);
@@ -469,6 +496,7 @@ export class WalletService {
     // Record transaction in general ledger
     const ledgerDocId = docId || `tx-${reference}`;
     const ledgerRef = adminDb.collection("transactions").doc(ledgerDocId);
+    const combinedFee = fee + autoInflowFee;
     const ledgerRecord: TransactionRecord = {
       userId,
       amount, // Preserve principal transfer amount (e.g. 5000)
@@ -479,16 +507,16 @@ export class WalletService {
       category: params.category,
       direction: params.direction || "CREDIT",
       description,
-      narration: params.narration,
+      narration: autoInflowFee > 0 ? `${params.narration || description} (Includes ${autoInflowNarration}: ₦${autoInflowFee})` : params.narration,
       recipientName,
       status: "SUCCESS",
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      fee,
+      fee: combinedFee,
       vat: params.vat,
       markup: params.markup,
       totalDebited: params.totalDebited,
-      totalCredited: creditAmount, // Record full credited total (e.g. 5030)
+      totalCredited: creditAmount, // Record full credited total after auto inflow fee
       provider: params.provider,
       providerReference: params.providerReference || flwId || undefined,
       providerTransactionId: params.providerTransactionId,
@@ -534,7 +562,15 @@ export class WalletService {
       destinationAmount: params.destinationAmount,
       exchangeRate: params.exchangeRate,
 
-      metadata: params.metadata,
+      metadata: {
+        ...params.metadata,
+        ...(autoInflowFee > 0 ? {
+          autoInflowFee,
+          autoInflowNarration,
+          grossAmount: grossCreditAmount,
+          netAmount: creditAmount,
+        } : {}),
+      },
     };
 
     // Filter out undefined keys before writing to Firestore
