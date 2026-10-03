@@ -12,6 +12,7 @@ import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { AppLogo } from "@/components/AppLogo";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { getBiometricLabel, getBiometricType, authenticateBiometric } from "@/lib/biometrics-util";
 
 function maskEmail(email?: string | null): string {
   if (!email || !email.includes("@")) return "t***t@gmail.com";
@@ -47,10 +48,47 @@ export default function PinPage() {
   // Logout confirmation state
   const [isLogoutDrawerOpen, setIsLogoutDrawerOpen] = useState(false);
 
-  // Face ID Coming Soon Modal State
+  const biometricLabel = getBiometricLabel();
+  const biometricType = getBiometricType();
+
+  // Face ID / Biometrics Modal State
   const [showFaceIdModal, setShowFaceIdModal] = useState(false);
 
   useModalBackHandler(showFaceIdModal, () => setShowFaceIdModal(false), "face-id-drawer");
+
+  const hasAutoTriggeredBioRef = useRef(false);
+
+  // Biometric login execution
+  const handleBiometricAuth = async () => {
+    if (userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) {
+      setIsVerifying(true);
+      setVerifyingText(`Authenticating ${biometricLabel}...`);
+      const success = await authenticateBiometric(`Login with ${biometricLabel}`);
+      setIsVerifying(false);
+
+      if (success) {
+        if (userData?.is2faOtpEnabled === true) {
+          setIs2faStage(true);
+          return;
+        }
+        setPinVerified(true);
+        toast.success(`${biometricLabel} Authenticated! Welcome back.`);
+        router.push("/");
+      } else {
+        toast.error(`${biometricLabel} authentication cancelled or failed.`);
+      }
+    } else {
+      setShowFaceIdModal(true);
+    }
+  };
+
+  // Auto-trigger biometric prompt if enabled for login
+  useEffect(() => {
+    if (userData?.isBiometricLoginEnabled === true && !hasAutoTriggeredBioRef.current) {
+      hasAutoTriggeredBioRef.current = true;
+      handleBiometricAuth();
+    }
+  }, [userData?.isBiometricLoginEnabled]);
 
   // Loading Delay State
   const [isVerifying, setIsVerifying] = useState(false);
@@ -816,11 +854,13 @@ export default function PinPage() {
         <motion.button
           whileTap={{ scale: 0.9 }}
           whileHover={{ scale: 1.05 }}
-          onClick={() => setShowFaceIdModal(true)}
+          onClick={handleBiometricAuth}
           className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-[#FC7A00] border border-gray-200 bg-orange-50/50 cursor-pointer transition-colors"
-          title="Face ID / Biometrics"
+          title={biometricLabel}
         >
-          <span className="material-symbols-outlined text-[26px] min-[360px]:text-[30px] min-[410px]:text-3xl">face_6</span>
+          <span className="material-symbols-outlined text-[26px] min-[360px]:text-[30px] min-[410px]:text-3xl">
+            {biometricType === "faceid" ? "face_6" : "fingerprint"}
+          </span>
         </motion.button>
         {keypadNumbers[9] !== undefined && (
           <motion.button
@@ -899,7 +939,7 @@ export default function PinPage() {
               <div className="w-full flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
                 <div className="w-8" />
                 <h2 className="font-hanken font-bold text-base text-black text-center">
-                  Face ID Authentication
+                  {biometricLabel} Authentication
                 </h2>
                 <button
                   type="button"
@@ -912,14 +952,13 @@ export default function PinPage() {
 
               {/* Icon & Badge */}
               <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-100 text-[#FC7A00] flex items-center justify-center mb-3 shadow-inner">
-                <span className="material-symbols-outlined text-[36px] font-bold">face_6</span>
+                <span className="material-symbols-outlined text-[36px] font-bold">
+                  {biometricType === "faceid" ? "face_6" : "fingerprint"}
+                </span>
               </div>
-              <span className="px-3 py-1 text-[9.5px] font-black uppercase tracking-wider bg-[#FC7A00]/10 text-[#FC7A00] rounded-full mb-3 border border-[#FC7A00]/20">
-                Coming Soon 🚀
-              </span>
 
               <p className="font-hanken text-xs text-gray-500 text-center max-w-[290px] mb-6 leading-relaxed font-medium">
-                Biometric login and Face ID verification are currently under active development and will be available in our upcoming app update.
+                Enable &quot;{biometricLabel} for Login&quot; in Security Settings to use {biometricLabel} directly instead of entering your Access PIN.
               </p>
 
               <button

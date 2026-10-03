@@ -18,6 +18,7 @@ import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
 import { triggerHaptic } from "@/lib/haptics";
 import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
+import { getBiometricLabel, getBiometricType, authenticateBiometric } from "@/lib/biometrics-util";
 
 interface BalanceCardProps {
   balance: number;
@@ -1885,6 +1886,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
       toast.error(error.message || "Internal connection error during transfer.");
     } finally {
       setIsTransferring(false);
+    }
+  };
+
+  const handleBiometricTransferAuth = async () => {
+    const label = getBiometricLabel();
+    toast.loading(`Authenticating ${label}...`);
+    const success = await authenticateBiometric(`Authorize ₦${trfTotalDebit.toLocaleString()} transfer`);
+    toast.dismiss();
+
+    if (success) {
+      toast.success(`${label} Authenticated! Executing transfer...`);
+      executeOutwardTransfer("0000");
+    } else {
+      toast.error(`${label} authentication cancelled or failed.`);
     }
   };
 
@@ -4252,15 +4267,28 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                         </button>
                       </div>
 
-                      {/* Authorize Transfer button */}
-                      <div className="w-full max-w-xs mx-auto pt-1 pb-2">
+                      {/* Biometric Transfer or PIN Authorize Transfer button */}
+                      <div className="w-full max-w-xs mx-auto pt-1 pb-2 space-y-2">
+                        {userData?.isBiometricTransferEnabled === true && (
+                          <button
+                            type="button"
+                            onClick={handleBiometricTransferAuth}
+                            className="w-full py-3.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">
+                              {getBiometricType() === "faceid" ? "face_6" : "fingerprint"}
+                            </span>
+                            <span>Authorize via {getBiometricLabel()}</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           disabled={trfPin.length < 4}
                           onClick={() => executeOutwardTransfer(trfPin)}
                           className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98"
                         >
-                          Authorize Transfer
+                          Authorize via PIN
                         </button>
                       </div>
                     </>

@@ -71,6 +71,8 @@ export default function ProfilePage() {
   const isPinRequired = userData?.isPinRequired !== false;
   const isFaceIdEnabled = userData?.isFaceIdEnabled === true;
   const is2faOtpEnabled = userData?.is2faOtpEnabled === true;
+  const isBiometricLoginEnabled = userData?.isBiometricLoginEnabled === true;
+  const isBiometricTransferEnabled = userData?.isBiometricTransferEnabled === true;
   const dailyLimit = userData?.dailyLimit ?? 500000;
 
   // Resolve or retrieve the permanent static account details if verified
@@ -219,6 +221,70 @@ export default function ProfilePage() {
     }
   };
 
+  const handleToggleBiometricLogin = async (enteredPin: string): Promise<boolean> => {
+    try {
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const verifyRes = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        toast.error(verifyData.error || "Invalid Access PIN.");
+        return false;
+      }
+
+      const targetState = !isBiometricLoginEnabled;
+      await updateUserData({ isBiometricLoginEnabled: targetState });
+      toast.success(targetState ? "Biometric Login Enabled! 🔓" : "Biometric Login Disabled");
+      return true;
+    } catch {
+      toast.error("Failed to update Biometric Login state");
+      return false;
+    }
+  };
+
+  const handleToggleBiometricTransfer = async (enteredPin: string): Promise<boolean> => {
+    try {
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
+
+      const verifyRes = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "verify", pin: enteredPin }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        toast.error(verifyData.error || "Invalid Access PIN.");
+        return false;
+      }
+
+      const targetState = !isBiometricTransferEnabled;
+      await updateUserData({ isBiometricTransferEnabled: targetState });
+      toast.success(targetState ? "Biometric Transfer Enabled! ⚡" : "Biometric Transfer Disabled");
+      return true;
+    } catch {
+      toast.error("Failed to update Biometric Transfer state");
+      return false;
+    }
+  };
+
   const handleLogoutConfirm = async () => {
     setIsLogoutOpen(false);
     await handleAppSignOut(router);
@@ -269,9 +335,13 @@ export default function ProfilePage() {
             isPinRequired={isPinRequired}
             isFaceIdEnabled={isFaceIdEnabled}
             is2faOtpEnabled={is2faOtpEnabled}
+            isBiometricLoginEnabled={isBiometricLoginEnabled}
+            isBiometricTransferEnabled={isBiometricTransferEnabled}
             onTogglePinRequired={handleTogglePinRequired}
             onToggleFaceId={handleToggleFaceId}
             onToggle2faOtp={handleToggle2faOtp}
+            onToggleBiometricLogin={handleToggleBiometricLogin}
+            onToggleBiometricTransfer={handleToggleBiometricTransfer}
           />
 
           {/* Section: Daily Transfer Limit */}

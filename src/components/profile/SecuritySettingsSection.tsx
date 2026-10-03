@@ -8,24 +8,34 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { triggerHaptic } from "@/lib/haptics";
+import { getBiometricLabel } from "@/lib/biometrics-util";
 
 interface SecuritySettingsSectionProps {
   isPinRequired: boolean;
   isFaceIdEnabled: boolean;
   is2faOtpEnabled: boolean;
+  isBiometricLoginEnabled: boolean;
+  isBiometricTransferEnabled: boolean;
   onTogglePinRequired: () => Promise<void>;
   onToggleFaceId: () => Promise<void>;
   onToggle2faOtp: (pin: string) => Promise<boolean>;
+  onToggleBiometricLogin: (pin: string) => Promise<boolean>;
+  onToggleBiometricTransfer: (pin: string) => Promise<boolean>;
 }
 
 export function SecuritySettingsSection({
   isPinRequired,
   isFaceIdEnabled,
   is2faOtpEnabled,
+  isBiometricLoginEnabled,
+  isBiometricTransferEnabled,
   onTogglePinRequired,
   onToggleFaceId,
   onToggle2faOtp,
+  onToggleBiometricLogin,
+  onToggleBiometricTransfer,
 }: SecuritySettingsSectionProps) {
+  const biometricLabel = getBiometricLabel();
   const { user } = useAuth();
 
   const [mounted, setMounted] = useState(false);
@@ -35,7 +45,7 @@ export function SecuritySettingsSection({
 
   // 4-Digit PIN Verification Pad Modal state
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [pinAction, setPinAction] = useState<"2fa_toggle" | "pin_toggle">("2fa_toggle");
+  const [pinAction, setPinAction] = useState<"2fa_toggle" | "pin_toggle" | "bio_login_toggle" | "bio_transfer_toggle">("2fa_toggle");
   const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
@@ -44,6 +54,20 @@ export function SecuritySettingsSection({
   const handleInitiate2faToggle = () => {
     triggerHaptic();
     setPinAction("2fa_toggle");
+    setPinDigits(["", "", "", ""]);
+    setIsPinModalOpen(true);
+  };
+
+  const handleInitiateBioLoginToggle = () => {
+    triggerHaptic();
+    setPinAction("bio_login_toggle");
+    setPinDigits(["", "", "", ""]);
+    setIsPinModalOpen(true);
+  };
+
+  const handleInitiateBioTransferToggle = () => {
+    triggerHaptic();
+    setPinAction("bio_transfer_toggle");
     setPinDigits(["", "", "", ""]);
     setIsPinModalOpen(true);
   };
@@ -90,6 +114,20 @@ export function SecuritySettingsSection({
     try {
       if (pinAction === "2fa_toggle") {
         const success = await onToggle2faOtp(enteredPin);
+        if (success) {
+          setIsPinModalOpen(false);
+        } else {
+          setPinDigits(["", "", "", ""]);
+        }
+      } else if (pinAction === "bio_login_toggle") {
+        const success = await onToggleBiometricLogin(enteredPin);
+        if (success) {
+          setIsPinModalOpen(false);
+        } else {
+          setPinDigits(["", "", "", ""]);
+        }
+      } else if (pinAction === "bio_transfer_toggle") {
+        const success = await onToggleBiometricTransfer(enteredPin);
         if (success) {
           setIsPinModalOpen(false);
         } else {
@@ -180,23 +218,59 @@ export function SecuritySettingsSection({
         </button>
       </div>
 
-      {/* Toggle FaceID */}
+      {/* Biometric Login Toggle */}
       <div className="flex justify-between items-center py-2 border-t border-gray-100/60">
         <div>
-          <p className="font-hanken font-bold text-xs text-black">Simulate FaceID Biometrics</p>
-          <p className="font-hanken text-[10px] text-gray-400 font-semibold">Quick authentication via FaceID simulations</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-hanken font-bold text-xs text-black">Enable {biometricLabel} for Login</p>
+            <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-emerald-100 text-emerald-700">
+              {biometricLabel}
+            </span>
+          </div>
+          <p className="font-hanken text-[10px] text-gray-400 font-semibold mt-0.5">
+            Use {biometricLabel} as your Access PIN on login screen
+          </p>
         </div>
         <button
-          onClick={onToggleFaceId}
+          onClick={handleInitiateBioLoginToggle}
           className={cn(
             "w-12 h-6 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative cursor-pointer shrink-0 ml-3",
-            isFaceIdEnabled ? "bg-[#07B038]" : "bg-gray-200"
+            isBiometricLoginEnabled ? "bg-[#07B038]" : "bg-gray-200"
           )}
         >
           <motion.div
             layout
             className="w-5 h-5 bg-white rounded-full shadow-md"
-            animate={{ x: isFaceIdEnabled ? 24 : 0 }}
+            animate={{ x: isBiometricLoginEnabled ? 24 : 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          />
+        </button>
+      </div>
+
+      {/* Biometric Transfer Toggle */}
+      <div className="flex justify-between items-center py-2 border-t border-gray-100/60">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <p className="font-hanken font-bold text-xs text-black">Enable {biometricLabel} for Transfers</p>
+            <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-blue-100 text-blue-700">
+              Fast Authorize
+            </span>
+          </div>
+          <p className="font-hanken text-[10px] text-gray-400 font-semibold mt-0.5">
+            Authorize outward bank transfers with {biometricLabel} instead of entering PIN & OTP
+          </p>
+        </div>
+        <button
+          onClick={handleInitiateBioTransferToggle}
+          className={cn(
+            "w-12 h-6 rounded-full p-0.5 transition-colors duration-300 focus:outline-none relative cursor-pointer shrink-0 ml-3",
+            isBiometricTransferEnabled ? "bg-[#07B038]" : "bg-gray-200"
+          )}
+        >
+          <motion.div
+            layout
+            className="w-5 h-5 bg-white rounded-full shadow-md"
+            animate={{ x: isBiometricTransferEnabled ? 24 : 0 }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
           />
         </button>
@@ -249,6 +323,10 @@ export function SecuritySettingsSection({
                   <p className="text-[11px] text-gray-500 max-w-xs font-semibold leading-relaxed">
                     {pinAction === "2fa_toggle"
                       ? `Enter your 4-digit PIN to ${is2faOtpEnabled ? "disable" : "enable"} 2FA Login OTP verification.`
+                      : pinAction === "bio_login_toggle"
+                      ? `Enter your 4-digit PIN to ${isBiometricLoginEnabled ? "disable" : "enable"} ${biometricLabel} for login.`
+                      : pinAction === "bio_transfer_toggle"
+                      ? `Enter your 4-digit PIN to ${isBiometricTransferEnabled ? "disable" : "enable"} ${biometricLabel} for transfers.`
                       : `Enter your 4-digit PIN to ${isPinRequired ? "disable" : "enable"} Access PIN requirement.`}
                   </p>
                 </div>
