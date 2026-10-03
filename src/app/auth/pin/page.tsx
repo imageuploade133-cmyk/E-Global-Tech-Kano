@@ -66,7 +66,7 @@ export default function PinPage() {
       const success = await authenticateBiometric(`Login with ${biometricLabel}`);
       setIsVerifying(false);
 
-      if (success) {
+      if (success === true) {
         if (userData?.is2faOtpEnabled === true) {
           setIs2faStage(true);
           return;
@@ -75,7 +75,8 @@ export default function PinPage() {
         toast.success(`${biometricLabel} Authenticated! Welcome back.`);
         router.push("/");
       } else {
-        toast.error(`${biometricLabel} authentication cancelled or failed.`);
+        setPin("");
+        toast.error(`${biometricLabel} verification failed or cancelled. Please enter your Access PIN.`);
       }
     } else {
       setShowFaceIdModal(true);
