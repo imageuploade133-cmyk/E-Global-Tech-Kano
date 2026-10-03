@@ -53,10 +53,24 @@ export async function GET(req: Request) {
 
     const depositsSnap = await queryRef.get();
 
-    const depositLogs = depositsSnap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    // Deduplicate any legacy duplicate records by unique reference ID
+    const seenRefs = new Set<string>();
+    const depositLogs: any[] = [];
+
+    depositsSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      const rawRef = data.reference || doc.id;
+      const cleanRef = rawRef.replace(/^tx-/, "");
+
+      if (!seenRefs.has(cleanRef)) {
+        seenRefs.add(cleanRef);
+        depositLogs.push({
+          id: doc.id,
+          ...data,
+          adminEmail: data.adminEmail || data.metadata?.adminEmail || "Admin",
+        });
+      }
+    });
 
     const lastFetchedDocId = depositsSnap.docs.length > 0 ? depositsSnap.docs[depositsSnap.docs.length - 1].id : null;
     const hasMore = depositsSnap.docs.length === pageSize;
@@ -176,43 +190,28 @@ export async function POST(req: Request) {
     const depositNarration = narration?.trim() || `Administrative Credit Deposit by ${adminEmail}`;
 
     // Execute atomic credit deposit via WalletService inside runTransaction
+    // WalletService.creditWallet writes the single authoritative transaction record under `transactions/tx-${ref}`
     const creditResult = await adminDb.runTransaction(async (transaction) => {
       return await WalletService.creditWallet(transaction, {
         userId: targetUid,
         amount: numAmount,
         currency,
         reference: ref,
+        docId: `tx-${ref}`,
         description: depositNarration,
+        narration: depositNarration,
         recipientName: userData.name || targetUid,
         type: "DEPOSIT",
         category: "DEPOSIT",
         direction: "CREDIT",
         totalCredited: numAmount,
+        metadata: {
+          adminEmail,
+          isAdminDeposit: true,
+          depositedAt: new Date().toISOString(),
+        },
       });
     });
-
-    // Save detailed admin audit record
-    await adminDb.collection("transactions").doc(ref).set({
-      id: ref,
-      reference: ref,
-      userId: targetUid,
-      type: "DEPOSIT",
-      category: "DEPOSIT",
-      direction: "CREDIT",
-      status: "SUCCESS",
-      amount: numAmount,
-      totalCredited: numAmount,
-      currency,
-      description: depositNarration,
-      adminEmail,
-      isAdminDeposit: true,
-      metadata: {
-        adminEmail,
-        depositedAt: new Date().toISOString(),
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
 
     // Dispatch FCM Push Notification to target customer
     const currSym = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency === "XOF" ? "CFA" : "₦";
