@@ -1625,6 +1625,11 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                     ? resolvedReceivingBank
                     : (transaction.virtualAccountBankName || "Wema Bank");
 
+                  const meta = (transaction.metadata || {}) as Record<string, any>;
+                  const autoInflowFee = Number(meta.autoInflowFee) || (feeAmt > 0 ? feeAmt : 0);
+                  const autoInflowNarration = meta.autoInflowNarration || "Stamp Duty Charge";
+                  const grossAmt = Number(meta.grossAmount) || Number(meta.heldAmount) || transaction.amount;
+
                   return (
                     <>
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
@@ -1678,19 +1683,28 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       )}
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
-                        <span>{isSuccessFunding ? "Amount" : "Attempted Amount"}</span>
-                        <span className="text-black font-bold">{currencySymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span>{isHeldDeposit ? "Gross Deposit Received" : isSuccessFunding ? "Gross Deposit" : "Attempted Amount"}</span>
+                        <span className="text-black font-bold">{currencySymbol}{grossAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
 
-                      <div className="flex justify-between items-center text-gray-500 font-semibold">
-                        <span>Fee</span>
-                        <span className="text-black font-bold">{currencySymbol}{feeAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      </div>
+                      {autoInflowFee > 0 && (
+                        <div className="flex justify-between items-center text-[#E06600] font-bold">
+                          <span>{autoInflowNarration}</span>
+                          <span className="font-mono">- {currencySymbol}{autoInflowFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+
+                      {feeAmt > 0 && autoInflowFee === 0 && (
+                        <div className="flex justify-between items-center text-gray-500 font-semibold">
+                          <span>Processing Fee</span>
+                          <span className="text-black font-bold">{currencySymbol}{feeAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold border-t border-gray-100 pt-2">
-                        <span>{isSuccessFunding ? "Total Credited" : "Amount Credited"}</span>
-                        <span className={cn("font-extrabold", isSuccessFunding ? "text-emerald-600" : "text-gray-500")}>
-                          {currencySymbol}{totalCreditedAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <span>{isHeldDeposit ? "Net Held Amount" : isSuccessFunding ? "Net Credited Balance" : "Amount Credited"}</span>
+                        <span className={cn("font-extrabold", isHeldDeposit ? "text-amber-700 font-mono text-sm" : isSuccessFunding ? "text-emerald-600 text-sm" : "text-gray-500")}>
+                          {currencySymbol}{(isHeldDeposit ? (grossAmt - autoInflowFee) : totalCreditedAmt).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
                       </div>
 
@@ -1702,8 +1716,8 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
                       )}
 
                       <div className="flex justify-between items-center text-gray-500 font-semibold">
-                        <span>Credited To</span>
-                        <span className="text-black font-bold">Available Balance</span>
+                        <span>{isHeldDeposit ? "Held Status" : "Credited To"}</span>
+                        <span className="text-black font-bold">{isHeldDeposit ? "Pending Tier Limit Release" : "Available Balance"}</span>
                       </div>
                     </>
                   );
