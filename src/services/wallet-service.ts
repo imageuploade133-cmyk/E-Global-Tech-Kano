@@ -287,9 +287,11 @@ export class WalletService {
       const appConfig = await getCachedTierLimits();
       const userTier = String(user.data.tier || (user.data.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
 
-      // 1. Max Account Balance Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
+      const hasCustom = user.data.hasCustomLimits === true;
+
+      // 1. Max Account Balance Cap
       let maxBalanceCap = 0;
-      if (typeof user.data.maxAccountBalance === "number" && Number(user.data.maxAccountBalance) > 0) {
+      if (hasCustom && typeof user.data.maxAccountBalance === "number" && Number(user.data.maxAccountBalance) > 0) {
         maxBalanceCap = Number(user.data.maxAccountBalance);
       } else if (userTier === "Tier 3") {
         maxBalanceCap = typeof appConfig.tier3MaxBalance === "number" ? appConfig.tier3MaxBalance : 50000000;
@@ -308,10 +310,10 @@ export class WalletService {
         limitExceededReason = `Account balance limit exceeded for ${userTier}. Maximum allowed balance is ₦${maxBalanceCap.toLocaleString()}.`;
       }
 
-      // 2. Daily Deposit / Inflow Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
+      // 2. Daily Deposit / Inflow Cap
       if (!isLimitExceeded && isDepositType && !user.data.unlimitedDeposits) {
         let dailyDepositCap = 0;
-        if (typeof user.data.dailyDepositLimit === "number" && Number(user.data.dailyDepositLimit) > 0) {
+        if (hasCustom && typeof user.data.dailyDepositLimit === "number" && Number(user.data.dailyDepositLimit) > 0) {
           dailyDepositCap = Number(user.data.dailyDepositLimit);
         } else if (userTier === "Tier 3") {
           dailyDepositCap = typeof appConfig.tier3DailyDepositLimit === "number" ? appConfig.tier3DailyDepositLimit : (typeof appConfig.tier3DailyLimit === "number" ? appConfig.tier3DailyLimit : 50000000);
@@ -680,9 +682,11 @@ export class WalletService {
         const appConfig = await getCachedTierLimits();
         const userTier = String(user.data.tier || (user.data.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
 
-        // 1. Single Transfer Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
+        const hasCustom = user.data.hasCustomLimits === true;
+
+        // 1. Single Transfer Cap
         let singleTransferCap = 0;
-        if (typeof user.data.maxSingleTransferLimit === "number" && Number(user.data.maxSingleTransferLimit) > 0) {
+        if (hasCustom && typeof user.data.maxSingleTransferLimit === "number" && Number(user.data.maxSingleTransferLimit) > 0) {
           singleTransferCap = Number(user.data.maxSingleTransferLimit);
         } else if (userTier === "Tier 3") {
           singleTransferCap = typeof appConfig.tier3SingleTransferLimit === "number" ? appConfig.tier3SingleTransferLimit : (typeof appConfig.tier3SingleLimit === "number" ? appConfig.tier3SingleLimit : 10000000);
@@ -696,17 +700,23 @@ export class WalletService {
           throw new Error(`Single transfer amount of ₦${amount.toLocaleString()} exceeds single transfer limit of ₦${singleTransferCap.toLocaleString()} for ${userTier}.`);
         }
 
-        // 2. Daily Transfer Cap (User custom limit used ONLY if > 0; otherwise falls back to Global Tier Defaults)
+        // 2. Daily Transfer Cap
         let dailyTransferCap = 0;
-        const customDaily = Number(user.data.dailyTransferLimit ?? user.data.dailyLimit);
-        if (typeof customDaily === "number" && customDaily > 0) {
-          dailyTransferCap = customDaily;
-        } else if (userTier === "Tier 3") {
-          dailyTransferCap = typeof appConfig.tier3DailyTransferLimit === "number" ? appConfig.tier3DailyTransferLimit : (typeof appConfig.tier3DailyLimit === "number" ? appConfig.tier3DailyLimit : 50000000);
-        } else if (userTier === "Tier 2") {
-          dailyTransferCap = typeof appConfig.tier2DailyTransferLimit === "number" ? appConfig.tier2DailyTransferLimit : (typeof appConfig.tier2DailyLimit === "number" ? appConfig.tier2DailyLimit : 5000000);
-        } else {
-          dailyTransferCap = typeof appConfig.tier1DailyTransferLimit === "number" ? appConfig.tier1DailyTransferLimit : 500000;
+        if (hasCustom) {
+          const customDaily = Number(user.data.dailyTransferLimit ?? user.data.dailyLimit);
+          if (typeof customDaily === "number" && customDaily > 0) {
+            dailyTransferCap = customDaily;
+          }
+        }
+
+        if (!dailyTransferCap || dailyTransferCap <= 0) {
+          if (userTier === "Tier 3") {
+            dailyTransferCap = typeof appConfig.tier3DailyTransferLimit === "number" ? appConfig.tier3DailyTransferLimit : (typeof appConfig.tier3DailyLimit === "number" ? appConfig.tier3DailyLimit : 50000000);
+          } else if (userTier === "Tier 2") {
+            dailyTransferCap = typeof appConfig.tier2DailyTransferLimit === "number" ? appConfig.tier2DailyTransferLimit : (typeof appConfig.tier2DailyLimit === "number" ? appConfig.tier2DailyLimit : 5000000);
+          } else {
+            dailyTransferCap = typeof appConfig.tier1DailyTransferLimit === "number" ? appConfig.tier1DailyTransferLimit : 500000;
+          }
         }
 
         if (dailyTransferCap > 0) {

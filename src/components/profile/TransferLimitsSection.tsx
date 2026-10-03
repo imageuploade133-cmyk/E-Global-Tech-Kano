@@ -32,7 +32,9 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
   const { config } = useAppConfig();
   const currentTier = String(userData?.tier || (userData?.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
 
-  const singleLimit = Number(userData?.singleLimit) || (
+  const hasCustom = userData?.hasCustomLimits === true;
+
+  const singleLimit = (hasCustom && Number(userData?.singleLimit) > 0) ? Number(userData.singleLimit) : (
     currentTier === "Tier 3"
       ? (config?.tier3SingleTransferLimit ?? config?.tier3SingleLimit ?? 10000000)
       : currentTier === "Tier 2"
@@ -40,7 +42,7 @@ export function TransferLimitsSection({ dailyLimit = 500000 }: TransferLimitsSec
       : (config?.tier1SingleTransferLimit ?? 200000)
   );
 
-  const numDailyLimit = Number(userData?.dailyTransferLimit ?? userData?.dailyLimit) || (
+  const numDailyLimit = (hasCustom && Number(userData?.dailyTransferLimit ?? userData?.dailyLimit) > 0) ? Number(userData.dailyTransferLimit ?? userData.dailyLimit) : (
     currentTier === "Tier 3"
       ? (config?.tier3DailyTransferLimit ?? config?.tier3DailyLimit ?? 50000000)
       : currentTier === "Tier 2"

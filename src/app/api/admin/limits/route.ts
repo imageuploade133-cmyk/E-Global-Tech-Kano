@@ -155,6 +155,7 @@ export async function POST(req: Request) {
     }
 
     const updatePayload: Record<string, any> = {
+      hasCustomLimits: true,
       updatedAt: new Date().toISOString(),
     };
 

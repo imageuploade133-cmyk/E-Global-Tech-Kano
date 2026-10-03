@@ -156,6 +156,7 @@ export async function POST(req: Request) {
         dailyTransferLimit: numDaily,
         singleLimit: numSingle,
         maxSingleTransferLimit: numSingle,
+        hasCustomLimits: true,
         limitUpdatedAt: nowIso,
         limitUpdatedBy: adminEmail,
       }, { merge: true });
