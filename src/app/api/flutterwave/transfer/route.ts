@@ -169,12 +169,25 @@ export async function POST(req: Request) {
         };
       }
 
+      const hasCustom = userData.hasCustomLimits === true;
+      const userTier = String(userData.tier || (userData.kycStatus === "VERIFIED" ? "Tier 2" : "Tier 1"));
+
       if (!userData.unlimitedTransfers) {
-        const maxSingle = Number(userData.maxSingleTransferLimit) || 200000;
-        if (trfAmount > maxSingle) {
+        let singleTransferCap = 0;
+        if (hasCustom && typeof userData.maxSingleTransferLimit === "number" && Number(userData.maxSingleTransferLimit) > 0) {
+          singleTransferCap = Number(userData.maxSingleTransferLimit);
+        } else if (userTier === "Tier 3") {
+          singleTransferCap = 10000000;
+        } else if (userTier === "Tier 2") {
+          singleTransferCap = 2000000;
+        } else {
+          singleTransferCap = 200000;
+        }
+
+        if (singleTransferCap > 0 && trfAmount > singleTransferCap) {
           return {
             success: false,
-            error: `Transfer amount exceeds your single transaction limit of ₦${maxSingle.toLocaleString()}. Contact support to upgrade your limits.`,
+            error: `Transfer amount of ₦${trfAmount.toLocaleString()} exceeds your single transaction limit of ₦${singleTransferCap.toLocaleString()} for ${userTier}. Please upgrade your account tier or contact Support for assistance.`,
           };
         }
       }

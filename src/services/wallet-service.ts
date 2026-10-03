@@ -733,7 +733,7 @@ export class WalletService {
         }
 
         if (singleTransferCap > 0 && amount > singleTransferCap) {
-          throw new Error(`Single transfer amount of ₦${amount.toLocaleString()} exceeds single transfer limit of ₦${singleTransferCap.toLocaleString()} for ${userTier}.`);
+          throw new Error(`Single transfer amount of ₦${amount.toLocaleString()} exceeds your single transaction limit of ₦${singleTransferCap.toLocaleString()} for ${userTier}. Please upgrade your account tier or contact Support for assistance.`);
         }
 
         // 2. Daily Transfer Cap
@@ -762,7 +762,7 @@ export class WalletService {
           const currentTransferTotal = (lastTransferTime >= cutoffTime) ? (Number(user.data.todayTransferTotal) || 0) : 0;
 
           if (currentTransferTotal + totalDeduction > dailyTransferCap) {
-            throw new Error(`Daily transfer limit of ₦${dailyTransferCap.toLocaleString()} exceeded for ${userTier}. Cumulative transfer in ${resetWindowHours}-hour window: ₦${currentTransferTotal.toLocaleString()}.`);
+            throw new Error(`Daily transfer limit of ₦${dailyTransferCap.toLocaleString()} exceeded for ${userTier}. Cumulative transfer in ${resetWindowHours}-hour window: ₦${currentTransferTotal.toLocaleString()}. Please upgrade your account tier or contact Support for assistance.`);
           }
 
           userUpdates.todayTransferTotal = currentTransferTotal + totalDeduction;
