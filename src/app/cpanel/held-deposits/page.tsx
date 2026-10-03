@@ -35,6 +35,7 @@ interface HeldDepositRecord {
   createdAt: string;
   completedAt?: string;
   metadata?: {
+    isHeldDeposit?: boolean;
     heldAmount?: number;
     heldReason?: string;
     heldAt?: string;
