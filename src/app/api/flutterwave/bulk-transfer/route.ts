@@ -508,6 +508,6 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const error = err as Error;
     console.error("[Bulk Transfer API Exception]:", error.message, error.stack);
-    return NextResponse.json({ error: "Internal processing error occurred while executing bulk transfer." }, { status: 500 });
+    return NextResponse.json({ error: "Unable to complete bulk transfer at this time. If your transaction amount exceeds your account Tier limit, please upgrade your Tier or contact Support for assistance." }, { status: 500 });
   }
 }

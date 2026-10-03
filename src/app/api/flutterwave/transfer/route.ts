@@ -650,7 +650,7 @@ export async function POST(req: Request) {
       gatewayUrl,
     });
     return NextResponse.json({
-      error: "Internal processing error occurred while executing transfer.",
+      error: "Unable to complete transfer at this time. If your transaction amount exceeds your account Tier limit, please upgrade your Tier or contact Support for assistance.",
       details: error.message,
       stack: error.stack,
       requestBody,
