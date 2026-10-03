@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 
-export interface AutoInflowDeductionConfig {
+interface AutoInflowDeductionConfig {
   enabled: boolean;
   minThreshold: number; // Minimum deposit amount to trigger fee (e.g., 1000)
   chargeType: "FIXED" | "PERCENTAGE"; // Fixed amount or percentage
@@ -14,7 +14,7 @@ export interface AutoInflowDeductionConfig {
   updatedBy?: string;
 }
 
-export const DEFAULT_INFLOW_DEDUCTION_CONFIG: AutoInflowDeductionConfig = {
+const DEFAULT_INFLOW_DEDUCTION_CONFIG: AutoInflowDeductionConfig = {
   enabled: false,
   minThreshold: 1000,
   chargeType: "FIXED",
