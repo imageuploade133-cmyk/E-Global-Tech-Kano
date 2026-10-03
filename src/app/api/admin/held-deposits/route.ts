@@ -202,13 +202,11 @@ export async function POST(req: Request) {
       if (releasedUserId && releasedAmount > 0) {
         NotificationService.sendPushNotification(releasedUserId, {
           title: "Held Deposit Released 💰",
-          body: `Your held deposit of ₦${releasedAmount.toLocaleString()} has been released and credited to your available wallet balance!`,
+          body: `Your held deposit of ₦${releasedAmount.toLocaleString("en-NG")} has been released and credited to your available wallet balance!`,
           type: "transaction",
-          data: {
-            reference: releasedRef,
-            amount: String(releasedAmount),
-            type: "DEPOSIT",
-          },
+          reference: releasedRef,
+          amount: releasedAmount,
+          url: "/history",
         }).catch((notifErr) => console.warn("[Held Deposit Release] FCM Push warn:", notifErr));
       }
 
