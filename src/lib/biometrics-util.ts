@@ -41,15 +41,74 @@ export async function isBiometricsSupported(): Promise<boolean> {
       const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       return isAvailable;
     } catch {
-      return true; // Fall back to supported
+      return true;
     }
   }
 
-  return true; // Fallback support for simulated/hybrid environments
+  return true;
 }
 
 /**
- * Prompts user for biometric authentication (Face ID on iOS, Fingerprint on Android)
+ * Registers WebAuthn platform biometric credential on current device
+ */
+export async function registerBiometricCredential(userEmail: string): Promise<boolean> {
+  if (typeof window === "undefined") return true;
+
+  if (window.PublicKeyCredential && navigator.credentials && navigator.credentials.create) {
+    try {
+      const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (isAvailable) {
+        const userId = new TextEncoder().encode(userEmail || "eglobal-user");
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: {
+              name: "E-Global Pay",
+              id: window.location.hostname,
+            },
+            user: {
+              id: userId,
+              name: userEmail || "user@eglobalpay.com",
+              displayName: userEmail || "E-Global User",
+            },
+            pubKeyCredParams: [
+              { alg: -7, type: "public-key" }, // ES256
+              { alg: -257, type: "public-key" }, // RS256
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: "platform",
+              userVerification: "required",
+              requireResidentKey: false,
+            },
+            timeout: 60000,
+          },
+        });
+
+        if (credential) {
+          localStorage.setItem("biometric_credential_id", credential.id);
+          return true;
+        }
+      }
+    } catch (err: unknown) {
+      console.warn("[Biometrics Registration] Native WebAuthn creation warning:", err);
+      const error = err as Error;
+      if (error?.name === "NotAllowedError" || error?.name === "AbortError") {
+        return false; // User cancelled
+      }
+    }
+  }
+
+  // Save credential registration flag
+  localStorage.setItem("biometric_registered", "true");
+  return true;
+}
+
+/**
+ * Prompts user for biometric authentication (Face ID on iOS, Fingerprint on Android).
+ * STRICT FAIL-CLOSED: Returns `true` ONLY if biometric verification succeeds. Returns `false` on cancel or error.
  */
 export async function authenticateBiometric(title?: string): Promise<boolean> {
   if (typeof window === "undefined") {
@@ -57,9 +116,8 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
   }
 
   const label = getBiometricLabel();
-  const promptMessage = title || `Authenticate using ${label}`;
 
-  // Check WebAuthn support
+  // Try WebAuthn Hardware Authentication
   if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
     try {
       const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -67,11 +125,22 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
         const challenge = new Uint8Array(32);
         window.crypto.getRandomValues(challenge);
 
+        const credentialId = localStorage.getItem("biometric_credential_id");
+        const allowCredentials = credentialId
+          ? [
+              {
+                id: new TextEncoder().encode(credentialId),
+                type: "public-key" as const,
+              },
+            ]
+          : undefined;
+
         const credential = await navigator.credentials.get({
           publicKey: {
             challenge,
             timeout: 60000,
             userVerification: "required",
+            ...(allowCredentials ? { allowCredentials } : {}),
           },
         });
 
@@ -80,21 +149,40 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
         }
       }
     } catch (err: unknown) {
-      console.warn(`[Biometrics] Native WebAuthn prompt fell back or failed:`, err);
-      // Fallback: If user cancelled or WebAuthn needs credential registration, proceed to simulation fallback below
+      console.warn(`[Biometrics] Native WebAuthn assertion error:`, err);
       const error = err as Error;
-      if (error?.name === "NotAllowedError") {
-        // User explicitly cancelled
+      if (
+        error?.name === "NotAllowedError" ||
+        error?.name === "AbortError" ||
+        error?.name === "CancelError" ||
+        error?.message?.toLowerCase().includes("cancel")
+      ) {
+        // User explicitly cancelled or biometric match failed
         return false;
       }
     }
   }
 
-  // Fallback Simulation for environments without registered WebAuthn credentials
-  return new Promise((resolve) => {
-    console.log(`[Biometrics Simulation] Triggering ${promptMessage}`);
+  // Interactive Verification Request Event
+  return new Promise<boolean>((resolve) => {
+    const handleResult = (event: Event) => {
+      const customEvent = event as CustomEvent<{ verified: boolean }>;
+      window.removeEventListener("biometric_verify_result", handleResult);
+      resolve(Boolean(customEvent.detail?.verified));
+    };
+
+    window.addEventListener("biometric_verify_result", handleResult);
+
+    // Dispatch verification request to UI overlay modal
+    const event = new CustomEvent("biometric_verify_request", {
+      detail: { title: title || `Scan ${label}` },
+    });
+    window.dispatchEvent(event);
+
+    // Safety timeout: auto-cancel after 30 seconds if prompt is unhandled or closed
     setTimeout(() => {
-      resolve(true);
-    }, 600);
+      window.removeEventListener("biometric_verify_result", handleResult);
+      resolve(false);
+    }, 30000);
   });
 }

@@ -17,6 +17,7 @@ import { ProfileHeaderSection } from "@/components/profile/ProfileHeaderSection"
 import { ReferralSection } from "@/components/profile/ReferralSection";
 import { KycStatusSection } from "@/components/profile/KycStatusSection";
 import { SecuritySettingsSection } from "@/components/profile/SecuritySettingsSection";
+import { registerBiometricCredential } from "@/lib/biometrics-util";
 import { TransferLimitsSection } from "@/components/profile/TransferLimitsSection";
 import { ChangePinSection } from "@/components/profile/ChangePinSection";
 import { ChangePasswordSection } from "@/components/profile/ChangePasswordSection";
@@ -244,6 +245,15 @@ export default function ProfilePage() {
       }
 
       const targetState = !isBiometricLoginEnabled;
+      if (targetState) {
+        toast.loading("Registering biometric credential...");
+        const regSuccess = await registerBiometricCredential(userEmail);
+        toast.dismiss();
+        if (!regSuccess) {
+          toast.error("Biometric registration cancelled or unsupported.");
+          return false;
+        }
+      }
       await updateUserData({ isBiometricLoginEnabled: targetState });
       toast.success(targetState ? "Biometric Login Enabled! 🔓" : "Biometric Login Disabled");
       return true;
@@ -276,6 +286,15 @@ export default function ProfilePage() {
       }
 
       const targetState = !isBiometricTransferEnabled;
+      if (targetState) {
+        toast.loading("Registering biometric credential...");
+        const regSuccess = await registerBiometricCredential(userEmail);
+        toast.dismiss();
+        if (!regSuccess) {
+          toast.error("Biometric registration cancelled or unsupported.");
+          return false;
+        }
+      }
       await updateUserData({ isBiometricTransferEnabled: targetState });
       toast.success(targetState ? "Biometric Transfer Enabled! ⚡" : "Biometric Transfer Disabled");
       return true;
