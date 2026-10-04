@@ -56,9 +56,7 @@ export default function PinPage() {
 
   useModalBackHandler(showFaceIdModal, () => setShowFaceIdModal(false), "face-id-drawer");
 
-  const hasAutoTriggeredBioRef = useRef(false);
-
-  // Biometric login execution
+  // Biometric login execution - triggered explicitly on user button click
   const handleBiometricAuth = async () => {
     if (userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) {
       setIsVerifying(true);
@@ -81,17 +79,6 @@ export default function PinPage() {
       setShowFaceIdModal(true);
     }
   };
-
-  // Auto-trigger biometric prompt if enabled for login
-  useEffect(() => {
-    if (userData?.isBiometricLoginEnabled === true && !hasAutoTriggeredBioRef.current) {
-      hasAutoTriggeredBioRef.current = true;
-      const timer = setTimeout(() => {
-        handleBiometricAuth();
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [userData?.isBiometricLoginEnabled]);
 
   // Loading Delay State
   const [isVerifying, setIsVerifying] = useState(false);
