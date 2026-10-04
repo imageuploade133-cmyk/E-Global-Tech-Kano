@@ -76,7 +76,6 @@ export default function PinPage() {
         router.push("/");
       } else {
         setPin("");
-        toast.error(`${biometricLabel} verification failed or cancelled. Please enter your Access PIN.`);
       }
     } else {
       setShowFaceIdModal(true);
@@ -87,7 +86,10 @@ export default function PinPage() {
   useEffect(() => {
     if (userData?.isBiometricLoginEnabled === true && !hasAutoTriggeredBioRef.current) {
       hasAutoTriggeredBioRef.current = true;
-      handleBiometricAuth();
+      const timer = setTimeout(() => {
+        handleBiometricAuth();
+      }, 400);
+      return () => clearTimeout(timer);
     }
   }, [userData?.isBiometricLoginEnabled]);
 

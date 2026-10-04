@@ -224,9 +224,18 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
   // 0. Try Flutter InAppWebView Native Biometric Bridge (Android / iOS native hardware sensor)
   if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
     try {
-      const res = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
-      const parsed = parseBiometricResponse(res);
-      return parsed.success;
+      let res = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
+      let parsed = parseBiometricResponse(res);
+      if (parsed.success) {
+        return true;
+      }
+      // Brief 300ms retry if native handler was still initializing on app relaunch
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      res = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
+      parsed = parseBiometricResponse(res);
+      if (parsed.success) {
+        return true;
+      }
     } catch (err) {
       console.warn("[Flutter InAppWebView Biometrics] Native bridge call failed:", err);
     }
@@ -261,7 +270,6 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
           }
         }
 
-        // Attempt 1 with credential ID if present
         try {
           const credential = await navigator.credentials.get({
             publicKey: {
@@ -276,38 +284,32 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
             return true;
           }
         } catch (firstErr: unknown) {
-          console.warn("[Biometrics Hardware] Credential assertion attempt 1 failed, retrying open prompt:", firstErr);
-          const firstError = firstErr as Error;
-
-          if (
-            firstError?.name === "NotAllowedError" ||
-            firstError?.name === "AbortError" ||
-            firstError?.message?.toLowerCase().includes("cancel")
-          ) {
-            return false;
-          }
+          console.warn("[Biometrics Hardware] Credential assertion attempt 1 failed, retrying open assertion:", firstErr);
 
           // Retry open WebAuthn prompt without allowCredentials filter
-          const retryCredential = await navigator.credentials.get({
-            publicKey: {
-              challenge,
-              timeout: 60000,
-              userVerification: "preferred",
-            },
-          });
+          try {
+            const retryCredential = await navigator.credentials.get({
+              publicKey: {
+                challenge,
+                timeout: 60000,
+                userVerification: "preferred",
+              },
+            });
 
-          if (retryCredential) {
-            return true;
+            if (retryCredential) {
+              return true;
+            }
+          } catch (retryErr) {
+            console.warn("[Biometrics Hardware] WebAuthn open retry failed:", retryErr);
           }
         }
       }
     } catch (err: unknown) {
       console.warn("[Biometrics Hardware] Hardware biometric scan failed or mismatched:", err);
-      return false;
     }
   }
 
-  // 2. Fallback Event Request for Hybrid / Custom WebView Native Bridge
+  // 2. Fallback Event Request for Custom Prompt Drawer
   return new Promise<boolean>((resolve) => {
     const handleResult = (event: Event) => {
       const customEvent = event as CustomEvent<{ verified: boolean }>;
@@ -317,7 +319,7 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
 
     window.addEventListener("biometric_verify_result", handleResult);
 
-    // Dispatch hardware prompt modal
+    // Dispatch hardware prompt modal event
     const event = new CustomEvent("biometric_verify_request", {
       detail: { title: title || `Scan Enrolled ${label}` },
     });
@@ -326,6 +328,6 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
     setTimeout(() => {
       window.removeEventListener("biometric_verify_result", handleResult);
       resolve(false);
-    }, 30000);
+    }, 45000);
   });
 }
