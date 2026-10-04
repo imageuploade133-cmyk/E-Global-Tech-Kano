@@ -216,16 +216,18 @@ export function BiometricPromptModal() {
             )}
 
             <div className="w-full space-y-2.5 pt-2">
-              {errorMessage ? (
+              {!isScanning && (
                 <button
                   type="button"
                   onClick={triggerNativeHardwareScan}
                   className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] active:scale-98 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border-0"
                 >
-                  <span className="material-symbols-outlined text-[20px]">refresh</span>
-                  <span>Try {label} Scan Again</span>
+                  <span className="material-symbols-outlined text-[20px]">
+                    {type === "faceid" ? "face_6" : "fingerprint"}
+                  </span>
+                  <span>{errorMessage ? `Try ${label} Scan Again` : `Scan ${label} Now`}</span>
                 </button>
-              ) : null}
+              )}
 
               <button
                 type="button"
