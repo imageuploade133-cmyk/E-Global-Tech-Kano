@@ -114,23 +114,20 @@ export function SecuritySettingsSection({
     try {
       if (pinAction === "2fa_toggle") {
         const success = await onToggle2faOtp(enteredPin);
-        if (success) {
-          setIsPinModalOpen(false);
-        } else {
+        setIsPinModalOpen(false);
+        if (!success) {
           setPinDigits(["", "", "", ""]);
         }
       } else if (pinAction === "bio_login_toggle") {
         const success = await onToggleBiometricLogin(enteredPin);
-        if (success) {
-          setIsPinModalOpen(false);
-        } else {
+        setIsPinModalOpen(false);
+        if (!success) {
           setPinDigits(["", "", "", ""]);
         }
       } else if (pinAction === "bio_transfer_toggle") {
         const success = await onToggleBiometricTransfer(enteredPin);
-        if (success) {
-          setIsPinModalOpen(false);
-        } else {
+        setIsPinModalOpen(false);
+        if (!success) {
           setPinDigits(["", "", "", ""]);
         }
       } else {

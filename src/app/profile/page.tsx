@@ -17,7 +17,7 @@ import { ProfileHeaderSection } from "@/components/profile/ProfileHeaderSection"
 import { ReferralSection } from "@/components/profile/ReferralSection";
 import { KycStatusSection } from "@/components/profile/KycStatusSection";
 import { SecuritySettingsSection } from "@/components/profile/SecuritySettingsSection";
-import { registerBiometricCredential } from "@/lib/biometrics-util";
+import { registerBiometricCredential, getBiometricLabel } from "@/lib/biometrics-util";
 import { TransferLimitsSection } from "@/components/profile/TransferLimitsSection";
 import { ChangePinSection } from "@/components/profile/ChangePinSection";
 import { ChangePasswordSection } from "@/components/profile/ChangePasswordSection";
@@ -244,18 +244,19 @@ export default function ProfilePage() {
         return false;
       }
 
+      const bioLabel = getBiometricLabel();
       const targetState = !isBiometricLoginEnabled;
       if (targetState) {
-        toast.loading("Touch sensor to verify biometric credential...");
+        toast.loading(`Touch sensor to verify ${bioLabel} credential...`);
         const regResult = await registerBiometricCredential(userEmail);
         toast.dismiss();
         if (!regResult.success) {
-          toast.error(regResult.message || "Biometric registration failed or was cancelled.");
+          toast.error(regResult.message || `${bioLabel} registration failed or was cancelled.`);
           return false;
         }
       }
-      await updateUserData({ isBiometricLoginEnabled: targetState });
-      toast.success(targetState ? "Biometric Login Enabled! 🔓" : "Biometric Login Disabled");
+      await updateUserData({ isBiometricLoginEnabled: targetState, isFaceIdEnabled: targetState });
+      toast.success(targetState ? `${bioLabel} Login Enabled! 🔓` : `${bioLabel} Login Disabled`);
       return true;
     } catch {
       toast.error("Failed to update Biometric Login state");
@@ -285,18 +286,19 @@ export default function ProfilePage() {
         return false;
       }
 
+      const bioLabel = getBiometricLabel();
       const targetState = !isBiometricTransferEnabled;
       if (targetState) {
-        toast.loading("Touch sensor to verify biometric credential...");
+        toast.loading(`Touch sensor to verify ${bioLabel} credential...`);
         const regResult = await registerBiometricCredential(userEmail);
         toast.dismiss();
         if (!regResult.success) {
-          toast.error(regResult.message || "Biometric registration failed or was cancelled.");
+          toast.error(regResult.message || `${bioLabel} registration failed or was cancelled.`);
           return false;
         }
       }
       await updateUserData({ isBiometricTransferEnabled: targetState });
-      toast.success(targetState ? "Biometric Transfer Enabled! ⚡" : "Biometric Transfer Disabled");
+      toast.success(targetState ? `${bioLabel} Transfer Enabled! ⚡` : `${bioLabel} Transfer Disabled`);
       return true;
     } catch {
       toast.error("Failed to update Biometric Transfer state");
