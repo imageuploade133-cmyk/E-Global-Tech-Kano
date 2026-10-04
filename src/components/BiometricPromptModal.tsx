@@ -16,7 +16,7 @@ export function BiometricPromptModal() {
 
   const isScanningRef = useRef(false);
 
-  // Triggers real native device hardware biometric scan (WebAuthn / LocalAuthenticators)
+  // Triggers real native device hardware biometric scan (Flutter InAppWebView / WebAuthn)
   const triggerNativeHardwareScan = useCallback(async () => {
     if (isScanningRef.current) return;
     isScanningRef.current = true;
@@ -24,6 +24,27 @@ export function BiometricPromptModal() {
     setErrorMessage("");
 
     try {
+      // 1. Flutter InAppWebView Native Biometric Bridge
+      if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
+        const verified = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
+        if (verified) {
+          triggerHaptic();
+          setIsOpen(false);
+          setIsScanning(false);
+          isScanningRef.current = false;
+          window.dispatchEvent(
+            new CustomEvent("biometric_verify_result", { detail: { verified: true } })
+          );
+          return;
+        } else {
+          setErrorMessage("Biometric verification cancelled or failed.");
+          setIsScanning(false);
+          isScanningRef.current = false;
+          return;
+        }
+      }
+
+      // 2. Browser WebAuthn Platform Authenticator
       if (
         typeof window !== "undefined" &&
         window.PublicKeyCredential &&

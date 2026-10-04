@@ -65,6 +65,15 @@ function stringToUint8Array(str: string): Uint8Array {
 export async function registerBiometricCredential(userEmail: string): Promise<boolean> {
   if (typeof window === "undefined") return true;
 
+  if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
+    try {
+      const enabled = await (window as any).flutter_inappwebview.callHandler("enableBiometricLogin");
+      return Boolean(enabled);
+    } catch (err) {
+      console.warn("[Flutter InAppWebView Biometrics] Native enableBiometricLogin call failed:", err);
+    }
+  }
+
   if (window.PublicKeyCredential && navigator.credentials && navigator.credentials.create) {
     try {
       const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -129,6 +138,16 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
   }
 
   const label = getBiometricLabel();
+
+  // 0. Try Flutter InAppWebView Native Biometric Bridge (Android / iOS native hardware sensor)
+  if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
+    try {
+      const verified = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
+      return Boolean(verified);
+    } catch (err) {
+      console.warn("[Flutter InAppWebView Biometrics] Native bridge call failed:", err);
+    }
+  }
 
   // 1. Try Native Device Hardware WebAuthn Authentication (Android Fingerprint Sensor / iOS Face ID)
   if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
