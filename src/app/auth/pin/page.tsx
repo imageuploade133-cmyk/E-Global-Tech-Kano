@@ -58,12 +58,32 @@ export default function PinPage() {
 
   // Biometric login execution - triggered explicitly on user button click
   const handleBiometricAuth = async () => {
-    if (userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) {
-      setIsVerifying(true);
-      setVerifyingText(`Authenticating ${biometricLabel}...`);
-      const success = await authenticateBiometric(`Login with ${biometricLabel}`);
-      setIsVerifying(false);
+    if (typeof window !== "undefined" && window.flutter_inappwebview) {
+      try {
+        const res = await window.flutter_inappwebview.callHandler("triggerNativeBiometric");
+        if (res && res.success === true) {
+          if (userData?.is2faOtpEnabled === true) {
+            setIs2faStage(true);
+            return;
+          }
+          setPinVerified(true);
+          toast.success(`${biometricLabel} Authenticated! Welcome back.`);
+          router.push("/");
+          return;
+        } else if (res && res.error) {
+          const errStr = String(res.error).toLowerCase();
+          if (!errStr.includes("cancel") && !errStr.includes("not allowed")) {
+            toast.error("Biometric verification failed.");
+          }
+        }
+      } catch (err) {
+        console.warn("[Native Biometrics] triggerNativeBiometric error:", err);
+      }
+      return;
+    }
 
+    if (userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) {
+      const success = await authenticateBiometric(`Login with ${biometricLabel}`);
       if (success === true) {
         if (userData?.is2faOtpEnabled === true) {
           setIs2faStage(true);
@@ -76,7 +96,7 @@ export default function PinPage() {
         setPin("");
       }
     } else {
-      setShowFaceIdModal(true);
+      toast.info("Biometric login is only available in the mobile app.");
     }
   };
 

@@ -222,22 +222,21 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
   const label = getBiometricLabel();
 
   // 0. Try Flutter InAppWebView Native Biometric Bridge (Android / iOS native hardware sensor)
-  if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
+  if (typeof window !== "undefined" && window.flutter_inappwebview) {
     try {
-      let res = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
-      let parsed = parseBiometricResponse(res);
+      // Primary JS Handler in Flutter WebView
+      let res = await window.flutter_inappwebview.callHandler("triggerNativeBiometric");
+      if (!res) {
+        res = await window.flutter_inappwebview.callHandler("authenticateBiometric");
+      }
+      const parsed = parseBiometricResponse(res);
       if (parsed.success) {
         return true;
       }
-      // Brief 300ms retry if native handler was still initializing on app relaunch
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      res = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
-      parsed = parseBiometricResponse(res);
-      if (parsed.success) {
-        return true;
-      }
+      return false;
     } catch (err) {
       console.warn("[Flutter InAppWebView Biometrics] Native bridge call failed:", err);
+      return false;
     }
   }
 
