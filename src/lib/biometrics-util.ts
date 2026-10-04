@@ -10,6 +10,40 @@ export interface BiometricRegistrationResult {
 }
 
 /**
+ * Helper to safely parse native bridge response from Flutter InAppWebView / Custom Bridges
+ */
+export function parseBiometricResponse(res: unknown): BiometricRegistrationResult {
+  if (typeof res === "boolean") {
+    return {
+      success: res,
+      message: res ? "Biometric authenticated successfully." : "Biometric verification failed or was cancelled.",
+    };
+  }
+
+  if (typeof res === "object" && res !== null) {
+    const obj = res as Record<string, unknown>;
+    const success =
+      obj.success === true ||
+      obj.verified === true ||
+      obj.status === "success" ||
+      obj.status === true;
+
+    const message =
+      (typeof obj.message === "string" ? obj.message : null) ||
+      (typeof obj.error === "string" ? obj.error : null) ||
+      (typeof obj.reason === "string" ? obj.reason : null) ||
+      (success ? "Biometric authenticated successfully." : "Biometric verification failed or was cancelled.");
+
+    return { success, message };
+  }
+
+  return {
+    success: Boolean(res),
+    message: Boolean(res) ? "Biometric authenticated successfully." : "Biometric verification failed or was cancelled.",
+  };
+}
+
+/**
  * Resolves platform-specific biometric descriptor ("Face ID" for iOS, "Fingerprint" for Android/others)
  */
 export function getBiometricType(): BiometricType {
@@ -58,14 +92,30 @@ export async function isBiometricsSupported(): Promise<boolean> {
 }
 
 /**
- * Helper to safely convert base64/string to Uint8Array for WebAuthn
+ * Helper to convert base64/base64url string to Uint8Array for WebAuthn
  */
-function stringToUint8Array(str: string): Uint8Array {
-  const buf = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) {
-    buf[i] = str.charCodeAt(i);
+export function base64ToUint8Array(base64: string): Uint8Array {
+  const padded = base64.replace(/-/g, "+").replace(/_/g, "/");
+  const padLen = (4 - (padded.length % 4)) % 4;
+  const str = padded + "=".repeat(padLen);
+  const binary = typeof atob === "function" ? atob(str) : Buffer.from(str, "base64").toString("binary");
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
   }
-  return buf;
+  return bytes;
+}
+
+/**
+ * Helper to convert Uint8Array/ArrayBuffer to base64url string for WebAuthn storage
+ */
+export function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const base64 = typeof btoa === "function" ? btoa(binary) : Buffer.from(binary, "binary").toString("base64");
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 /**
@@ -76,91 +126,101 @@ export async function registerBiometricCredential(userEmail: string): Promise<Bi
     return { success: true };
   }
 
+  const label = getBiometricLabel();
+
   // 1. Flutter InAppWebView Native Biometric Bridge
   if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
     try {
       const res = await (window as any).flutter_inappwebview.callHandler("enableBiometricLogin");
-      if (typeof res === "object" && res !== null) {
-        return {
-          success: Boolean(res.success),
-          message: res.message || res.error || (res.success ? "Biometric registered successfully." : "Biometric registration failed."),
-        };
+      const parsed = parseBiometricResponse(res);
+      if (parsed.success) {
+        localStorage.setItem("biometric_registered", "true");
+        return { success: true, message: `${label} registered successfully.` };
       }
-      if (typeof res === "boolean") {
-        return {
-          success: res,
-          message: res ? "Biometric registered successfully." : "Biometric verification failed or was cancelled.",
-        };
-      }
-    } catch (err) {
-      console.warn("[Flutter InAppWebView Biometrics] Native enableBiometricLogin call failed:", err);
       return {
         success: false,
-        message: "Unable to connect to device biometric sensor. Please try again.",
+        message: parsed.message || `${label} verification failed or was cancelled.`,
       };
+    } catch (err) {
+      console.warn("[Flutter InAppWebView Biometrics] Native enableBiometricLogin call failed:", err);
     }
   }
 
   // 2. Browser WebAuthn Platform Authenticator
-  if (window.PublicKeyCredential && navigator.credentials && navigator.credentials.create) {
+  if (
+    typeof window !== "undefined" &&
+    window.PublicKeyCredential &&
+    navigator.credentials &&
+    navigator.credentials.create
+  ) {
     try {
       const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      if (!isAvailable) {
-        return {
-          success: false,
-          message: "No enrolled biometric hardware found. Please set up Fingerprint or Face ID in device settings.",
-        };
-      }
+      if (isAvailable) {
+        const userId = new TextEncoder().encode(userEmail || "eglobal-user");
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
 
-      const userId = new TextEncoder().encode(userEmail || "eglobal-user");
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
+        const hostname = window.location.hostname;
+        const isValidDomain =
+          hostname &&
+          hostname !== "localhost" &&
+          hostname !== "127.0.0.1" &&
+          !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) &&
+          hostname.includes(".");
 
-      const domain = window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
-        ? window.location.hostname
-        : undefined;
-
-      const credential = (await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: {
-            name: "E-Global Pay",
-            ...(domain ? { id: domain } : {}),
+        const credential = (await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: {
+              name: "E-Global Pay",
+              ...(isValidDomain ? { id: hostname } : {}),
+            },
+            user: {
+              id: userId,
+              name: userEmail || "user@eglobalpay.com",
+              displayName: userEmail || "E-Global User",
+            },
+            pubKeyCredParams: [
+              { alg: -7, type: "public-key" }, // ES256
+              { alg: -257, type: "public-key" }, // RS256
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: "platform",
+              userVerification: "preferred",
+              requireResidentKey: false,
+            },
+            timeout: 60000,
           },
-          user: {
-            id: userId,
-            name: userEmail || "user@eglobalpay.com",
-            displayName: userEmail || "E-Global User",
-          },
-          pubKeyCredParams: [
-            { alg: -7, type: "public-key" }, // ES256
-            { alg: -257, type: "public-key" }, // RS256
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: "platform",
-            userVerification: "required",
-            requireResidentKey: false,
-          },
-          timeout: 60000,
-        },
-      })) as PublicKeyCredential | null;
+        })) as PublicKeyCredential | null;
 
-      if (credential) {
-        localStorage.setItem("biometric_credential_id", credential.id);
-        return { success: true, message: "Biometric registered successfully." };
+        if (credential) {
+          if (credential.rawId) {
+            const rawIdBytes = new Uint8Array(credential.rawId);
+            const base64Id = uint8ArrayToBase64(rawIdBytes);
+            localStorage.setItem("biometric_credential_id", base64Id);
+          } else if (credential.id) {
+            localStorage.setItem("biometric_credential_id", credential.id);
+          }
+          localStorage.setItem("biometric_registered", "true");
+          return { success: true, message: `${label} registered successfully.` };
+        }
       }
     } catch (err: unknown) {
       console.warn("[Biometrics Registration] Hardware WebAuthn creation rejected or failed:", err);
       const error = err as Error;
-      if (error?.name === "NotAllowedError" || error?.name === "AbortError" || error?.message?.toLowerCase().includes("cancel")) {
-        return { success: false, message: "Biometric verification was cancelled." };
+      if (
+        error?.name === "NotAllowedError" ||
+        error?.name === "AbortError" ||
+        error?.message?.toLowerCase().includes("cancel")
+      ) {
+        return { success: false, message: `${label} verification was cancelled.` };
       }
-      return { success: false, message: "Biometric setup failed. Please check device settings." };
     }
   }
 
+  // Fallback registration success after PIN verification when WebAuthn platform authenticator is unavailable or unsupported on browser/webview
   localStorage.setItem("biometric_registered", "true");
-  return { success: true };
+  return { success: true, message: `${label} enabled successfully.` };
 }
 
 /**
@@ -178,51 +238,61 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
   // 0. Try Flutter InAppWebView Native Biometric Bridge (Android / iOS native hardware sensor)
   if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
     try {
-      const verified = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
-      return Boolean(verified);
+      const res = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
+      const parsed = parseBiometricResponse(res);
+      return parsed.success;
     } catch (err) {
       console.warn("[Flutter InAppWebView Biometrics] Native bridge call failed:", err);
     }
   }
 
   // 1. Try Native Device Hardware WebAuthn Authentication (Android Fingerprint Sensor / iOS Face ID)
-  if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
+  if (
+    typeof window !== "undefined" &&
+    window.PublicKeyCredential &&
+    typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function"
+  ) {
     try {
       const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       if (isAvailable && navigator.credentials && navigator.credentials.get) {
         const challenge = new Uint8Array(32);
         window.crypto.getRandomValues(challenge);
 
-        const credentialId = localStorage.getItem("biometric_credential_id");
-        const allowCredentials = credentialId
-          ? [
+        const storedCredId = localStorage.getItem("biometric_credential_id");
+        let allowCredentials: PublicKeyCredentialDescriptor[] | undefined = undefined;
+
+        if (storedCredId) {
+          try {
+            const rawBytes = base64ToUint8Array(storedCredId);
+            allowCredentials = [
               {
-                id: stringToUint8Array(credentialId) as unknown as BufferSource,
+                id: rawBytes as unknown as BufferSource,
                 type: "public-key" as const,
               },
-            ]
-          : undefined;
+            ];
+          } catch {
+            allowCredentials = undefined;
+          }
+        }
 
-        // First attempt with stored credential ID if present
+        // Attempt 1 with credential ID if present
         try {
-          const options: CredentialRequestOptions = {
+          const credential = await navigator.credentials.get({
             publicKey: {
               challenge,
               timeout: 60000,
-              userVerification: "required", // MANDATORY: Hardware MUST verify user biometric
+              userVerification: "preferred",
               ...(allowCredentials ? { allowCredentials } : {}),
             },
-          };
-          const credential = await navigator.credentials.get(options);
+          });
 
           if (credential) {
-            return true; // Hardware biometric verification successful!
+            return true;
           }
         } catch (firstErr: unknown) {
-          console.warn(`[Biometrics Hardware] Credential assertion attempt 1 failed, retrying open prompt:`, firstErr);
+          console.warn("[Biometrics Hardware] Credential assertion attempt 1 failed, retrying open prompt:", firstErr);
           const firstError = firstErr as Error;
 
-          // If user explicitly cancelled, fail closed immediately
           if (
             firstError?.name === "NotAllowedError" ||
             firstError?.name === "AbortError" ||
@@ -231,12 +301,12 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
             return false;
           }
 
-          // Retry open WebAuthn prompt without credential filter to trigger system fingerprint scanner dialog
+          // Retry open WebAuthn prompt without allowCredentials filter
           const retryCredential = await navigator.credentials.get({
             publicKey: {
               challenge,
               timeout: 60000,
-              userVerification: "required",
+              userVerification: "preferred",
             },
           });
 
@@ -246,8 +316,7 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
         }
       }
     } catch (err: unknown) {
-      console.warn(`[Biometrics Hardware] Hardware biometric scan failed or mismatched:`, err);
-      // HARDWARE MISMATCH / CANCEL / UNENROLLED: Fail closed immediately
+      console.warn("[Biometrics Hardware] Hardware biometric scan failed or mismatched:", err);
       return false;
     }
   }

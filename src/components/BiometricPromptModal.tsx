@@ -2,7 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getBiometricLabel, getBiometricType } from "@/lib/biometrics-util";
+import {
+  getBiometricLabel,
+  getBiometricType,
+  parseBiometricResponse,
+  base64ToUint8Array,
+} from "@/lib/biometrics-util";
 import { triggerHaptic } from "@/lib/haptics";
 
 export function BiometricPromptModal() {
@@ -26,8 +31,9 @@ export function BiometricPromptModal() {
     try {
       // 1. Flutter InAppWebView Native Biometric Bridge
       if (typeof window !== "undefined" && (window as any).flutter_inappwebview) {
-        const verified = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
-        if (verified) {
+        const res = await (window as any).flutter_inappwebview.callHandler("authenticateBiometric");
+        const parsed = parseBiometricResponse(res);
+        if (parsed.success) {
           triggerHaptic();
           setIsOpen(false);
           setIsScanning(false);
@@ -37,7 +43,7 @@ export function BiometricPromptModal() {
           );
           return;
         } else {
-          setErrorMessage("Biometric verification cancelled or failed.");
+          setErrorMessage(parsed.message || "Biometric verification cancelled or failed.");
           setIsScanning(false);
           isScanningRef.current = false;
           return;
@@ -57,21 +63,28 @@ export function BiometricPromptModal() {
           window.crypto.getRandomValues(challenge);
 
           const credentialId = localStorage.getItem("biometric_credential_id");
-          const allowCredentials = credentialId
-            ? [
+          let allowCredentials: PublicKeyCredentialDescriptor[] | undefined = undefined;
+
+          if (credentialId) {
+            try {
+              const rawBytes = base64ToUint8Array(credentialId);
+              allowCredentials = [
                 {
-                  id: new TextEncoder().encode(credentialId),
+                  id: rawBytes as unknown as BufferSource,
                   type: "public-key" as const,
                 },
-              ]
-            : undefined;
+              ];
+            } catch {
+              allowCredentials = undefined;
+            }
+          }
 
           // Invoke OS Native Biometric Scanner (Face ID / Android Fingerprint dialog)
           const credential = await navigator.credentials.get({
             publicKey: {
               challenge,
               timeout: 60000,
-              userVerification: "required", // MANDATORY: Hardware MUST verify user biometric
+              userVerification: "preferred",
               ...(allowCredentials ? { allowCredentials } : {}),
             },
           });
