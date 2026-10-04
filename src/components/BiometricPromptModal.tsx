@@ -215,28 +215,17 @@ export function BiometricPromptModal() {
               </div>
             )}
 
-            <div className="w-full space-y-2.5">
-              {/* Scan Hardware Sensor Button */}
-              <button
-                type="button"
-                disabled={isScanning}
-                onClick={triggerNativeHardwareScan}
-                className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] active:scale-98 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border-0 disabled:opacity-50"
-              >
-                {isScanning ? (
-                  <>
-                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
-                    <span>Scanning Device Sensor...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[20px]">
-                      {type === "faceid" ? "face_6" : "fingerprint"}
-                    </span>
-                    <span>Touch Sensor to Scan {label}</span>
-                  </>
-                )}
-              </button>
+            <div className="w-full space-y-2.5 pt-2">
+              {errorMessage ? (
+                <button
+                  type="button"
+                  onClick={triggerNativeHardwareScan}
+                  className="w-full py-4 bg-[#FC7A00] hover:bg-[#e06600] active:scale-98 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border-0"
+                >
+                  <span className="material-symbols-outlined text-[20px]">refresh</span>
+                  <span>Try {label} Scan Again</span>
+                </button>
+              ) : null}
 
               <button
                 type="button"
