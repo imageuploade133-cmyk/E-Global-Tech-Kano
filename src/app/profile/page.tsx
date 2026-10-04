@@ -246,11 +246,11 @@ export default function ProfilePage() {
 
       const targetState = !isBiometricLoginEnabled;
       if (targetState) {
-        toast.loading("Registering biometric credential...");
-        const regSuccess = await registerBiometricCredential(userEmail);
+        toast.loading("Touch sensor to verify biometric credential...");
+        const regResult = await registerBiometricCredential(userEmail);
         toast.dismiss();
-        if (!regSuccess) {
-          toast.error("Biometric registration cancelled or unsupported.");
+        if (!regResult.success) {
+          toast.error(regResult.message || "Biometric registration failed or was cancelled.");
           return false;
         }
       }
@@ -287,11 +287,11 @@ export default function ProfilePage() {
 
       const targetState = !isBiometricTransferEnabled;
       if (targetState) {
-        toast.loading("Registering biometric credential...");
-        const regSuccess = await registerBiometricCredential(userEmail);
+        toast.loading("Touch sensor to verify biometric credential...");
+        const regResult = await registerBiometricCredential(userEmail);
         toast.dismiss();
-        if (!regSuccess) {
-          toast.error("Biometric registration cancelled or unsupported.");
+        if (!regResult.success) {
+          toast.error(regResult.message || "Biometric registration failed or was cancelled.");
           return false;
         }
       }
