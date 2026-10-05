@@ -190,7 +190,7 @@ function PushNotificationsContent() {
     if (!file) return;
 
     setIsUploading(true);
-    toast.loading("Uploading banner image to ImgBB...");
+    toast.loading("Uploading banner image to secure storage...");
 
     try {
       const result = await uploadImageSecurely(file, "banner");

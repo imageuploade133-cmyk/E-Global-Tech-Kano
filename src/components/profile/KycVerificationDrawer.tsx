@@ -178,12 +178,12 @@ export function KycVerificationDrawer({
 
     setIsSubmitting(true);
     setSubmitStep("uploading");
-    setStatusMessage("Securing connection and uploading document image to ImgBB...");
+    setStatusMessage("Securing connection and uploading document image to secure storage...");
 
     try {
       let uploadedUrl = "";
 
-      // Convert active image source into a File object for ImgBB upload
+      // Convert active image source into a File object for secure storage upload
       let fileToUpload: File | null = selectedFile;
       if (!fileToUpload && selfiePreview && selfiePreview.startsWith("data:")) {
         try {
@@ -207,7 +207,7 @@ export function KycVerificationDrawer({
         if (uploadResult.success && uploadResult.url) {
           uploadedUrl = uploadResult.url;
         } else {
-          throw new Error(uploadResult.error || "Failed to upload selfie image to ImgBB.");
+          throw new Error(uploadResult.error || "Failed to upload selfie image.");
         }
       } else {
         throw new Error("No valid image file available for upload.");
