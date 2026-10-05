@@ -595,9 +595,7 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSignUp} className="space-y-6" autoComplete="off" data-lpignore="true" data-form-type="other">
-          <input type="text" style={{ display: 'none' }} name="prevent_autofill" tabIndex={-1} aria-hidden="true" />
-          <input type="password" style={{ display: 'none' }} name="password_prevent_autofill" tabIndex={-1} aria-hidden="true" />
+        <form onSubmit={handleSignUp} className="space-y-6" autoComplete="on">
           <AnimatePresence mode="wait">
             {/* STEP 1: Personal Details */}
             {currentStep === 1 && (
@@ -697,11 +695,9 @@ export default function SignUpPage() {
                     <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
                       <input
                         id="email"
-                        name="email_no_autofill"
+                        name="email"
                         type="email"
-                        autoComplete="off"
-                        data-lpignore="true"
-                        data-form-type="other"
+                        autoComplete="email"
                         required
                         value={email}
                         onChange={(e) => {
@@ -1003,11 +999,9 @@ export default function SignUpPage() {
                     <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
                       <input
                         id="password"
-                        name="password_no_autofill"
+                        name="password"
                         type={showPassword ? "text" : "password"}
                         autoComplete="new-password"
-                        data-lpignore="true"
-                        data-form-type="other"
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -1031,11 +1025,9 @@ export default function SignUpPage() {
                     <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs relative">
                       <input
                         id="confirmPassword"
-                        name="confirm_password_no_autofill"
+                        name="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         autoComplete="new-password"
-                        data-lpignore="true"
-                        data-form-type="other"
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
