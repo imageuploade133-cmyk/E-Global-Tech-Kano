@@ -283,6 +283,8 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [showWeakPasswordModal, setShowWeakPasswordModal] = useState(false);
+  const [hasConfirmedWeakPassword, setHasConfirmedWeakPassword] = useState(false);
 
   // UI States
   const [showPassword, setShowPassword] = useState(false);
@@ -431,10 +433,8 @@ export default function SignUpPage() {
     e.preventDefault();
     setTermsError("");
 
-    // Step 4 final validations
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!password || !passwordRegex.test(password)) {
-      toast.error("Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.");
+    if (!password || password.length < 6) {
+      toast.error("Password must be at least 6 characters.");
       return;
     }
 
@@ -446,6 +446,13 @@ export default function SignUpPage() {
     if (!acceptedTerms || !acceptedPrivacy) {
       setTermsError("You must accept both the Terms & Conditions and Privacy Policy.");
       toast.error("Please accept both the Terms and Privacy Policy.");
+      return;
+    }
+
+    // Check if password is weak (doesn't meet full strong requirements)
+    const isStrongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(password);
+    if (!isStrongPassword && !hasConfirmedWeakPassword) {
+      setShowWeakPasswordModal(true);
       return;
     }
 
@@ -1307,6 +1314,70 @@ export default function SignUpPage() {
           </Link>
         </p>
       </motion.div>
+
+      {/* Weak Password Confirmation Modal */}
+      <AnimatePresence>
+        {showWeakPasswordModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[999999] flex items-center justify-center p-4 font-hanken"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl p-6 max-w-sm w-full text-center space-y-5 border border-gray-100 shadow-xl text-black"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#FC7A00] mx-auto">
+                <span className="material-symbols-outlined text-[32px]">shield_lock</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="font-extrabold text-base text-gray-900 uppercase tracking-tight">Weak Password Warning</h3>
+                <p className="text-xs text-gray-600 leading-relaxed font-semibold">
+                  Your chosen password does not meet our recommended strong password guidelines (8+ characters with uppercase, lowercase, numbers, and symbols).
+                </p>
+              </div>
+
+              <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl text-left text-[11px] text-amber-900 font-semibold space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm text-amber-600">info</span>
+                  Security Recommendation
+                </p>
+                <p>Using a weak password increases the risk of unauthorized access. Are you sure you want to proceed with this password?</p>
+              </div>
+
+              <div className="flex flex-col gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowWeakPasswordModal(false);
+                    setHasConfirmedWeakPassword(true);
+                    // Trigger signup again with confirmed weak password
+                    setTimeout(() => {
+                      const form = document.querySelector("form");
+                      if (form) form.requestSubmit();
+                    }, 50);
+                  }}
+                  className="w-full py-3.5 bg-[#FC7A00] hover:brightness-105 active:scale-98 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all shadow-sm"
+                >
+                  Agree & Continue with Weak Password
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWeakPasswordModal(false)}
+                  className="w-full py-3 bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-700 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer transition-all"
+                >
+                  Improve Password
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

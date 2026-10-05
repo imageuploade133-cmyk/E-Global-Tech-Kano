@@ -85,33 +85,48 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Active check on the Firestore otp_sessions collection for verified WhatsApp OTP state
-    // Generate all potential phone number format variations to match the verified session robustly
-    const cleanPrefix = phonePrefix.trim().replace(/\D/g, "");
-    const cleanNum = phoneNumber.trim().replace(/\D/g, "");
-    const cleanNumNoZero = cleanNum.startsWith("0") ? cleanNum.slice(1) : cleanNum;
+    // Check if EITHER WhatsApp OTP (in otp_sessions) OR Email OTP (in signup_email_otps) was verified
+    const cleanEmail = email ? email.trim().toLowerCase() : "";
+    let isChannelVerified = false;
 
-    const possiblePhones = Array.from(new Set([
-      `${cleanPrefix}${cleanNum}`,
-      `${cleanPrefix}${cleanNumNoZero}`,
-      `+${cleanPrefix}${cleanNum}`,
-      `+${cleanPrefix}${cleanNumNoZero}`,
-      `${phonePrefix}${phoneNumber.trim()}`,
-      cleanNum,
-      cleanNumNoZero
-    ])).filter(Boolean);
+    // 1. Check Email OTP Verification (signup_email_otps)
+    if (cleanEmail) {
+      const emailOtpSnap = await adminDb.collection("signup_email_otps").doc(cleanEmail).get();
+      if (emailOtpSnap.exists && emailOtpSnap.data()?.verified === true) {
+        isChannelVerified = true;
+      }
+    }
 
-    console.log("[Register API] Checking verified WhatsApp OTP with potential formats:", possiblePhones);
+    // 2. Check WhatsApp OTP Verification (otp_sessions)
+    if (!isChannelVerified && phoneNumber) {
+      const cleanPrefix = phonePrefix.trim().replace(/\D/g, "");
+      const cleanNum = phoneNumber.trim().replace(/\D/g, "");
+      const cleanNumNoZero = cleanNum.startsWith("0") ? cleanNum.slice(1) : cleanNum;
 
-    const otpQuery = await adminDb.collection("otp_sessions")
-      .where("phoneNumber", "in", possiblePhones)
-      .where("type", "==", "signup")
-      .where("verified", "==", true)
-      .get();
+      const possiblePhones = Array.from(new Set([
+        `${cleanPrefix}${cleanNum}`,
+        `${cleanPrefix}${cleanNumNoZero}`,
+        `+${cleanPrefix}${cleanNum}`,
+        `+${cleanPrefix}${cleanNumNoZero}`,
+        `${phonePrefix}${phoneNumber.trim()}`,
+        cleanNum,
+        cleanNumNoZero
+      ])).filter(Boolean);
 
-    if (otpQuery.empty) {
+      const otpQuery = await adminDb.collection("otp_sessions")
+        .where("phoneNumber", "in", possiblePhones)
+        .where("type", "==", "signup")
+        .where("verified", "==", true)
+        .get();
+
+      if (!otpQuery.empty) {
+        isChannelVerified = true;
+      }
+    }
+
+    if (!isChannelVerified) {
       return NextResponse.json({
-        error: "Your WhatsApp phone number has not been verified yet. Please verify it before proceeding."
+        error: "Contact verification required. Please verify your Email or WhatsApp number with the verification code before proceeding."
       }, { status: 400 });
     }
 
@@ -134,11 +149,10 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Password Validation: 8 chars, uppercase, lowercase, number, special char
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!password || !passwordRegex.test(password)) {
+    // Password Validation: Minimum 6 characters (allows weak passwords if user confirmed)
+    if (!password || String(password).length < 6) {
       return NextResponse.json({
-        error: "Password must be at least 8 characters and include uppercase, lowercase, number, and a special character.",
+        error: "Password must be at least 6 characters.",
       }, { status: 400 });
     }
 
