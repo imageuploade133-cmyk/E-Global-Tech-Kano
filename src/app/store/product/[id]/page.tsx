@@ -25,6 +25,7 @@ import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
 import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
+import { InvestmentPinModal } from "@/components/investment/InvestmentPinModal";
 
 interface ProductReview {
   id: string;
@@ -104,6 +105,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [customerDeliveryPhone, setCustomerDeliveryPhone] = useState<string>(String(userData?.phoneNumber || ""));
   const [customerDeliveryAddress, setCustomerDeliveryAddress] = useState<string>("");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isStorePinModalOpen, setIsStorePinModalOpen] = useState<boolean>(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
 
   // Lock body scroll & mobile hardware back button handling across modals
@@ -372,6 +374,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       return;
     }
 
+    if (selectedPaymentMethod === "WALLET_NGN") {
+      setIsStorePinModalOpen(true);
+      return;
+    }
+
+    executeStoreOrder();
+  };
+
+  const executeStoreOrder = async () => {
+    setIsStorePinModalOpen(false);
     setIsPlacingOrder(true);
     toast.loading("Processing order payment...", { id: "place-order" });
 
@@ -1510,6 +1522,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
         )}
+
+        {/* Store Payment PIN / Biometric Authorization Modal */}
+        <InvestmentPinModal
+          isOpen={isStorePinModalOpen}
+          onClose={() => setIsStorePinModalOpen(false)}
+          title="Authorize Store Purchase"
+          description={`Approving ₦${cart.reduce((s, i) => s + i.product.price * i.quantity, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} store order.`}
+          isSubmitting={isPlacingOrder}
+          onPinSubmit={() => executeStoreOrder()}
+        />
       </div>
     </RouteGuard>
   );

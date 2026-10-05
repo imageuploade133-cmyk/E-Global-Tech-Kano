@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Biller, BillItem } from "./types";
 import { useAuth } from "@/lib/AuthContext";
 import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
+import { getBiometricLabel, getBiometricType, authenticateBiometric } from "@/lib/biometrics-util";
+import { toast } from "sonner";
 
 interface BillPinModalProps {
   isOpen: boolean;
@@ -35,6 +37,13 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
   if (!isOpen) return null;
 
   const is2faActive = userData?.is2faOtpEnabled === true;
+  const isBiometricEnabled =
+    userData?.isBiometricTransferEnabled === true ||
+    userData?.isBiometricLoginEnabled === true ||
+    userData?.isFaceIdEnabled === true;
+
+  const biometricLabel = getBiometricLabel();
+  const biometricType = getBiometricType();
 
   const handlePinPress = (num: string) => {
     if (enteredPin.length < 4) {
@@ -50,6 +59,23 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
     setEnteredPin((prev) => prev.slice(0, -1));
   };
 
+  const handleBiometricAuth = async () => {
+    if (!navigator.onLine) {
+      toast.error("Internet connection required to verify biometrics.");
+      return;
+    }
+    toast.loading(`Authenticating ${biometricLabel}...`);
+    const success = await authenticateBiometric(`Authorize ₦${finalAmount.toLocaleString()} payment`);
+    toast.dismiss();
+
+    if (success) {
+      toast.success(`${biometricLabel} Authenticated! Executing payment...`);
+      onExecutePayment("0000");
+    } else {
+      toast.error(`${biometricLabel} authentication failed or cancelled.`);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -61,23 +87,23 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
           className="fixed inset-0 bg-white z-[99999] p-6 flex flex-col justify-between text-black max-w-md mx-auto"
         >
           {/* Back / Close button */}
-          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <button
               type="button"
               onClick={onClose}
-              className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer shadow-none"
+              className="w-9 h-9 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-500 hover:text-black transition-all cursor-pointer shadow-none"
               title="Close Pin Pad"
             >
-              <span className="material-symbols-outlined text-[20px] font-bold">arrow_back</span>
+              <span className="material-symbols-outlined text-[18px] font-bold">arrow_back</span>
             </button>
-            <h3 className="font-hanken font-black text-sm text-black uppercase tracking-wider">
+            <h3 className="font-hanken font-black text-xs text-black uppercase tracking-wider">
               Secure Verification
             </h3>
-            <div className="w-10" />
+            <div className="w-9" />
           </div>
 
           {/* Central Details and dots or 2FA OTP */}
-          <div className="flex-grow flex flex-col items-center justify-center space-y-6 py-6 overflow-y-auto">
+          <div className="flex-grow flex flex-col items-center justify-center space-y-4 py-4 overflow-y-auto">
             {is2faActive ? (
               <TwoFactorOtpVerificationView
                 user={user}
@@ -89,36 +115,36 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
             ) : (
               <>
                 {/* Visual Lock Badge */}
-                <div className="w-16 h-16 bg-orange-50 border border-orange-100 text-primary rounded-full flex items-center justify-center shadow-sm">
-                  <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: '"FILL" 1' }}>
+                <div className="w-12 h-12 bg-orange-50 border border-orange-100 text-primary rounded-full flex items-center justify-center shadow-sm">
+                  <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: '"FILL" 1' }}>
                     lock
                   </span>
                 </div>
 
-                <div className="text-center space-y-2">
+                <div className="text-center space-y-1">
                   <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
                     Order Payout Settlement
                   </p>
-                  <p className="font-mono text-3xl font-black text-black">
+                  <p className="font-mono text-2xl font-black text-black">
                     ₦{finalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
-                  <p className="text-xs text-gray-500 font-semibold max-w-[260px] mx-auto leading-relaxed mt-1">
+                  <p className="text-[11px] text-gray-500 font-semibold max-w-[260px] mx-auto leading-tight">
                     Paying <span className="font-bold text-black">{selectedBiller?.name}</span> for{" "}
                     <span className="font-bold text-black">{selectedItem?.name}</span>
                   </p>
                 </div>
 
-                <div className="space-y-4 w-full flex flex-col items-center">
-                  <p className="font-hanken text-[11px] text-gray-400 text-center max-w-[240px]">
-                    Provide your highly secure 4-digit Access PIN to approve this debit transaction.
+                <div className="space-y-2 w-full flex flex-col items-center">
+                  <p className="font-hanken text-[10px] text-gray-400 text-center max-w-[240px]">
+                    Enter your 4-digit PIN or use biometrics to authorize.
                   </p>
 
                   {/* 4 Box PIN Indicators */}
-                  <div className="flex justify-center gap-2 pt-1">
+                  <div className="flex justify-center gap-2 pt-0.5">
                     {[0, 1, 2, 3].map((idx) => (
                       <div
                         key={idx}
-                        className={`w-11 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
+                        className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center text-base font-black transition-all ${
                           enteredPin.length > idx
                             ? "border-[#FC7A00] bg-orange-50/40 text-black"
                             : "border-gray-200 bg-white"
@@ -131,13 +157,13 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
                 </div>
 
                 {/* Standardized Transaction Keypad Grid */}
-                <div className="grid grid-cols-3 gap-2.5 pt-1 w-full max-w-xs mx-auto">
+                <div className="grid grid-cols-3 gap-2 pt-1 w-full max-w-xs mx-auto">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                     <button
                       key={num}
                       type="button"
                       onClick={() => handlePinPress(num.toString())}
-                      className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                      className="py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-sm font-black text-black cursor-pointer active:scale-95 transition-all"
                     >
                       {num}
                     </button>
@@ -145,30 +171,44 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setEnteredPin("")}
-                    className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
+                    className="py-2.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-[10px] font-bold text-gray-600 cursor-pointer active:scale-95 transition-all"
                   >
                     CLEAR
                   </button>
                   <button
                     type="button"
                     onClick={() => handlePinPress("0")}
-                    className="py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-base font-black text-black cursor-pointer active:scale-95 transition-all"
+                    className="py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-sm font-black text-black cursor-pointer active:scale-95 transition-all"
                   >
                     0
                   </button>
                   <button
                     type="button"
                     onClick={handlePinDelete}
-                    className="py-3.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
+                    className="py-2.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 cursor-pointer active:scale-95 transition-all flex items-center justify-center"
                   >
-                    <span className="material-symbols-outlined text-[20px]">backspace</span>
+                    <span className="material-symbols-outlined text-[18px]">backspace</span>
                   </button>
                 </div>
+
+                {/* Compact Biometric Authorization Option */}
+                {isBiometricEnabled && (
+                  <button
+                    type="button"
+                    onClick={handleBiometricAuth}
+                    className="w-full max-w-xs mx-auto py-2.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-1.5 mt-1"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      {biometricType === "faceid" ? "face_6" : "fingerprint"}
+                    </span>
+                    <span>Authorize via {biometricLabel}</span>
+                  </button>
+                )}
               </>
             )}
           </div>
 
-          <div className="h-4" />
+          <div className="h-2" />
         </motion.div>
       )}
     </AnimatePresence>
