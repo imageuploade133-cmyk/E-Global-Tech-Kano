@@ -22,6 +22,7 @@ import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
 import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
+import { InvestmentPinModal } from "@/components/investment/InvestmentPinModal";
 import {
   StoreItem,
   StoreSlide,
@@ -113,6 +114,7 @@ export default function StorePage() {
   const [customerDeliveryPhone, setCustomerDeliveryPhone] = useState<string>(String(userData?.phoneNumber || ""));
   const [customerDeliveryAddress, setCustomerDeliveryAddress] = useState<string>("");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isStorePinModalOpen, setIsStorePinModalOpen] = useState<boolean>(false);
   const [confirmedOrder, setConfirmedOrder] = useState<OrderRecord | null>(null);
 
   // Customer Order History Drawer state
@@ -314,6 +316,16 @@ export default function StorePage() {
       return;
     }
 
+    if (selectedPaymentMethod === "WALLET_NGN") {
+      setIsStorePinModalOpen(true);
+      return;
+    }
+
+    executeStoreOrder();
+  };
+
+  const executeStoreOrder = async () => {
+    setIsStorePinModalOpen(false);
     setIsPlacingOrder(true);
     toast.loading("Processing order payment...", { id: "place-order" });
 
@@ -608,6 +620,16 @@ export default function StorePage() {
         <StoreConfirmedOrderModal
           confirmedOrder={confirmedOrder}
           onClose={() => setConfirmedOrder(null)}
+        />
+
+        {/* Store Payment PIN / Biometric Authorization Modal */}
+        <InvestmentPinModal
+          isOpen={isStorePinModalOpen}
+          onClose={() => setIsStorePinModalOpen(false)}
+          title="Authorize Store Purchase"
+          description={`Approving ₦${cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} store order.`}
+          isSubmitting={isPlacingOrder}
+          onPinSubmit={() => executeStoreOrder()}
         />
 
         <BottomNav />

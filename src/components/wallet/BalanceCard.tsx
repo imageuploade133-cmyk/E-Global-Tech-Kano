@@ -1890,6 +1890,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   const handleBiometricTransferAuth = async () => {
+    if (!navigator.onLine) {
+      toast.error("Internet connection required to verify biometrics.");
+      return;
+    }
     const label = getBiometricLabel();
     toast.loading(`Authenticating ${label}...`);
     const success = await authenticateBiometric(`Authorize ₦${trfTotalDebit.toLocaleString()} transfer`);
@@ -4268,14 +4272,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       </div>
 
                       {/* Biometric Transfer or PIN Authorize Transfer button */}
-                      <div className="w-full max-w-xs mx-auto pt-1 pb-2 space-y-2">
-                        {userData?.isBiometricTransferEnabled === true && (
+                      <div className="w-full max-w-xs mx-auto pt-1 pb-2 space-y-1.5">
+                        {(userData?.isBiometricTransferEnabled === true || userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) && (
                           <button
                             type="button"
                             onClick={handleBiometricTransferAuth}
-                            className="w-full py-3.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
+                            className="w-full py-2.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-1.5"
                           >
-                            <span className="material-symbols-outlined text-[20px]">
+                            <span className="material-symbols-outlined text-[18px]">
                               {getBiometricType() === "faceid" ? "face_6" : "fingerprint"}
                             </span>
                             <span>Authorize via {getBiometricLabel()}</span>
@@ -4286,7 +4290,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                           type="button"
                           disabled={trfPin.length < 4}
                           onClick={() => executeOutwardTransfer(trfPin)}
-                          className="w-full py-3.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer shadow-md transition-all active:scale-98"
+                          className="w-full py-2.5 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98"
                         >
                           Authorize via PIN
                         </button>
