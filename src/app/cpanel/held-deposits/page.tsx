@@ -35,18 +35,7 @@ interface HeldDepositRecord {
   virtualAccountBankName?: string;
   createdAt: string;
   completedAt?: string;
-  metadata?: {
-    isHeldDeposit?: boolean;
-    heldAmount?: number;
-    heldReason?: string;
-    heldAt?: string;
-    wasHeldReleased?: boolean;
-    releasedBy?: string;
-    releasedAt?: string;
-    canceledReason?: string;
-    canceledBy?: string;
-    canceledAt?: string;
-  };
+  metadata?: Record<string, any>;
 }
 
 interface Metrics {
@@ -55,6 +44,93 @@ interface Metrics {
   releasedCount: number;
   releasedAmount: number;
   canceledCount: number;
+}
+
+/**
+ * Helper to format timestamps into 12-hour AM/PM format (e.g., Oct 5, 2026, 6:42:15 AM)
+ */
+function format12HourDate(dateInput?: string | number | Date | null): string {
+  if (!dateInput) return "N/A";
+  try {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return String(dateInput);
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return String(dateInput);
+  }
+}
+
+/**
+ * Resolves sender bank name, account number, and full name across record fields & metadata
+ */
+function resolveSenderBankAndAccount(record: HeldDepositRecord): { bankName: string; accountNumber: string; fullName: string } {
+  const meta = (record.metadata || {}) as Record<string, any>;
+  const bankName =
+    record.senderBankName ||
+    meta.senderBankName ||
+    meta.sender_bank_name ||
+    meta.originatorBankName ||
+    meta.originator_bank_name ||
+    meta.bankName ||
+    meta.bank_name ||
+    "Bank";
+
+  const accountNumber =
+    record.senderAccountNumber ||
+    meta.senderAccountNumber ||
+    meta.sender_account_number ||
+    meta.originatorAccountNumber ||
+    meta.originator_account_number ||
+    meta.sender_account ||
+    "N/A";
+
+  const fullName =
+    record.senderName ||
+    meta.senderName ||
+    meta.sender_name ||
+    meta.originatorName ||
+    meta.originator_name ||
+    meta.customer_name ||
+    record.recipientName ||
+    "Deposit Sender";
+
+  return { bankName, accountNumber, fullName };
+}
+
+/**
+ * Resolves virtual account bank name and virtual account number across record fields & metadata
+ */
+function resolveVirtualBankAndAccount(record: HeldDepositRecord): { bankName: string; accountNumber: string } {
+  const meta = (record.metadata || {}) as Record<string, any>;
+  const bankName =
+    record.virtualAccountBankName ||
+    meta.virtualAccountBankName ||
+    meta.virtual_account_bank_name ||
+    meta.receivingBankName ||
+    meta.receiving_bank_name ||
+    record.virtualAccountBankName ||
+    meta.bank_name ||
+    "E-Global Pay";
+
+  const accountNumber =
+    record.virtualAccountNumber ||
+    meta.virtualAccountNumber ||
+    meta.virtual_account_number ||
+    meta.receivingAccountNumber ||
+    meta.receiving_account_number ||
+    record.virtualAccountNumber ||
+    meta.account_number ||
+    "N/A";
+
+  return { bankName, accountNumber };
 }
 
 function HeldDepositsPageContent() {
@@ -347,6 +423,7 @@ function HeldDepositsPageContent() {
                     <th className="py-3 px-3">Reference &amp; Date</th>
                     <th className="py-3 px-3">Customer UID</th>
                     <th className="py-3 px-3">Sender Details</th>
+                    <th className="py-3 px-3">Virtual Account</th>
                     <th className="py-3 px-3">Held Amount</th>
                     <th className="py-3 px-3">Held Reason</th>
                     <th className="py-3 px-3">Status</th>
@@ -358,13 +435,15 @@ function HeldDepositsPageContent() {
                     const status = String(r.status || "").toUpperCase();
                     const isHeld = status === "HELD_LIMIT_EXCEEDED" || status === "HELD" || Boolean(r.metadata?.isHeldDeposit && !r.metadata?.wasHeldReleased);
                     const heldAmt = Number(r.metadata?.heldAmount ?? r.amount ?? 0);
+                    const sender = resolveSenderBankAndAccount(r);
+                    const virtual = resolveVirtualBankAndAccount(r);
 
                     return (
                       <tr key={r.id} className={cn("transition-colors", isDark ? "hover:bg-gray-900/50" : "hover:bg-gray-50/50")}>
                         <td className="py-3.5 px-3 font-mono font-bold text-gray-900 dark:text-white select-all">
                           <div>{r.reference || r.id}</div>
                           <p className="text-[10px] text-gray-400 font-normal">
-                            {new Date(r.createdAt).toLocaleString()}
+                            {format12HourDate(r.createdAt)}
                           </p>
                         </td>
 
@@ -373,9 +452,16 @@ function HeldDepositsPageContent() {
                         </td>
 
                         <td className="py-3.5 px-3 font-semibold text-gray-700 dark:text-gray-300">
-                          <div>{r.senderName || r.recipientName || "Deposit Sender"}</div>
+                          <div>{sender.fullName}</div>
                           <p className="text-[10px] text-gray-400 font-mono">
-                            {r.senderBankName || "Bank"} • {r.senderAccountNumber || r.virtualAccountNumber || "N/A"}
+                            {sender.bankName} • {sender.accountNumber}
+                          </p>
+                        </td>
+
+                        <td className="py-3.5 px-3 font-semibold text-gray-700 dark:text-gray-300">
+                          <div className="font-mono">{virtual.bankName}</div>
+                          <p className="text-[10px] text-gray-400 font-mono">
+                            {virtual.accountNumber}
                           </p>
                         </td>
 
@@ -456,47 +542,54 @@ function HeldDepositsPageContent() {
                   </button>
                 </div>
 
-                <div className="space-y-4 text-xs">
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1">
-                    <p className="text-[10px] font-black uppercase text-amber-600">Held Amount</p>
-                    <p className="font-mono font-black text-2xl text-amber-600">
-                      ₦{(Number(selectedRecord.metadata?.heldAmount ?? selectedRecord.amount ?? 0)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-[11px] text-gray-500 font-semibold">{selectedRecord.metadata?.heldReason || selectedRecord.narration}</p>
-                  </div>
+                {(() => {
+                  const sender = resolveSenderBankAndAccount(selectedRecord);
+                  const virtual = resolveVirtualBankAndAccount(selectedRecord);
 
-                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl border space-y-2.5 font-semibold">
-                    <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
-                      <span className="text-gray-400">Reference ID</span>
-                      <span className="font-mono font-bold select-all">{selectedRecord.reference || selectedRecord.id}</span>
-                    </div>
+                  return (
+                    <div className="space-y-4 text-xs">
+                      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1">
+                        <p className="text-[10px] font-black uppercase text-amber-600">Held Amount</p>
+                        <p className="font-mono font-black text-2xl text-amber-600">
+                          ₦{(Number(selectedRecord.metadata?.heldAmount ?? selectedRecord.amount ?? 0)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[11px] text-gray-500 font-semibold">{selectedRecord.metadata?.heldReason || selectedRecord.narration}</p>
+                      </div>
 
-                    <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
-                      <span className="text-gray-400">Customer UID</span>
-                      <span className="font-mono font-bold select-all truncate max-w-[180px]">{selectedRecord.userId}</span>
-                    </div>
+                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl border space-y-2.5 font-semibold">
+                        <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
+                          <span className="text-gray-400">Reference ID</span>
+                          <span className="font-mono font-bold select-all">{selectedRecord.reference || selectedRecord.id}</span>
+                        </div>
 
-                    <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
-                      <span className="text-gray-400">Sender Name</span>
-                      <span className="font-bold">{selectedRecord.senderName || selectedRecord.recipientName || "N/A"}</span>
-                    </div>
+                        <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
+                          <span className="text-gray-400">Customer UID</span>
+                          <span className="font-mono font-bold select-all truncate max-w-[180px]">{selectedRecord.userId}</span>
+                        </div>
 
-                    <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
-                      <span className="text-gray-400">Sender Bank / Account</span>
-                      <span className="font-mono font-bold">{selectedRecord.senderBankName || "Bank"} • {selectedRecord.senderAccountNumber || "N/A"}</span>
-                    </div>
+                        <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
+                          <span className="text-gray-400">Sender Name</span>
+                          <span className="font-bold">{sender.fullName}</span>
+                        </div>
 
-                    <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
-                      <span className="text-gray-400">Virtual Account Deposited</span>
-                      <span className="font-mono font-bold">{selectedRecord.virtualAccountBankName || "Bank"} • {selectedRecord.virtualAccountNumber || "N/A"}</span>
-                    </div>
+                        <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
+                          <span className="text-gray-400">Sender Bank / Account</span>
+                          <span className="font-mono font-bold">{sender.bankName} • {sender.accountNumber}</span>
+                        </div>
 
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Deposit Date</span>
-                      <span className="font-mono">{new Date(selectedRecord.createdAt).toLocaleString()}</span>
+                        <div className="flex justify-between border-b pb-2 border-gray-200/60 dark:border-gray-700">
+                          <span className="text-gray-400">Virtual Account Deposited</span>
+                          <span className="font-mono font-bold">{virtual.bankName} • {virtual.accountNumber}</span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Deposit Date</span>
+                          <span className="font-mono">{format12HourDate(selectedRecord.createdAt)}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {(selectedRecord.status === "HELD_LIMIT_EXCEEDED" || selectedRecord.status === "HELD") && (

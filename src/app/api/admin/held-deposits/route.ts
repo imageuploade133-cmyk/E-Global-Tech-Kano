@@ -3,7 +3,6 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { WalletService } from "@/services/wallet-service";
 import { NotificationService } from "@/services/notification-service";
-import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(req: Request) {
   try {
@@ -29,7 +28,7 @@ export async function GET(req: Request) {
     let canceledCount = 0;
 
     txSnap.forEach((doc) => {
-      const data = doc.data();
+      const data = doc.data() || {};
       const status = String(data.status || "").toUpperCase();
       const isHeld = status === "HELD_LIMIT_EXCEEDED" || status === "HELD" || Boolean(data.metadata?.isHeldDeposit);
 
@@ -60,21 +59,79 @@ export async function GET(req: Request) {
         }
 
         if (matchesStatus) {
+          const meta = (data.metadata || {}) as Record<string, any>;
+          const senderBankName =
+            data.senderBankName ||
+            meta.senderBankName ||
+            meta.sender_bank_name ||
+            meta.originatorBankName ||
+            meta.originator_bank_name ||
+            meta.bankName ||
+            meta.bank_name ||
+            undefined;
+
+          const senderAccountNumber =
+            data.senderAccountNumber ||
+            meta.senderAccountNumber ||
+            meta.sender_account_number ||
+            meta.originatorAccountNumber ||
+            meta.originator_account_number ||
+            meta.sender_account ||
+            undefined;
+
+          const senderName =
+            data.senderName ||
+            meta.senderName ||
+            meta.sender_name ||
+            meta.originatorName ||
+            meta.originator_name ||
+            meta.customer_name ||
+            data.recipientName ||
+            undefined;
+
+          const virtualAccountBankName =
+            data.virtualAccountBankName ||
+            meta.virtualAccountBankName ||
+            meta.virtual_account_bank_name ||
+            meta.receivingBankName ||
+            meta.receiving_bank_name ||
+            data.bank_name ||
+            meta.bank_name ||
+            undefined;
+
+          const virtualAccountNumber =
+            data.virtualAccountNumber ||
+            meta.virtualAccountNumber ||
+            meta.virtual_account_number ||
+            meta.receivingAccountNumber ||
+            meta.receiving_account_number ||
+            data.account_number ||
+            meta.account_number ||
+            undefined;
+
           const ref = data.reference || doc.id;
           const userEmail = String(data.userEmail || data.email || "").toLowerCase();
-          const userName = String(data.recipientName || data.name || data.senderName || "").toLowerCase();
+          const userName = String(senderName || data.recipientName || data.name || "").toLowerCase();
           const userId = String(data.userId || "").toLowerCase();
 
-          const matchesSearch = !searchQuery ||
+          const matchesSearch =
+            !searchQuery ||
             ref.toLowerCase().includes(searchQuery) ||
             userEmail.includes(searchQuery) ||
             userName.includes(searchQuery) ||
-            userId.includes(searchQuery);
+            userId.includes(searchQuery) ||
+            String(senderAccountNumber || "").includes(searchQuery) ||
+            String(virtualAccountNumber || "").includes(searchQuery);
 
           if (matchesSearch) {
             allRecords.push({
               id: doc.id,
               ...data,
+              ...(senderBankName ? { senderBankName } : {}),
+              ...(senderAccountNumber ? { senderAccountNumber } : {}),
+              ...(senderName ? { senderName } : {}),
+              ...(virtualAccountBankName ? { virtualAccountBankName } : {}),
+              ...(virtualAccountNumber ? { virtualAccountNumber } : {}),
             });
           }
         }
