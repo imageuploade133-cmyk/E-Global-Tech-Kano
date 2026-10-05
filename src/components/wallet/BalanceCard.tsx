@@ -87,7 +87,7 @@ const BankLogo: React.FC<BankLogoProps> = ({ name, code, logoUrl, logoBackupUrl 
 
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, userName, isLoading }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const { userData, user } = useAuth();
+  const { userData, user, updateUserData } = useAuth();
   const [isTierUpgradeOpen, setIsTierUpgradeOpen] = useState(false);
 
   useEffect(() => {
