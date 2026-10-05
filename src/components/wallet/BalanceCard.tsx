@@ -4297,18 +4297,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                       {/* Biometric Transfer or PIN Authorize Transfer button */}
                       <div className="w-full max-w-xs mx-auto pt-1 pb-2 space-y-1.5">
-                        {(userData?.isBiometricTransferEnabled === true || userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) && (
-                          <button
-                            type="button"
-                            onClick={handleBiometricTransferAuth}
-                            className="w-full py-2.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-1.5"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">
-                              {getBiometricType() === "faceid" ? "face_6" : "fingerprint"}
-                            </span>
-                            <span>Authorize via {getBiometricLabel()}</span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={handleBiometricTransferAuth}
+                          className="w-full py-2.5 bg-[#07B038] hover:bg-[#058a2f] text-white text-[11px] font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {getBiometricType() === "faceid" ? "face_6" : "fingerprint"}
+                          </span>
+                          <span>Authorize via {getBiometricLabel()}</span>
+                        </button>
 
                         <button
                           type="button"
