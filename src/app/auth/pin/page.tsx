@@ -12,7 +12,7 @@ import { LogoutDrawer } from "@/components/layout/LogoutDrawer";
 import { handleAppSignOut } from "@/lib/logout-util";
 import { AppLogo } from "@/components/AppLogo";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
-import { getBiometricLabel, getBiometricType, authenticateBiometric } from "@/lib/biometrics-util";
+import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 
 function maskEmail(email?: string | null): string {
   if (!email || !email.includes("@")) return "t***t@gmail.com";
@@ -69,50 +69,24 @@ export default function PinPage() {
       toast.error("Internet connection required to verify biometrics and log in.");
       return;
     }
-    if (typeof window !== "undefined" && window.flutter_inappwebview) {
-      try {
-        const res = await window.flutter_inappwebview.callHandler("triggerNativeBiometric");
-        if (res && res.success === true) {
-          if (userData?.is2faOtpEnabled === true) {
-            setIs2faStage(true);
-            return;
-          }
-          setPinVerified(true);
-          toast.success(`${biometricLabel} Authenticated! Welcome back.`);
-          router.push("/");
-          return;
-        } else if (res && res.error) {
-          const errStr = String(res.error);
-          const errLower = errStr.toLowerCase();
-          if (res.code === "LOCKOUT" || errLower.includes("lockout") || errLower.includes("too many")) {
-            toast.error(res.error || "Too many attempts. Please try again later.");
-          } else if (res.code === "OFFLINE") {
-            toast.error(res.error);
-          } else if (!errLower.includes("cancel") && !errLower.includes("not allowed")) {
-            toast.error("Biometric verification failed.");
-          }
-        }
-      } catch (err) {
-        console.warn("[Native Biometrics] triggerNativeBiometric error:", err);
-      }
-      return;
-    }
 
-    if (userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true) {
-      const success = await authenticateBiometric(`Login with ${biometricLabel}`);
-      if (success === true) {
-        if (userData?.is2faOtpEnabled === true) {
-          setIs2faStage(true);
-          return;
-        }
-        setPinVerified(true);
-        toast.success(`${biometricLabel} Authenticated! Welcome back.`);
-        router.push("/");
-      } else {
-        setPin("");
+    toast.loading(`Authenticating ${biometricLabel}...`);
+    const res = await authenticateBiometricDetailed(`Login with ${biometricLabel}`);
+    toast.dismiss();
+
+    if (res.success) {
+      if (userData?.is2faOtpEnabled === true) {
+        setIs2faStage(true);
+        return;
       }
+      setPinVerified(true);
+      toast.success(`${biometricLabel} Authenticated! Welcome back.`);
+      router.push("/");
+    } else if (res.cancelled) {
+      setPin("");
     } else {
-      toast.info("Biometric login is only available in the mobile app.");
+      toast.error(res.message || `${biometricLabel} authentication failed.`);
+      setPin("");
     }
   };
 

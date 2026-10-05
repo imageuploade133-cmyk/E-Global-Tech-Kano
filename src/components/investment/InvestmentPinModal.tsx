@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import { useAuth } from "@/lib/AuthContext";
 import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
-import { getBiometricLabel, getBiometricType, authenticateBiometric } from "@/lib/biometrics-util";
+import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 import { toast } from "sonner";
 
 interface InvestmentPinModalProps {
@@ -81,14 +81,16 @@ export function InvestmentPinModal({
       return;
     }
     toast.loading(`Authenticating ${biometricLabel}...`);
-    const success = await authenticateBiometric(`Authorize ${title}`);
+    const res = await authenticateBiometricDetailed(`Authorize ${title}`);
     toast.dismiss();
 
-    if (success) {
+    if (res.success) {
       toast.success(`${biometricLabel} Authenticated! Proceeding...`);
       onPinSubmit("0000");
+    } else if (res.cancelled) {
+      // User cancelled biometric prompt cleanly
     } else {
-      toast.error(`${biometricLabel} authentication failed or cancelled.`);
+      toast.error(res.message || `${biometricLabel} authentication failed.`);
     }
   };
 
