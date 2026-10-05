@@ -221,6 +221,8 @@ export function TierUpgradeDrawerModal({
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinDigits, setPinDigits] = useState<string[]>(["", "", "", ""]);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const [is2faStage, setIs2faStage] = useState(false);
+  const [verifiedPin, setVerifiedPin] = useState("");
 
   useModalBackHandler(isPinModalOpen, () => setIsPinModalOpen(false), "tier-upgrade-pin-modal");
 
@@ -309,6 +311,8 @@ export function TierUpgradeDrawerModal({
 
     // Open 4-digit PIN verification modal
     setPinDigits(["", "", "", ""]);
+    setIs2faStage(false);
+    setVerifiedPin("");
     setIsPinModalOpen(true);
   };
 
@@ -322,7 +326,12 @@ export function TierUpgradeDrawerModal({
 
       if (emptyIdx === 3) {
         const fullPin = updated.join("");
-        executeVerifiedSubmit(fullPin);
+        if (userData?.is2faOtpEnabled === true) {
+          setVerifiedPin(fullPin);
+          setIs2faStage(true);
+        } else {
+          executeVerifiedSubmit(fullPin);
+        }
       }
     }
   };
@@ -907,16 +916,19 @@ export function TierUpgradeDrawerModal({
               exit={{ opacity: 0, scale: 0.95 }}
               className="w-full max-w-sm bg-white rounded-3xl p-6 text-center shadow-2xl space-y-5 border border-gray-100 font-hanken text-black"
             >
-              {userData?.is2faOtpEnabled === true ? (
+              {is2faStage ? (
                 <TwoFactorOtpVerificationView
                   user={user}
                   title="Tier Upgrade Verification"
-                  description="Select delivery channel and verify 2FA OTP to submit tier limit upgrade request."
+                  description="PIN/Biometrics verified! Select delivery channel and verify 2FA OTP to submit tier limit upgrade request."
                   onVerifiedSuccess={() => {
                     setIsPinModalOpen(false);
-                    executeVerifiedSubmit("0000");
+                    executeVerifiedSubmit(verifiedPin || "0000");
                   }}
-                  onCancel={() => setIsPinModalOpen(false)}
+                  onCancel={() => {
+                    setIs2faStage(false);
+                    setPinDigits(["", "", "", ""]);
+                  }}
                 />
               ) : (
                 <>

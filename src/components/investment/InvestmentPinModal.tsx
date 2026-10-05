@@ -28,6 +28,8 @@ export function InvestmentPinModal({
 }: InvestmentPinModalProps) {
   const { user, userData } = useAuth();
   const [pin, setPin] = useState("");
+  const [is2faStage, setIs2faStage] = useState(false);
+  const [verifiedPin, setVerifiedPin] = useState("");
   const [mounted, setMounted] = useState(false);
 
   useModalBackHandler(isOpen, onClose, "investment-pin-modal");
@@ -39,6 +41,8 @@ export function InvestmentPinModal({
   useEffect(() => {
     if (isOpen) {
       setPin("");
+      setIs2faStage(false);
+      setVerifiedPin("");
     }
   }, [isOpen]);
 
@@ -59,7 +63,12 @@ export function InvestmentPinModal({
       const nextPin = pin + num;
       setPin(nextPin);
       if (nextPin.length === 4) {
-        onPinSubmit(nextPin);
+        if (is2faActive) {
+          setVerifiedPin(nextPin);
+          setIs2faStage(true);
+        } else {
+          onPinSubmit(nextPin);
+        }
       }
     }
   };
@@ -85,10 +94,15 @@ export function InvestmentPinModal({
     toast.dismiss();
 
     if (res.success) {
-      toast.success(`${biometricLabel} Authenticated! Proceeding...`);
-      onPinSubmit("0000");
+      toast.success(`${biometricLabel} Authenticated!`);
+      if (is2faActive) {
+        setVerifiedPin("0000");
+        setIs2faStage(true);
+      } else {
+        onPinSubmit("0000");
+      }
     } else if (res.cancelled) {
-      // User cancelled biometric prompt cleanly
+      // User cancelled
     } else {
       toast.error(res.message || `${biometricLabel} authentication failed.`);
     }
@@ -108,13 +122,16 @@ export function InvestmentPinModal({
         >
           <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
 
-          {is2faActive ? (
+          {is2faStage ? (
             <TwoFactorOtpVerificationView
               user={user}
               title={title}
-              description={description}
-              onVerifiedSuccess={() => onPinSubmit("0000")}
-              onCancel={onClose}
+              description={`PIN/Biometrics verified! Enter 2FA OTP to complete ${title.toLowerCase()}.`}
+              onVerifiedSuccess={() => onPinSubmit(verifiedPin || "0000")}
+              onCancel={() => {
+                setIs2faStage(false);
+                setPin("");
+              }}
             />
           ) : (
             <>

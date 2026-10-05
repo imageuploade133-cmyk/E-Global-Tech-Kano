@@ -27,10 +27,14 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
 }) => {
   const { user, userData } = useAuth();
   const [enteredPin, setEnteredPin] = useState<string>("");
+  const [is2faStage, setIs2faStage] = useState(false);
+  const [verifiedPin, setVerifiedPin] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       setEnteredPin("");
+      setIs2faStage(false);
+      setVerifiedPin("");
     }
   }, [isOpen]);
 
@@ -50,7 +54,12 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
       const nextPin = enteredPin + num;
       setEnteredPin(nextPin);
       if (nextPin.length === 4) {
-        onExecutePayment(nextPin);
+        if (is2faActive) {
+          setVerifiedPin(nextPin);
+          setIs2faStage(true);
+        } else {
+          onExecutePayment(nextPin);
+        }
       }
     }
   };
@@ -69,10 +78,15 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
     toast.dismiss();
 
     if (res.success) {
-      toast.success(`${biometricLabel} Authenticated! Executing payment...`);
-      onExecutePayment("0000");
+      toast.success(`${biometricLabel} Authenticated!`);
+      if (is2faActive) {
+        setVerifiedPin("0000");
+        setIs2faStage(true);
+      } else {
+        onExecutePayment("0000");
+      }
     } else if (res.cancelled) {
-      // User cancelled biometric prompt cleanly - no intrusive error toast
+      // User cancelled biometric prompt cleanly
     } else {
       toast.error(res.message || `${biometricLabel} authentication failed.`);
     }
@@ -106,13 +120,16 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
 
           {/* Central Details and dots or 2FA OTP */}
           <div className="flex-grow flex flex-col items-center justify-center space-y-4 py-4 overflow-y-auto">
-            {is2faActive ? (
+            {is2faStage ? (
               <TwoFactorOtpVerificationView
                 user={user}
                 title="2FA Payment Verification"
-                description={`Approving ₦${finalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} payment for ${selectedBiller?.name || "Bill Payment"}.`}
-                onVerifiedSuccess={() => onExecutePayment("0000")}
-                onCancel={onClose}
+                description={`PIN/Biometrics verified! Enter 2FA OTP to complete ₦${finalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} payment for ${selectedBiller?.name || "Bill Payment"}.`}
+                onVerifiedSuccess={() => onExecutePayment(verifiedPin || "0000")}
+                onCancel={() => {
+                  setIs2faStage(false);
+                  setEnteredPin("");
+                }}
               />
             ) : (
               <>
