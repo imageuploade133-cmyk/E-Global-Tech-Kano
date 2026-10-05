@@ -137,7 +137,6 @@ export async function POST(req: Request) {
     }
 
     // Active database lookup to prevent duplicate linking of Email Address
-    const cleanEmail = email.trim().toLowerCase();
     const emailQuery = await adminDb.collection("users")
       .where("email", "==", cleanEmail)
       .limit(1)
