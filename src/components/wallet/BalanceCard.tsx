@@ -1889,6 +1889,12 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
   };
 
+  const [isTrf2faStage, setIsTrf2faStage] = useState(false);
+  const [trfVerifiedPin, setTrfVerifiedPin] = useState("");
+
+  const [isSwap2faStage, setIsSwap2faStage] = useState(false);
+  const [swapVerifiedPin, setSwapVerifiedPin] = useState("");
+
   const handleBiometricTransferAuth = async () => {
     if (!navigator.onLine) {
       toast.error("Internet connection required to verify biometrics.");
@@ -1900,8 +1906,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     toast.dismiss();
 
     if (res.success) {
-      toast.success(`${label} Authenticated! Executing transfer...`);
-      executeOutwardTransfer("0000");
+      toast.success(`${label} Authenticated!`);
+      if (userData?.is2faOtpEnabled === true) {
+        setTrfVerifiedPin("0000");
+        setIsTrf2faStage(true);
+      } else {
+        executeOutwardTransfer("0000");
+      }
     } else if (res.cancelled) {
       // User cancelled biometric prompt cleanly
     } else {
@@ -1913,6 +1924,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     if (trfPin.length < 4) {
       const nextPin = trfPin + num;
       setTrfPin(nextPin);
+      if (nextPin.length === 4) {
+        if (userData?.is2faOtpEnabled === true) {
+          setTrfVerifiedPin(nextPin);
+          setIsTrf2faStage(true);
+        } else {
+          executeOutwardTransfer(nextPin);
+        }
+      }
     }
   };
 
@@ -4180,13 +4199,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                   exit={{ opacity: 0 }}
                   className="space-y-4 flex-1 flex flex-col justify-between items-center text-center w-full max-w-md mx-auto"
                 >
-                  {userData?.is2faOtpEnabled === true ? (
+                  {isTrf2faStage ? (
                     <TwoFactorOtpVerificationView
                       user={user}
                       title="2FA Transfer Verification"
-                      description={`Authorizing ₦${trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })} transfer.`}
-                      onVerifiedSuccess={() => executeOutwardTransfer("0000")}
-                      onCancel={() => setTrfStep("confirm")}
+                      description={`PIN/Biometrics verified! Complete 2FA OTP verification to authorize ₦${trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })} transfer.`}
+                      onVerifiedSuccess={() => executeOutwardTransfer(trfVerifiedPin || "0000")}
+                      onCancel={() => {
+                        setIsTrf2faStage(false);
+                        setTrfPin("");
+                      }}
                     />
                   ) : (
                     <>
@@ -4810,13 +4832,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             ) : (
               /* PIN Authorization Step */
               <div className="space-y-5 flex flex-col items-center text-center w-full max-w-md mx-auto">
-                {userData?.is2faOtpEnabled === true ? (
+                {isSwap2faStage ? (
                   <TwoFactorOtpVerificationView
                     user={user}
                     title="2FA Currency Swap Verification"
-                    description={`Authorizing currency swap from ${swapFromCurrency} to ${swapToCurrency}.`}
+                    description={`PIN/Biometrics verified! Complete 2FA OTP verification to authorize currency swap from ${swapFromCurrency} to ${swapToCurrency}.`}
                     onVerifiedSuccess={() => handleSwapExecute()}
-                    onCancel={() => setSwapStep("form")}
+                    onCancel={() => {
+                      setIsSwap2faStage(false);
+                      setSwapPin("");
+                    }}
                   />
                 ) : (
                   <>
@@ -4924,7 +4949,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
                 <button
                   type="button"
-                  onClick={() => handleSwapExecute()}
+                  onClick={() => {
+                    if (swapPin.length < 4) return;
+                    if (userData?.is2faOtpEnabled === true) {
+                      setSwapVerifiedPin(swapPin);
+                      setIsSwap2faStage(true);
+                    } else {
+                      handleSwapExecute();
+                    }
+                  }}
                   disabled={isSwapping || swapPin.length < 4}
                   className="w-full py-4 bg-gradient-to-r from-[#FC7A00] to-[#E06600] disabled:from-gray-300 disabled:to-gray-400 text-white text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer hover:brightness-105 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2 shadow-sm"
                 >
