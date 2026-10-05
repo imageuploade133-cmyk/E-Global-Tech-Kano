@@ -772,7 +772,7 @@ export default function PinPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white p-8 items-center justify-between relative overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#0F172A] via-[#1E293B] to-[#0B192C] p-8 items-center justify-between relative overflow-hidden text-white select-none">
       {/* Full Screen High-Fidelity Loading Overlay */}
       <AnimatePresence>
         {isVerifying && (
@@ -780,7 +780,7 @@ export default function PinPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-white/95 backdrop-blur-md z-[99999] flex flex-col items-center justify-center p-6"
+            className="fixed inset-0 bg-[#0F172A]/95 backdrop-blur-md z-[99999] flex flex-col items-center justify-center p-6"
           >
             <div className="relative flex flex-col items-center">
               {/* Spinning luxury gradient ring */}
@@ -788,14 +788,14 @@ export default function PinPage() {
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-3 border-gray-100 border-t-[#FC7A00] border-r-[#0b513d]"
+                  className="absolute inset-0 rounded-full border-3 border-gray-700 border-t-[#FC7A00] border-r-[#0b513d]"
                 />
 
                 {/* Logo container inside the ring with micro-scale pulse */}
                 <motion.div
                   animate={{ scale: [1, 1.03, 1] }}
                   transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
-                  className="relative w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-sm"
+                  className="relative w-9 h-9 bg-[#1E293B] rounded-full flex items-center justify-center shadow-sm"
                 >
                   <AppLogo size={28} />
                 </motion.div>
@@ -808,7 +808,7 @@ export default function PinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
-                className="mt-6 font-hanken font-bold text-xs tracking-wider uppercase text-gray-800 text-center"
+                className="mt-6 font-hanken font-bold text-xs tracking-wider uppercase text-white text-center"
               >
                 {verifyingText}
               </motion.p>
@@ -824,8 +824,8 @@ export default function PinPage() {
         <div className="relative w-14 h-14 min-[375px]:w-16 min-[375px]:h-16 mb-3 flex items-center justify-center">
           <AppLogo size={56} />
         </div>
-        <h1 className="font-hanken font-bold text-lg min-[375px]:text-xl tracking-tight text-black mb-1">E-Global Pay</h1>
-        <p className="text-gray-500 font-hanken tracking-widest uppercase text-[10px] min-[375px]:text-xs">Enter Access PIN</p>
+        <h1 className="font-hanken font-extrabold text-lg min-[375px]:text-xl tracking-tight text-white mb-1">E-Global Pay</h1>
+        <p className="text-gray-400 font-hanken tracking-widest uppercase text-[10px] min-[375px]:text-xs">Enter Access PIN</p>
       </div>
 
       <div className="flex gap-3 min-[375px]:gap-4 justify-center my-6 min-[375px]:my-10">
@@ -833,7 +833,7 @@ export default function PinPage() {
           <div
             key={i}
             className={`w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4 rounded-full border-2 transition-all duration-300 ${
-              pin.length > i ? "bg-black border-black scale-110" : "bg-transparent border-gray-200"
+              pin.length > i ? "bg-[#FC7A00] border-[#FC7A00] scale-110 shadow-sm" : "bg-transparent border-gray-600"
             }`}
           />
         ))}
@@ -842,11 +842,11 @@ export default function PinPage() {
       <div className="w-full max-w-[260px] min-[360px]:max-w-[290px] min-[410px]:max-w-xs grid grid-cols-3 gap-3 min-[360px]:gap-4 min-[410px]:gap-6 mb-6 min-[360px]:mb-10">
         {keypadNumbers.slice(0, 9).map((num) => (
           <motion.button
-            whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+            whileTap={{ scale: 0.9, backgroundColor: "#FC7A00", borderColor: "#FC7A00", color: "#FFFFFF" }}
             whileHover={{ scale: 1.05 }}
             key={num}
             onClick={() => handleKeyPress(num)}
-            className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+            className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-slate-700/60 bg-[#1E293B]/80 text-white cursor-pointer transition-colors shadow-xs"
           >
             {num}
           </motion.button>
@@ -855,7 +855,7 @@ export default function PinPage() {
           whileTap={{ scale: 0.9 }}
           whileHover={{ scale: 1.05 }}
           onClick={handleBiometricAuth}
-          className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-[#FC7A00] border border-gray-200 bg-orange-50/50 cursor-pointer transition-colors"
+          className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-[#FC7A00] border border-slate-700/60 bg-[#1E293B]/80 cursor-pointer transition-colors shadow-xs"
           title={biometricLabel}
         >
           <span className="material-symbols-outlined text-[26px] min-[360px]:text-[30px] min-[410px]:text-3xl">
@@ -864,10 +864,10 @@ export default function PinPage() {
         </motion.button>
         {keypadNumbers[9] !== undefined && (
           <motion.button
-            whileTap={{ scale: 0.9, backgroundColor: "#000000", borderColor: "#000000", color: "#FFFFFF" }}
+            whileTap={{ scale: 0.9, backgroundColor: "#FC7A00", borderColor: "#FC7A00", color: "#FFFFFF" }}
             whileHover={{ scale: 1.05 }}
             onClick={() => handleKeyPress(keypadNumbers[9])}
-            className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-gray-200 text-black cursor-pointer transition-colors"
+            className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-xl min-[360px]:text-2xl font-hanken border border-slate-700/60 bg-[#1E293B]/80 text-white cursor-pointer transition-colors shadow-xs"
           >
             {keypadNumbers[9]}
           </motion.button>
@@ -876,7 +876,7 @@ export default function PinPage() {
           whileTap={{ scale: 0.9 }}
           whileHover={{ scale: 1.05 }}
           onClick={handleDelete}
-          className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-black active:text-red-500 cursor-pointer"
+          className="w-16 h-16 min-[360px]:w-18 min-[360px]:h-18 min-[410px]:w-20 min-[410px]:h-20 rounded-full flex items-center justify-center text-white active:text-red-400 cursor-pointer"
         >
           <span className="material-symbols-outlined text-[24px] min-[360px]:text-[28px] min-[410px]:text-3xl">backspace</span>
         </motion.button>
@@ -886,13 +886,13 @@ export default function PinPage() {
       <div className="flex justify-between w-full max-w-xs px-2 mb-8 font-hanken text-sm">
         <button
           onClick={() => setShowForgotPin(true)}
-          className="text-gray-400 hover:text-black font-semibold transition-colors cursor-pointer"
+          className="text-gray-400 hover:text-white font-semibold transition-colors cursor-pointer"
         >
           Forgot PIN?
         </button>
         <button
           onClick={() => setIsLogoutDrawerOpen(true)}
-          className="text-gray-400 hover:text-red-500 font-semibold transition-colors cursor-pointer"
+          className="text-gray-400 hover:text-red-400 font-semibold transition-colors cursor-pointer"
         >
           Sign Out
         </button>

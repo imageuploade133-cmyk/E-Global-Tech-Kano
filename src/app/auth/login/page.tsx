@@ -66,7 +66,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-white p-6 justify-center text-black">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#0F172A] via-[#1E293B] to-[#0B192C] p-6 justify-center text-white select-none">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -76,11 +76,11 @@ export default function LoginPage() {
           <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
             <AppLogo size={64} />
           </div>
-          <h1 className="font-hanken font-bold text-2xl tracking-tight text-black">E-Global Pay</h1>
-          <p className="text-gray-500 font-hanken mt-1 text-xs font-semibold">Welcome back to your secure hub</p>
+          <h1 className="font-hanken font-extrabold text-2xl tracking-tight text-white">E-Global Pay</h1>
+          <p className="text-gray-400 font-hanken mt-1 text-xs font-semibold">Welcome back to your secure hub</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6" autoComplete="off" data-lpignore="true">
           <div className="space-y-1.5 text-left">
             <label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">Email Address</label>
             <div className="p-[1.5px] rounded-2xl bg-gradient-to-r from-[#FC7A00] via-[#FF9022] to-[#70AC00] focus-within:ring-2 focus-within:ring-[#FC7A00]/30 transition-all shadow-xs">
@@ -88,9 +88,12 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 required
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full appearance-none bg-white border-0 py-3.5 px-4 rounded-[14px] outline-none text-black text-xs font-semibold placeholder-gray-400"
+                className="w-full appearance-none bg-[#1E293B] border-0 py-3.5 px-4 rounded-[14px] outline-none text-white text-xs font-semibold placeholder-gray-500"
                 placeholder="doe@example.com"
                 aria-label="Email Address"
               />
@@ -116,9 +119,12 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 required
+                autoComplete="new-password"
+                data-lpignore="true"
+                data-form-type="other"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full appearance-none bg-white border-0 py-3.5 pl-4 pr-10 rounded-[14px] outline-none text-black text-xs font-semibold placeholder-gray-400"
+                className="w-full appearance-none bg-[#1E293B] border-0 py-3.5 pl-4 pr-10 rounded-[14px] outline-none text-white text-xs font-semibold placeholder-gray-500"
                 placeholder="••••••••"
                 aria-label="Password"
               />
@@ -174,7 +180,7 @@ export default function LoginPage() {
           </div>
         </form>
 
-        <p className="mt-8 text-center text-sm text-gray-500">
+        <p className="mt-8 text-center text-sm text-gray-400">
           Don&apos;t have an account?{" "}
           <Link href="/auth/signup" className="text-[#FC7A00] font-bold underline">
             Sign Up
