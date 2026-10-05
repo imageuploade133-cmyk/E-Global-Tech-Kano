@@ -1,13 +1,12 @@
 "use client";
-import { useCpanelTheme } from "@/lib/CpanelThemeContext";
-
-
 
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { CpanelActionDropdown } from "@/components/cpanel/CpanelActionDropdown";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
+import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
@@ -47,6 +46,11 @@ function CpanelUsersPageContent() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [isUpdatingUser, setIsUpdatingUser] = useState<string | null>(null);
 
+  // Administrator PIN creation modal state
+  const [pinTargetUser, setPinTargetUser] = useState<AdminUser | null>(null);
+  const [adminNewPin, setAdminNewPin] = useState("");
+  const [isSavingAdminPin, setIsSavingAdminPin] = useState(false);
+
   const [newUserForm, setNewUserForm] = useState({
     firstName: "",
     lastName: "",
@@ -84,10 +88,6 @@ function CpanelUsersPageContent() {
   ) => {
     setAdminActionModal({ isOpen: true, title, message, actionLabel, actionStyle, onConfirm });
   };
-
-
-
-
 
   const fetchUsersDirectory = async (searchTermVal?: string) => {
     setIsLoadingUsers(true);
@@ -212,6 +212,56 @@ function CpanelUsersPageContent() {
     }
   };
 
+  const handleSaveAdminPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinTargetUser) return;
+
+    if (adminNewPin.length !== 4 || isNaN(Number(adminNewPin))) {
+      toast.error("Access PIN must be a 4-digit numeric code.");
+      return;
+    }
+
+    setIsSavingAdminPin(true);
+    toast.loading(`Creating Access PIN for ${pinTargetUser.name}...`);
+
+    try {
+      let idToken = "mock-admin-token";
+      const isMock = typeof window !== "undefined" && (window.location.search.includes("mock=true") || sessionStorage.getItem("admin_session_unlocked") === "true");
+      if (!isMock && user) {
+        idToken = await user.getIdToken();
+      }
+
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "set_pin",
+          targetUid: pinTargetUser.uid,
+          pin: adminNewPin,
+        }),
+      });
+
+      toast.dismiss();
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success(data.message || `Access PIN successfully created for ${pinTargetUser.name}!`);
+        setPinTargetUser(null);
+        setAdminNewPin("");
+      } else {
+        toast.error(data.error || "Failed to set Access PIN.");
+      }
+    } catch {
+      toast.dismiss();
+      toast.error("Network error creating user Access PIN.");
+    } finally {
+      setIsSavingAdminPin(false);
+    }
+  };
+
   const bgClass = isDark ? "bg-[#0c0f17] text-white" : "bg-gray-50 text-gray-900";
   const panelClass = isDark
     ? "bg-[#111827] border-gray-800/80 text-white shadow-2xs"
@@ -237,10 +287,10 @@ function CpanelUsersPageContent() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-orange-500 text-[22px]">group</span>
-                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Users & Permissions Management</h1>
+                <h1 className="font-extrabold text-base md:text-lg uppercase tracking-tight">Users &amp; Permissions Management</h1>
               </div>
               <p className={cn("text-xs font-medium mt-0.5", isDark ? "text-gray-400" : "text-gray-500")}>
-                Create authenticated profiles, update user roles, assign security permissions, and deposit capital.
+                Create authenticated profiles, update user roles, assign security permissions, set Access PINs, and deposit capital.
               </p>
             </div>
           </div>
@@ -272,7 +322,7 @@ function CpanelUsersPageContent() {
                 <h3 className={cn("font-hanken font-extrabold text-sm uppercase", labelClass)}>
                   Secure User Creator
                 </h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Setup Authenticated Profile & Roles</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Setup Authenticated Profile &amp; Roles</p>
               </div>
 
               <form onSubmit={handleCreateUserSubmit} className="space-y-4">
@@ -366,7 +416,7 @@ function CpanelUsersPageContent() {
                     <option value="agent">AGENT (Privileged Operative)</option>
                     <option value="super_admin">SUPER ADMIN (Full Platform Control)</option>
                     <option value="admin">ADMIN (Standard Operations)</option>
-                    <option value="finance">FINANCE (Withdrawals & Deposits)</option>
+                    <option value="finance">FINANCE (Withdrawals &amp; Deposits)</option>
                     <option value="kyc_admin">KYC ADMIN (Document Approvals)</option>
                     <option value="support">SUPPORT (Customer Helpdesk)</option>
                     <option value="read_only">READ ONLY (Auditor)</option>
@@ -510,6 +560,15 @@ function CpanelUsersPageContent() {
                                   onClick: () => setEditingUser(u),
                                 },
                                 {
+                                  label: "Set Access PIN",
+                                  icon: "lock_reset",
+                                  variant: "warning",
+                                  onClick: () => {
+                                    setAdminNewPin("");
+                                    setPinTargetUser(u);
+                                  },
+                                },
+                                {
                                   label: "Cash Deposit",
                                   icon: "payments",
                                   variant: "emerald",
@@ -523,7 +582,7 @@ function CpanelUsersPageContent() {
                         {isEditing && editingUser && (
                           <div className={cn("p-4 border rounded-xl space-y-4 transition-colors duration-300", isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200")}>
                             <div className="space-y-3.5">
-                              <p className="text-[10px] font-black uppercase text-[#FC7A00]">Modify Privileges & Permissions</p>
+                              <p className="text-[10px] font-black uppercase text-[#FC7A00]">Modify Privileges &amp; Permissions</p>
 
                               <div className="space-y-1">
                                 <label className="text-[9px] font-black uppercase text-gray-400">Change Role</label>
@@ -536,7 +595,7 @@ function CpanelUsersPageContent() {
                                   <option value="agent">AGENT (Privileged Operative)</option>
                                   <option value="super_admin">SUPER ADMIN (Full Access)</option>
                                   <option value="admin">ADMIN (Standard Operations)</option>
-                                  <option value="finance">FINANCE (Withdrawals & Deposits)</option>
+                                  <option value="finance">FINANCE (Withdrawals &amp; Deposits)</option>
                                   <option value="kyc_admin">KYC ADMIN (Document Approvals)</option>
                                   <option value="support">SUPPORT (Customer Helpdesk)</option>
                                   <option value="read_only">READ ONLY (Auditor)</option>
@@ -689,6 +748,75 @@ function CpanelUsersPageContent() {
         </div>
 
       </div>
+
+      {/* Set User Access PIN Drawer Modal */}
+      <AnimatePresence>
+        {pinTargetUser && (
+          <div className="fixed inset-0 z-[100000] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={cn("w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5", isDark ? "bg-gray-900 border-gray-800 text-white" : "bg-white border-gray-200 text-gray-900")}
+            >
+              <div className="flex justify-between items-center border-b pb-3 border-gray-200/50">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-amber-500 text-[22px]">lock_reset</span>
+                  <h3 className="font-extrabold text-sm uppercase">Create User Access PIN</h3>
+                </div>
+                <button onClick={() => setPinTargetUser(null)} className="w-8 h-8 rounded-full border flex items-center justify-center text-gray-400 hover:text-black dark:hover:text-white cursor-pointer">
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveAdminPin} className="space-y-4">
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1 text-center">
+                  <p className="text-[10px] font-black uppercase text-amber-500">Target User Profile</p>
+                  <p className="font-extrabold text-base text-gray-900 dark:text-white">{pinTargetUser.name}</p>
+                  <p className="font-mono text-xs text-gray-400 select-all">{pinTargetUser.email}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 block text-center">
+                    New 4-Digit Access PIN
+                  </label>
+                  <input
+                    type="password"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    maxLength={4}
+                    required
+                    placeholder="e.g. 1234"
+                    value={adminNewPin}
+                    onChange={(e) => setAdminNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className={cn(inputClass, "h-12 text-center font-mono font-black text-2xl tracking-widest")}
+                  />
+                  <p className="text-[10px] text-gray-400 text-center">
+                    Setting this PIN will allow the user to log in and authorize transactions immediately.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPinTargetUser(null)}
+                    className="py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-2xl text-xs font-black uppercase cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingAdminPin || adminNewPin.length !== 4}
+                    className="py-3 bg-[#FC7A00] hover:bg-[#e06600] text-white rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    {isSavingAdminPin ? <ButtonSpinner /> : "Save Access PIN"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Confirmation Modal */}
       {adminActionModal.isOpen && (
