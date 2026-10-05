@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
 
     if (action === "create_admin") {
-      const { email, password, displayName, phoneNumber, role, permissions } = adminData || {};
+      const { email, password, displayName, phoneNumber, role, permissions, pin } = adminData || {};
       if (!email || !email.includes("@")) {
         return NextResponse.json({ error: "Valid administrator email address is required." }, { status: 400 });
       }
@@ -85,6 +85,11 @@ export async function POST(req: Request) {
         cleanPhone = "+234" + cleanPhone.slice(1);
       } else if (cleanPhone && !cleanPhone.startsWith("+") && (cleanPhone.length === 10 || cleanPhone.length === 11)) {
         cleanPhone = "+234" + cleanPhone;
+      }
+
+      const cleanPin = String(pin || "").trim();
+      if (cleanPin && (cleanPin.length !== 4 || isNaN(Number(cleanPin)))) {
+        return NextResponse.json({ error: "Access PIN must be a valid 4-digit numeric code." }, { status: 400 });
       }
 
       // Check if admin already exists
@@ -111,7 +116,7 @@ export async function POST(req: Request) {
         firebaseUid = createdUser.uid;
       }
 
-      const newAdminRecord = {
+      const newAdminRecord: any = {
         uid: firebaseUid,
         email: cleanEmail,
         displayName: displayName || cleanEmail.split("@")[0],
@@ -126,7 +131,25 @@ export async function POST(req: Request) {
         mfaEnabled: false,
       };
 
+      if (cleanPin) {
+        newAdminRecord.pin = cleanPin;
+        newAdminRecord.isPinRequired = true;
+      }
+
       await adminDb.collection("admin_users").doc(firebaseUid).set(newAdminRecord);
+
+      // Also set pin in users collection if exists or create basic profile
+      const userRef = adminDb.collection("users").doc(firebaseUid);
+      await userRef.set({
+        uid: firebaseUid,
+        name: displayName || cleanEmail.split("@")[0],
+        email: cleanEmail,
+        phoneNumber: cleanPhone,
+        role: role || "admin",
+        permissions: Array.isArray(permissions) ? permissions : ["users.view", "transactions.view", "kyc.view"],
+        ...(cleanPin ? { pin: cleanPin, isPinRequired: true } : {}),
+        createdAt: now,
+      }, { merge: true });
 
       // Set Custom Claims via dependency-free REST API
       try {
@@ -155,7 +178,7 @@ export async function POST(req: Request) {
       });
 
     } else if (action === "update_admin") {
-      const { targetUid, role, permissions, status, displayName, phoneNumber } = adminData || {};
+      const { targetUid, role, permissions, status, displayName, phoneNumber, pin } = adminData || {};
       if (!targetUid) {
         return NextResponse.json({ error: "Target administrator UID is required." }, { status: 400 });
       }
@@ -198,6 +221,22 @@ export async function POST(req: Request) {
         updatePayload.phoneNumber = cleanPhone;
       }
 
+      if (pin) {
+        const cleanPin = String(pin).trim();
+        if (cleanPin.length !== 4 || isNaN(Number(cleanPin))) {
+          return NextResponse.json({ error: "Access PIN must be a valid 4-digit numeric code." }, { status: 400 });
+        }
+        updatePayload.pin = cleanPin;
+        updatePayload.isPinRequired = true;
+
+        // Sync to users collection
+        await adminDb.collection("users").doc(targetUid).set({
+          pin: cleanPin,
+          isPinRequired: true,
+          updatedAt: now,
+        }, { merge: true });
+      }
+
       await targetRef.update(updatePayload);
 
       await logAdminAction({
@@ -214,6 +253,55 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: "Administrator account updated successfully!",
+      });
+
+    } else if (action === "set_pin" || action === "set_admin_pin") {
+      const { targetUid, pin } = adminData || body || {};
+      if (!targetUid) {
+        return NextResponse.json({ error: "Target administrator UID is required." }, { status: 400 });
+      }
+
+      const cleanPin = String(pin || "").trim();
+      if (cleanPin.length !== 4 || isNaN(Number(cleanPin))) {
+        return NextResponse.json({ error: "Access PIN must be a valid 4-digit numeric code." }, { status: 400 });
+      }
+
+      const targetRef = adminDb.collection("admin_users").doc(targetUid);
+      const targetSnap = await targetRef.get();
+
+      if (targetSnap.exists) {
+        await targetRef.update({
+          pin: cleanPin,
+          isPinRequired: true,
+          updatedAt: now,
+          pinUpdatedAt: now,
+          pinUpdatedBy: auth.email || auth.uid,
+        });
+      }
+
+      // Also update user document in users collection
+      const userRef = adminDb.collection("users").doc(targetUid);
+      await userRef.set({
+        pin: cleanPin,
+        isPinRequired: true,
+        updatedAt: now,
+        pinUpdatedAt: now,
+        pinUpdatedBy: auth.email || auth.uid,
+      }, { merge: true });
+
+      await logAdminAction({
+        adminUid: auth.uid,
+        adminEmail: auth.email || "",
+        action: "set_admin_pin",
+        resource: "admin_users",
+        resourceId: targetUid,
+        newValue: { pinSet: true },
+        result: "SUCCESS",
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `4-Digit Access PIN successfully created and updated for administrator!`,
       });
 
     } else if (action === "delete_admin") {
