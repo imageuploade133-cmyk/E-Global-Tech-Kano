@@ -1907,6 +1907,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
 
     if (res.success) {
       toast.success(`${label} Authenticated!`);
+      if (userData?.isBiometricTransferEnabled !== true) {
+        updateUserData({ isBiometricTransferEnabled: true, isBiometricLoginEnabled: true, isFaceIdEnabled: true }).catch(() => {});
+      }
       if (userData?.is2faOtpEnabled === true) {
         setTrfVerifiedPin("0000");
         setIsTrf2faStage(true);
