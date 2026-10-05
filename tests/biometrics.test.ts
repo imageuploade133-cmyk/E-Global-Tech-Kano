@@ -4,6 +4,7 @@ import {
   getBiometricLabel,
   isBiometricsSupported,
   authenticateBiometric,
+  authenticateBiometricDetailed,
   parseBiometricResponse,
   base64ToUint8Array,
   uint8ArrayToBase64,
@@ -26,6 +27,8 @@ describe("Platform-Aware Biometrics Suite", () => {
   test("3. Authenticate biometric fallback succeeds in node/simulation environment", async () => {
     const result = await authenticateBiometric("Test Prompt");
     expect(result).toBe(true);
+    const detailed = await authenticateBiometricDetailed("Test Prompt");
+    expect(detailed.success).toBe(true);
   });
 
   test("4. Parses biometric responses from native bridges correctly", () => {

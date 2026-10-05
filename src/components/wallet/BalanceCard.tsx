@@ -18,7 +18,7 @@ import { FeatureDisabledBanner } from "@/components/FeatureDisabledBanner";
 import { isFeatureEnabled, getFeatureDisabledMessage } from "@/lib/feature-toggle";
 import { triggerHaptic } from "@/lib/haptics";
 import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
-import { getBiometricLabel, getBiometricType, authenticateBiometric } from "@/lib/biometrics-util";
+import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 
 interface BalanceCardProps {
   balance: number;
@@ -1896,14 +1896,16 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
     }
     const label = getBiometricLabel();
     toast.loading(`Authenticating ${label}...`);
-    const success = await authenticateBiometric(`Authorize ₦${trfTotalDebit.toLocaleString()} transfer`);
+    const res = await authenticateBiometricDetailed(`Authorize ₦${trfTotalDebit.toLocaleString()} transfer`);
     toast.dismiss();
 
-    if (success) {
+    if (res.success) {
       toast.success(`${label} Authenticated! Executing transfer...`);
       executeOutwardTransfer("0000");
+    } else if (res.cancelled) {
+      // User cancelled biometric prompt cleanly
     } else {
-      toast.error(`${label} authentication cancelled or failed.`);
+      toast.error(res.message || `${label} authentication failed.`);
     }
   };
 

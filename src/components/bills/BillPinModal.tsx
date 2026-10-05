@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Biller, BillItem } from "./types";
 import { useAuth } from "@/lib/AuthContext";
 import { TwoFactorOtpVerificationView } from "@/components/auth/TwoFactorOtpVerificationView";
-import { getBiometricLabel, getBiometricType, authenticateBiometric } from "@/lib/biometrics-util";
+import { getBiometricLabel, getBiometricType, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 import { toast } from "sonner";
 
 interface BillPinModalProps {
@@ -65,14 +65,16 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
       return;
     }
     toast.loading(`Authenticating ${biometricLabel}...`);
-    const success = await authenticateBiometric(`Authorize ₦${finalAmount.toLocaleString()} payment`);
+    const res = await authenticateBiometricDetailed(`Authorize ₦${finalAmount.toLocaleString()} payment`);
     toast.dismiss();
 
-    if (success) {
+    if (res.success) {
       toast.success(`${biometricLabel} Authenticated! Executing payment...`);
       onExecutePayment("0000");
+    } else if (res.cancelled) {
+      // User cancelled biometric prompt cleanly - no intrusive error toast
     } else {
-      toast.error(`${biometricLabel} authentication failed or cancelled.`);
+      toast.error(res.message || `${biometricLabel} authentication failed.`);
     }
   };
 

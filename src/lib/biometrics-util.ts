@@ -9,6 +9,12 @@ export interface BiometricRegistrationResult {
   message?: string;
 }
 
+export interface BiometricAuthResult {
+  success: boolean;
+  cancelled?: boolean;
+  message?: string;
+}
+
 /**
  * Helper to safely parse native bridge response from Flutter InAppWebView / Custom Bridges
  */
@@ -210,13 +216,11 @@ export async function registerBiometricCredential(userEmail: string): Promise<Bi
 }
 
 /**
- * Prompts user for biometric authentication (Face ID on iOS, Fingerprint on Android).
- * STRICT HARDWARE-ONLY VERIFICATION: Triggers Android/iOS System Hardware Fingerprint / Face ID sensor.
- * Returns `true` ONLY if real hardware biometric match succeeds. Returns `false` on mismatch or cancel.
+ * Detailed biometric authentication returning structured outcome { success, cancelled, message }
  */
-export async function authenticateBiometric(title?: string): Promise<boolean> {
+export async function authenticateBiometricDetailed(title?: string): Promise<BiometricAuthResult> {
   if (typeof window === "undefined") {
-    return true; // Node/SSR test fallback
+    return { success: true, message: "SSR environment" };
   }
 
   const label = getBiometricLabel();
@@ -224,19 +228,71 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
   // 0. Try Flutter InAppWebView Native Biometric Bridge (Android / iOS native hardware sensor)
   if (typeof window !== "undefined" && window.flutter_inappwebview) {
     try {
-      // Primary JS Handler in Flutter WebView
       let res = await window.flutter_inappwebview.callHandler("triggerNativeBiometric");
       if (!res) {
         res = await window.flutter_inappwebview.callHandler("authenticateBiometric");
       }
-      const parsed = parseBiometricResponse(res);
-      if (parsed.success) {
-        return true;
+
+      if (res && typeof res === "object") {
+        const obj = res as Record<string, unknown>;
+        if (obj.success === true) {
+          return { success: true, message: `${label} authenticated successfully.` };
+        }
+
+        const errStr = String(obj.error || obj.message || "").toLowerCase();
+        const code = String(obj.code || "");
+
+        if (code === "LOCKOUT" || errStr.includes("lockout") || errStr.includes("too many")) {
+          return {
+            success: false,
+            cancelled: false,
+            message: "Too many attempts. Please try again later.",
+          };
+        }
+
+        if (code === "OFFLINE" || errStr.includes("internet") || errStr.includes("offline")) {
+          return {
+            success: false,
+            cancelled: false,
+            message: "Internet connection required to verify biometrics.",
+          };
+        }
+
+        if (
+          errStr.includes("cancel") ||
+          errStr.includes("user_cancel") ||
+          errStr.includes("not_allowed") ||
+          errStr.includes("negative") ||
+          errStr.includes("dismiss")
+        ) {
+          return {
+            success: false,
+            cancelled: true,
+            message: `${label} authentication cancelled.`,
+          };
+        }
+
+        return {
+          success: false,
+          cancelled: false,
+          message: String(obj.error || obj.message || `${label} authentication failed.`),
+        };
+      } else if (res === true) {
+        return { success: true, message: `${label} authenticated successfully.` };
       }
-      return false;
+
+      return {
+        success: false,
+        cancelled: true,
+        message: `${label} authentication cancelled.`,
+      };
     } catch (err) {
       console.warn("[Flutter InAppWebView Biometrics] Native bridge call failed:", err);
-      return false;
+      return {
+        success: false,
+        cancelled: false,
+        message: "Native biometric bridge call failed.",
+      };
     }
   }
 
@@ -280,9 +336,18 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
           });
 
           if (credential) {
-            return true;
+            return { success: true, message: `${label} authenticated successfully.` };
           }
         } catch (firstErr: unknown) {
+          const err = firstErr as Error;
+          if (
+            err?.name === "NotAllowedError" ||
+            err?.name === "AbortError" ||
+            err?.message?.toLowerCase().includes("cancel")
+          ) {
+            return { success: false, cancelled: true, message: `${label} authentication cancelled.` };
+          }
+
           console.warn("[Biometrics Hardware] Credential assertion attempt 1 failed, retrying open assertion:", firstErr);
 
           // Retry open WebAuthn prompt without allowCredentials filter
@@ -296,9 +361,17 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
             });
 
             if (retryCredential) {
-              return true;
+              return { success: true, message: `${label} authenticated successfully.` };
             }
-          } catch (retryErr) {
+          } catch (retryErr: unknown) {
+            const rErr = retryErr as Error;
+            if (
+              rErr?.name === "NotAllowedError" ||
+              rErr?.name === "AbortError" ||
+              rErr?.message?.toLowerCase().includes("cancel")
+            ) {
+              return { success: false, cancelled: true, message: `${label} authentication cancelled.` };
+            }
             console.warn("[Biometrics Hardware] WebAuthn open retry failed:", retryErr);
           }
         }
@@ -309,11 +382,19 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
   }
 
   // 2. Fallback Event Request for Custom Prompt Drawer
-  return new Promise<boolean>((resolve) => {
+  return new Promise<BiometricAuthResult>((resolve) => {
     const handleResult = (event: Event) => {
-      const customEvent = event as CustomEvent<{ verified: boolean }>;
+      const customEvent = event as CustomEvent<{ verified: boolean; cancelled?: boolean; message?: string }>;
       window.removeEventListener("biometric_verify_result", handleResult);
-      resolve(Boolean(customEvent.detail?.verified));
+      if (customEvent.detail?.verified) {
+        resolve({ success: true, message: `${label} authenticated successfully.` });
+      } else {
+        resolve({
+          success: false,
+          cancelled: customEvent.detail?.cancelled ?? true,
+          message: customEvent.detail?.message || `${label} authentication cancelled or failed.`,
+        });
+      }
     };
 
     window.addEventListener("biometric_verify_result", handleResult);
@@ -326,7 +407,17 @@ export async function authenticateBiometric(title?: string): Promise<boolean> {
 
     setTimeout(() => {
       window.removeEventListener("biometric_verify_result", handleResult);
-      resolve(false);
+      resolve({ success: false, cancelled: true, message: `${label} authentication timed out.` });
     }, 45000);
   });
+}
+
+/**
+ * Prompts user for biometric authentication (Face ID on iOS, Fingerprint on Android).
+ * STRICT HARDWARE-ONLY VERIFICATION: Triggers Android/iOS System Hardware Fingerprint / Face ID sensor.
+ * Returns `true` ONLY if real hardware biometric match succeeds. Returns `false` on mismatch or cancel.
+ */
+export async function authenticateBiometric(title?: string): Promise<boolean> {
+  const result = await authenticateBiometricDetailed(title);
+  return result.success;
 }
