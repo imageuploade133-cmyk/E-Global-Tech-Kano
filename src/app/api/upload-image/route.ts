@@ -272,8 +272,8 @@ export async function POST(req: Request) {
     const imgbbJson = await imgbbRes.json();
 
     if (!imgbbRes.ok || !imgbbJson.success) {
-      const errMsg = imgbbJson.error?.message || "ImgBB upload service error";
-      console.error("[Upload API] ImgBB upload failed:", errMsg);
+      const errMsg = imgbbJson.error?.message || "Image upload service error";
+      console.error("[Upload API] Image upload failed:", errMsg);
       return NextResponse.json({ error: `Upload failed: ${errMsg}` }, { status: 502 });
     }
 
@@ -281,7 +281,7 @@ export async function POST(req: Request) {
     const { url, backupUrl, id, fileName: extractedName, mimeType: extractedMime, size: extractedSize } = extractImgBbDirectUrls(imgbbJson);
 
     if (!url) {
-      return NextResponse.json({ error: "ImgBB upload succeeded but failed to extract direct image URL" }, { status: 502 });
+      return NextResponse.json({ error: "Image upload succeeded but failed to extract direct image URL" }, { status: 502 });
     }
 
     // STRICT DIRECT URL CHECK: Use URL parser to verify hostname is strictly i.ibb.co or ibb.co and protocol is https
