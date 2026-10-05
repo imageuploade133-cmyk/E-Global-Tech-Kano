@@ -58,6 +58,10 @@ export default function PinPage() {
 
   // Biometric login execution - triggered explicitly on user button click
   const handleBiometricAuth = async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error("Internet connection required to verify biometrics and log in.");
+      return;
+    }
     if (typeof window !== "undefined" && window.flutter_inappwebview) {
       try {
         const res = await window.flutter_inappwebview.callHandler("triggerNativeBiometric");
