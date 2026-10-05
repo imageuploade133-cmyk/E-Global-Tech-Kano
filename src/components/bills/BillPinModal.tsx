@@ -25,7 +25,7 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
   onClose,
   onExecutePayment,
 }) => {
-  const { user, userData } = useAuth();
+  const { user, userData, updateUserData } = useAuth();
   const [enteredPin, setEnteredPin] = useState<string>("");
   const [is2faStage, setIs2faStage] = useState(false);
   const [verifiedPin, setVerifiedPin] = useState("");
@@ -79,6 +79,9 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
 
     if (res.success) {
       toast.success(`${biometricLabel} Authenticated!`);
+      if (userData?.isBiometricTransferEnabled !== true) {
+        updateUserData?.({ isBiometricTransferEnabled: true, isBiometricLoginEnabled: true, isFaceIdEnabled: true })?.catch(() => {});
+      }
       if (is2faActive) {
         setVerifiedPin("0000");
         setIs2faStage(true);

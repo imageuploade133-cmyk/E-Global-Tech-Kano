@@ -149,10 +149,12 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       formData.append("file", fileToUpload);
       formData.append("purpose", "kyc_selfie");
 
+      const activeSessionId = typeof window !== "undefined" ? (localStorage.getItem("active_session_id") || "") : "";
       const uploadRes = await fetch("/api/upload-image", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${idToken}`,
+          ...(activeSessionId ? { "X-Session-ID": activeSessionId } : {}),
         },
         body: formData,
       });
@@ -164,7 +166,7 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       const uploadedUrl = uploadJson.url;
 
       // STEP 2: Submit KYC payload with full user profile details
-      const sessionId = typeof window !== "undefined" ? (localStorage.getItem("active_session_id") || "") : "";
+      const sessionId = activeSessionId;
       const res = await fetch("/api/profile/verify-kyc", {
         method: "POST",
         headers: {

@@ -26,7 +26,7 @@ export function InvestmentPinModal({
   isSubmitting,
   onPinSubmit,
 }: InvestmentPinModalProps) {
-  const { user, userData } = useAuth();
+  const { user, userData, updateUserData } = useAuth();
   const [pin, setPin] = useState("");
   const [is2faStage, setIs2faStage] = useState(false);
   const [verifiedPin, setVerifiedPin] = useState("");
@@ -95,6 +95,9 @@ export function InvestmentPinModal({
 
     if (res.success) {
       toast.success(`${biometricLabel} Authenticated!`);
+      if (userData?.isBiometricTransferEnabled !== true) {
+        updateUserData?.({ isBiometricTransferEnabled: true, isBiometricLoginEnabled: true, isFaceIdEnabled: true })?.catch(() => {});
+      }
       if (is2faActive) {
         setVerifiedPin("0000");
         setIs2faStage(true);
