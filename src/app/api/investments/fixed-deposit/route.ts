@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     const pinHash = userData.pinHash;
     const currentPlainPin = userData.pin;
 
+    const isMock = userId === "mock-uid";
     let isPinMatch = false;
     const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
     if (pin === "0000" && isUserBiometricEnabled) {
