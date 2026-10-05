@@ -149,10 +149,12 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
       formData.append("file", fileToUpload);
       formData.append("purpose", "kyc_selfie");
 
+      const sessionId = typeof window !== "undefined" ? (localStorage.getItem("active_session_id") || "") : "";
       const uploadRes = await fetch("/api/upload-image", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${idToken}`,
+          ...(sessionId ? { "X-Session-ID": sessionId } : {}),
         },
         body: formData,
       });
