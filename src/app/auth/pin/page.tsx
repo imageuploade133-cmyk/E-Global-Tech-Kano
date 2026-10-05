@@ -75,8 +75,13 @@ export default function PinPage() {
           router.push("/");
           return;
         } else if (res && res.error) {
-          const errStr = String(res.error).toLowerCase();
-          if (!errStr.includes("cancel") && !errStr.includes("not allowed")) {
+          const errStr = String(res.error);
+          const errLower = errStr.toLowerCase();
+          if (res.code === "LOCKOUT" || errLower.includes("lockout") || errLower.includes("too many")) {
+            toast.error(res.error || "Too many attempts. Please try again later.");
+          } else if (res.code === "OFFLINE") {
+            toast.error(res.error);
+          } else if (!errLower.includes("cancel") && !errLower.includes("not allowed")) {
             toast.error("Biometric verification failed.");
           }
         }
