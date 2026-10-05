@@ -625,7 +625,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   const isMockRoute = typeof window !== "undefined" && (sessionStorage.getItem("mock") === "true" || window.location.search.includes("mock=true"));
   if (loading && !isMockRoute) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-transparent p-6">
         <div className="relative flex flex-col items-center">
           <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50">
             <div className="relative w-10 h-10 flex items-center justify-center">
@@ -949,7 +949,7 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
   // Wait for Firestore user data & session state check before making any PIN decision
   if (user && (deviceAuthState === "CHECKING_DEVICE_SESSION" || !userData) && !isMockRoute) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-transparent p-6">
         <div className="relative flex flex-col items-center">
           <div className="flex flex-col items-center p-5 rounded-2xl bg-[#fdfdfd]/80 backdrop-blur-md border border-gray-100/50">
             <div className="relative w-10 h-10 flex items-center justify-center">
