@@ -1168,7 +1168,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         Payment Method / Checkout Channel
                       </label>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className={`grid ${settings.hideCardPayment ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
                         <button
                           type="button"
                           onClick={() => setSelectedPaymentMethod("WALLET_NGN")}
@@ -1189,25 +1189,27 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           )}
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPaymentMethod("CARD_CHECKOUT")}
-                          className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                            selectedPaymentMethod === "CARD_CHECKOUT"
-                              ? "border-emerald-500 bg-emerald-50/90 text-black font-extrabold"
-                              : "border-gray-200 bg-white text-gray-600 font-bold"
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="material-symbols-outlined text-[18px] text-emerald-600">
-                              credit_card
-                            </span>
-                            <span className="text-[10px] uppercase truncate">Pay with Card</span>
-                          </div>
-                          {selectedPaymentMethod === "CARD_CHECKOUT" && (
-                            <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-                          )}
-                        </button>
+                        {!settings.hideCardPayment && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaymentMethod("CARD_CHECKOUT")}
+                            className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                              selectedPaymentMethod === "CARD_CHECKOUT"
+                                ? "border-emerald-500 bg-emerald-50/90 text-black font-extrabold"
+                                : "border-gray-200 bg-white text-gray-600 font-bold"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="material-symbols-outlined text-[18px] text-emerald-600">
+                                credit_card
+                              </span>
+                              <span className="text-[10px] uppercase truncate">Pay with Card</span>
+                            </div>
+                            {selectedPaymentMethod === "CARD_CHECKOUT" && (
+                              <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1257,7 +1259,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             Select Payment Method *
                           </label>
 
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className={`grid ${settings.hideCardPayment ? "grid-cols-1" : "grid-cols-2"} gap-2`}>
                             <button
                               type="button"
                               onClick={() => setSelectedPaymentMethod("WALLET_NGN")}
@@ -1281,28 +1283,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                               </div>
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={() => setSelectedPaymentMethod("CARD_CHECKOUT")}
-                              className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                                selectedPaymentMethod === "CARD_CHECKOUT"
-                                  ? "border-emerald-500 bg-emerald-50/80 shadow-xs"
-                                  : "border-gray-200 bg-white hover:bg-gray-100"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="material-symbols-outlined text-[20px] text-emerald-600">
-                                  credit_card
-                                </span>
-                                {selectedPaymentMethod === "CARD_CHECKOUT" && (
-                                  <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
-                                )}
-                              </div>
-                              <div className="mt-2">
-                                <span className="font-extrabold text-[11px] uppercase block text-black">Pay with Card</span>
-                                <span className="text-[9px] text-gray-400 font-semibold block">Pay securely using Flutterwave card</span>
-                              </div>
-                            </button>
+                            {!settings.hideCardPayment && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPaymentMethod("CARD_CHECKOUT")}
+                                className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                                  selectedPaymentMethod === "CARD_CHECKOUT"
+                                    ? "border-emerald-500 bg-emerald-50/80 shadow-xs"
+                                    : "border-gray-200 bg-white hover:bg-gray-100"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="material-symbols-outlined text-[20px] text-emerald-600">
+                                    credit_card
+                                  </span>
+                                  {selectedPaymentMethod === "CARD_CHECKOUT" && (
+                                    <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                                  )}
+                                </div>
+                                <div className="mt-2">
+                                  <span className="font-extrabold text-[11px] uppercase block text-black">Pay with Card</span>
+                                  <span className="text-[9px] text-gray-400 font-semibold block">Pay securely using Flutterwave card</span>
+                                </div>
+                              </button>
+                            )}
                           </div>
                         </div>
 

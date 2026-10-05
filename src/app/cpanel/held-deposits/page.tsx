@@ -7,6 +7,7 @@ import { useCpanelTheme } from "@/lib/CpanelThemeContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CpanelRouteGuard } from "@/components/cpanel/CpanelRouteGuard";
+import { CpanelActionDropdown, CpanelActionItem } from "@/components/cpanel/CpanelActionDropdown";
 import Link from "next/link";
 
 const ButtonSpinner = () => (
@@ -398,32 +399,32 @@ function HeldDepositsPageContent() {
                         </td>
 
                         <td className="py-3.5 px-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setSelectedRecord(r)}
-                              className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-200 rounded-xl text-[11px] font-extrabold uppercase transition-all cursor-pointer"
-                            >
-                              Inspect
-                            </button>
-
-                            {isHeld && (
-                              <>
-                                <button
-                                  onClick={() => setApproveModalRecord(r)}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-black uppercase transition-all cursor-pointer shadow-3xs flex items-center gap-1"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">task_alt</span>
-                                  <span>Approve &amp; Credit</span>
-                                </button>
-                                <button
-                                  onClick={() => setCancelModalRecord(r)}
-                                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] font-black uppercase transition-all cursor-pointer shadow-3xs"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            )}
-                          </div>
+                          {(() => {
+                            const actions: CpanelActionItem[] = [
+                              {
+                                label: "Inspect Details",
+                                icon: "visibility",
+                                onClick: () => setSelectedRecord(r),
+                              },
+                              ...(isHeld
+                                ? [
+                                    {
+                                      label: "Approve & Credit",
+                                      icon: "task_alt",
+                                      variant: "emerald" as const,
+                                      onClick: () => setApproveModalRecord(r),
+                                    },
+                                    {
+                                      label: "Cancel Deposit",
+                                      icon: "cancel",
+                                      variant: "danger" as const,
+                                      onClick: () => setCancelModalRecord(r),
+                                    },
+                                  ]
+                                : []),
+                            ];
+                            return <CpanelActionDropdown actions={actions} />;
+                          })()}
                         </td>
                       </tr>
                     );
