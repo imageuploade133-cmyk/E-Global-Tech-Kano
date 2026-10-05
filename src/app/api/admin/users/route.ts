@@ -203,7 +203,8 @@ export async function POST(req: Request) {
         phoneNumber,
         balance,
         role,
-        permissions
+        permissions,
+        pin
       } = body;
 
       // Enforce administrative creation privileges: Only SUPER_ADMIN or root can create administrative accounts
@@ -282,6 +283,11 @@ export async function POST(req: Request) {
 
       const fullName = `${firstName.trim()} ${lastName.trim()}`.toUpperCase();
 
+      const cleanPin = String(pin || "").trim();
+      if (cleanPin && (cleanPin.length !== 4 || isNaN(Number(cleanPin)))) {
+        return NextResponse.json({ error: "Access PIN must be a valid 4-digit numeric code." }, { status: 400 });
+      }
+
       // Write user document to Firestore
       await adminDb.collection("users").doc(userRecord.uid).set({
         uid: userRecord.uid,
@@ -294,6 +300,7 @@ export async function POST(req: Request) {
         bonusBalance: 0,
         role: role || "user",
         permissions: cleanPermissions,
+        ...(cleanPin ? { pin: cleanPin, isPinRequired: true } : {}),
         createdAt: new Date().toISOString()
       });
 
