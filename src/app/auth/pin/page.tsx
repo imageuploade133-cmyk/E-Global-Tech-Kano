@@ -58,6 +58,17 @@ export default function PinPage() {
 
   // Biometric login execution - triggered explicitly on user button click
   const handleBiometricAuth = async () => {
+    // Verify if biometric login has been enabled by user
+    const isBiometricEnabled = userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true;
+    if (!isBiometricEnabled) {
+      toast.error("Kindly enable Biometric Login in Security Settings to have access.");
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error("Internet connection required to verify biometrics and log in.");
+      return;
+    }
     if (typeof window !== "undefined" && window.flutter_inappwebview) {
       try {
         const res = await window.flutter_inappwebview.callHandler("triggerNativeBiometric");
@@ -71,8 +82,13 @@ export default function PinPage() {
           router.push("/");
           return;
         } else if (res && res.error) {
-          const errStr = String(res.error).toLowerCase();
-          if (!errStr.includes("cancel") && !errStr.includes("not allowed")) {
+          const errStr = String(res.error);
+          const errLower = errStr.toLowerCase();
+          if (res.code === "LOCKOUT" || errLower.includes("lockout") || errLower.includes("too many")) {
+            toast.error(res.error || "Too many attempts. Please try again later.");
+          } else if (res.code === "OFFLINE") {
+            toast.error(res.error);
+          } else if (!errLower.includes("cancel") && !errLower.includes("not allowed")) {
             toast.error("Biometric verification failed.");
           }
         }
