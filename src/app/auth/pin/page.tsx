@@ -58,6 +58,13 @@ export default function PinPage() {
 
   // Biometric login execution - triggered explicitly on user button click
   const handleBiometricAuth = async () => {
+    // Verify if biometric login has been enabled by user
+    const isBiometricEnabled = userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true;
+    if (!isBiometricEnabled) {
+      toast.error("Kindly enable Biometric Login in Security Settings to have access.");
+      return;
+    }
+
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       toast.error("Internet connection required to verify biometrics and log in.");
       return;
