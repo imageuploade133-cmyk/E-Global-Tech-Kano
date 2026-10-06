@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { authenticateUserRequest } from "@/lib/auth-util";
 import { adminDb } from "@/lib/firebase-admin";
+import { WalletService } from "@/services/wallet-service";
+import { NotificationService } from "@/services/notification-service";
 
 const GATEWAY_URL = process.env.PAYMENT_GATEWAY_URL || "http://127.0.0.1:3055";
 
@@ -122,6 +124,117 @@ export async function POST(req: Request) {
       success: false,
       error: "Invalid JSON response from gateway."
     }));
+
+    const isVerifiedSuccess =
+      gatewayResponse.ok &&
+      (data.success === true ||
+        data.status === "SUCCESS" ||
+        data.status === "SUCCESSFUL" ||
+        data.status === "successful" ||
+        data.data?.status === "successful");
+
+    if (isVerifiedSuccess) {
+      const resolvedTxRef = txRef || data.txRef || data.tx_ref || data.data?.tx_ref || `flw-tx-${authenticatedUser.uid}-${Date.now()}`;
+      const resolvedFlwId = String(transactionId || data.flwId || data.id || data.data?.id || "");
+      const resolvedAmount = Number(
+        data.totalCredited ?? data.fundedAmount ?? data.amount ?? data.data?.amount ?? 0
+      );
+
+      if (resolvedAmount > 0) {
+        try {
+          const creditOutcome = await adminDb.runTransaction(async (transaction) => {
+            const docId = resolvedTxRef.startsWith("tx-FUNDING-") ? resolvedTxRef : `tx-FUNDING-${resolvedTxRef}`;
+            const txDocRef = adminDb.collection("transactions").doc(docId);
+            const txDoc = await transaction.get(txDocRef);
+
+            if (txDoc.exists) {
+              const txData = txDoc.data() || {};
+              if (txData.status === "SUCCESS" || txData.credited === true) {
+                const userRef = adminDb.collection("users").doc(authenticatedUser.uid);
+                const userDoc = await transaction.get(userRef);
+                const currentBal = Number(userDoc.data()?.balance) || 0;
+                return {
+                  alreadyCredited: true,
+                  newBalance: currentBal,
+                  amount: Number(txData.totalCredited || txData.amount || resolvedAmount)
+                };
+              }
+            }
+
+            // Perform atomic credit
+            const creditRes = await WalletService.creditWallet(transaction, {
+              userId: authenticatedUser.uid,
+              amount: resolvedAmount,
+              currency: "NGN",
+              reference: resolvedTxRef,
+              flwId: resolvedFlwId,
+              docId,
+              description: "Wallet Funding via Payment Gateway",
+              recipientName: "Self",
+              type: "WALLET_FUNDING",
+              category: "DEPOSIT",
+              direction: "CREDIT",
+              fundingMethod: "PAYMENT_GATEWAY",
+              completedAt: new Date().toISOString(),
+              metadata: {
+                flwVerified: true,
+                verifiedVia: "api_flutterwave_verify",
+                flwData: data.data || data,
+              }
+            });
+
+            // Update pending_payments record if present
+            const pendingRef = adminDb.collection("pending_payments").doc(resolvedTxRef);
+            transaction.set(pendingRef, {
+              status: "SUCCESS",
+              completedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+
+            return {
+              alreadyCredited: false,
+              newBalance: creditRes.newBalance,
+              amount: resolvedAmount
+            };
+          });
+
+          // Send FCM notification if newly credited
+          if (!creditOutcome.alreadyCredited) {
+            NotificationService.sendPushNotification({
+              userId: authenticatedUser.uid,
+              title: "Wallet Funded Successfully",
+              body: `Your wallet has been credited with ₦${resolvedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}.`,
+              data: {
+                type: "WALLET_FUNDING",
+                reference: resolvedTxRef,
+                amount: String(resolvedAmount),
+              }
+            }).catch((notifErr) => console.warn("[Verify Route Notification Warning]:", notifErr.message));
+          }
+
+          return NextResponse.json({
+            ...data,
+            success: true,
+            status: "SUCCESS",
+            credited: true,
+            alreadyCredited: creditOutcome.alreadyCredited,
+            fundedAmount: creditOutcome.amount,
+            totalCredited: creditOutcome.amount,
+            amount: creditOutcome.amount,
+            newBalance: creditOutcome.newBalance,
+            message: "Payment verified and wallet credited successfully."
+          });
+        } catch (creditError: any) {
+          console.error(`[Verify Route Credit Error]: ${creditError.message}`);
+          // Return response with error detail if wallet credit transaction failed
+          return NextResponse.json({
+            ...data,
+            success: false,
+            error: `Payment verified but wallet crediting failed: ${creditError.message}`
+          }, { status: 500 });
+        }
+      }
+    }
 
     return NextResponse.json(data, { status: gatewayResponse.status });
   } catch (error: any) {
