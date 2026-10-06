@@ -107,12 +107,13 @@ export class PaymentGatewayManager {
     const gatewayUrl = process.env.PAYMENT_GATEWAY_URL || "https://etechglobalhub.duckdns.org";
     const gatewayApiKey = process.env.PAYMENT_GATEWAY_API_KEY || process.env.GATEWAY_API_KEY;
 
-    // Option 1 Design: If feature is airtime, route to Clubkonnect VTU endpoint on the Payment Gateway
-    if (params.feature === "airtime") {
+    // Option 1 Design: If feature is airtime or data, route to Clubkonnect VTU endpoint on the Payment Gateway
+    if (params.feature === "airtime" || params.feature === "data") {
+      const endpoint = params.feature === "data" ? `${gatewayUrl}/api/vtu/data` : `${gatewayUrl}/api/vtu/airtime`;
       return {
         name: "clubkonnect",
         payBills: async (payload: BillPaymentPayload, idToken?: string) => {
-          console.log(`[PaymentGatewayManager] Routing airtime purchase S2S to Clubkonnect VTU endpoint | ref=${payload.reference}`);
+          console.log(`[PaymentGatewayManager] Routing ${params.feature} purchase S2S to Clubkonnect VTU endpoint | ref=${payload.reference}`);
 
           const headers: Record<string, string> = {
             "Authorization": `Bearer ${idToken || ""}`,
@@ -120,23 +121,41 @@ export class PaymentGatewayManager {
           };
           if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
 
-          const response = await fetch(`${gatewayUrl}/api/vtu/airtime`, {
+          const requestBody = params.feature === "data"
+            ? {
+                network: payload.biller_name || payload.biller_code || "MTN",
+                mobile_number: payload.customer_id,
+                plan_code: payload.item_code,
+                amount: payload.amount,
+                reference: payload.reference,
+              }
+            : {
+                network: payload.biller_name || "MTN",
+                phone: payload.customer_id,
+                amount: payload.amount,
+                reference: payload.reference,
+              };
+
+          const response = await fetch(endpoint, {
             method: "POST",
             headers,
-            body: JSON.stringify({
-              network: payload.biller_name || "MTN",
-              phone: payload.customer_id,
-              amount: payload.amount,
-            }),
+            body: JSON.stringify(requestBody),
           });
 
           const resData = await safeParseJson(response);
-          if (response.ok && resData.success) {
+          const statusCode = String(resData.statuscode || resData.statusCode || "");
+          const statusStr = String(resData.status || resData.orderstatus || "").toUpperCase();
+
+          const isCompleted = statusCode === "200" || statusStr === "ORDER_COMPLETED";
+          const isReceivedOrPending = statusCode === "100" || statusStr === "ORDER_RECEIVED" || statusStr === "ORDER_PROCESSING" || response.ok;
+
+          if (response.ok && resData.success !== false) {
             return {
               success: true,
+              status: isCompleted ? "SUCCESS" : "PENDING",
               reference: payload.reference,
               tx_ref: payload.reference,
-              flw_ref: resData.orderId || resData.requestId,
+              flw_ref: resData.orderId || resData.orderid || resData.requestId || resData.reference,
               amount: payload.amount,
               customer: payload.customer_id,
               biller_name: payload.biller_name,
@@ -150,7 +169,7 @@ export class PaymentGatewayManager {
             amount: payload.amount,
             customer: payload.customer_id,
             biller_name: payload.biller_name,
-            error: resData.message || "Failed to process airtime VTU payment via Clubkonnect.",
+            error: resData.message || resData.error || `Failed to process ${params.feature} VTU payment via Clubkonnect.`,
           };
         }
       };

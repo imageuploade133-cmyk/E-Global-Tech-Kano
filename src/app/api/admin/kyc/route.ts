@@ -84,6 +84,45 @@ async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
   }
 }
 
+async function resolveTierLimits(assignedTier: string, customDaily?: number, customSingle?: number) {
+  let appData: Record<string, any> = {};
+  try {
+    const appDoc = await adminDb.collection("config").doc("app").get();
+    if (appDoc.exists) {
+      appData = appDoc.data() || {};
+    }
+  } catch (err: any) {
+    console.warn("[Resolve Tier Limits Warning]:", err.message);
+  }
+
+  let defaultDaily = 500000;
+  let defaultSingle = 200000;
+
+  if (assignedTier === "Tier 3") {
+    defaultDaily = Number(appData.tier3DailyTransferLimit ?? appData.tier3DailyLimit ?? 50000000);
+    defaultSingle = Number(appData.tier3SingleTransferLimit ?? appData.tier3SingleLimit ?? 10000000);
+  } else if (assignedTier === "Tier 2") {
+    defaultDaily = Number(appData.tier2DailyTransferLimit ?? appData.tier2DailyLimit ?? 5000000);
+    defaultSingle = Number(appData.tier2SingleTransferLimit ?? appData.tier2SingleLimit ?? 2000000);
+  } else {
+    defaultDaily = Number(appData.tier1DailyTransferLimit ?? appData.tier1DailyLimit ?? 500000);
+    defaultSingle = Number(appData.tier1SingleTransferLimit ?? appData.tier1SingleLimit ?? 200000);
+  }
+
+  const hasCustomDaily = typeof customDaily === "number" && customDaily > 0 && customDaily !== defaultDaily;
+  const hasCustomSingle = typeof customSingle === "number" && customSingle > 0 && customSingle !== defaultSingle;
+  const isCustom = hasCustomDaily || hasCustomSingle;
+
+  const finalDaily = typeof customDaily === "number" && customDaily > 0 ? customDaily : defaultDaily;
+  const finalSingle = typeof customSingle === "number" && customSingle > 0 ? customSingle : defaultSingle;
+
+  return {
+    dailyLimit: finalDaily,
+    singleLimit: finalSingle,
+    hasCustomLimits: isCustom,
+  };
+}
+
 async function parseResponseJson(response: Response, defaultMessage: string) {
   try {
     const contentType = response.headers.get("content-type") || "";
@@ -339,8 +378,10 @@ export async function POST(req: Request) {
       }
 
       const assignedTier = requestBody.tier || "Tier 2";
-      const numDaily = Number(requestBody.dailyLimit) || (assignedTier === "Tier 3" ? 50000000 : assignedTier === "Tier 2" ? 5000000 : 500000);
-      const numSingle = Number(requestBody.singleLimit) || (assignedTier === "Tier 3" ? 10000000 : assignedTier === "Tier 2" ? 2000000 : 200000);
+      const customDaily = requestBody.dailyLimit !== undefined && requestBody.dailyLimit !== null && requestBody.dailyLimit !== "" ? Number(requestBody.dailyLimit) : undefined;
+      const customSingle = requestBody.singleLimit !== undefined && requestBody.singleLimit !== null && requestBody.singleLimit !== "" ? Number(requestBody.singleLimit) : undefined;
+
+      const limits = await resolveTierLimits(assignedTier, customDaily, customSingle);
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -359,17 +400,31 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: result.message || "Failed to approve KYC in gateway." }, { status: response.status });
       }
 
-      // Update user document in Firestore with approved Tier level and custom limits
+      // Update user and wallet documents in Firestore globally with approved Tier level and limits
       const adminEmail = perm.auth?.email || "admin@system";
-      await adminDb.collection("users").doc(targetUid).set({
+      const userUpdatePayload = {
         tier: assignedTier,
-        dailyLimit: numDaily,
-        dailyTransferLimit: numDaily,
-        singleLimit: numSingle,
-        maxSingleTransferLimit: numSingle,
+        dailyLimit: limits.dailyLimit,
+        dailyTransferLimit: limits.dailyLimit,
+        singleLimit: limits.singleLimit,
+        maxSingleTransferLimit: limits.singleLimit,
+        hasCustomLimits: limits.hasCustomLimits,
         kycStatus: "VERIFIED",
         kycVerifiedAt: new Date().toISOString(),
         kycVerifiedBy: adminEmail,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await adminDb.collection("users").doc(targetUid).set(userUpdatePayload, { merge: true });
+
+      await adminDb.collection("wallets").doc(`${targetUid}_NGN`).set({
+        tier: assignedTier,
+        dailyLimit: limits.dailyLimit,
+        dailyTransferLimit: limits.dailyLimit,
+        singleLimit: limits.singleLimit,
+        maxSingleTransferLimit: limits.singleLimit,
+        hasCustomLimits: limits.hasCustomLimits,
+        updatedAt: new Date().toISOString(),
       }, { merge: true });
 
       // Auto-release any pending held deposits for this user now that KYC is approved
@@ -379,7 +434,7 @@ export async function POST(req: Request) {
         const { NotificationService } = await import("@/services/notification-service");
         await NotificationService.sendPushNotification(targetUid, {
           title: "KYC Verified! 🎉",
-          body: `Congratulations! Your identity verification has been approved for ${assignedTier}. Your daily transfer limit is ₦${numDaily.toLocaleString("en-NG")}.`,
+          body: `Congratulations! Your identity verification has been approved for ${assignedTier}. Your daily transfer limit is ₦${limits.dailyLimit.toLocaleString("en-NG")}.`,
           type: "security"
         });
       } catch (notifErr: any) {
