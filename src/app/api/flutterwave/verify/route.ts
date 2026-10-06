@@ -143,7 +143,11 @@ export async function POST(req: Request) {
       if (resolvedAmount > 0) {
         try {
           const creditOutcome = await adminDb.runTransaction(async (transaction) => {
-            const docId = resolvedTxRef.startsWith("tx-FUNDING-") ? resolvedTxRef : `tx-FUNDING-${resolvedTxRef}`;
+            // Use unique provider transaction ID (resolvedFlwId) as canonical docId to ensure distinct deposits on permanent virtual accounts credit individually
+            const docId = resolvedFlwId
+              ? `tx-FUNDING-flw-${resolvedFlwId}`
+              : (resolvedTxRef.startsWith("tx-FUNDING-") ? resolvedTxRef : `tx-FUNDING-${resolvedTxRef}`);
+
             const txDocRef = adminDb.collection("transactions").doc(docId);
             const txDoc = await transaction.get(txDocRef);
 

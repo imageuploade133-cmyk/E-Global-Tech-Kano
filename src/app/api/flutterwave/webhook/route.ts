@@ -17,6 +17,16 @@ export async function POST(req: Request) {
     const rawBody = await req.text();
     console.log(`[Webhook Proxy] [${reqId}] Signature: "${signature}" | Body Length: ${rawBody.length}`);
 
+    // Signature Verification: Validate verif-hash if FLW_WEBHOOK_SECRET is set
+    const expectedSecret = process.env.FLW_WEBHOOK_SECRET || process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+    if (expectedSecret && signature !== expectedSecret) {
+      console.warn(`[Webhook Proxy] [${reqId}] Rejecting webhook due to invalid signature.`);
+      return NextResponse.json(
+        { success: false, error: "Unauthorized: Invalid webhook signature." },
+        { status: 401 }
+      );
+    }
+
     // Trim trailing slash to prevent double-slash (//) routing issues on certain Nginx configurations
     const cleanGatewayUrl = GATEWAY_URL.endsWith("/") ? GATEWAY_URL.slice(0, -1) : GATEWAY_URL;
 
@@ -48,7 +58,10 @@ export async function POST(req: Request) {
         const customerEmail = payload.data.customer?.email || payload.customer?.email || "";
 
         if (amount > 0 && (txRef || flwId)) {
-          const docId = txRef ? (txRef.startsWith("tx-FUNDING-") ? txRef : `tx-FUNDING-${txRef}`) : `tx-FUNDING-flw-${flwId}`;
+          // Use unique provider transaction ID (flwId) as canonical docId so distinct deposits on permanent virtual accounts credit individually
+          const docId = flwId
+            ? `tx-FUNDING-flw-${flwId}`
+            : (txRef.startsWith("tx-FUNDING-") ? txRef : `tx-FUNDING-${txRef}`);
 
           await adminDb.runTransaction(async (transaction) => {
             const txRefDoc = adminDb.collection("transactions").doc(docId);
