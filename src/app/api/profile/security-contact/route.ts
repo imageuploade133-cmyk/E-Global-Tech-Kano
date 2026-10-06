@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { action, pin, newContact, contactType, requestId, otpCode } = body;
+    const { action, pin, isBiometricAuthenticated, newContact, contactType, requestId, otpCode } = body;
     const now = Date.now();
     const nowIso = new Date().toISOString();
 
@@ -53,11 +53,6 @@ export async function POST(req: Request) {
     }
 
     const userData = userDoc.data() || {};
-
-    // 1. PIN Verification Requirement
-    if (!pin || typeof pin !== "string") {
-      return NextResponse.json({ error: "4-digit transaction PIN is required to modify security recovery contacts." }, { status: 400 });
-    }
 
     const pinHash = userData.pinHash;
     const currentPlainPin = userData.pin;
@@ -71,21 +66,29 @@ export async function POST(req: Request) {
       }
     }
 
-    let isPinMatch = false;
+    let isAuthorized = false;
     const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
-    if (pin === "0000" && isUserBiometricEnabled) {
-      isPinMatch = true;
-    } else if (process.env.NODE_ENV !== "production" && uid === "mock-uid") {
-      isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-    } else if (pinHash) {
-      isPinMatch = bcrypt.compareSync(pin, pinHash);
-    } else if (currentPlainPin) {
-      isPinMatch = (pin === currentPlainPin);
+
+    if (isBiometricAuthenticated === true) {
+      if (!isUserBiometricEnabled) {
+        return NextResponse.json({ error: "Biometric authorization is not enabled on this account." }, { status: 403 });
+      }
+      isAuthorized = true;
+    } else if (pin && typeof pin === "string") {
+      if (process.env.NODE_ENV !== "production" && uid === "mock-uid") {
+        isAuthorized = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
+      } else if (pinHash) {
+        isAuthorized = bcrypt.compareSync(pin, pinHash);
+      } else if (currentPlainPin) {
+        isAuthorized = (pin === currentPlainPin);
+      } else {
+        return NextResponse.json({ error: "No transaction PIN has been set up on this account." }, { status: 400 });
+      }
     } else {
-      return NextResponse.json({ error: "No transaction PIN has been set up on this account." }, { status: 400 });
+      return NextResponse.json({ error: "4-digit transaction PIN or biometric authorization is required." }, { status: 400 });
     }
 
-    if (!isPinMatch) {
+    if (!isAuthorized) {
       const pinAttempts = (Number(userData.pinAttempts) || 0) + 1;
       let lockTimestamp = null;
       if (pinAttempts >= 5) {

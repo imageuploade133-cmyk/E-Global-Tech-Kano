@@ -211,7 +211,9 @@ export async function POST(req: Request) {
 
       let isPinMatch = false;
       const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
-      if (pin === "0000" && isUserBiometricEnabled) {
+      const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
+      if (isBiometricAuth && isUserBiometricEnabled) {
         isPinMatch = true;
       } else if (isMock) {
         isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));

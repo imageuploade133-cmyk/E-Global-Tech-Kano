@@ -96,7 +96,8 @@ export async function POST(req: Request) {
 
         let isMatch = false;
         const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
-        if (pin === "0000" && isUserBiometricEnabled) {
+        const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+        if (isBiometricAuth && isUserBiometricEnabled) {
           isMatch = true;
         } else if (uid === "mock-uid") {
           // Mock verification bypass for integration tests

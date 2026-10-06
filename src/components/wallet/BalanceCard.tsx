@@ -1749,7 +1749,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
   };
 
   // Execute Direct Outward Transfer (Single or Bulk)
-  const executeOutwardTransfer = async (completedPin: string) => {
+  const executeOutwardTransfer = async (completedPin?: string, isBiometricAuthenticated?: boolean) => {
     if (!isFeatureEnabled(config?.featureToggles, "transfer")) {
       toast.error(getFeatureDisabledMessage(config?.featureToggles, "transfer"));
       return;
@@ -1774,6 +1774,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
             title: "Staff December Settlement",
             recipients: bulkRecipients,
             pin: completedPin,
+            isBiometricAuthenticated,
           }),
         });
 
@@ -1838,6 +1839,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         beneficiary_name: trfAccountName,
         beneficiaryName: trfAccountName,
         pin: completedPin,
+        isBiometricAuthenticated,
       };
       console.log("Outward Transfer Payload to VM Payment Gateway:", payload);
 
@@ -1911,10 +1913,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
         updateUserData({ isBiometricTransferEnabled: true, isBiometricLoginEnabled: true, isFaceIdEnabled: true }).catch(() => {});
       }
       if (userData?.is2faOtpEnabled === true) {
-        setTrfVerifiedPin("0000");
+        setTrfVerifiedPin("");
         setIsTrf2faStage(true);
       } else {
-        executeOutwardTransfer("0000");
+        executeOutwardTransfer(undefined, true);
       }
     } else if (res.cancelled) {
       // User cancelled biometric prompt cleanly
@@ -4207,7 +4209,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balance, currency, use
                       user={user}
                       title="2FA Transfer Verification"
                       description={`PIN/Biometrics verified! Complete 2FA OTP verification to authorize ₦${trfTotalDebit.toLocaleString("en-NG", { minimumFractionDigits: 2 })} transfer.`}
-                      onVerifiedSuccess={() => executeOutwardTransfer(trfVerifiedPin || "0000")}
+                      onVerifiedSuccess={() => executeOutwardTransfer(trfVerifiedPin || undefined, !trfVerifiedPin)}
                       onCancel={() => {
                         setIsTrf2faStage(false);
                         setTrfPin("");

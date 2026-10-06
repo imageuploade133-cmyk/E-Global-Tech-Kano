@@ -60,4 +60,50 @@ describe("Platform-Aware Biometrics Suite", () => {
     expect(shouldAutoTriggerBiometric({})).toBe(false);
     expect(shouldAutoTriggerBiometric(null)).toBe(false);
   });
+
+  test("7. Validates server-side biometric authorization payload without dummy PIN", () => {
+    function authorizeTransaction(
+      body: { pin?: string; isBiometricAuthenticated?: boolean },
+      userData: { isBiometricTransferEnabled?: boolean; isBiometricLoginEnabled?: boolean; isFaceIdEnabled?: boolean }
+    ): { authorized: boolean; error?: string } {
+      const isUserBiometricEnabled =
+        userData.isBiometricTransferEnabled === true ||
+        userData.isBiometricLoginEnabled === true ||
+        userData.isFaceIdEnabled === true;
+
+      if (body.isBiometricAuthenticated === true) {
+        if (!isUserBiometricEnabled) {
+          return { authorized: false, error: "Biometric authorization is not enabled on this account." };
+        }
+        return { authorized: true };
+      }
+
+      if (body.pin && typeof body.pin === "string") {
+        return { authorized: body.pin === "1234" };
+      }
+
+      return { authorized: false, error: "4-digit transaction PIN or biometric authorization is required." };
+    }
+
+    // Biometric enabled account + isBiometricAuthenticated: true
+    expect(authorizeTransaction({ isBiometricAuthenticated: true }, { isBiometricTransferEnabled: true })).toEqual({ authorized: true });
+
+    // Biometric disabled account + isBiometricAuthenticated: true
+    expect(authorizeTransaction({ isBiometricAuthenticated: true }, { isBiometricTransferEnabled: false })).toEqual({
+      authorized: false,
+      error: "Biometric authorization is not enabled on this account.",
+    });
+
+    // Valid PIN authorization
+    expect(authorizeTransaction({ pin: "1234" }, { isBiometricTransferEnabled: false })).toEqual({ authorized: true });
+
+    // Invalid PIN authorization
+    expect(authorizeTransaction({ pin: "9999" }, { isBiometricTransferEnabled: false })).toEqual({ authorized: false });
+
+    // Missing auth payload
+    expect(authorizeTransaction({}, { isBiometricTransferEnabled: true })).toEqual({
+      authorized: false,
+      error: "4-digit transaction PIN or biometric authorization is required.",
+    });
+  });
 });

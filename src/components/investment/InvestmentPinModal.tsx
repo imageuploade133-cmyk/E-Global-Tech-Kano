@@ -15,7 +15,7 @@ interface InvestmentPinModalProps {
   title?: string;
   description?: string;
   isSubmitting: boolean;
-  onPinSubmit: (pin: string) => void;
+  onPinSubmit: (pin?: string, isBiometricAuthenticated?: boolean) => void;
 }
 
 export function InvestmentPinModal({
@@ -99,10 +99,10 @@ export function InvestmentPinModal({
         updateUserData?.({ isBiometricTransferEnabled: true, isBiometricLoginEnabled: true, isFaceIdEnabled: true })?.catch(() => {});
       }
       if (is2faActive) {
-        setVerifiedPin("0000");
+        setVerifiedPin("");
         setIs2faStage(true);
       } else {
-        onPinSubmit("0000");
+        onPinSubmit(undefined, true);
       }
     } else if (res.cancelled) {
       // User cancelled
@@ -130,7 +130,7 @@ export function InvestmentPinModal({
               user={user}
               title={title}
               description={`PIN/Biometrics verified! Enter 2FA OTP to complete ${title.toLowerCase()}.`}
-              onVerifiedSuccess={() => onPinSubmit(verifiedPin || "0000")}
+              onVerifiedSuccess={() => onPinSubmit(verifiedPin || undefined, !verifiedPin)}
               onCancel={() => {
                 setIs2faStage(false);
                 setPin("");

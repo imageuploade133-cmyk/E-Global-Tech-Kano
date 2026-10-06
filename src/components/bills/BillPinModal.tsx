@@ -14,7 +14,7 @@ interface BillPinModalProps {
   selectedItem: BillItem | null;
   finalAmount: number;
   onClose: () => void;
-  onExecutePayment: (pin: string) => void;
+  onExecutePayment: (pin?: string, isBiometricAuthenticated?: boolean) => void;
 }
 
 export const BillPinModal: React.FC<BillPinModalProps> = ({
@@ -83,10 +83,10 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
         updateUserData?.({ isBiometricTransferEnabled: true, isBiometricLoginEnabled: true, isFaceIdEnabled: true })?.catch(() => {});
       }
       if (is2faActive) {
-        setVerifiedPin("0000");
+        setVerifiedPin("");
         setIs2faStage(true);
       } else {
-        onExecutePayment("0000");
+        onExecutePayment(undefined, true);
       }
     } else if (res.cancelled) {
       // User cancelled biometric prompt cleanly
@@ -128,7 +128,7 @@ export const BillPinModal: React.FC<BillPinModalProps> = ({
                 user={user}
                 title="2FA Payment Verification"
                 description={`PIN/Biometrics verified! Enter 2FA OTP to complete ₦${finalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} payment for ${selectedBiller?.name || "Bill Payment"}.`}
-                onVerifiedSuccess={() => onExecutePayment(verifiedPin || "0000")}
+                onVerifiedSuccess={() => onExecutePayment(verifiedPin || undefined, !verifiedPin)}
                 onCancel={() => {
                   setIs2faStage(false);
                   setEnteredPin("");
