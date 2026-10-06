@@ -923,7 +923,7 @@ export function TierUpgradeDrawerModal({
                   description="PIN/Biometrics verified! Select delivery channel and verify 2FA OTP to submit tier limit upgrade request."
                   onVerifiedSuccess={() => {
                     setIsPinModalOpen(false);
-                    executeVerifiedSubmit(verifiedPin || "0000");
+                    executeVerifiedSubmit(verifiedPin);
                   }}
                   onCancel={() => {
                     setIs2faStage(false);

@@ -33,14 +33,14 @@ export function ChangePinSection() {
     }
   };
 
-  const handleVerifyAccessPin = async (submittedPin: string) => {
+  const handleVerifyAccessPin = async (submittedPin?: string, isBiometricAuthenticated?: boolean) => {
     setIsVerifyingPin(true);
     try {
       const isMock = sessionStorage.getItem("mock") === "true";
 
       if (isMock) {
         const currentStoredPin = userData?.pin || "1234";
-        if (submittedPin !== currentStoredPin) {
+        if (!isBiometricAuthenticated && submittedPin !== currentStoredPin) {
           toast.error("Incorrect Access PIN. Access denied.");
           setIsVerifyingPin(false);
           return;
@@ -62,6 +62,7 @@ export function ChangePinSection() {
           body: JSON.stringify({
             action: "verify",
             pin: submittedPin,
+            isBiometricAuthenticated,
           }),
         });
 
