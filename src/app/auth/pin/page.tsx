@@ -56,21 +56,6 @@ export default function PinPage() {
 
   useModalBackHandler(showFaceIdModal, () => setShowFaceIdModal(false), "face-id-drawer");
 
-  // Auto-trigger biometric authentication if enabled by user on app launch / PIN screen load
-  const hasAutoTriggeredBiometricRef = useRef(false);
-
-  useEffect(() => {
-    if (loading || !user || !userData) return;
-    if (is2faStage || showForgotPin || showFaceIdModal) return;
-
-    const isBiometricEnabled = userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true;
-
-    if (isBiometricEnabled && !hasAutoTriggeredBiometricRef.current) {
-      hasAutoTriggeredBiometricRef.current = true;
-      handleBiometricAuth();
-    }
-  }, [loading, user, userData, is2faStage, showForgotPin, showFaceIdModal]);
-
   // Biometric login execution - triggered explicitly on user button click or automatically on launch
   const handleBiometricAuth = async () => {
     // Verify if biometric login has been enabled by user
@@ -141,6 +126,21 @@ export default function PinPage() {
 
   // 2FA Login OTP Stage States on Access PIN screen
   const [is2faStage, setIs2faStage] = useState(false);
+
+  // Auto-trigger biometric authentication if enabled by user on app launch / PIN screen load
+  const hasAutoTriggeredBiometricRef = useRef(false);
+
+  useEffect(() => {
+    if (loading || !user || !userData) return;
+    if (is2faStage || showForgotPin || showFaceIdModal) return;
+
+    const isBiometricEnabled = userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true;
+
+    if (isBiometricEnabled && !hasAutoTriggeredBiometricRef.current) {
+      hasAutoTriggeredBiometricRef.current = true;
+      handleBiometricAuth();
+    }
+  }, [loading, user, userData, is2faStage, showForgotPin, showFaceIdModal]);
   const [has2faOtpBeenSent, setHas2faOtpBeenSent] = useState(false);
   const [login2faChannel, setLogin2faChannel] = useState<"email" | "whatsapp">("email");
   const [login2faOtpDigits, setLogin2faOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
