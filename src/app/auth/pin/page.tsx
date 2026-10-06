@@ -127,20 +127,9 @@ export default function PinPage() {
   // 2FA Login OTP Stage States on Access PIN screen
   const [is2faStage, setIs2faStage] = useState(false);
 
-  // Auto-trigger biometric authentication if enabled by user on app launch / PIN screen load
-  const hasAutoTriggeredBiometricRef = useRef(false);
-
-  useEffect(() => {
-    if (loading || !user || !userData) return;
-    if (is2faStage || showForgotPin || showFaceIdModal) return;
-
-    const isBiometricEnabled = userData?.isBiometricLoginEnabled === true || userData?.isFaceIdEnabled === true;
-
-    if (isBiometricEnabled && !hasAutoTriggeredBiometricRef.current) {
-      hasAutoTriggeredBiometricRef.current = true;
-      handleBiometricAuth();
-    }
-  }, [loading, user, userData, is2faStage, showForgotPin, showFaceIdModal]);
+  // Biometric login remains available through its explicit button.
+  // Do not launch the biometric unlock UI automatically when the app opens;
+  // users should see the normal PIN screen first.
   const [has2faOtpBeenSent, setHas2faOtpBeenSent] = useState(false);
   const [login2faChannel, setLogin2faChannel] = useState<"email" | "whatsapp">("email");
   const [login2faOtpDigits, setLogin2faOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
