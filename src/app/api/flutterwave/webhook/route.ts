@@ -57,11 +57,14 @@ export async function POST(req: Request) {
         const amount = Number(payload.data.amount || payload.amount || 0);
         const customerEmail = payload.data.customer?.email || payload.customer?.email || "";
 
-        if (amount > 0 && (txRef || flwId)) {
-          // Use unique provider transaction ID (flwId) as canonical docId so distinct deposits on permanent virtual accounts credit individually
-          const docId = flwId
-            ? `tx-FUNDING-flw-${flwId}`
-            : (txRef.startsWith("tx-FUNDING-") ? txRef : `tx-FUNDING-${txRef}`);
+        if (!flwId) {
+          console.warn(`[Webhook Proxy] [${reqId}] Missing unique provider transaction ID for txRef ${txRef}. Requiring manual reconciliation.`);
+          return;
+        }
+
+        if (amount > 0) {
+          // Canonical docId strictly uses unique provider transaction ID (flwId)
+          const docId = `tx-FUNDING-flw-${flwId}`;
 
           await adminDb.runTransaction(async (transaction) => {
             const txRefDoc = adminDb.collection("transactions").doc(docId);

@@ -140,13 +140,22 @@ export async function POST(req: Request) {
         data.totalCredited ?? data.fundedAmount ?? data.amount ?? data.data?.amount ?? 0
       );
 
+      if (!resolvedFlwId) {
+        console.warn(`[Verify Route] Unique provider transaction ID missing for txRef ${resolvedTxRef}. Requiring manual reconciliation.`);
+        return NextResponse.json({
+          ...data,
+          success: false,
+          credited: false,
+          reconciliationRequired: true,
+          error: "Unique provider transaction ID missing. Manual reconciliation required."
+        }, { status: 422 });
+      }
+
       if (resolvedAmount > 0) {
         try {
           const creditOutcome = await adminDb.runTransaction(async (transaction) => {
-            // Use unique provider transaction ID (resolvedFlwId) as canonical docId to ensure distinct deposits on permanent virtual accounts credit individually
-            const docId = resolvedFlwId
-              ? `tx-FUNDING-flw-${resolvedFlwId}`
-              : (resolvedTxRef.startsWith("tx-FUNDING-") ? resolvedTxRef : `tx-FUNDING-${resolvedTxRef}`);
+            // Canonical docId strictly uses unique provider transaction ID (flwId) to prevent permanent account tx_ref collision
+            const docId = `tx-FUNDING-flw-${resolvedFlwId}`;
 
             const txDocRef = adminDb.collection("transactions").doc(docId);
             const txDoc = await transaction.get(txDocRef);
