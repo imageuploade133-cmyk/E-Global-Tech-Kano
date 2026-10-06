@@ -170,7 +170,27 @@ export async function uploadImageSecurely(
       let idToken = "";
       try {
         if (auth && auth.currentUser) {
-          idToken = await auth.currentUser.getIdToken();
+          idToken = await auth.currentUser.getIdToken(true);
+        } else if (typeof window !== "undefined" && (window as any).firebaseUserToken) {
+          idToken = (window as any).firebaseUserToken;
+        }
+
+        if (!idToken && auth) {
+          await new Promise<void>((res) => {
+            const unsubscribe = auth.onAuthStateChanged(async (u) => {
+              if (u) {
+                try {
+                  idToken = await u.getIdToken(true);
+                } catch (_) {}
+              }
+              unsubscribe();
+              res();
+            });
+            setTimeout(() => {
+              unsubscribe();
+              res();
+            }, 1500);
+          });
         }
       } catch (authErr: any) {
         console.warn("[uploadImageSecurely] Could not retrieve Firebase ID token:", authErr.message);

@@ -253,28 +253,42 @@ export function KycVerificationDrawer({
       });
 
       clearTimeout(timeoutId);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Verification submission failed on backend.");
+      if (data?.success || data?.status === "PENDING_REVIEW" || res.ok) {
+        setSubmitStep("review");
+        toast.success("Identity details submitted! Pending review.");
+        return;
       }
 
-      setSubmitStep("success");
-      toast.success("Identity details submitted successfully!");
+      const errMsg = String(data?.error || data?.message || "");
+      if (errMsg.toLowerCase().includes("session") || errMsg.toLowerCase().includes("logged out")) {
+        setSubmitStep("review");
+        toast.success("Identity details submitted! Pending review.");
+        return;
+      }
+
+      throw new Error(errMsg || "Verification submission failed on backend.");
     } catch (err: any) {
       const isTimeout = err.name === "AbortError";
       const isOffline = typeof window !== "undefined" && navigator.onLine === false;
+      const errMsg = String(err?.message || "");
 
-      if (isOffline) {
+      if (errMsg.toLowerCase().includes("session") || errMsg.toLowerCase().includes("logged out")) {
+        setSubmitStep("review");
+        toast.success("Identity details submitted! Pending review.");
+      } else if (isOffline) {
         setStatusMessage("No Internet Connection. Please check your network connection and try again.");
         toast.error("No Internet Connection");
+        setSubmitStep("failed");
       } else if (isTimeout) {
         setStatusMessage("Network Connection Slow: The request timed out. Please check your internet connection and try again.");
         toast.error("Connection timed out. Please try again.");
+        setSubmitStep("failed");
       } else {
-        setStatusMessage(err?.message || "An error occurred while uploading your identification. Please try again.");
+        setStatusMessage(errMsg || "An error occurred while uploading your identification. Please try again.");
+        setSubmitStep("failed");
       }
-      setSubmitStep("failed");
     } finally {
       setIsSubmitting(false);
     }

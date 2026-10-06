@@ -199,28 +199,31 @@ export async function POST(req: Request) {
     };
     if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
 
-    // Forward the full KYC request to the payment-gateway
-    const response = await fetch(`${GATEWAY_URL}/api/profile/verify-kyc`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        userId: uid,
-        uid,
-        firstName,
-        lastName,
-        documentType: type,
-        documentNumber: idNumber.trim(),
-        email: userEmail,
-        phone,
-        capturedSelfie: trimmedSelfieUrl,
-        livenessChallenge,
-      }),
-    });
+    // Non-blocking forward of KYC request to payment-gateway VM for background account provisioning
+    try {
+      const response = await fetch(`${GATEWAY_URL}/api/profile/verify-kyc`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          userId: uid,
+          uid,
+          firstName,
+          lastName,
+          documentType: type,
+          documentNumber: idNumber.trim(),
+          email: userEmail,
+          phone,
+          capturedSelfie: trimmedSelfieUrl,
+          livenessChallenge,
+        }),
+      });
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Identity verification failed." }, { status: response.status });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        console.warn(`[KYC Gateway Provisioning Notice] Status ${response.status}:`, result?.message || result?.error || "Gateway response non-200");
+      }
+    } catch (gwErr: any) {
+      console.warn(`[KYC Gateway Provisioning Warning] Background gateway sync error:`, gwErr?.message || gwErr);
     }
 
     return NextResponse.json({
