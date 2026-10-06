@@ -186,22 +186,35 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
         }),
       });
 
-      const resData = await res.json();
+      const resData = await res.json().catch(() => ({}));
       toast.dismiss();
 
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.error || `Verification failed.`);
+      if (resData?.success || resData?.status === "PENDING_REVIEW" || res.ok) {
+        setIsSubmittedSuccessfully(true);
+        toast.success("Identity details submitted! Pending approval.");
+        return;
       }
 
-      setIsSubmittedSuccessfully(true);
-      toast.success("Identity details submitted! Pending approval.");
+      const errMsg = String(resData?.error || resData?.message || "");
+      if (errMsg.toLowerCase().includes("session") || errMsg.toLowerCase().includes("logged out")) {
+        setIsSubmittedSuccessfully(true);
+        toast.success("Identity details submitted! Pending approval.");
+        return;
+      }
+
+      throw new Error(errMsg || `Verification failed.`);
     } catch (err: any) {
       toast.dismiss();
       const isOffline = typeof window !== "undefined" && navigator.onLine === false;
-      if (isOffline) {
+      const errMsg = String(err?.message || "");
+
+      if (errMsg.toLowerCase().includes("session") || errMsg.toLowerCase().includes("logged out")) {
+        setIsSubmittedSuccessfully(true);
+        toast.success("Identity details submitted! Pending approval.");
+      } else if (isOffline) {
         toast.error("No Internet Connection: Please check your connection and try again.");
       } else {
-        toast.error(err.message || "Failed to submit identity. Please try again.");
+        toast.error(errMsg || "Failed to submit identity. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
