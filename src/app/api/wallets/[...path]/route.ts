@@ -360,8 +360,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         const userData = userSnap.data() || {};
         const isMock = uid === "mock-uid";
 
+        const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
         // Transaction PIN Verification
-        if (!pin) {
+        if (!isBiometricAuth && !pin) {
           throw new Error("Transaction PIN is required to authorize currency swap.");
         }
 
@@ -380,15 +382,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
 
         let isPinMatch = false;
         const isUserBiometricEnabled = userData.isBiometricTransferEnabled === true || userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
-        const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
 
         if (isBiometricAuth && isUserBiometricEnabled) {
           isPinMatch = true;
         } else if (isMock) {
-          isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-        } else if (pinHash) {
+          isPinMatch = (pin === "1234" || (Boolean(pin) && pin === currentPlainPin) || (pinHash && Boolean(pin) && bcrypt.compareSync(pin!, pinHash)));
+        } else if (pin && pinHash) {
           isPinMatch = bcrypt.compareSync(pin, pinHash);
-        } else if (currentPlainPin) {
+        } else if (pin && currentPlainPin) {
           isPinMatch = (pin === currentPlainPin);
         } else {
           throw new Error("No transaction PIN has been set up on this account.");

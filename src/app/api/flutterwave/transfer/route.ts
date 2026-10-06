@@ -78,6 +78,8 @@ export async function POST(req: Request) {
     const trfCurrency = currency ? String(currency).trim() : "NGN";
     const trfReference = reference ? String(reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
 
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
     // Validations
     const globalMinTransfer = await getGlobalMinTransferAmount();
     if (!trfAmount || isNaN(trfAmount) || trfAmount < globalMinTransfer) {
@@ -85,7 +87,7 @@ export async function POST(req: Request) {
         error: `Invalid transfer amount. The global minimum required transfer limit is ₦${globalMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`,
       }, { status: 400 });
     }
-    if (!trfAccount || !trfBank || !pin) {
+    if (!trfAccount || !trfBank || (!isBiometricReq && !pin)) {
       return NextResponse.json({ error: "Account number, bank, and transaction PIN are required." }, { status: 400 });
     }
 
@@ -216,10 +218,10 @@ export async function POST(req: Request) {
       if (isBiometricAuth && isUserBiometricEnabled) {
         isPinMatch = true;
       } else if (isMock) {
-        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-      } else if (pinHash) {
+        isPinMatch = (pin === "1234" || (Boolean(pin) && pin === currentPlainPin) || (pinHash && Boolean(pin) && bcrypt.compareSync(pin!, pinHash)));
+      } else if (pin && pinHash) {
         isPinMatch = bcrypt.compareSync(pin, pinHash);
-      } else if (currentPlainPin) {
+      } else if (pin && currentPlainPin) {
         isPinMatch = (pin === currentPlainPin);
       } else {
         return {
