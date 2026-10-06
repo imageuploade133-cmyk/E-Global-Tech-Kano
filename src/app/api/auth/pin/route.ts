@@ -27,12 +27,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { action, pin } = body;
+    const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
 
     if (!action || !["set", "verify", "reset"].includes(action)) {
       return NextResponse.json({ error: "Invalid action. Supported: set, verify, reset." }, { status: 400 });
     }
 
-    if (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin))) {
+    if (!isBiometricAuth && (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin)))) {
       return NextResponse.json({ error: "PIN must be a valid 4-digit numeric string." }, { status: 400 });
     }
 

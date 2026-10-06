@@ -68,8 +68,10 @@ export async function POST(req: Request) {
       walletType, // "MAIN" | "BONUS"
     } = body;
 
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
     // Validations
-    if (!biller_code || !item_code || !customer_id || !pin) {
+    if (!biller_code || !item_code || !customer_id || (!isBiometricReq && !pin)) {
       return NextResponse.json(
         { error: "Biller code, item code, customer identifier and your transaction PIN are required." },
         { status: 400 }

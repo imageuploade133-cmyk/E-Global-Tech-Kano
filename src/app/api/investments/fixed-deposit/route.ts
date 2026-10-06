@@ -33,8 +33,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Product specification (productId) is required." }, { status: 400 });
     }
 
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
     // PIN Verification
-    if (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin))) {
+    if (!isBiometricReq && (!pin || typeof pin !== "string" || pin.length !== 4 || isNaN(Number(pin)))) {
       return NextResponse.json({ error: "4-digit transaction PIN is required to authorize investment." }, { status: 400 });
     }
 

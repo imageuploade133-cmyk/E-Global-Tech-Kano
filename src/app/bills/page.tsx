@@ -629,7 +629,7 @@ export default function GenericBillPage() {
 
       const pinData = await pinVerifyRes.json();
       if (!pinVerifyRes.ok || !pinData.success) {
-        throw new Error(pinData.message || "Authorization failed. Please try again.");
+        throw new Error(pinData.error || pinData.message || "Authorization failed. Please try again.");
       }
 
       toast.loading("Processing your transaction with gateway...");

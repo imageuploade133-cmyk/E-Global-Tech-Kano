@@ -78,6 +78,8 @@ export async function POST(req: Request) {
     const trfCurrency = currency ? String(currency).trim() : "NGN";
     const trfReference = reference ? String(reference).trim() : `trf-${Date.now()}-${uid.slice(-6)}`;
 
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
     // Validations
     const globalMinTransfer = await getGlobalMinTransferAmount();
     if (!trfAmount || isNaN(trfAmount) || trfAmount < globalMinTransfer) {
@@ -85,7 +87,7 @@ export async function POST(req: Request) {
         error: `Invalid transfer amount. The global minimum required transfer limit is ₦${globalMinTransfer.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`,
       }, { status: 400 });
     }
-    if (!trfAccount || !trfBank || !pin) {
+    if (!trfAccount || !trfBank || (!isBiometricReq && !pin)) {
       return NextResponse.json({ error: "Account number, bank, and transaction PIN are required." }, { status: 400 });
     }
 

@@ -49,11 +49,13 @@ export async function POST(req: Request) {
 
     const trfRecipients = (recipients || bulk_data) as BulkRecipient[] | undefined;
 
+    const isBiometricReq = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
     // Validations
     if (!trfRecipients || !Array.isArray(trfRecipients) || trfRecipients.length === 0) {
       return NextResponse.json({ error: "A list of transfer recipients is required." }, { status: 400 });
     }
-    if (!pin) {
+    if (!isBiometricReq && !pin) {
       return NextResponse.json({ error: "Transaction PIN is required to authorize bulk transfers." }, { status: 400 });
     }
 

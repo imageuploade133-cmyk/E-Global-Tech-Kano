@@ -360,8 +360,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ path: s
         const userData = userSnap.data() || {};
         const isMock = uid === "mock-uid";
 
+        const isBiometricAuth = body.isBiometricAuthenticated === true || body.isBiometric === true;
+
         // Transaction PIN Verification
-        if (!pin) {
+        if (!isBiometricAuth && !pin) {
           throw new Error("Transaction PIN is required to authorize currency swap.");
         }
 
