@@ -17,7 +17,7 @@ import { ProfileHeaderSection } from "@/components/profile/ProfileHeaderSection"
 import { ReferralSection } from "@/components/profile/ReferralSection";
 import { KycStatusSection } from "@/components/profile/KycStatusSection";
 import { SecuritySettingsSection } from "@/components/profile/SecuritySettingsSection";
-import { registerBiometricCredential, getBiometricLabel } from "@/lib/biometrics-util";
+import { registerBiometricCredential, getBiometricLabel, authenticateBiometricDetailed } from "@/lib/biometrics-util";
 import { TransferLimitsSection } from "@/components/profile/TransferLimitsSection";
 import { ChangePinSection } from "@/components/profile/ChangePinSection";
 import { ChangePasswordSection } from "@/components/profile/ChangePasswordSection";
