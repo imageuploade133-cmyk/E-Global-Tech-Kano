@@ -246,15 +246,32 @@ export default function ProfilePage() {
 
       const bioLabel = getBiometricLabel();
       const targetState = !isBiometricLoginEnabled;
+
       if (targetState) {
-        toast.loading(`Touch sensor to verify ${bioLabel} credential...`);
-        const regResult = await registerBiometricCredential(userEmail);
+        triggerHaptic();
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate([100, 50, 100]);
+        }
+        toast.loading(`Scan ${bioLabel} sensor to authorize enablement...`);
+        const authRes = await authenticateBiometricDetailed(`Enable ${bioLabel} Login`);
         toast.dismiss();
+
+        if (!authRes.success) {
+          if (authRes.cancelled) {
+            toast.info(`${bioLabel} verification cancelled. Biometrics remained disabled.`);
+          } else {
+            toast.error(authRes.message || `${bioLabel} verification failed.`);
+          }
+          return false;
+        }
+
+        const regResult = await registerBiometricCredential(userEmail);
         if (!regResult.success) {
-          toast.error(regResult.message || `${bioLabel} registration failed or was cancelled.`);
+          toast.error(regResult.message || `${bioLabel} registration failed.`);
           return false;
         }
       }
+
       await updateUserData({ isBiometricLoginEnabled: targetState, isFaceIdEnabled: targetState });
       toast.success(targetState ? `${bioLabel} Login Enabled! 🔓` : `${bioLabel} Login Disabled`);
       return true;
@@ -288,15 +305,32 @@ export default function ProfilePage() {
 
       const bioLabel = getBiometricLabel();
       const targetState = !isBiometricTransferEnabled;
+
       if (targetState) {
-        toast.loading(`Touch sensor to verify ${bioLabel} credential...`);
-        const regResult = await registerBiometricCredential(userEmail);
+        triggerHaptic();
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate([100, 50, 100]);
+        }
+        toast.loading(`Scan ${bioLabel} sensor to authorize enablement...`);
+        const authRes = await authenticateBiometricDetailed(`Enable ${bioLabel} Transfers`);
         toast.dismiss();
+
+        if (!authRes.success) {
+          if (authRes.cancelled) {
+            toast.info(`${bioLabel} verification cancelled. Biometrics remained disabled.`);
+          } else {
+            toast.error(authRes.message || `${bioLabel} verification failed.`);
+          }
+          return false;
+        }
+
+        const regResult = await registerBiometricCredential(userEmail);
         if (!regResult.success) {
-          toast.error(regResult.message || `${bioLabel} registration failed or was cancelled.`);
+          toast.error(regResult.message || `${bioLabel} registration failed.`);
           return false;
         }
       }
+
       await updateUserData({ isBiometricTransferEnabled: targetState });
       toast.success(targetState ? `${bioLabel} Transfer Enabled! ⚡` : `${bioLabel} Transfer Disabled`);
       return true;
