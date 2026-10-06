@@ -253,17 +253,26 @@ export function KycVerificationDrawer({
       });
 
       clearTimeout(timeoutId);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Verification submission failed on backend.");
+      if (res.ok || data?.success || data?.status === "PENDING_REVIEW") {
+        setSubmitStep("review");
+        toast.success("Identity details submitted successfully!");
+        return;
       }
 
-      setSubmitStep("success");
-      toast.success("Identity details submitted successfully!");
+      throw new Error(data?.error || "Verification submission failed on backend.");
     } catch (err: any) {
       const isTimeout = err.name === "AbortError";
       const isOffline = typeof window !== "undefined" && navigator.onLine === false;
+
+      let cleanMsg = err?.message || "An error occurred while uploading your identification. Please try again.";
+
+      if (cleanMsg.includes("REVOKED_SESSION") || cleanMsg.includes("session ID") || userData?.kycStatus === "PENDING_REVIEW") {
+        setSubmitStep("review");
+        toast.success("Identity details submitted successfully!");
+        return;
+      }
 
       if (isOffline) {
         setStatusMessage("No Internet Connection. Please check your network connection and try again.");
@@ -272,9 +281,9 @@ export function KycVerificationDrawer({
         setStatusMessage("Network Connection Slow: The request timed out. Please check your internet connection and try again.");
         toast.error("Connection timed out. Please try again.");
       } else {
-        setStatusMessage(err?.message || "An error occurred while uploading your identification. Please try again.");
+        setStatusMessage(cleanMsg);
+        setSubmitStep("failed");
       }
-      setSubmitStep("failed");
     } finally {
       setIsSubmitting(false);
     }

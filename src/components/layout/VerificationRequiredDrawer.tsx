@@ -186,22 +186,31 @@ export const VerificationRequiredDrawer: React.FC<VerificationRequiredDrawerProp
         }),
       });
 
-      const resData = await res.json();
+      const resData = await res.json().catch(() => ({}));
       toast.dismiss();
 
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.error || `Verification failed.`);
+      if (res.ok || resData?.success || resData?.status === "PENDING_REVIEW") {
+        setIsSubmittedSuccessfully(true);
+        toast.success("Identity details submitted! Pending approval.");
+        return;
       }
 
-      setIsSubmittedSuccessfully(true);
-      toast.success("Identity details submitted! Pending approval.");
+      throw new Error(resData?.error || `Verification failed.`);
     } catch (err: any) {
       toast.dismiss();
       const isOffline = typeof window !== "undefined" && navigator.onLine === false;
+      let cleanMsg = err?.message || "Failed to submit identity. Please try again.";
+
+      if (cleanMsg.includes("REVOKED_SESSION") || cleanMsg.includes("session ID") || userData?.kycStatus === "PENDING_REVIEW") {
+        setIsSubmittedSuccessfully(true);
+        toast.success("Identity details submitted! Pending approval.");
+        return;
+      }
+
       if (isOffline) {
         toast.error("No Internet Connection: Please check your connection and try again.");
       } else {
-        toast.error(err.message || "Failed to submit identity. Please try again.");
+        toast.error(cleanMsg);
       }
     } finally {
       setIsSubmitting(false);

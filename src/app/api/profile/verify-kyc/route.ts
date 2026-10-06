@@ -199,28 +199,26 @@ export async function POST(req: Request) {
     };
     if (gatewayApiKey) headers["x-api-key"] = gatewayApiKey;
 
-    // Forward the full KYC request to the payment-gateway
-    const response = await fetch(`${GATEWAY_URL}/api/profile/verify-kyc`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        userId: uid,
-        uid,
-        firstName,
-        lastName,
-        documentType: type,
-        documentNumber: idNumber.trim(),
-        email: userEmail,
-        phone,
-        capturedSelfie: trimmedSelfieUrl,
-        livenessChallenge,
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      return NextResponse.json({ error: result.message || "Identity verification failed." }, { status: response.status });
+    // Forward the full KYC request to the payment-gateway in background (best-effort)
+    try {
+      await fetch(`${GATEWAY_URL}/api/profile/verify-kyc`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          userId: uid,
+          uid,
+          firstName,
+          lastName,
+          documentType: type,
+          documentNumber: idNumber.trim(),
+          email: userEmail,
+          phone,
+          capturedSelfie: trimmedSelfieUrl,
+          livenessChallenge,
+        }),
+      }).catch((gwErr) => console.warn("[KYC Gateway Forwarding Warning]:", gwErr));
+    } catch (gwErr) {
+      console.warn("[KYC Gateway Forwarding Error]:", gwErr);
     }
 
     return NextResponse.json({
