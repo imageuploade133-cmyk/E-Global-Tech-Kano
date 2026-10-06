@@ -46,4 +46,18 @@ describe("Platform-Aware Biometrics Suite", () => {
     const decoded = base64ToUint8Array(encoded);
     expect(decoded).toEqual(original);
   });
+
+  test("6. Auto-trigger decision helper correctly determines whether to launch biometrics on app launch", () => {
+    function shouldAutoTriggerBiometric(userData: { isBiometricLoginEnabled?: boolean; isFaceIdEnabled?: boolean } | null): boolean {
+      if (!userData) return false;
+      return userData.isBiometricLoginEnabled === true || userData.isFaceIdEnabled === true;
+    }
+
+    expect(shouldAutoTriggerBiometric({ isBiometricLoginEnabled: true })).toBe(true);
+    expect(shouldAutoTriggerBiometric({ isFaceIdEnabled: true })).toBe(true);
+    expect(shouldAutoTriggerBiometric({ isBiometricLoginEnabled: true, isFaceIdEnabled: true })).toBe(true);
+    expect(shouldAutoTriggerBiometric({ isBiometricLoginEnabled: false, isFaceIdEnabled: false })).toBe(false);
+    expect(shouldAutoTriggerBiometric({})).toBe(false);
+    expect(shouldAutoTriggerBiometric(null)).toBe(false);
+  });
 });
