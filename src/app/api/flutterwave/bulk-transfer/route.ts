@@ -136,10 +136,10 @@ export async function POST(req: Request) {
       if (isBiometricAuth && isUserBiometricEnabled) {
         isPinMatch = true;
       } else if (isMock) {
-        isPinMatch = (pin === "1234" || pin === currentPlainPin || (pinHash && bcrypt.compareSync(pin, pinHash)));
-      } else if (pinHash) {
+        isPinMatch = (pin === "1234" || (Boolean(pin) && pin === currentPlainPin) || (pinHash && Boolean(pin) && bcrypt.compareSync(pin!, pinHash)));
+      } else if (pin && pinHash) {
         isPinMatch = bcrypt.compareSync(pin, pinHash);
-      } else if (currentPlainPin) {
+      } else if (pin && currentPlainPin) {
         isPinMatch = (pin === currentPlainPin);
       } else {
         return {
