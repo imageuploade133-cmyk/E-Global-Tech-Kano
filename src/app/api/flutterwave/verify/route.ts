@@ -200,15 +200,13 @@ export async function POST(req: Request) {
 
           // Send FCM notification if newly credited
           if (!creditOutcome.alreadyCredited) {
-            NotificationService.sendPushNotification({
-              userId: authenticatedUser.uid,
+            NotificationService.sendPushNotification(authenticatedUser.uid, {
               title: "Wallet Funded Successfully",
               body: `Your wallet has been credited with ₦${resolvedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}.`,
-              data: {
-                type: "WALLET_FUNDING",
-                reference: resolvedTxRef,
-                amount: String(resolvedAmount),
-              }
+              type: "transaction",
+              reference: resolvedTxRef,
+              amount: resolvedAmount,
+              url: "/history",
             }).catch((notifErr) => console.warn("[Verify Route Notification Warning]:", notifErr.message));
           }
 

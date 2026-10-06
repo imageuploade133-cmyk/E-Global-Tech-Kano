@@ -124,15 +124,13 @@ export async function POST(req: Request) {
                 }
 
                 // Dispatch notification
-                NotificationService.sendPushNotification({
-                  userId: targetUid,
+                NotificationService.sendPushNotification(targetUid, {
                   title: "Wallet Funded Successfully",
                   body: `Your wallet has been credited with ₦${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}.`,
-                  data: {
-                    type: "WALLET_FUNDING",
-                    reference: txRef || `flw-${flwId}`,
-                    amount: String(amount),
-                  }
+                  type: "transaction",
+                  reference: txRef || `flw-${flwId}`,
+                  amount: amount,
+                  url: "/history",
                 }).catch((nErr) => console.warn(`[Webhook Notification Error] [${reqId}]:`, nErr.message));
               }
             }

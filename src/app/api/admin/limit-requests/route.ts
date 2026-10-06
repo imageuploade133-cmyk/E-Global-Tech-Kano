@@ -4,6 +4,45 @@ import { requireAdminPermission } from "@/lib/admin-permissions";
 import { NotificationService } from "@/services/notification-service";
 import { WalletService } from "@/services/wallet-service";
 
+async function resolveTierLimits(assignedTier: string, customDaily?: number, customSingle?: number) {
+  let appData: Record<string, any> = {};
+  try {
+    const appDoc = await adminDb.collection("config").doc("app").get();
+    if (appDoc.exists) {
+      appData = appDoc.data() || {};
+    }
+  } catch (err: any) {
+    console.warn("[Resolve Tier Limits Warning]:", err.message);
+  }
+
+  let defaultDaily = 500000;
+  let defaultSingle = 200000;
+
+  if (assignedTier === "Tier 3") {
+    defaultDaily = Number(appData.tier3DailyTransferLimit ?? appData.tier3DailyLimit ?? 50000000);
+    defaultSingle = Number(appData.tier3SingleTransferLimit ?? appData.tier3SingleLimit ?? 10000000);
+  } else if (assignedTier === "Tier 2") {
+    defaultDaily = Number(appData.tier2DailyTransferLimit ?? appData.tier2DailyLimit ?? 5000000);
+    defaultSingle = Number(appData.tier2SingleTransferLimit ?? appData.tier2SingleLimit ?? 2000000);
+  } else {
+    defaultDaily = Number(appData.tier1DailyTransferLimit ?? appData.tier1DailyLimit ?? 500000);
+    defaultSingle = Number(appData.tier1SingleTransferLimit ?? appData.tier1SingleLimit ?? 200000);
+  }
+
+  const hasCustomDaily = typeof customDaily === "number" && customDaily > 0 && customDaily !== defaultDaily;
+  const hasCustomSingle = typeof customSingle === "number" && customSingle > 0 && customSingle !== defaultSingle;
+  const isCustom = hasCustomDaily || hasCustomSingle;
+
+  const finalDaily = typeof customDaily === "number" && customDaily > 0 ? customDaily : defaultDaily;
+  const finalSingle = typeof customSingle === "number" && customSingle > 0 ? customSingle : defaultSingle;
+
+  return {
+    dailyLimit: finalDaily,
+    singleLimit: finalSingle,
+    hasCustomLimits: isCustom,
+  };
+}
+
 async function autoReleaseUserHeldDeposits(userId: string, adminEmail: string) {
   try {
     const heldSnap = await adminDb.collection("transactions")
@@ -135,30 +174,45 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
 
     if (action === "approve") {
-      const numDaily = Number(dailyLimit) || (assignedTier === "Tier 3" ? 50000000 : assignedTier === "Tier 2" ? 5000000 : 500000);
-      const numSingle = Number(singleLimit) || (assignedTier === "Tier 3" ? 10000000 : assignedTier === "Tier 2" ? 2000000 : 200000);
+      const customDaily = dailyLimit !== undefined && dailyLimit !== null && dailyLimit !== "" ? Number(dailyLimit) : undefined;
+      const customSingle = singleLimit !== undefined && singleLimit !== null && singleLimit !== "" ? Number(singleLimit) : undefined;
+
+      const limits = await resolveTierLimits(assignedTier, customDaily, customSingle);
 
       // Update upgrade request document
       await adminDb.collection("tier_upgrade_requests").doc(userId).set({
         status: "APPROVED",
         assignedTier,
-        dailyLimit: numDaily,
-        singleLimit: numSingle,
+        dailyLimit: limits.dailyLimit,
+        singleLimit: limits.singleLimit,
+        hasCustomLimits: limits.hasCustomLimits,
         approvedAt: nowIso,
         approvedBy: adminEmail,
         updatedAt: nowIso,
       }, { merge: true });
 
-      // Update user document
+      // Update user document globally
       await adminDb.collection("users").doc(userId).set({
         tier: assignedTier,
-        dailyLimit: numDaily,
-        dailyTransferLimit: numDaily,
-        singleLimit: numSingle,
-        maxSingleTransferLimit: numSingle,
-        hasCustomLimits: true,
+        dailyLimit: limits.dailyLimit,
+        dailyTransferLimit: limits.dailyLimit,
+        singleLimit: limits.singleLimit,
+        maxSingleTransferLimit: limits.singleLimit,
+        hasCustomLimits: limits.hasCustomLimits,
         limitUpdatedAt: nowIso,
         limitUpdatedBy: adminEmail,
+        updatedAt: nowIso,
+      }, { merge: true });
+
+      // Update wallet document globally so limits stay 100% in sync
+      await adminDb.collection("wallets").doc(`${userId}_NGN`).set({
+        tier: assignedTier,
+        dailyLimit: limits.dailyLimit,
+        dailyTransferLimit: limits.dailyLimit,
+        singleLimit: limits.singleLimit,
+        maxSingleTransferLimit: limits.singleLimit,
+        hasCustomLimits: limits.hasCustomLimits,
+        updatedAt: nowIso,
       }, { merge: true });
 
       // Auto-release any pending held deposits for this user now that tier limits are upgraded
@@ -167,14 +221,14 @@ export async function POST(req: Request) {
       // Dispatch push notification
       await NotificationService.sendPushNotification(userId, {
         title: "🎉 Tier Upgrade Approved!",
-        body: `Congratulations! Your account has been upgraded to ${assignedTier}. Your new daily limit is ₦${numDaily.toLocaleString("en-NG")}.`,
+        body: `Congratulations! Your account has been upgraded to ${assignedTier}. Your new daily limit is ₦${limits.dailyLimit.toLocaleString("en-NG")}.`,
         type: "system",
         url: "/profile",
       });
 
       return NextResponse.json({
         success: true,
-        message: `Limit upgrade approved successfully! User set to ${assignedTier} with ₦${numDaily.toLocaleString("en-NG")} daily limit.`,
+        message: `Limit upgrade approved successfully! User set to ${assignedTier} with ₦${limits.dailyLimit.toLocaleString("en-NG")} daily limit.`,
       });
     } else if (action === "reject") {
       await adminDb.collection("tier_upgrade_requests").doc(userId).set({
