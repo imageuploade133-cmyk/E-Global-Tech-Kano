@@ -566,6 +566,8 @@ export async function POST(req: Request) {
 
       try {
         const batch = adminDb.batch();
+
+        // Delete wallet docs by query
         const walletsQuery = await adminDb.collection("wallets")
           .where("userId", "==", targetUid)
           .get();
@@ -573,12 +575,19 @@ export async function POST(req: Request) {
           batch.delete(doc.ref);
         });
 
+        // Delete explicit multi-currency wallet doc IDs
+        batch.delete(adminDb.collection("wallets").doc(`${targetUid}_NGN`));
+        batch.delete(adminDb.collection("wallets").doc(`${targetUid}_USD`));
+        batch.delete(adminDb.collection("wallets").doc(`${targetUid}_XOF`));
+
+        // Delete kyc_submissions
         const subQuery = await adminDb.collection("kyc_submissions")
           .where("userId", "==", targetUid)
           .get();
         subQuery.forEach(doc => {
           batch.delete(doc.ref);
         });
+        batch.delete(adminDb.collection("kyc_submissions").doc(targetUid));
 
         await batch.commit();
       } catch (colErr: any) {

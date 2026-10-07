@@ -614,7 +614,7 @@ function CpanelKycPageContent() {
                             onClick: () => handleProcessKyc(u.uid, "reject"),
                           },
                           {
-                            label: "Delete User",
+                            label: "Delete Unverified User",
                             icon: "delete_forever",
                             variant: "danger",
                             disabled: u.kycStatus !== "UNVERIFIED",
@@ -622,6 +622,17 @@ function CpanelKycPageContent() {
                           },
                         ]}
                       />
+
+                      {u.kycStatus === "UNVERIFIED" && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUnverifiedUser(u.uid, u.name)}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                          <span>Delete Unverified User</span>
+                        </button>
+                      )}
                     </div>
 
                     {u.kycStatus !== "REJECTED" && u.kycStatus !== "VERIFIED" && u.kycStatus !== "UNVERIFIED" && (
@@ -755,23 +766,41 @@ function CpanelKycPageContent() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={() => {
-                  openEditingModal(inspectingUser);
-                }}
-                className="px-4 py-2 bg-[#FC7A00] text-white text-xs font-bold uppercase rounded-xl hover:bg-[#e06c00] transition-all"
-              >
-                Edit KYC Information
-              </button>
-              <button
-                type="button"
-                onClick={() => setInspectingUser(null)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all"
-              >
-                Close
-              </button>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-800 flex-wrap">
+              {inspectingUser.kycStatus === "UNVERIFIED" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetUid = inspectingUser.uid;
+                    const name = inspectingUser.name;
+                    handleDeleteUnverifiedUser(targetUid, name);
+                  }}
+                  className="px-4 py-2 bg-rose-600 text-white text-xs font-extrabold uppercase rounded-xl hover:bg-rose-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                  <span>Delete Unverified User</span>
+                </button>
+              ) : (
+                <div />
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    openEditingModal(inspectingUser);
+                  }}
+                  className="px-4 py-2 bg-[#FC7A00] text-white text-xs font-bold uppercase rounded-xl hover:bg-[#e06c00] transition-all cursor-pointer"
+                >
+                  Edit KYC Information
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectingUser(null)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
