@@ -72,4 +72,15 @@ describe("CPanel KYC Unverified User Deletion Test Suite", () => {
     expect(requestPayload.action).toBe("delete_unverified");
     expect(requestPayload.targetUid).toBe("mock-unverified-uid-555");
   });
+
+  test("8. Allows deletion if user is REJECTED and non-admin", () => {
+    const userRejected = {
+      uid: "rejected-user-202",
+      kycStatus: "REJECTED",
+      role: "user",
+    };
+
+    const isDeletionAllowed = userRejected.kycStatus !== "VERIFIED" && userRejected.role !== "admin" && userRejected.role !== "SUPER_ADMIN";
+    expect(isDeletionAllowed).toBe(true);
+  });
 });

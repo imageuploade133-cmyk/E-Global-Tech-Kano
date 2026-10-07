@@ -608,7 +608,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: "Unverified user profile and associated data permanently purged from the server."
+        message: "User profile and associated data permanently purged from the server."
       });
 
     } else {
