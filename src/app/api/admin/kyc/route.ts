@@ -410,7 +410,9 @@ export async function POST(req: Request) {
 
       // Update user and wallet documents in Firestore globally with approved Tier level and limits
       const adminEmail = perm.auth?.email || "admin@system";
-      const userUpdatePayload = {
+      const customBalance = requestBody.balance !== undefined && requestBody.balance !== null && requestBody.balance !== "" ? Number(requestBody.balance) : undefined;
+
+      const userUpdatePayload: Record<string, any> = {
         tier: assignedTier,
         dailyLimit: limits.dailyLimit,
         dailyTransferLimit: limits.dailyLimit,
@@ -425,9 +427,13 @@ export async function POST(req: Request) {
         updatedAt: new Date().toISOString(),
       };
 
+      if (typeof customBalance === "number" && !isNaN(customBalance) && customBalance >= 0) {
+        userUpdatePayload.balance = customBalance;
+      }
+
       await adminDb.collection("users").doc(targetUid).set(userUpdatePayload, { merge: true });
 
-      await adminDb.collection("wallets").doc(`${targetUid}_NGN`).set({
+      const walletUpdatePayload: Record<string, any> = {
         tier: assignedTier,
         dailyLimit: limits.dailyLimit,
         dailyTransferLimit: limits.dailyLimit,
@@ -437,7 +443,13 @@ export async function POST(req: Request) {
         maxAccountBalance: limits.maxBalance,
         hasCustomLimits: limits.hasCustomLimits,
         updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      };
+
+      if (typeof customBalance === "number" && !isNaN(customBalance) && customBalance >= 0) {
+        walletUpdatePayload.balance = customBalance;
+      }
+
+      await adminDb.collection("wallets").doc(`${targetUid}_NGN`).set(walletUpdatePayload, { merge: true });
 
       // Auto-release any pending held deposits for this user now that KYC is approved
       await autoReleaseUserHeldDeposits(targetUid, adminEmail);

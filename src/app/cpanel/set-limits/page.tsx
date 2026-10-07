@@ -55,6 +55,7 @@ function SetLimitsPageContent() {
 
   const [approveProvider, setApproveProvider] = useState<"flutterwave" | "squad">("flutterwave");
   const [approveTier, setApproveTier] = useState<"Tier 1" | "Tier 2" | "Tier 3">("Tier 2");
+  const [approveUserBalance, setApproveUserBalance] = useState<number>(0);
   const [approveMaxBalance, setApproveMaxBalance] = useState<number>(5000000);
   const [approveDailyLimit, setApproveDailyLimit] = useState<number>(5000000);
   const [approveSingleLimit, setApproveSingleLimit] = useState<number>(2000000);
@@ -141,6 +142,11 @@ function SetLimitsPageContent() {
     }
   };
 
+  const handleSelectUserAccount = (u: SearchedUser) => {
+    setSelectedUser(u);
+    setApproveUserBalance(Number(u.balance) || 0);
+  };
+
   const handleApproveKycAndLimits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) {
@@ -160,6 +166,7 @@ function SetLimitsPageContent() {
           targetUid: selectedUser.uid,
           provider: approveProvider,
           tier: approveTier,
+          balance: approveUserBalance,
           dailyLimit: approveDailyLimit,
           singleLimit: approveSingleLimit,
           maxBalance: approveMaxBalance,
@@ -287,6 +294,191 @@ function SetLimitsPageContent() {
               <span>Account Limits Manager</span>
             </Link>
           </div>
+        </div>
+
+        {/* Dedicated Section: APPROVE KYC & SET LIMITS Workspace */}
+        <div className={cn("p-6 rounded-2xl border space-y-5", panelClass)}>
+          <div className="flex items-center justify-between border-b pb-3 border-gray-200/40 dark:border-gray-800 flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-emerald-500 text-[24px]">verified</span>
+              <div>
+                <h2 className="font-extrabold text-base uppercase tracking-tight">APPROVE KYC &amp; SET LIMITS</h2>
+                <p className="text-xs text-gray-400 font-medium">Search customer account, assign Tier level, set wallet available balance, and configure transfer limits.</p>
+              </div>
+            </div>
+            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-black uppercase rounded-full">
+              Quick Manager
+            </span>
+          </div>
+
+          {!selectedUser ? (
+            <div className="space-y-4 text-xs">
+              <form onSubmit={handleSearchUsers} className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Search Customer Account *</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by Full Name, Email, Phone, or BVN..."
+                    className={inputClass}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearchingUsers}
+                    className="px-5 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    {isSearchingUsers ? <ButtonSpinner /> : <span className="material-symbols-outlined text-[18px]">search</span>}
+                    <span>Search</span>
+                  </button>
+                </div>
+              </form>
+
+              {searchResults.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Matching Accounts ({searchResults.length})</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+                    {searchResults.map((u) => (
+                      <div
+                        key={u.uid}
+                        onClick={() => handleSelectUserAccount(u)}
+                        className={cn(
+                          "p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all hover:border-emerald-500",
+                          isDark ? "bg-gray-800/80 border-gray-700 hover:bg-gray-800" : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                        )}
+                      >
+                        <div>
+                          <p className="font-extrabold text-sm uppercase text-gray-900 dark:text-white">{u.name}</p>
+                          <p className="font-mono text-[11px] text-gray-400">{u.email} • {u.phoneNumber}</p>
+                          <p className="text-[10px] font-bold text-emerald-500 mt-0.5">Balance: ₦{(u.balance || 0).toLocaleString("en-NG")}</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-xl"
+                        >
+                          Select
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleApproveKycAndLimits} className="space-y-4 text-xs">
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-emerald-500">Selected Customer</span>
+                  <p className="font-extrabold text-base text-gray-900 dark:text-white">{selectedUser.name}</p>
+                  <p className="font-mono text-xs text-gray-400">{selectedUser.email} • {selectedUser.phoneNumber}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(null)}
+                  className="px-3 py-1.5 text-xs font-black uppercase tracking-wider text-rose-500 border border-rose-500/30 rounded-xl hover:bg-rose-500/10 cursor-pointer"
+                >
+                  Change User
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">ASSIGN TIER LEVEL *</label>
+                  <select
+                    value={approveTier}
+                    onChange={(e) => handleSelectTierForUser(e.target.value as any)}
+                    className={cn(inputClass, "cursor-pointer font-bold")}
+                  >
+                    <option value="Tier 1">Tier 1 (Basic Tier)</option>
+                    <option value="Tier 2">Tier 2 (Verified Tier)</option>
+                    <option value="Tier 3">Tier 3 (Premium Tier)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Virtual Account Gateway Rail *</label>
+                  <select
+                    value={approveProvider}
+                    onChange={(e) => setApproveProvider(e.target.value as any)}
+                    className={cn(inputClass, "cursor-pointer font-bold")}
+                  >
+                    <option value="flutterwave">Flutterwave Gateway Rail</option>
+                    <option value="squad">Squadco (GTBank) Virtual Account Rail</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">User Available Balance (₦) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={approveUserBalance}
+                    onChange={(e) => setApproveUserBalance(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Maximum Tier Balance Cap (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={100000}
+                    value={approveMaxBalance}
+                    onChange={(e) => setApproveMaxBalance(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Daily Transfer Limit (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={100000}
+                    value={approveDailyLimit}
+                    onChange={(e) => setApproveDailyLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">Single Transfer Limit (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min={50000}
+                    value={approveSingleLimit}
+                    onChange={(e) => setApproveSingleLimit(Number(e.target.value))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(null)}
+                  disabled={isApprovingKyc}
+                  className="px-4 py-2.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold uppercase rounded-xl hover:bg-gray-300 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isApprovingKyc}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isApprovingKyc && <ButtonSpinner />}
+                  <span>Approve KYC &amp; Set Limits</span>
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         <form onSubmit={handleSaveLimits} className="space-y-6">
@@ -667,17 +859,31 @@ function SetLimitsPageContent() {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-extrabold uppercase text-gray-400">Assign Tier Level *</label>
-                  <select
-                    value={approveTier}
-                    onChange={(e) => handleSelectTierForUser(e.target.value as any)}
-                    className={cn(inputClass, "cursor-pointer font-bold")}
-                  >
-                    <option value="Tier 1">Tier 1 (Basic Tier)</option>
-                    <option value="Tier 2">Tier 2 (Verified Tier)</option>
-                    <option value="Tier 3">Tier 3 (Premium Tier)</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-extrabold uppercase text-gray-400">Assign Tier Level *</label>
+                    <select
+                      value={approveTier}
+                      onChange={(e) => handleSelectTierForUser(e.target.value as any)}
+                      className={cn(inputClass, "cursor-pointer font-bold")}
+                    >
+                      <option value="Tier 1">Tier 1 (Basic Tier)</option>
+                      <option value="Tier 2">Tier 2 (Verified Tier)</option>
+                      <option value="Tier 3">Tier 3 (Premium Tier)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-extrabold uppercase text-gray-400">User Available Balance (₦) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={approveUserBalance}
+                      onChange={(e) => setApproveUserBalance(Number(e.target.value))}
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">

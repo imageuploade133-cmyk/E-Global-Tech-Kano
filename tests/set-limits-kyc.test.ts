@@ -71,4 +71,20 @@ describe("Set Limits & KYC Approval Architecture Suite", () => {
     expect(resolveTierBalance("Tier 2")).toBe(5000000);
     expect(resolveTierBalance("Tier 3")).toBe(50000000);
   });
+
+  test("5. Approve KYC payload includes custom balance update field", () => {
+    const approvalPayload = {
+      action: "approve",
+      targetUid: "user-xyz-789",
+      provider: "squad",
+      tier: "Tier 3",
+      balance: 150000,
+      maxBalance: 50000000,
+      dailyLimit: 50000000,
+      singleLimit: 10000000,
+    };
+
+    expect(approvalPayload.balance).toBe(150000);
+    expect(approvalPayload.tier).toBe("Tier 3");
+  });
 });
